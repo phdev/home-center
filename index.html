@@ -5093,16 +5093,37 @@ function _slsUpdateEndpointInfo() {
   }
 }
 
+// Try proxy, fall back to direct with API key from pod config
+async function _runpodFetch(url, opts) {
+  try {
+    var res = await proxiedFetch(url, opts);
+    if (res.status === 404) {
+      var body = await res.text();
+      if (body === 'Not found') throw new Error('Proxy route not found');
+      // Reconstruct response since we consumed the body
+      return new Response(body, { status: res.status, statusText: res.statusText, headers: res.headers });
+    }
+    return res;
+  } catch (proxyErr) {
+    _slsLogApi('PROXY FAILED', proxyErr.message + ' — trying direct with API key');
+    var rpKeyEl = document.getElementById('runpod-apikey');
+    var rpKey = rpKeyEl ? rpKeyEl.value.trim() : '';
+    if (!rpKey || rpKey === 'proxy-managed') throw new Error('Worker proxy failed (' + proxyErr.message + '). Switch to Pod mode and enter your RunPod API key, or redeploy the worker (cd worker && wrangler deploy)');
+    var h = Object.assign({}, opts.headers || {}, { 'Authorization': 'Bearer ' + rpKey });
+    return fetch(url, Object.assign({}, opts, { headers: h }));
+  }
+}
+
 async function _serverlessApi(method, path, body) {
   var opts = { method: method, headers: { 'Content-Type': 'application/json' } };
   if (body) opts.body = JSON.stringify(body);
-  return proxiedFetch('https://api.runpod.ai/v2' + path, opts);
+  return _runpodFetch('https://api.runpod.ai/v2' + path, opts);
 }
 
 async function _runpodGql(query, variables) {
   var reqBody = { query: query, variables: variables || {} };
   _slsLogApi('GQL REQUEST', { query: query.replace(/\s+/g, ' ').trim(), variables: variables });
-  var res = await proxiedFetch('https://api.runpod.io/graphql', {
+  var res = await _runpodFetch('https://api.runpod.io/graphql', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(reqBody)
