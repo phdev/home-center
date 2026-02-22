@@ -4728,27 +4728,36 @@ async function _buildTrainingFrames(prog) {
     }
   }
 
+  // Cap frame resolution to 512px max dimension — sufficient for splatfacto training
+  // and keeps memory reasonable on Safari/mobile
+  var _MAX_FRAME_DIM = 512;
+  var fw = cp.w, fh = cp.h;
+  if (Math.max(fw, fh) > _MAX_FRAME_DIM) {
+    var s = _MAX_FRAME_DIM / Math.max(fw, fh);
+    fw = Math.round(fw * s); fh = Math.round(fh * s);
+  }
+
   // Extract frames
   var canvas = document.createElement('canvas');
-  canvas.width = cp.w; canvas.height = cp.h;
+  canvas.width = fw; canvas.height = fh;
   var ctx = canvas.getContext('2d');
   var frames = [];
 
   for (var i = 0; i < extractList.length; i++) {
-    if (i % 10 === 0) prog('Extracting frame ' + (i + 1) + ' / ' + extractList.length);
+    if (i % 10 === 0) prog('Extracting frame ' + (i + 1) + ' / ' + extractList.length + ' (' + fw + 'x' + fh + ')');
     video.currentTime = Math.min(extractList[i].time, vidDuration - 0.01);
     await new Promise(function(r) { video.onseeked = r; });
-    ctx.drawImage(video, 0, 0, cp.w, cp.h);
-    // Use JPEG for smaller upload size
-    var dataUrl = canvas.toDataURL('image/jpeg', 0.92);
+    ctx.drawImage(video, 0, 0, fw, fh);
+    var dataUrl = canvas.toDataURL('image/jpeg', 0.85);
     var b64 = dataUrl.split(',')[1];
     frames.push({ name: 'frame_' + String(i).padStart(5, '0') + '.jpg', b64: b64, elements: extractList[i].elements });
     if (i % 4 === 0) await new Promise(function(r) { setTimeout(r, 0); });
   }
 
   URL.revokeObjectURL(blobUrl);
+  video.src = ''; video.load(); // release video memory
 
-  var transforms = _buildTransformsJson(frames.map(function(f) { return { elements: f.elements }; }), cp.w, cp.h, cp.fov);
+  var transforms = _buildTransformsJson(frames.map(function(f) { return { elements: f.elements }; }), fw, fh, cp.fov);
   // Fix file paths to use .jpg
   for (var i = 0; i < transforms.frames.length; i++) {
     transforms.frames[i].file_path = 'images/' + frames[i].name;
@@ -4889,16 +4898,22 @@ async function runpodTrain() {
     // Upload transforms.json
     await _jupyterPut(podId, token, 'data/transforms.json', JSON.stringify(data.transforms, null, 2));
 
-    // Upload frames in parallel batches of 8
+    // Upload frames in parallel batches of 8, freeing each after upload
     var batchSize = 8;
-    for (var bi = 0; bi < data.frames.length; bi += batchSize) {
+    var totalFrames = data.frames.length;
+    for (var bi = 0; bi < totalFrames; bi += batchSize) {
       var batch = data.frames.slice(bi, bi + batchSize);
       await Promise.all(batch.map(function(f) {
         return _jupyterPut(podId, token, 'data/images/' + f.name, f.b64);
       }));
-      var pct = Math.round(Math.min(bi + batchSize, data.frames.length) / data.frames.length * 100);
-      updateProg('Uploading frames... ' + pct + '% (' + Math.min(bi + batchSize, data.frames.length) + '/' + data.frames.length + ')');
+      // Free uploaded frames to reduce memory pressure
+      for (var fi = bi; fi < Math.min(bi + batchSize, totalFrames); fi++) {
+        data.frames[fi].b64 = null;
+      }
+      var pct = Math.round(Math.min(bi + batchSize, totalFrames) / totalFrames * 100);
+      updateProg('Uploading frames... ' + pct + '% (' + Math.min(bi + batchSize, totalFrames) + '/' + totalFrames + ')');
     }
+    data.frames = null; data = null; // free remaining references
 
     // --- Phase 6: Upload and start training script ---
     var trainScript = [
@@ -5289,70 +5304,75 @@ async function runpodServerlessTrain() {
         sampled.push(data.frames[Math.round(si * step)]);
       }
       data.frames = sampled;
-      // Rebuild transforms for subsampled frames
+      // Rebuild transforms for subsampled frames (use actual frame dims from transforms)
+      var tw = data.transforms.w || _flyCamParams.w;
+      var th = data.transforms.h || _flyCamParams.h;
       data.transforms = _buildTransformsJson(
         data.frames.map(function(f) { return { elements: f.elements }; }),
-        _flyCamParams.w, _flyCamParams.h, _flyCamParams.fov
+        tw, th, _flyCamParams.fov
       );
       for (var fi = 0; fi < data.transforms.frames.length; fi++) {
         data.transforms.frames[fi].file_path = 'images/' + data.frames[fi].name;
       }
     }
 
-    // --- Phase 3: Downscale frames to fit RunPod 10MB payload limit ---
+    // --- Phase 3: Check payload size, further downscale if still over 10MB ---
     var _SLS_MAX_PAYLOAD = 9.5 * 1024 * 1024; // stay under 10MiB with margin
     var framesList = data.frames.map(function(f) { return { name: f.name, b64: f.b64 }; });
     var payloadSize = JSON.stringify({ input: { frames: framesList } }).length;
     updateProg('Extracted ' + data.frames.length + ' frames (' + (payloadSize / 1e6).toFixed(1) + 'MB)...');
     if (payloadSize > _SLS_MAX_PAYLOAD) {
-      updateProg('Payload ' + (payloadSize / 1e6).toFixed(1) + 'MB exceeds 10MB limit. Downscaling frames...');
-      var scale = Math.sqrt(_SLS_MAX_PAYLOAD / payloadSize) * 0.9; // target ~90% of limit
-      var newW = Math.round(_flyCamParams.w * scale);
-      var newH = Math.round(_flyCamParams.h * scale);
-      newW = Math.max(newW, 128); newH = Math.max(newH, 128);
+      // Still too large even after 512px cap — re-encode at lower quality
+      updateProg('Payload ' + (payloadSize / 1e6).toFixed(1) + 'MB exceeds 10MB. Re-encoding at lower quality...');
       var dsCanvas = document.createElement('canvas');
-      dsCanvas.width = newW; dsCanvas.height = newH;
-      var dsCtx = dsCanvas.getContext('2d');
       var tmpImg = new Image();
-      for (var di = 0; di < data.frames.length; di++) {
-        if (di % 10 === 0) updateProg('Downscaling frame ' + (di + 1) + '/' + data.frames.length + ' to ' + newW + 'x' + newH + '...');
-        await new Promise(function(resolve) {
-          tmpImg.onload = resolve;
-          tmpImg.src = 'data:image/jpeg;base64,' + data.frames[di].b64;
-        });
-        dsCtx.drawImage(tmpImg, 0, 0, newW, newH);
-        data.frames[di].b64 = dsCanvas.toDataURL('image/jpeg', 0.80).split(',')[1];
-        if (di % 4 === 0) await new Promise(function(r) { setTimeout(r, 0); });
+      // Try progressively lower quality until it fits
+      var qualities = [0.65, 0.50, 0.35];
+      for (var qi = 0; qi < qualities.length; qi++) {
+        var q = qualities[qi];
+        for (var di = 0; di < data.frames.length; di++) {
+          if (di % 10 === 0) updateProg('Re-encoding frame ' + (di + 1) + '/' + data.frames.length + ' (q=' + q + ')...');
+          await new Promise(function(resolve) {
+            tmpImg.onload = resolve;
+            tmpImg.src = 'data:image/jpeg;base64,' + data.frames[di].b64;
+          });
+          dsCanvas.width = tmpImg.naturalWidth; dsCanvas.height = tmpImg.naturalHeight;
+          dsCanvas.getContext('2d').drawImage(tmpImg, 0, 0);
+          data.frames[di].b64 = dsCanvas.toDataURL('image/jpeg', q).split(',')[1];
+          if (di % 4 === 0) await new Promise(function(r) { setTimeout(r, 0); });
+        }
+        framesList = data.frames.map(function(f) { return { name: f.name, b64: f.b64 }; });
+        payloadSize = JSON.stringify({ input: { frames: framesList } }).length;
+        if (payloadSize <= _SLS_MAX_PAYLOAD) break;
       }
-      // Rebuild transforms with new dimensions
-      data.transforms = _buildTransformsJson(
-        data.frames.map(function(f) { return { elements: f.elements }; }),
-        newW, newH, _flyCamParams.fov
-      );
-      for (var fi = 0; fi < data.transforms.frames.length; fi++) {
-        data.transforms.frames[fi].file_path = 'images/' + data.frames[fi].name;
-      }
-      framesList = data.frames.map(function(f) { return { name: f.name, b64: f.b64 }; });
-      payloadSize = JSON.stringify({ input: { frames: framesList } }).length;
-      updateProg('Downscaled to ' + newW + 'x' + newH + ' (' + (payloadSize / 1e6).toFixed(1) + 'MB). Submitting...');
+      updateProg('Re-encoded (' + (payloadSize / 1e6).toFixed(1) + 'MB). Submitting...');
     } else {
       updateProg('Payload fits (' + (payloadSize / 1e6).toFixed(1) + 'MB). Submitting serverless job...');
     }
 
-    // Build final payload
-    var payload = {
+    // Build final payload — stringify immediately so we can free object references
+    var nFrames = framesList.length;
+    var bodyStr = JSON.stringify({
       input: {
         action: 'train_3dgs',
         iterations: iterations,
         transforms: data.transforms,
         frames: framesList
       }
-    };
+    });
+    // Free all frame data now — only the JSON string remains
+    data.frames.length = 0; data.frames = null; data = null;
+    framesList.length = 0; framesList = null;
 
     // --- Phase 4: Submit to serverless endpoint ---
     _serverlessState.phase = 'submitting';
-    _slsLogApi('SUBMIT POST /' + endpointId + '/run', { frames: data.frames.length + ' frames', iterations: iterations });
-    var submitRes = await _serverlessApi('POST', '/' + endpointId + '/run', payload);
+    _slsLogApi('SUBMIT POST /' + endpointId + '/run', { frames: nFrames + ' frames', bodyMB: (bodyStr.length / 1e6).toFixed(1), iterations: iterations });
+    var submitRes = await proxiedFetch('https://api.runpod.ai/v2/' + endpointId + '/run', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: bodyStr
+    });
+    bodyStr = null; // free the JSON string after fetch consumes it
     var submitText = await submitRes.text();
     var submitData;
     try { submitData = JSON.parse(submitText); } catch(e) { submitData = submitText; }
