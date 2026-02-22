@@ -3875,10 +3875,10 @@ if (_rpKeyEl) {
     else localStorage.removeItem('apikey_runpod-apikey');
   });
 }
-function _getRunpodKey() {
+var _getRunpodKey = function() {
   var el = document.getElementById('runpod-apikey');
   return el ? el.value.trim() : '';
-}
+};
 if (_proxyUrl) {
   _apiKeyIds.forEach(function(id) {
     var el = document.getElementById(id); if (!el) return;
