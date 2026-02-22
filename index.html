@@ -5204,7 +5204,7 @@ async function _slsEnsureEndpoint(prog) {
   var startCmd = 'pip install runpod && python -u /handler.py';
   var dockerArgs = 'bash -c "echo \'' + handlerPy.replace(/'/g, "'\\''") + '\' > /handler.py && ' + startCmd + '"';
   // Escape for GraphQL string literal (backslashes then double quotes)
-  var gqlDockerArgs = dockerArgs.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+  var gqlDockerArgs = dockerArgs.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n');
   var tmplName = 'accel-driv-3dgs-' + Date.now().toString(36).slice(-4);
 
   // Create template (inline values — RunPod doesn't document typed input variables)
