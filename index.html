@@ -5202,44 +5202,42 @@ async function _slsEnsureEndpoint(prog) {
   // Encode handler as base64 for docker start command
   var handlerPy = _slsHandlerScript();
   var startCmd = 'pip install runpod && python -u /handler.py';
+  var dockerArgs = 'bash -c "echo \'' + handlerPy.replace(/'/g, "'\\''") + '\' > /handler.py && ' + startCmd + '"';
+  // Escape for GraphQL string literal (backslashes then double quotes)
+  var gqlDockerArgs = dockerArgs.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+  var tmplName = 'accel-driv-3dgs-' + Date.now().toString(36).slice(-4);
 
-  // Create template
+  // Create template (inline values — RunPod doesn't document typed input variables)
   var tmplData = await _runpodGql(
-    'mutation createTemplate($input: CreateTemplateInput!) { createTemplate(input: $input) { id name } }',
-    { input: {
-      name: 'accel-driv-3dgs-' + Date.now().toString(36).slice(-4),
-      imageName: _SLS_DOCKER_IMAGE,
-      isServerless: true,
-      containerDiskInGb: 40,
-      volumeInGb: 20,
-      volumeMountPath: '/workspace',
-      startJupyter: false,
-      startSsh: false,
-      dockerArgs: 'bash -c "echo \'' + handlerPy.replace(/'/g, "'\\''") + '\' > /handler.py && ' + startCmd + '"'
-    }}
+    'mutation { saveTemplate(input: {' +
+      ' name: "' + tmplName + '",' +
+      ' imageName: "' + _SLS_DOCKER_IMAGE + '",' +
+      ' isServerless: true,' +
+      ' containerDiskInGb: 40,' +
+      ' volumeInGb: 0,' +
+      ' dockerArgs: "' + gqlDockerArgs + '"' +
+    ' }) { id name } }'
   );
-  var templateId = tmplData.createTemplate.id;
+  var templateId = tmplData.saveTemplate.id;
   prog('Template created: ' + templateId + '. Creating endpoint...');
 
-  // Create serverless endpoint
+  // Create serverless endpoint (inline values)
   var epData = await _runpodGql(
-    'mutation createEndpoint($input: CreateEndpointInput!) { createEndpoint(input: $input) { id name } }',
-    { input: {
-      name: 'accel-driv-3dgs',
-      templateId: templateId,
-      gpuIds: 'AMPERE_48',
-      workersMin: 0,
-      workersMax: 1,
-      idleTimeout: 5,
-      flashboot: true,
-      scalerType: 'QUEUE_DELAY',
-      scalerValue: 1
-    }}
+    'mutation { saveEndpoint(input: {' +
+      ' name: "accel-driv-3dgs",' +
+      ' templateId: "' + templateId + '",' +
+      ' gpuIds: "AMPERE_48",' +
+      ' workersMin: 0,' +
+      ' workersMax: 1,' +
+      ' idleTimeout: 5,' +
+      ' scalerType: "QUEUE_DELAY",' +
+      ' scalerValue: 1' +
+    ' }) { id name } }'
   );
-  var endpointId = epData.createEndpoint.id;
+  var endpointId = epData.saveEndpoint.id;
 
   // Cache
-  var cacheObj = { endpointId: endpointId, templateId: templateId, created: Date.now() };
+  var cacheObj = { endpointId: endpointId, templateId: templateId, templateName: tmplName, created: Date.now() };
   localStorage.setItem(_SLS_STORAGE_KEY, JSON.stringify(cacheObj));
   _serverlessState.endpointId = endpointId;
   _serverlessState.templateId = templateId;
@@ -5508,9 +5506,10 @@ async function serverlessDeleteEndpoint() {
     if (d.endpointId) {
       await _runpodGql('mutation { deleteEndpoint(id: "' + d.endpointId + '") }');
     }
-    // Delete template
-    if (d.templateId) {
-      await _runpodGql('mutation { deleteTemplate(templateName: "' + d.templateId + '") }');
+    // Delete template (deleteTemplate uses name, not id)
+    var tmplDel = d.templateName || d.templateId;
+    if (tmplDel) {
+      await _runpodGql('mutation { deleteTemplate(templateName: "' + tmplDel + '") }');
     }
     prog.textContent = 'Endpoint deleted.';
   } catch(err) {
