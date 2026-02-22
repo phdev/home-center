@@ -94,56 +94,6 @@ export default function App() {
           }}
         />
 
-        {/* Theme switcher */}
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "center",
-            gap: 4,
-            zIndex: 20,
-            marginBottom: 10,
-            flexShrink: 0,
-            position: "relative",
-          }}
-        >
-          {THEMES.map((th, i) => (
-            <button
-              key={th.id}
-              onClick={() => setThemeIndex(i)}
-              title={th.name}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 5,
-                padding: "6px 14px",
-                borderRadius: t.radius / 2,
-                border:
-                  themeIndex === i
-                    ? `2px solid ${t.accent}`
-                    : `1px solid ${t.textMuted}`,
-                background:
-                  themeIndex === i ? `${t.accent}30` : `${t.text}10`,
-                cursor: "pointer",
-                transition: "all 0.2s",
-              }}
-            >
-              <span style={{ fontSize: "0.85rem" }}>{th.emoji}</span>
-              <span
-                style={{
-                  fontFamily: t.bodyFont,
-                  fontSize: "0.65rem",
-                  fontWeight: 600,
-                  color: themeIndex === i ? t.accent : t.text,
-                  whiteSpace: "nowrap",
-                  letterSpacing: "0.02em",
-                }}
-              >
-                {th.name}
-              </span>
-            </button>
-          ))}
-        </div>
-
         {/* Header */}
         <Header
           t={t}
@@ -311,94 +261,113 @@ export default function App() {
     </>
   );
 
-  if (!preview) return dashboard;
-
-  return (
+  const themePicker = (
     <div
+      id="theme-picker"
       style={{
-        width: "100vw",
-        minHeight: "100vh",
-        background: "#0A0A0A",
+        position: "fixed",
+        bottom: 0,
+        left: 0,
+        right: 0,
+        zIndex: 99999,
         display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        paddingTop: 4,
-        paddingBottom: 12,
+        justifyContent: "center",
+        gap: 6,
+        padding: "10px 12px 14px",
+        background: "rgba(10,10,10,0.92)",
+        backdropFilter: "blur(16px)",
+        WebkitBackdropFilter: "blur(16px)",
+        borderTop: "1px solid rgba(255,255,255,0.2)",
+        flexWrap: "wrap",
       }}
     >
-      {/* Scaled dashboard preview */}
-      <div
-        style={{
-          width: tvWidth * scale,
-          height: tvHeight * scale,
-          overflow: "hidden",
-          borderRadius: 8,
-          boxShadow: "0 2px 24px rgba(0,0,0,0.5)",
-          flexShrink: 0,
-        }}
-      >
-        <div
+      {THEMES.map((th, i) => (
+        <button
+          key={th.id}
+          onClick={() => setThemeIndex(i)}
           style={{
-            width: tvWidth,
-            height: tvHeight,
-            transform: `scale(${scale})`,
-            transformOrigin: "top left",
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+            padding: "8px 14px",
+            borderRadius: 10,
+            border:
+              themeIndex === i
+                ? `2px solid ${th.accent}`
+                : "1px solid rgba(255,255,255,0.25)",
+            background:
+              themeIndex === i ? `${th.accent}35` : "rgba(255,255,255,0.06)",
+            cursor: "pointer",
+            transition: "all 0.2s",
+            WebkitAppearance: "none",
+            appearance: "none",
           }}
         >
-          {dashboard}
-        </div>
-      </div>
-
-      {/* Theme switcher — full-size, outside the scaled preview */}
-      <div
-        style={{
-          display: "flex",
-          gap: 8,
-          marginTop: 12,
-          padding: "10px 16px",
-          background: "rgba(255,255,255,0.12)",
-          borderRadius: 12,
-          border: "1px solid rgba(255,255,255,0.25)",
-          flexWrap: "wrap",
-          justifyContent: "center",
-        }}
-      >
-        {THEMES.map((th, i) => (
-          <button
-            key={th.id}
-            onClick={() => setThemeIndex(i)}
+          <span style={{ fontSize: "1rem", lineHeight: 1 }}>{th.emoji}</span>
+          <span
             style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 6,
-              padding: "10px 16px",
-              borderRadius: 10,
-              border:
-                themeIndex === i
-                  ? `2px solid ${th.accent}`
-                  : "1px solid rgba(255,255,255,0.3)",
-              background:
-                themeIndex === i ? `${th.accent}40` : "rgba(255,255,255,0.08)",
-              cursor: "pointer",
-              transition: "all 0.2s",
+              fontFamily: "'DM Sans', sans-serif",
+              fontSize: "0.8rem",
+              fontWeight: 600,
+              color:
+                themeIndex === i ? th.accent : "rgba(255,255,255,0.8)",
+              whiteSpace: "nowrap",
             }}
           >
-            <span style={{ fontSize: "1.2rem" }}>{th.emoji}</span>
-            <span
-              style={{
-                fontFamily: "'DM Sans',sans-serif",
-                fontSize: "0.85rem",
-                fontWeight: 600,
-                color:
-                  themeIndex === i ? th.accent : "rgba(255,255,255,0.85)",
-                whiteSpace: "nowrap",
-              }}
-            >
-              {th.name}
-            </span>
-          </button>
-        ))}
-      </div>
+            {th.name}
+          </span>
+        </button>
+      ))}
     </div>
+  );
+
+  if (!preview) {
+    return (
+      <>
+        {dashboard}
+        {themePicker}
+      </>
+    );
+  }
+
+  return (
+    <>
+      <div
+        style={{
+          width: "100vw",
+          minHeight: "100vh",
+          background: "#0A0A0A",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          paddingTop: 4,
+          paddingBottom: 60,
+        }}
+      >
+        {/* Scaled dashboard preview */}
+        <div
+          style={{
+            width: tvWidth * scale,
+            height: tvHeight * scale,
+            overflow: "hidden",
+            borderRadius: 8,
+            boxShadow: "0 2px 24px rgba(0,0,0,0.5)",
+            flexShrink: 0,
+          }}
+        >
+          <div
+            style={{
+              width: tvWidth,
+              height: tvHeight,
+              transform: `scale(${scale})`,
+              transformOrigin: "top left",
+            }}
+          >
+            {dashboard}
+          </div>
+        </div>
+      </div>
+      {themePicker}
+    </>
   );
 }
