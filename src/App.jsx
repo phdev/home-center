@@ -102,11 +102,11 @@ export default function App() {
             left: "50%",
             transform: "translateX(-50%)",
             display: "flex",
-            gap: 3,
+            gap: 4,
             zIndex: 20,
             background: `${t.text}08`,
             borderRadius: t.radius,
-            padding: "3px 5px",
+            padding: "4px 6px",
             border: `1px solid ${t.panelBorder}`,
           }}
         >
@@ -116,9 +116,11 @@ export default function App() {
               onClick={() => setThemeIndex(i)}
               title={th.name}
               style={{
-                width: 30,
-                height: 24,
-                borderRadius: t.radius / 2.5,
+                display: "flex",
+                alignItems: "center",
+                gap: 4,
+                padding: "4px 10px",
+                borderRadius: t.radius / 2,
                 border:
                   themeIndex === i
                     ? `2px solid ${t.accent}`
@@ -126,14 +128,22 @@ export default function App() {
                 background:
                   themeIndex === i ? `${t.accent}20` : "transparent",
                 cursor: "pointer",
-                fontSize: "0.8rem",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
                 transition: "all 0.2s",
               }}
             >
-              {th.emoji}
+              <span style={{ fontSize: "0.8rem" }}>{th.emoji}</span>
+              <span
+                style={{
+                  fontFamily: t.bodyFont,
+                  fontSize: "0.6rem",
+                  fontWeight: 600,
+                  color: themeIndex === i ? t.text : t.textDim,
+                  whiteSpace: "nowrap",
+                  letterSpacing: "0.02em",
+                }}
+              >
+                {th.name}
+              </span>
             </button>
           ))}
         </div>
