@@ -1,6 +1,10 @@
 const STORAGE_KEY = "homeCenter_settings";
 
 const DEFAULTS = {
+  worker: {
+    url: "",
+    token: "",
+  },
   weather: {
     lat: null,
     lng: null,
@@ -28,6 +32,7 @@ export function getSettings() {
     if (!raw) return { ...DEFAULTS };
     const saved = JSON.parse(raw);
     return {
+      worker: { ...DEFAULTS.worker, ...saved.worker },
       weather: { ...DEFAULTS.weather, ...saved.weather },
       calendar: { ...DEFAULTS.calendar, ...saved.calendar },
       photos: { ...DEFAULTS.photos, ...saved.photos },

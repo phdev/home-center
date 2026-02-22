@@ -2,9 +2,9 @@ import { useState, useEffect, useRef } from "react";
 import { Panel, PanelHeader } from "./Panel";
 import { useVoiceInput } from "../hooks/useVoiceInput";
 import { SEARCH_SUGGESTIONS, CONVOS } from "../data/mockData";
-import { askWithImage } from "../services/llm";
+import { askWithImage, askViaWorker } from "../services/llm";
 
-export function SearchPanel({ t, llmSettings }) {
+export function SearchPanel({ t, llmSettings, workerSettings }) {
   const [tab, setTab] = useState("ask");
   const [query, setQuery] = useState("");
   const [messages, setMessages] = useState([]);
@@ -12,7 +12,9 @@ export function SearchPanel({ t, llmSettings }) {
   const [interim, setInterim] = useState("");
   const [expanded, setExpanded] = useState(null);
   const endRef = useRef(null);
-  const hasApiKey = !!llmSettings?.apiKey;
+  const hasWorker = !!(workerSettings?.url);
+  const hasApiKey = !!(llmSettings?.apiKey);
+  const hasLLM = hasWorker || hasApiKey;
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -26,7 +28,27 @@ export function SearchPanel({ t, llmSettings }) {
     setMessages((p) => [...p, { r: "u", t: txt }]);
     setTyping(true);
 
-    if (hasApiKey) {
+    if (hasWorker) {
+      try {
+        const result = await askViaWorker(
+          txt,
+          messages,
+          workerSettings.url,
+          workerSettings.token,
+        );
+        setTyping(false);
+        setMessages((p) => [
+          ...p,
+          { r: "a", t: result.text, img: result.imageUrl },
+        ]);
+      } catch (e) {
+        setTyping(false);
+        setMessages((p) => [
+          ...p,
+          { r: "a", t: `Error: ${e.message}`, error: true },
+        ]);
+      }
+    } else if (hasApiKey) {
       try {
         const result = await askWithImage(
           txt,
@@ -54,7 +76,7 @@ export function SearchPanel({ t, llmSettings }) {
           ...p,
           {
             r: "a",
-            t: `Here's what I found about "${txt}": Add your OpenAI API key in Settings to get real answers with AI-generated images.`,
+            t: `Here's what I found about "${txt}": Configure a Worker URL or OpenAI API key in Settings.`,
           },
         ]);
       }, 800);
@@ -123,7 +145,7 @@ export function SearchPanel({ t, llmSettings }) {
             <button onClick={() => setTab("history")} style={tabStyle("history")}>
               History
             </button>
-            {!hasApiKey && (
+            {!hasLLM && (
               <span
                 style={{
                   fontFamily: t.bodyFont,

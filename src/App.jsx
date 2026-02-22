@@ -30,10 +30,10 @@ export default function App() {
   const { preview, scale, tvWidth, tvHeight } = usePreviewMode();
   const { settings, update: updateSettings } = useSettings();
 
-  // Real API data hooks
+  // Real API data hooks (pass worker settings for server-side proxy)
   const weather = useWeather(settings.weather);
-  const calendar = useCalendar(settings.calendar);
-  const photos = usePhotos(settings.photos);
+  const calendar = useCalendar(settings.calendar, settings.worker);
+  const photos = usePhotos(settings.photos, settings.worker);
 
   const dashboard = (
     <>
@@ -197,7 +197,7 @@ export default function App() {
           </div>
 
           {/* Right column: Ask Anything (with History tab) */}
-          <SearchPanel t={t} llmSettings={settings.llm} />
+          <SearchPanel t={t} llmSettings={settings.llm} workerSettings={settings.worker} />
         </div>
 
         {/* Theme name footer */}

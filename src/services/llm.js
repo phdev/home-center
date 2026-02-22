@@ -82,3 +82,22 @@ export async function askWithImage(query, conversationHistory, apiKey, model, im
 
   return { text: responseText, imageUrl };
 }
+
+// Worker-proxied version — no keys in browser
+export async function askViaWorker(query, conversationHistory, workerUrl, workerToken) {
+  const headers = { "Content-Type": "application/json" };
+  if (workerToken) headers.Authorization = `Bearer ${workerToken}`;
+
+  const res = await fetch(`${workerUrl}/api/ask`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ query, history: conversationHistory }),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || `Worker error: ${res.status}`);
+  }
+
+  return await res.json();
+}

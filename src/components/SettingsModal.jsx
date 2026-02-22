@@ -144,6 +144,53 @@ export function SettingsModal({ t, settings, onSave, onClose }) {
           </button>
         </div>
 
+        {/* Worker (server-side proxy) */}
+        <div style={sectionStyle}>
+          {sectionTitle("☁️", "Cloudflare Worker (recommended)")}
+          <div
+            style={{
+              fontFamily: t.bodyFont,
+              fontSize: "0.6rem",
+              color: t.textDim,
+              lineHeight: 1.5,
+              marginBottom: 8,
+            }}
+          >
+            When configured, all API calls route through your worker — no keys
+            stored in the browser. Calendar, photos, and LLM credentials live
+            server-side.
+          </div>
+          <label style={labelStyle}>Worker URL</label>
+          <input
+            value={local.worker.url}
+            onChange={(e) => update("worker", "url", e.target.value.replace(/\/+$/, ""))}
+            placeholder="https://home-center-api.yourname.workers.dev"
+            style={{ ...inputStyle, marginBottom: 8 }}
+          />
+          <label style={labelStyle}>Auth Token (optional)</label>
+          <input
+            type="password"
+            value={local.worker.token}
+            onChange={(e) => update("worker", "token", e.target.value)}
+            placeholder="Bearer token to authenticate with your worker"
+            style={inputStyle}
+          />
+          {local.worker.url && (
+            <div
+              style={{
+                marginTop: 8,
+                fontFamily: t.bodyFont,
+                fontSize: "0.58rem",
+                color: t.accent,
+                lineHeight: 1.5,
+              }}
+            >
+              Worker mode active — calendar, photos & LLM sections below are
+              only used as fallbacks if the worker is unavailable.
+            </div>
+          )}
+        </div>
+
         {/* Weather */}
         <div style={sectionStyle}>
           {sectionTitle("🌤️", "Weather (Open-Meteo)")}

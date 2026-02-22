@@ -1,0 +1,511 @@
+export default {
+  async fetch(request, env) {
+    const url = new URL(request.url);
+    const path = url.pathname;
+
+    // CORS preflight
+    if (request.method === "OPTIONS") {
+      return corsResponse(env, new Response(null, { status: 204 }));
+    }
+
+    // Auth check
+    if (env.AUTH_TOKEN) {
+      const auth = request.headers.get("Authorization");
+      if (auth !== `Bearer ${env.AUTH_TOKEN}`) {
+        return corsResponse(env, json({ error: "Unauthorized" }, 401));
+      }
+    }
+
+    try {
+      if (path === "/api/ask" && request.method === "POST") {
+        return corsResponse(env, await handleAsk(request, env));
+      }
+      if (path === "/api/calendar") {
+        return corsResponse(env, await handleCalendar(env));
+      }
+      if (path === "/api/photos") {
+        return corsResponse(env, await handlePhotos(env));
+      }
+      if (path === "/api/health") {
+        return corsResponse(env, json({
+          ok: true,
+          hasOpenAI: !!env.OPENAI_API_KEY,
+          hasCalDAV: !!(env.ICLOUD_APPLE_ID && env.ICLOUD_APP_PASSWORD),
+          hasCalendarUrls: !!(env.CALENDAR_URLS),
+          hasPhotos: !!env.PHOTOS_ALBUM_TOKEN,
+        }));
+      }
+      return corsResponse(env, json({ error: "Not found" }, 404));
+    } catch (e) {
+      return corsResponse(env, json({ error: e.message }, 500));
+    }
+  },
+};
+
+// ── Helpers ──────────────────────────────────────────────────────────
+
+function json(data, status = 200) {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: { "Content-Type": "application/json" },
+  });
+}
+
+function corsResponse(env, response) {
+  const origin = env.ALLOWED_ORIGIN || "*";
+  const headers = new Headers(response.headers);
+  headers.set("Access-Control-Allow-Origin", origin);
+  headers.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  headers.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  return new Response(response.body, {
+    status: response.status,
+    headers,
+  });
+}
+
+// ── Ask (OpenAI proxy) ─────────────────────────────────────────────
+
+async function handleAsk(request, env) {
+  if (!env.OPENAI_API_KEY) {
+    return json({ error: "OPENAI_API_KEY not configured" }, 500);
+  }
+
+  const body = await request.json();
+  const { query, history = [] } = body;
+  if (!query) return json({ error: "Missing query" }, 400);
+
+  const model = env.OPENAI_MODEL || "gpt-4o-mini";
+  const imageModel = env.OPENAI_IMAGE_MODEL || "dall-e-3";
+
+  const systemMsg = {
+    role: "system",
+    content:
+      "You are a helpful family home assistant. Keep answers concise, friendly, and family-appropriate. " +
+      "When it would be helpful, describe a scene or concept visually. " +
+      "If the user's question would benefit from an illustration, end your response with a line: " +
+      "[IMAGE_PROMPT: <a detailed prompt for generating an illustrative image>]",
+  };
+
+  const messages = [
+    systemMsg,
+    ...history.map((m) => ({
+      role: m.r === "u" ? "user" : "assistant",
+      content: m.t,
+    })),
+    { role: "user", content: query },
+  ];
+
+  // Chat completion
+  const chatRes = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${env.OPENAI_API_KEY}`,
+    },
+    body: JSON.stringify({ model, messages, max_tokens: 512 }),
+  });
+
+  if (!chatRes.ok) {
+    const err = await chatRes.json().catch(() => ({}));
+    return json({ error: err.error?.message || `OpenAI error: ${chatRes.status}` }, 502);
+  }
+
+  const chatData = await chatRes.json();
+  let text = chatData.choices?.[0]?.message?.content || "No response.";
+  let imageUrl = null;
+
+  // Check if LLM wants to generate an image
+  const imgMatch = text.match(/\[IMAGE_PROMPT:\s*(.+?)\]/);
+  if (imgMatch) {
+    text = text.replace(/\[IMAGE_PROMPT:\s*.+?\]/, "").trim();
+    try {
+      const imgRes = await fetch("https://api.openai.com/v1/images/generations", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${env.OPENAI_API_KEY}`,
+        },
+        body: JSON.stringify({
+          model: imageModel,
+          prompt: imgMatch[1],
+          n: 1,
+          size: "1024x1024",
+          quality: "standard",
+        }),
+      });
+      if (imgRes.ok) {
+        const imgData = await imgRes.json();
+        imageUrl = imgData.data?.[0]?.url || null;
+      }
+    } catch {
+      // Image generation failed silently
+    }
+  }
+
+  return json({ text, imageUrl });
+}
+
+// ── Calendar ────────────────────────────────────────────────────────
+
+async function handleCalendar(env) {
+  const events = [];
+
+  // Try CalDAV (private iCloud calendars) first
+  if (env.ICLOUD_APPLE_ID && env.ICLOUD_APP_PASSWORD) {
+    try {
+      const caldavEvents = await fetchCalDAV(env.ICLOUD_APPLE_ID, env.ICLOUD_APP_PASSWORD);
+      events.push(...caldavEvents);
+    } catch (e) {
+      console.error("CalDAV error:", e);
+    }
+  }
+
+  // Also fetch any configured iCal URLs
+  if (env.CALENDAR_URLS) {
+    const urls = env.CALENDAR_URLS.split(",").map((u) => u.trim()).filter(Boolean);
+    for (const url of urls) {
+      try {
+        const icsUrl = url.replace("webcal://", "https://");
+        const res = await fetch(icsUrl);
+        if (res.ok) {
+          const text = await res.text();
+          events.push(...parseIcalToday(text));
+        }
+      } catch (e) {
+        console.error("iCal fetch error:", url, e);
+      }
+    }
+  }
+
+  // Sort by start time
+  events.sort((a, b) => (a.startDate || 0) - (b.startDate || 0));
+
+  return json({ events: events.map(({ startDate, ...rest }) => rest) });
+}
+
+async function fetchCalDAV(appleId, appPassword) {
+  const auth = btoa(`${appleId}:${appPassword}`);
+  const headers = {
+    Authorization: `Basic ${auth}`,
+    "Content-Type": "application/xml; charset=utf-8",
+    Depth: "0",
+  };
+
+  // Step 1: Find principal URL
+  const principalRes = await fetch("https://caldav.icloud.com/", {
+    method: "PROPFIND",
+    headers,
+    body: `<?xml version="1.0" encoding="utf-8"?>
+<d:propfind xmlns:d="DAV:">
+  <d:prop><d:current-user-principal/></d:prop>
+</d:propfind>`,
+  });
+
+  if (!principalRes.ok) {
+    throw new Error(`CalDAV auth failed: ${principalRes.status}`);
+  }
+
+  const principalXml = await principalRes.text();
+  const principalHref = extractHref(principalXml, "current-user-principal");
+  if (!principalHref) throw new Error("Could not find principal URL");
+
+  // Step 2: Find calendar home set
+  const homeRes = await fetch(`https://caldav.icloud.com${principalHref}`, {
+    method: "PROPFIND",
+    headers,
+    body: `<?xml version="1.0" encoding="utf-8"?>
+<d:propfind xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav">
+  <d:prop><c:calendar-home-set/></d:prop>
+</d:propfind>`,
+  });
+
+  const homeXml = await homeRes.text();
+  const homeHref = extractHref(homeXml, "calendar-home-set");
+  if (!homeHref) throw new Error("Could not find calendar home");
+
+  // Step 3: List calendars
+  const listRes = await fetch(`https://caldav.icloud.com${homeHref}`, {
+    method: "PROPFIND",
+    headers: { ...headers, Depth: "1" },
+    body: `<?xml version="1.0" encoding="utf-8"?>
+<d:propfind xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav" xmlns:cs="http://calendarserver.org/ns/">
+  <d:prop>
+    <d:displayname/>
+    <d:resourcetype/>
+    <cs:getctag/>
+  </d:prop>
+</d:propfind>`,
+  });
+
+  const listXml = await listRes.text();
+  const calendarHrefs = extractCalendarHrefs(listXml, homeHref);
+
+  // Step 4: Fetch today's events from each calendar
+  const today = new Date();
+  const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const endOfDay = new Date(startOfDay.getTime() + 86400000);
+  const dtStart = toIcalDate(startOfDay);
+  const dtEnd = toIcalDate(endOfDay);
+
+  const allEvents = [];
+
+  for (const calHref of calendarHrefs) {
+    try {
+      const reportRes = await fetch(`https://caldav.icloud.com${calHref}`, {
+        method: "REPORT",
+        headers: {
+          ...headers,
+          Depth: "1",
+        },
+        body: `<?xml version="1.0" encoding="utf-8"?>
+<c:calendar-query xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav">
+  <d:prop>
+    <d:getetag/>
+    <c:calendar-data/>
+  </d:prop>
+  <c:filter>
+    <c:comp-filter name="VCALENDAR">
+      <c:comp-filter name="VEVENT">
+        <c:time-range start="${dtStart}" end="${dtEnd}"/>
+      </c:comp-filter>
+    </c:comp-filter>
+  </c:filter>
+</c:calendar-query>`,
+      });
+
+      if (reportRes.ok) {
+        const reportXml = await reportRes.text();
+        const icsBlocks = extractCalendarData(reportXml);
+        for (const ics of icsBlocks) {
+          allEvents.push(...parseIcalToday(ics));
+        }
+      }
+    } catch {
+      // Skip individual calendar errors
+    }
+  }
+
+  return allEvents;
+}
+
+// ── Photos ──────────────────────────────────────────────────────────
+
+async function handlePhotos(env) {
+  const token = env.PHOTOS_ALBUM_TOKEN;
+  if (!token) {
+    return json({ photos: [] });
+  }
+
+  const partitions = [25, 26, 27, 28, 29, 30, 47, 48, 49, 50, 51, 52];
+  let streamData = null;
+  let baseUrl = null;
+
+  for (const p of partitions) {
+    try {
+      const url = `https://p${p}-sharedstreams.icloud.com/${token}/sharedstreams/webstream`;
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain" },
+        body: JSON.stringify({ streamCtag: null }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.photos) {
+          streamData = data;
+          baseUrl = `https://p${p}-sharedstreams.icloud.com/${token}/sharedstreams`;
+          break;
+        }
+      }
+    } catch {
+      continue;
+    }
+  }
+
+  if (!streamData?.photos) {
+    return json({ photos: [] });
+  }
+
+  const photos = streamData.photos.slice(0, 20);
+  const guids = photos.map((p) => p.photoGuid);
+
+  let assetUrls = {};
+  try {
+    const assetRes = await fetch(`${baseUrl}/webasseturls`, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain" },
+      body: JSON.stringify({ photoGuids: guids }),
+    });
+    if (assetRes.ok) {
+      const assetData = await assetRes.json();
+      assetUrls = assetData.items || {};
+    }
+  } catch {
+    return json({ photos: [] });
+  }
+
+  const result = [];
+  for (const photo of photos) {
+    const derivatives = photo.derivatives || {};
+    const best = pickBestDerivative(derivatives);
+    if (!best?.checksum) continue;
+    const asset = assetUrls[best.checksum];
+    if (!asset) continue;
+    result.push({
+      url: `https://${asset.url_location}${asset.url_path}`,
+      cap: photo.caption || "",
+    });
+  }
+
+  return json({ photos: result });
+}
+
+function pickBestDerivative(derivatives) {
+  let best = null;
+  let bestSize = 0;
+  for (const key of Object.keys(derivatives)) {
+    const d = derivatives[key];
+    const size = (d.width || 0) * (d.height || 0);
+    if (size > bestSize && size <= 2000 * 2000) {
+      best = d;
+      bestSize = size;
+    }
+  }
+  return best || Object.values(derivatives)[0];
+}
+
+// ── iCal Parsing ────────────────────────────────────────────────────
+
+function parseIcalToday(icsText) {
+  const unfolded = icsText.replace(/\r\n[ \t]/g, "").replace(/\n[ \t]/g, "");
+  const lines = unfolded.split(/\r?\n/);
+  const events = [];
+  let inEvent = false;
+  let current = {};
+  const today = new Date();
+
+  const COLORS = [
+    "#FF6B6B", "#4ECDC4", "#FFE66D", "#6BCB77",
+    "#9B59B6", "#FF8A5C", "#3498DB", "#E74C3C",
+  ];
+
+  for (const line of lines) {
+    if (line === "BEGIN:VEVENT") {
+      inEvent = true;
+      current = {};
+      continue;
+    }
+    if (line === "END:VEVENT") {
+      inEvent = false;
+      if (current.summary && current.dtstart) {
+        const start = parseIcalDate(current.dtstart);
+        if (start && isSameDay(start, today)) {
+          events.push({
+            time: formatTime(start),
+            title: unescapeIcal(current.summary),
+            who: current.location ? unescapeIcal(current.location) : "",
+            c: COLORS[events.length % COLORS.length],
+            startDate: start.getTime(),
+          });
+        }
+      }
+      continue;
+    }
+    if (!inEvent) continue;
+
+    const colonIdx = line.indexOf(":");
+    if (colonIdx < 0) continue;
+    const key = line.substring(0, colonIdx).split(";")[0].toUpperCase();
+    const value = line.substring(colonIdx + 1);
+
+    if (key === "SUMMARY") current.summary = value;
+    if (key === "DTSTART") current.dtstart = line;
+    if (key === "LOCATION") current.location = value;
+  }
+
+  return events;
+}
+
+function parseIcalDate(str) {
+  if (!str) return null;
+  const colonIdx = str.lastIndexOf(":");
+  const dateStr = colonIdx >= 0 ? str.substring(colonIdx + 1) : str;
+  const clean = dateStr.replace(/[^0-9TZ]/g, "");
+
+  if (clean.length === 8) {
+    return new Date(
+      parseInt(clean.slice(0, 4)),
+      parseInt(clean.slice(4, 6)) - 1,
+      parseInt(clean.slice(6, 8)),
+    );
+  }
+  if (clean.length >= 15) {
+    const y = parseInt(clean.slice(0, 4));
+    const mo = parseInt(clean.slice(4, 6)) - 1;
+    const d = parseInt(clean.slice(6, 8));
+    const h = parseInt(clean.slice(9, 11));
+    const mi = parseInt(clean.slice(11, 13));
+    const s = parseInt(clean.slice(13, 15));
+    if (clean.endsWith("Z")) return new Date(Date.UTC(y, mo, d, h, mi, s));
+    return new Date(y, mo, d, h, mi, s);
+  }
+  return null;
+}
+
+function isSameDay(d1, d2) {
+  return d1.getFullYear() === d2.getFullYear() &&
+    d1.getMonth() === d2.getMonth() &&
+    d1.getDate() === d2.getDate();
+}
+
+function formatTime(date) {
+  const h = date.getHours();
+  const m = date.getMinutes();
+  const ampm = h >= 12 ? "PM" : "AM";
+  const h12 = h % 12 || 12;
+  return m === 0 ? `${h12} ${ampm}` : `${h12}:${m.toString().padStart(2, "0")} ${ampm}`;
+}
+
+function unescapeIcal(str) {
+  return str.replace(/\\n/g, "\n").replace(/\\,/g, ",").replace(/\\;/g, ";").replace(/\\\\/g, "\\");
+}
+
+function toIcalDate(date) {
+  return date.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
+}
+
+// ── XML helpers for CalDAV ──────────────────────────────────────────
+
+function extractHref(xml, tagName) {
+  const pattern = new RegExp(`<[^>]*${tagName}[^>]*>[\\s\\S]*?<[^>]*href[^>]*>([^<]+)`, "i");
+  const match = xml.match(pattern);
+  return match ? match[1].trim() : null;
+}
+
+function extractCalendarHrefs(xml, homeHref) {
+  const hrefs = [];
+  const responses = xml.split(/<d:response>|<D:response>/i);
+  for (const resp of responses) {
+    if (resp.includes("<d:collection") || resp.includes("<D:collection")) {
+      if (resp.includes("calendar") || resp.includes("VCALENDAR")) {
+        const hrefMatch = resp.match(/<(?:d|D):href>([^<]+)/);
+        if (hrefMatch) {
+          const href = hrefMatch[1].trim();
+          if (href !== homeHref) {
+            hrefs.push(href);
+          }
+        }
+      }
+    }
+  }
+  return hrefs;
+}
+
+function extractCalendarData(xml) {
+  const blocks = [];
+  const pattern = /BEGIN:VCALENDAR[\s\S]*?END:VCALENDAR/g;
+  let match;
+  while ((match = pattern.exec(xml)) !== null) {
+    blocks.push(match[0]);
+  }
+  return blocks;
+}
