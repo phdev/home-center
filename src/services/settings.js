@@ -2,7 +2,7 @@ const STORAGE_KEY = "homeCenter_settings";
 
 const DEFAULTS = {
   worker: {
-    url: "",
+    url: "https://home-center-api.phhowell.workers.dev",
     token: "",
   },
   weather: {
@@ -31,13 +31,16 @@ export function getSettings() {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return { ...DEFAULTS };
     const saved = JSON.parse(raw);
-    return {
+    const merged = {
       worker: { ...DEFAULTS.worker, ...saved.worker },
       weather: { ...DEFAULTS.weather, ...saved.weather },
       calendar: { ...DEFAULTS.calendar, ...saved.calendar },
       photos: { ...DEFAULTS.photos, ...saved.photos },
       llm: { ...DEFAULTS.llm, ...saved.llm },
     };
+    // If worker URL was previously empty, pick up the new default
+    if (!merged.worker.url) merged.worker.url = DEFAULTS.worker.url;
+    return merged;
   } catch {
     return { ...DEFAULTS };
   }

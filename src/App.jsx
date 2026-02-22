@@ -38,8 +38,7 @@ export default function App() {
   const dashboard = (
     <>
       <style>{`
-        * { box-sizing: border-box; margin: 0; padding: 0 }
-        body { background: #0A0A0A; overflow: ${preview ? "auto" : "hidden"} }
+        body { overflow: ${preview ? "auto" : "hidden"} }
         ::-webkit-scrollbar { width: 3px }
         ::-webkit-scrollbar-track { background: transparent }
         ::-webkit-scrollbar-thumb { background: ${t.text}15; border-radius: 3px }
@@ -55,9 +54,11 @@ export default function App() {
       <div
         style={{
           width: preview ? tvWidth : "100vw",
-          height: preview ? tvHeight : "100vh",
+          height: preview ? tvHeight : "100dvh",
+          minHeight: preview ? undefined : "100vh",
           background: t.bg,
-          padding: "32px 44px 20px",
+          padding: "24px 44px 20px",
+          paddingTop: "max(24px, env(safe-area-inset-top, 0px))",
           display: "flex",
           flexDirection: "column",
           overflow: "hidden",
