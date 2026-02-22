@@ -5215,7 +5215,8 @@ async function _slsEnsureEndpoint(prog) {
       ' isServerless: true,' +
       ' containerDiskInGb: 40,' +
       ' volumeInGb: 0,' +
-      ' dockerArgs: "' + gqlDockerArgs + '"' +
+      ' dockerArgs: "' + gqlDockerArgs + '",' +
+      ' env: []' +
     ' }) { id name } }'
   );
   var templateId = tmplData.saveTemplate.id;
