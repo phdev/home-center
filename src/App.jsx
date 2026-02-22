@@ -98,16 +98,17 @@ export default function App() {
         <div
           style={{
             position: "absolute",
-            top: 10,
-            left: "50%",
-            transform: "translateX(-50%)",
+            top: 0,
+            left: 0,
+            right: 0,
             display: "flex",
-            gap: 4,
+            justifyContent: "center",
+            gap: 2,
             zIndex: 20,
-            background: `${t.text}08`,
-            borderRadius: t.radius,
-            padding: "4px 6px",
-            border: `1px solid ${t.panelBorder}`,
+            background: `${t.text}18`,
+            backdropFilter: "blur(12px)",
+            padding: "6px 10px",
+            borderBottom: `1px solid ${t.text}20`,
           }}
         >
           {THEMES.map((th, i) => (
@@ -118,26 +119,26 @@ export default function App() {
               style={{
                 display: "flex",
                 alignItems: "center",
-                gap: 4,
-                padding: "4px 10px",
+                gap: 5,
+                padding: "5px 12px",
                 borderRadius: t.radius / 2,
                 border:
                   themeIndex === i
                     ? `2px solid ${t.accent}`
                     : "1px solid transparent",
                 background:
-                  themeIndex === i ? `${t.accent}20` : "transparent",
+                  themeIndex === i ? `${t.accent}30` : "transparent",
                 cursor: "pointer",
                 transition: "all 0.2s",
               }}
             >
-              <span style={{ fontSize: "0.8rem" }}>{th.emoji}</span>
+              <span style={{ fontSize: "0.85rem" }}>{th.emoji}</span>
               <span
                 style={{
                   fontFamily: t.bodyFont,
-                  fontSize: "0.6rem",
+                  fontSize: "0.65rem",
                   fontWeight: 600,
-                  color: themeIndex === i ? t.text : t.textDim,
+                  color: themeIndex === i ? t.accent : t.textMuted,
                   whiteSpace: "nowrap",
                   letterSpacing: "0.02em",
                 }}
@@ -359,10 +360,10 @@ export default function App() {
           display: "flex",
           gap: 6,
           marginTop: 10,
-          padding: "6px 10px",
-          background: "rgba(255,255,255,0.05)",
+          padding: "8px 12px",
+          background: "rgba(255,255,255,0.1)",
           borderRadius: 12,
-          border: "1px solid rgba(255,255,255,0.08)",
+          border: "1px solid rgba(255,255,255,0.15)",
           flexWrap: "wrap",
           justifyContent: "center",
         }}
@@ -375,26 +376,26 @@ export default function App() {
               display: "flex",
               alignItems: "center",
               gap: 5,
-              padding: "6px 12px",
+              padding: "8px 14px",
               borderRadius: 8,
               border:
                 themeIndex === i
                   ? `2px solid ${th.accent}`
-                  : "1px solid rgba(255,255,255,0.1)",
+                  : "1px solid rgba(255,255,255,0.15)",
               background:
-                themeIndex === i ? `${th.accent}20` : "transparent",
+                themeIndex === i ? `${th.accent}30` : "rgba(255,255,255,0.05)",
               cursor: "pointer",
               transition: "all 0.2s",
             }}
           >
-            <span style={{ fontSize: "1rem" }}>{th.emoji}</span>
+            <span style={{ fontSize: "1.1rem" }}>{th.emoji}</span>
             <span
               style={{
                 fontFamily: "'DM Sans',sans-serif",
-                fontSize: "0.7rem",
+                fontSize: "0.75rem",
                 fontWeight: 600,
                 color:
-                  themeIndex === i ? th.accent : "rgba(255,255,255,0.5)",
+                  themeIndex === i ? th.accent : "rgba(255,255,255,0.7)",
                 whiteSpace: "nowrap",
               }}
             >
