@@ -8,17 +8,15 @@
 
 ### Push & Merge Process (with PAT)
 
-1. Commit changes on the feature branch.
-2. Switch to `main` and merge the feature branch:
+1. Commit changes on the `claude/` feature branch.
+2. Push the feature branch to origin:
    ```
-   git checkout main
-   git merge <feature-branch>
+   git push -u origin claude/<branch-name>
    ```
-3. Push `main` to origin:
-   ```
-   git push origin main
-   ```
-4. The remote uses a PAT-authenticated proxy — pushes go through the local proxy at the configured origin URL. No extra auth steps needed beyond what's configured in the remote.
+3. Create a PR from the feature branch into `main` using `gh pr create`.
+4. Merge the PR into `main` using `gh pr merge --merge --auto` (or `--squash`).
+5. The remote uses a PAT-authenticated proxy. Direct pushes to `main` are **not allowed** — always merge via PR.
+6. GitHub Pages deploys automatically once changes land on `main`.
 
 ### Retry Policy
 
