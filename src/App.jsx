@@ -97,18 +97,13 @@ export default function App() {
         {/* Theme switcher */}
         <div
           style={{
-            position: "absolute",
-            top: 0,
-            left: 0,
-            right: 0,
             display: "flex",
             justifyContent: "center",
-            gap: 2,
+            gap: 4,
             zIndex: 20,
-            background: `${t.text}18`,
-            backdropFilter: "blur(12px)",
-            padding: "6px 10px",
-            borderBottom: `1px solid ${t.text}20`,
+            marginBottom: 10,
+            flexShrink: 0,
+            position: "relative",
           }}
         >
           {THEMES.map((th, i) => (
@@ -120,14 +115,14 @@ export default function App() {
                 display: "flex",
                 alignItems: "center",
                 gap: 5,
-                padding: "5px 12px",
+                padding: "6px 14px",
                 borderRadius: t.radius / 2,
                 border:
                   themeIndex === i
                     ? `2px solid ${t.accent}`
-                    : "1px solid transparent",
+                    : `1px solid ${t.textMuted}`,
                 background:
-                  themeIndex === i ? `${t.accent}30` : "transparent",
+                  themeIndex === i ? `${t.accent}30` : `${t.text}10`,
                 cursor: "pointer",
                 transition: "all 0.2s",
               }}
@@ -138,7 +133,7 @@ export default function App() {
                   fontFamily: t.bodyFont,
                   fontSize: "0.65rem",
                   fontWeight: 600,
-                  color: themeIndex === i ? t.accent : t.textMuted,
+                  color: themeIndex === i ? t.accent : t.text,
                   whiteSpace: "nowrap",
                   letterSpacing: "0.02em",
                 }}
@@ -358,12 +353,12 @@ export default function App() {
       <div
         style={{
           display: "flex",
-          gap: 6,
-          marginTop: 10,
-          padding: "8px 12px",
-          background: "rgba(255,255,255,0.1)",
+          gap: 8,
+          marginTop: 12,
+          padding: "10px 16px",
+          background: "rgba(255,255,255,0.12)",
           borderRadius: 12,
-          border: "1px solid rgba(255,255,255,0.15)",
+          border: "1px solid rgba(255,255,255,0.25)",
           flexWrap: "wrap",
           justifyContent: "center",
         }}
@@ -375,27 +370,27 @@ export default function App() {
             style={{
               display: "flex",
               alignItems: "center",
-              gap: 5,
-              padding: "8px 14px",
-              borderRadius: 8,
+              gap: 6,
+              padding: "10px 16px",
+              borderRadius: 10,
               border:
                 themeIndex === i
                   ? `2px solid ${th.accent}`
-                  : "1px solid rgba(255,255,255,0.15)",
+                  : "1px solid rgba(255,255,255,0.3)",
               background:
-                themeIndex === i ? `${th.accent}30` : "rgba(255,255,255,0.05)",
+                themeIndex === i ? `${th.accent}40` : "rgba(255,255,255,0.08)",
               cursor: "pointer",
               transition: "all 0.2s",
             }}
           >
-            <span style={{ fontSize: "1.1rem" }}>{th.emoji}</span>
+            <span style={{ fontSize: "1.2rem" }}>{th.emoji}</span>
             <span
               style={{
                 fontFamily: "'DM Sans',sans-serif",
-                fontSize: "0.75rem",
+                fontSize: "0.85rem",
                 fontWeight: 600,
                 color:
-                  themeIndex === i ? th.accent : "rgba(255,255,255,0.7)",
+                  themeIndex === i ? th.accent : "rgba(255,255,255,0.85)",
                 whiteSpace: "nowrap",
               }}
             >
