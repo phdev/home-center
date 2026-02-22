@@ -10,7 +10,6 @@ export function BirthdaysPanel({ t }) {
   };
 
   const upcoming = BIRTHDAYS.filter((b) => !b.passed);
-  const past = BIRTHDAYS.filter((b) => b.passed);
 
   return (
     <Panel t={t} style={{ height: "100%" }}>
@@ -147,70 +146,6 @@ export function BirthdaysPanel({ t }) {
                   >
                     {"\u{1F381}"} {b.giftIdea}
                   </div>
-                </div>
-              </div>
-            ))}
-          </>
-        )}
-        {past.length > 0 && (
-          <>
-            <div
-              style={{
-                fontFamily: t.bodyFont,
-                fontSize: "0.55rem",
-                color: t.textDim,
-                textTransform: "uppercase",
-                letterSpacing: "0.08em",
-                marginTop: 4,
-              }}
-            >
-              Earlier
-            </div>
-            {past.map((b, i) => (
-              <div
-                key={i}
-                style={{
-                  padding: "6px 8px",
-                  borderRadius: t.radius / 2,
-                  background: `${t.text}03`,
-                  border: `1px solid ${t.panelBorder}`,
-                  opacity: 0.65,
-                }}
-              >
-                <div
-                  style={{ display: "flex", alignItems: "center", gap: 7 }}
-                >
-                  <span style={{ fontSize: "1.1rem" }}>{b.avatar}</span>
-                  <div style={{ flex: 1 }}>
-                    <div
-                      style={{
-                        fontFamily: t.bodyFont,
-                        fontSize: "0.75rem",
-                        fontWeight: 500,
-                        color: t.text,
-                      }}
-                    >
-                      {b.name}
-                    </div>
-                    <div
-                      style={{
-                        fontFamily: t.bodyFont,
-                        fontSize: "0.55rem",
-                        color: t.textDim,
-                      }}
-                    >
-                      {b.date} · Turned {b.age}
-                    </div>
-                  </div>
-                  <span
-                    style={{
-                      fontFamily: t.bodyFont,
-                      fontSize: "0.55rem",
-                      color: t.accent2,
-                    }}
-                  >
-                    {"\u2713"} {b.gift}
-                  </span>
                 </div>
               </div>
             ))}

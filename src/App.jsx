@@ -54,11 +54,9 @@ export default function App() {
       <div
         style={{
           width: preview ? tvWidth : "100vw",
-          height: preview ? tvHeight : "100dvh",
-          minHeight: preview ? undefined : "100vh",
+          height: preview ? tvHeight : "calc(100vh - 56px)",
           background: t.bg,
-          padding: "24px 44px 20px",
-          paddingTop: "max(24px, env(safe-area-inset-top, 0px))",
+          padding: "20px 44px 12px",
           display: "flex",
           flexDirection: "column",
           overflow: "hidden",

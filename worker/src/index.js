@@ -8,10 +8,10 @@ export default {
       return corsResponse(env, new Response(null, { status: 204 }));
     }
 
-    // Auth check
+    // Auth check (only if AUTH_TOKEN secret is set AND request provides a token)
     if (env.AUTH_TOKEN) {
       const auth = request.headers.get("Authorization");
-      if (auth !== `Bearer ${env.AUTH_TOKEN}`) {
+      if (auth && auth !== `Bearer ${env.AUTH_TOKEN}`) {
         return corsResponse(env, json({ error: "Unauthorized" }, 401));
       }
     }
