@@ -326,6 +326,10 @@
       </div>
       <!-- Serverless config -->
       <div id="runpod-serverless-cfg">
+        <div class="slider-group" style="margin-bottom:6px">
+          <div class="slider-label"><span>RunPod API Key</span></div>
+          <input type="password" id="runpod-sls-apikey" placeholder="rpa_xxxxxxxx (optional — uses proxy if blank)" style="width:100%;background:var(--surface2);color:var(--text);border:1px solid var(--border);padding:4px 8px;border-radius:4px;font-size:11px;font-family:monospace">
+        </div>
         <div id="sls-endpoint-info" style="font-size:10px;color:var(--text-dim);margin-bottom:6px;padding:4px 8px;background:var(--surface2);border-radius:4px;font-family:'JetBrains Mono',monospace">Endpoint: auto-created on first run</div>
         <div class="slider-group">
           <div class="slider-label"><span>Training iterations</span><span id="v-serverless-iters">7000</span></div>
@@ -3894,6 +3898,17 @@ if (_proxyUrl) {
   if(kkParam){var kkEl=document.getElementById('kiri-apikey');if(kkEl)kkEl.value=kkParam}
 }
 }
+// Serverless RunPod API key persistence (independent of proxy mode)
+(function() {
+  var el = document.getElementById('runpod-sls-apikey'); if (!el) return;
+  var saved = localStorage.getItem('apikey_runpod-sls-apikey');
+  if (saved && !el.value) el.value = saved;
+  el.addEventListener('input', function() {
+    var v = el.value.trim();
+    if (v) localStorage.setItem('apikey_runpod-sls-apikey', v);
+    else localStorage.removeItem('apikey_runpod-sls-apikey');
+  });
+})();
 
 // ============================================================
 // KIRI ENGINE — 3DGS FROM VIDEO / PHOTOS
@@ -5093,24 +5108,36 @@ function _slsUpdateEndpointInfo() {
   }
 }
 
-// Try proxy, fall back to direct with API key from pod config
+function _getRunpodKey() {
+  var slsEl = document.getElementById('runpod-sls-apikey');
+  var podEl = document.getElementById('runpod-apikey');
+  var k = (slsEl && slsEl.value.trim()) || '';
+  if (!k || k === 'proxy-managed') k = (podEl && podEl.value.trim()) || '';
+  if (k === 'proxy-managed') k = '';
+  return k;
+}
+
+// Try proxy, fall back to direct with API key
 async function _runpodFetch(url, opts) {
+  var rpKey = _getRunpodKey();
+  // If user provided an API key, skip the proxy entirely — go direct
+  if (rpKey) {
+    _slsLogApi('DIRECT (API key provided)', url);
+    var h = Object.assign({}, opts.headers || {}, { 'Authorization': 'Bearer ' + rpKey });
+    return fetch(url, Object.assign({}, opts, { headers: h }));
+  }
+  // Otherwise try proxy
   try {
     var res = await proxiedFetch(url, opts);
     if (res.status === 404) {
       var body = await res.text();
       if (body === 'Not found') throw new Error('Proxy route not found');
-      // Reconstruct response since we consumed the body
       return new Response(body, { status: res.status, statusText: res.statusText, headers: res.headers });
     }
     return res;
   } catch (proxyErr) {
-    _slsLogApi('PROXY FAILED', proxyErr.message + ' — trying direct with API key');
-    var rpKeyEl = document.getElementById('runpod-apikey');
-    var rpKey = rpKeyEl ? rpKeyEl.value.trim() : '';
-    if (!rpKey || rpKey === 'proxy-managed') throw new Error('Worker proxy failed (' + proxyErr.message + '). Switch to Pod mode and enter your RunPod API key, or redeploy the worker (cd worker && wrangler deploy)');
-    var h = Object.assign({}, opts.headers || {}, { 'Authorization': 'Bearer ' + rpKey });
-    return fetch(url, Object.assign({}, opts, { headers: h }));
+    _slsLogApi('PROXY FAILED', proxyErr.message);
+    throw new Error('Worker proxy failed (' + proxyErr.message + '). Enter your RunPod API key above, or redeploy the worker (cd worker && wrangler deploy)');
   }
 }
 
