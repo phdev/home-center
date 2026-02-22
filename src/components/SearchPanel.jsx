@@ -12,12 +12,16 @@ export function SearchPanel({ t, llmSettings, workerSettings }) {
   const [interim, setInterim] = useState("");
   const [expanded, setExpanded] = useState(null);
   const endRef = useRef(null);
+  const scrollRef = useRef(null);
   const hasWorker = !!(workerSettings?.url);
   const hasApiKey = !!(llmSettings?.apiKey);
   const hasLLM = hasWorker || hasApiKey;
 
   useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: "smooth" });
+    // Scroll the messages container to the bottom without using scrollIntoView,
+    // which propagates to ancestor containers and shifts the entire page.
+    const el = scrollRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
   }, [messages, typing]);
 
   const send = async (text) => {
@@ -165,6 +169,7 @@ export function SearchPanel({ t, llmSettings, workerSettings }) {
       {tab === "ask" && (
         <>
           <div
+            ref={scrollRef}
             style={{
               flex: 1,
               overflowY: "auto",
