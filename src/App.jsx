@@ -314,10 +314,13 @@ export default function App() {
         minHeight: "100vh",
         background: "#0A0A0A",
         display: "flex",
-        justifyContent: "center",
+        flexDirection: "column",
+        alignItems: "center",
         paddingTop: 4,
+        paddingBottom: 12,
       }}
     >
+      {/* Scaled dashboard preview */}
       <div
         style={{
           width: tvWidth * scale,
@@ -338,6 +341,57 @@ export default function App() {
         >
           {dashboard}
         </div>
+      </div>
+
+      {/* Theme switcher — full-size, outside the scaled preview */}
+      <div
+        style={{
+          display: "flex",
+          gap: 6,
+          marginTop: 10,
+          padding: "6px 10px",
+          background: "rgba(255,255,255,0.05)",
+          borderRadius: 12,
+          border: "1px solid rgba(255,255,255,0.08)",
+          flexWrap: "wrap",
+          justifyContent: "center",
+        }}
+      >
+        {THEMES.map((th, i) => (
+          <button
+            key={th.id}
+            onClick={() => setThemeIndex(i)}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 5,
+              padding: "6px 12px",
+              borderRadius: 8,
+              border:
+                themeIndex === i
+                  ? `2px solid ${th.accent}`
+                  : "1px solid rgba(255,255,255,0.1)",
+              background:
+                themeIndex === i ? `${th.accent}20` : "transparent",
+              cursor: "pointer",
+              transition: "all 0.2s",
+            }}
+          >
+            <span style={{ fontSize: "1rem" }}>{th.emoji}</span>
+            <span
+              style={{
+                fontFamily: "'DM Sans',sans-serif",
+                fontSize: "0.7rem",
+                fontWeight: 600,
+                color:
+                  themeIndex === i ? th.accent : "rgba(255,255,255,0.5)",
+                whiteSpace: "nowrap",
+              }}
+            >
+              {th.name}
+            </span>
+          </button>
+        ))}
       </div>
     </div>
   );
