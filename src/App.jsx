@@ -3,6 +3,7 @@ import { THEMES } from "./themes";
 import { TABS, BIRTHDAYS } from "./data/mockData";
 import { useTime } from "./hooks/useTime";
 import { useTimers } from "./hooks/useTimers";
+import { usePreviewMode } from "./hooks/usePreviewMode";
 import { Header } from "./components/Header";
 import { CalendarPanel } from "./components/CalendarPanel";
 import { WeatherPanel } from "./components/WeatherPanel";
@@ -24,12 +25,13 @@ export default function App() {
     useTimers();
   const activeTimers = timers.filter((tm) => tm.remaining > 0);
   const alertTimers = timers.filter((tm) => tm.alerted);
+  const { preview, scale, tvWidth, tvHeight } = usePreviewMode();
 
-  return (
+  const dashboard = (
     <>
       <style>{`
         * { box-sizing: border-box; margin: 0; padding: 0 }
-        body { background: #0A0A0A }
+        body { background: #0A0A0A; overflow: ${preview ? "auto" : "hidden"} }
         ::-webkit-scrollbar { width: 3px }
         ::-webkit-scrollbar-track { background: transparent }
         ::-webkit-scrollbar-thumb { background: ${t.text}15; border-radius: 3px }
@@ -43,8 +45,8 @@ export default function App() {
       `}</style>
       <div
         style={{
-          width: "100vw",
-          height: "100vh",
+          width: preview ? tvWidth : "100vw",
+          height: preview ? tvHeight : "100vh",
           background: t.bg,
           padding: "32px 44px 20px",
           display: "flex",
@@ -301,5 +303,42 @@ export default function App() {
         </div>
       </div>
     </>
+  );
+
+  if (!preview) return dashboard;
+
+  return (
+    <div
+      style={{
+        width: "100vw",
+        minHeight: "100vh",
+        background: "#0A0A0A",
+        display: "flex",
+        justifyContent: "center",
+        paddingTop: 4,
+      }}
+    >
+      <div
+        style={{
+          width: tvWidth * scale,
+          height: tvHeight * scale,
+          overflow: "hidden",
+          borderRadius: 8,
+          boxShadow: "0 2px 24px rgba(0,0,0,0.5)",
+          flexShrink: 0,
+        }}
+      >
+        <div
+          style={{
+            width: tvWidth,
+            height: tvHeight,
+            transform: `scale(${scale})`,
+            transformOrigin: "top left",
+          }}
+        >
+          {dashboard}
+        </div>
+      </div>
+    </div>
   );
 }
