@@ -1,0 +1,23 @@
+[Unit]
+Description=Home Center Wake Word Listener (Hey Homer)
+After=sound.target
+Wants=sound.target
+
+[Service]
+Type=simple
+User=__USER__
+WorkingDirectory=__REPO_DIR__
+ExecStart=__REPO_DIR__/pi/.venv/bin/python __REPO_DIR__/pi/wake_word_service.py
+Restart=always
+RestartSec=3
+
+# Audio device access
+SupplementaryGroups=audio video
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=wake-word
+
+[Install]
+WantedBy=multi-user.target
