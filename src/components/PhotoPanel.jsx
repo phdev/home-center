@@ -3,8 +3,10 @@ import { Panel } from "./Panel";
 import { useCycler } from "../hooks/useCycler";
 import { PHOTOS } from "../data/mockData";
 
-export function PhotoPanel({ t }) {
-  const [photo, photoIndex] = useCycler(PHOTOS, 6000);
+export function PhotoPanel({ t, photos, photosLoading }) {
+  const items = photos && photos.length > 0 ? photos : PHOTOS;
+  const showMock = !photos;
+  const [photo, photoIndex] = useCycler(items, 6000);
   const [fade, setFade] = useState(true);
 
   useEffect(() => {
@@ -15,6 +17,23 @@ export function PhotoPanel({ t }) {
 
   return (
     <Panel t={t} noPad style={{ position: "relative" }}>
+      {photosLoading && (
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontFamily: t.bodyFont,
+            fontSize: "0.75rem",
+            color: t.textDim,
+            zIndex: 2,
+          }}
+        >
+          Loading photos…
+        </div>
+      )}
       <img
         src={photo.url}
         alt=""
@@ -46,15 +65,37 @@ export function PhotoPanel({ t }) {
       >
         <div
           style={{
-            fontFamily: t.bodyFont,
-            fontSize: "0.8rem",
-            color: t.id === "paper" ? t.text : "#F0EDE6",
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
           }}
         >
-          {photo.cap}
+          <div
+            style={{
+              fontFamily: t.bodyFont,
+              fontSize: "0.8rem",
+              color: t.id === "paper" ? t.text : "#F0EDE6",
+              flex: 1,
+            }}
+          >
+            {photo.cap}
+          </div>
+          {showMock && (
+            <span
+              style={{
+                fontFamily: t.bodyFont,
+                fontSize: "0.45rem",
+                color: `${t.id === "paper" ? t.text : "#F0EDE6"}80`,
+                textTransform: "uppercase",
+                letterSpacing: "0.05em",
+              }}
+            >
+              demo
+            </span>
+          )}
         </div>
         <div style={{ display: "flex", gap: 4, marginTop: 5 }}>
-          {PHOTOS.map((_, i) => (
+          {items.map((_, i) => (
             <div
               key={i}
               style={{

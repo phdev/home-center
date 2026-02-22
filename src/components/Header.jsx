@@ -2,7 +2,7 @@ import { Clock } from "./Clock";
 import { WeatherStrip } from "./WeatherStrip";
 import { TimerStrip } from "./TimerStrip";
 
-export function Header({ t, now, timers, onTimerTabSwitch }) {
+export function Header({ t, now, timers, onTimerTabSwitch, weatherData, onOpenSettings }) {
   return (
     <div
       style={{
@@ -27,11 +27,27 @@ export function Header({ t, now, timers, onTimerTabSwitch }) {
         >
           {t.id === "terminal" ? "> HOME_" : "Home"}
         </div>
-        <WeatherStrip t={t} />
+        <WeatherStrip t={t} weatherData={weatherData} />
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
         <TimerStrip t={t} timers={timers} onTabSwitch={onTimerTabSwitch} />
         <Clock t={t} now={now} />
+        <button
+          onClick={onOpenSettings}
+          style={{
+            background: `${t.text}06`,
+            border: `1px solid ${t.panelBorder}`,
+            borderRadius: t.radius / 2,
+            padding: "6px 8px",
+            color: t.textDim,
+            fontSize: "1rem",
+            cursor: "pointer",
+            lineHeight: 1,
+            transition: "all 0.2s",
+          }}
+        >
+          ⚙
+        </button>
       </div>
     </div>
   );

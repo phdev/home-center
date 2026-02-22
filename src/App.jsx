@@ -1,31 +1,39 @@
 import { useState } from "react";
 import { THEMES } from "./themes";
-import { TABS, BIRTHDAYS } from "./data/mockData";
+import { BIRTHDAYS } from "./data/mockData";
 import { useTime } from "./hooks/useTime";
 import { useTimers } from "./hooks/useTimers";
 import { usePreviewMode } from "./hooks/usePreviewMode";
+import { useSettings } from "./hooks/useSettings";
+import { useWeather } from "./hooks/useWeather";
+import { useCalendar } from "./hooks/useCalendar";
+import { usePhotos } from "./hooks/usePhotos";
 import { Header } from "./components/Header";
 import { CalendarPanel } from "./components/CalendarPanel";
 import { WeatherPanel } from "./components/WeatherPanel";
 import { PhotoPanel } from "./components/PhotoPanel";
 import { FactPanel } from "./components/FactPanel";
-import { ConversationsPanel } from "./components/ConversationsPanel";
 import { AgentTasksPanel } from "./components/AgentTasksPanel";
 import { EventsPanel } from "./components/EventsPanel";
 import { BirthdaysPanel } from "./components/BirthdaysPanel";
 import { TimersPanel } from "./components/TimersPanel";
 import { SearchPanel } from "./components/SearchPanel";
+import { SettingsModal } from "./components/SettingsModal";
 
 export default function App() {
   const now = useTime();
   const [themeIndex, setThemeIndex] = useState(0);
-  const [tab, setTab] = useState("timers");
+  const [showSettings, setShowSettings] = useState(false);
   const t = THEMES[themeIndex];
   const { timers, addTimer, togglePause, removeTimer, resetTimer, dismissAlert } =
     useTimers();
-  const activeTimers = timers.filter((tm) => tm.remaining > 0);
-  const alertTimers = timers.filter((tm) => tm.alerted);
   const { preview, scale, tvWidth, tvHeight } = usePreviewMode();
+  const { settings, update: updateSettings } = useSettings();
+
+  // Real API data hooks
+  const weather = useWeather(settings.weather);
+  const calendar = useCalendar(settings.calendar);
+  const photos = usePhotos(settings.photos);
 
   const dashboard = (
     <>
@@ -42,6 +50,7 @@ export default function App() {
         @keyframes timerPulse { 0%,100% { opacity: 1 } 50% { opacity: 0.7 } }
         input::placeholder { color: ${t.textDim} }
         input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none }
+        select { color-scheme: dark }
       `}</style>
       <div
         style={{
@@ -99,7 +108,9 @@ export default function App() {
           t={t}
           now={now}
           timers={timers}
-          onTimerTabSwitch={() => setTab("timers")}
+          onTimerTabSwitch={() => {}}
+          weatherData={weather.data}
+          onOpenSettings={() => setShowSettings(true)}
         />
 
         {/* Top row */}
@@ -112,133 +123,81 @@ export default function App() {
             height: "36%",
           }}
         >
-          <CalendarPanel t={t} />
-          <WeatherPanel t={t} />
-          <PhotoPanel t={t} />
+          <CalendarPanel
+            t={t}
+            events={calendar.events}
+            loading={calendar.loading}
+            error={calendar.error}
+          />
+          <WeatherPanel
+            t={t}
+            weatherData={weather.data}
+            loading={weather.loading}
+            error={weather.error}
+          />
+          <PhotoPanel
+            t={t}
+            photos={photos.photos}
+            photosLoading={photos.loading}
+          />
           <FactPanel t={t} />
         </div>
 
-        {/* Bottom row */}
+        {/* Bottom row — all sections visible */}
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "1fr 1.2fr",
+            gridTemplateColumns: "1fr 1fr 1.2fr",
             gap: 14,
             flex: 1,
             marginTop: 14,
             minHeight: 0,
           }}
         >
-          <div style={{ display: "flex", flexDirection: "column", minHeight: 0 }}>
-            {/* Tab bar */}
-            <div
-              style={{
-                display: "flex",
-                gap: 3,
-                marginBottom: 6,
-                flexShrink: 0,
-                flexWrap: "wrap",
-              }}
-            >
-              {TABS.map((tb) => (
-                <button
-                  key={tb.id}
-                  onClick={() => setTab(tb.id)}
-                  style={{
-                    fontFamily: t.bodyFont,
-                    fontSize: "0.68rem",
-                    fontWeight: 600,
-                    padding: "5px 9px",
-                    borderRadius: t.radius / 2,
-                    background:
-                      tab === tb.id ? `${t.accent}15` : `${t.text}04`,
-                    border: `1px solid ${tab === tb.id ? t.accent + "25" : t.panelBorder}`,
-                    color: tab === tb.id ? t.text : t.textDim,
-                    cursor: "pointer",
-                    transition: "all 0.2s",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 4,
-                  }}
-                >
-                  <span style={{ fontSize: "0.78rem" }}>{tb.icon}</span>
-                  {tb.label}
-                  {tb.id === "agents" && (
-                    <span
-                      style={{
-                        width: 5,
-                        height: 5,
-                        borderRadius: "50%",
-                        background: t.warm,
-                        marginLeft: 1,
-                      }}
-                    />
-                  )}
-                  {tb.id === "birthdays" &&
-                    BIRTHDAYS.some((b) => b.daysUntil === 1) && (
-                      <span
-                        style={{
-                          width: 5,
-                          height: 5,
-                          borderRadius: "50%",
-                          background: "#FF6B6B",
-                          marginLeft: 1,
-                          animation: "typingDot 2s ease infinite",
-                        }}
-                      />
-                    )}
-                  {tb.id === "timers" &&
-                    (alertTimers.length > 0 ? (
-                      <span
-                        style={{
-                          width: 5,
-                          height: 5,
-                          borderRadius: "50%",
-                          background: t.warm,
-                          marginLeft: 1,
-                          animation: "timerPulse 1s ease infinite",
-                        }}
-                      />
-                    ) : activeTimers.length > 0 ? (
-                      <span
-                        style={{
-                          fontFamily: t.bodyFont,
-                          fontSize: "0.5rem",
-                          padding: "1px 4px",
-                          borderRadius: 6,
-                          background: `${t.accent}15`,
-                          color: t.accent,
-                          marginLeft: 1,
-                        }}
-                      >
-                        {activeTimers.length}
-                      </span>
-                    ) : null)}
-                </button>
-              ))}
-            </div>
-
-            {/* Tab content */}
+          {/* Left column: Agents + Birthdays stacked */}
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: 14,
+              minHeight: 0,
+            }}
+          >
             <div style={{ flex: 1, minHeight: 0 }}>
-              {tab === "convos" && <ConversationsPanel t={t} />}
-              {tab === "agents" && <AgentTasksPanel t={t} />}
-              {tab === "events" && <EventsPanel t={t} />}
-              {tab === "birthdays" && <BirthdaysPanel t={t} />}
-              {tab === "timers" && (
-                <TimersPanel
-                  t={t}
-                  timers={timers}
-                  addTimer={addTimer}
-                  togglePause={togglePause}
-                  removeTimer={removeTimer}
-                  resetTimer={resetTimer}
-                  dismissAlert={dismissAlert}
-                />
-              )}
+              <AgentTasksPanel t={t} />
+            </div>
+            <div style={{ flex: 1, minHeight: 0 }}>
+              <BirthdaysPanel t={t} />
             </div>
           </div>
 
-          <SearchPanel t={t} />
+          {/* Middle column: Events + Timers stacked */}
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: 14,
+              minHeight: 0,
+            }}
+          >
+            <div style={{ flex: 1, minHeight: 0 }}>
+              <EventsPanel t={t} />
+            </div>
+            <div style={{ flex: 1, minHeight: 0 }}>
+              <TimersPanel
+                t={t}
+                timers={timers}
+                addTimer={addTimer}
+                togglePause={togglePause}
+                removeTimer={removeTimer}
+                resetTimer={resetTimer}
+                dismissAlert={dismissAlert}
+              />
+            </div>
+          </div>
+
+          {/* Right column: Ask Anything (with History tab) */}
+          <SearchPanel t={t} llmSettings={settings.llm} />
         </div>
 
         {/* Theme name footer */}
@@ -258,6 +217,16 @@ export default function App() {
           {t.emoji} {t.name}
         </div>
       </div>
+
+      {/* Settings modal */}
+      {showSettings && (
+        <SettingsModal
+          t={t}
+          settings={settings}
+          onSave={updateSettings}
+          onClose={() => setShowSettings(false)}
+        />
+      )}
     </>
   );
 

@@ -1,7 +1,14 @@
-export function WeatherStrip({ t }) {
+export function WeatherStrip({ t, weatherData }) {
+  const current = weatherData?.current;
+  const temp = current?.temp ?? 72;
+  const icon = current?.icon ?? "☀️";
+  const desc = current?.desc ?? "Sunny";
+  const hi = current?.hi ?? 78;
+  const lo = current?.lo ?? 62;
+
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-      <span style={{ fontSize: "1.8rem" }}>{"\u2600\uFE0F"}</span>
+      <span style={{ fontSize: "1.8rem" }}>{icon}</span>
       <div>
         <div
           style={{
@@ -12,7 +19,7 @@ export function WeatherStrip({ t }) {
             lineHeight: 1,
           }}
         >
-          72°
+          {temp}°
         </div>
         <div
           style={{
@@ -21,7 +28,7 @@ export function WeatherStrip({ t }) {
             color: t.textMuted,
           }}
         >
-          Sunny · H:78° L:62°
+          {desc} · H:{hi}° L:{lo}°
         </div>
       </div>
     </div>
