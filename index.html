@@ -5111,7 +5111,7 @@ async function _runpodGql(query, variables) {
   var data;
   try { data = JSON.parse(text); } catch(e) { _slsLogApi('GQL RESPONSE ' + res.status, text); throw new Error('RunPod GraphQL error: ' + res.status + ' — ' + text.slice(0, 200)); }
   _slsLogApi('GQL RESPONSE ' + res.status, data);
-  if (!res.ok) throw new Error('RunPod GraphQL error: ' + res.status);
+  if (!res.ok) throw new Error('RunPod GraphQL error: ' + res.status + ' — ' + JSON.stringify(data).slice(0, 300));
   if (data.errors && data.errors.length) throw new Error('GQL: ' + data.errors[0].message);
   return data.data;
 }
