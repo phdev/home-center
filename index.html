@@ -5096,14 +5096,6 @@ function _slsUpdateEndpointInfo() {
 async function _serverlessApi(method, path, body) {
   var opts = { method: method, headers: { 'Content-Type': 'application/json' } };
   if (body) opts.body = JSON.stringify(body);
-  // Bypass proxy for large payloads (CF Workers have 10MB body limit)
-  if (opts.body && opts.body.length > 5 * 1024 * 1024) {
-    var rpKey = document.getElementById('runpod-apikey').value.trim();
-    if (!rpKey) throw new Error('RunPod API key required for large payloads (> 5MB). Enter it in the Splat tab.');
-    opts.headers['Authorization'] = 'Bearer ' + rpKey;
-    _slsLogApi('DIRECT (bypass proxy, ' + (opts.body.length / 1e6).toFixed(1) + 'MB)', method + ' ' + path);
-    return fetch('https://api.runpod.ai/v2' + path, opts);
-  }
   return proxiedFetch('https://api.runpod.ai/v2' + path, opts);
 }
 
@@ -5307,15 +5299,53 @@ async function runpodServerlessTrain() {
       }
     }
 
-    updateProg('Extracted ' + data.frames.length + ' frames. Submitting serverless job...');
+    // --- Phase 3: Downscale frames to fit RunPod 10MB payload limit ---
+    var _SLS_MAX_PAYLOAD = 9.5 * 1024 * 1024; // stay under 10MiB with margin
+    var framesList = data.frames.map(function(f) { return { name: f.name, b64: f.b64 }; });
+    var payloadSize = JSON.stringify({ input: { frames: framesList } }).length;
+    updateProg('Extracted ' + data.frames.length + ' frames (' + (payloadSize / 1e6).toFixed(1) + 'MB)...');
+    if (payloadSize > _SLS_MAX_PAYLOAD) {
+      updateProg('Payload ' + (payloadSize / 1e6).toFixed(1) + 'MB exceeds 10MB limit. Downscaling frames...');
+      var scale = Math.sqrt(_SLS_MAX_PAYLOAD / payloadSize) * 0.9; // target ~90% of limit
+      var newW = Math.round(_flyCamParams.w * scale);
+      var newH = Math.round(_flyCamParams.h * scale);
+      newW = Math.max(newW, 128); newH = Math.max(newH, 128);
+      var dsCanvas = document.createElement('canvas');
+      dsCanvas.width = newW; dsCanvas.height = newH;
+      var dsCtx = dsCanvas.getContext('2d');
+      var tmpImg = new Image();
+      for (var di = 0; di < data.frames.length; di++) {
+        if (di % 10 === 0) updateProg('Downscaling frame ' + (di + 1) + '/' + data.frames.length + ' to ' + newW + 'x' + newH + '...');
+        await new Promise(function(resolve) {
+          tmpImg.onload = resolve;
+          tmpImg.src = 'data:image/jpeg;base64,' + data.frames[di].b64;
+        });
+        dsCtx.drawImage(tmpImg, 0, 0, newW, newH);
+        data.frames[di].b64 = dsCanvas.toDataURL('image/jpeg', 0.80).split(',')[1];
+        if (di % 4 === 0) await new Promise(function(r) { setTimeout(r, 0); });
+      }
+      // Rebuild transforms with new dimensions
+      data.transforms = _buildTransformsJson(
+        data.frames.map(function(f) { return { elements: f.elements }; }),
+        newW, newH, _flyCamParams.fov
+      );
+      for (var fi = 0; fi < data.transforms.frames.length; fi++) {
+        data.transforms.frames[fi].file_path = 'images/' + data.frames[fi].name;
+      }
+      framesList = data.frames.map(function(f) { return { name: f.name, b64: f.b64 }; });
+      payloadSize = JSON.stringify({ input: { frames: framesList } }).length;
+      updateProg('Downscaled to ' + newW + 'x' + newH + ' (' + (payloadSize / 1e6).toFixed(1) + 'MB). Submitting...');
+    } else {
+      updateProg('Payload fits (' + (payloadSize / 1e6).toFixed(1) + 'MB). Submitting serverless job...');
+    }
 
-    // --- Phase 3: Build payload ---
+    // Build final payload
     var payload = {
       input: {
         action: 'train_3dgs',
         iterations: iterations,
         transforms: data.transforms,
-        frames: data.frames.map(function(f) { return { name: f.name, b64: f.b64 }; })
+        frames: framesList
       }
     };
 
