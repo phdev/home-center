@@ -324,10 +324,6 @@
           <option value="pod">Pod (manual)</option>
         </select>
       </div>
-      <div class="slider-group" style="margin-bottom:6px">
-        <div class="slider-label"><span>RunPod API Key</span></div>
-        <input type="password" id="runpod-apikey" placeholder="rpa_xxxxxxxx" style="width:100%;background:var(--surface2);color:var(--text);border:1px solid var(--border);padding:4px 8px;border-radius:4px;font-size:11px;font-family:monospace">
-      </div>
       <!-- Serverless config -->
       <div id="runpod-serverless-cfg">
         <div id="sls-endpoint-info" style="font-size:10px;color:var(--text-dim);margin-bottom:6px;padding:4px 8px;background:var(--surface2);border-radius:4px;font-family:'JetBrains Mono',monospace">Endpoint: auto-created on first run</div>
@@ -351,6 +347,10 @@
       </div>
       <!-- Pod config (hidden by default) -->
       <div id="runpod-pod-cfg" style="display:none">
+        <div class="slider-group" style="margin-bottom:6px">
+          <div class="slider-label"><span>RunPod API Key</span></div>
+          <input type="password" id="runpod-apikey" placeholder="rpa_xxxxxxxx" style="width:100%;background:var(--surface2);color:var(--text);border:1px solid var(--border);padding:4px 8px;border-radius:4px;font-size:11px;font-family:monospace">
+        </div>
         <div class="slider-group">
           <div class="slider-label"><span>GPU</span></div>
           <select id="runpod-gpu" style="width:100%;background:var(--surface2);color:var(--text);border:1px solid var(--border);padding:4px 8px;border-radius:4px;font-size:11px">
@@ -3863,18 +3863,7 @@ if (_proxyParam === '' || _proxyParam === 'clear') { localStorage.removeItem('pr
 else if (_proxyParam) { var _pu = _proxyParam.replace(/\/+$/, ''); localStorage.setItem('proxy_url', _pu); _proxyUrl = _pu; }
 else { var _stored = localStorage.getItem('proxy_url'); if (_stored) _proxyUrl = _stored; }
 // API key persistence: load from localStorage, URL params override
-var _apiKeyIds = ['runway-apikey', 'decart-apikey', 'marble-apikey', 'kiri-apikey'];
-// RunPod key is always user-managed (used directly for serverless calls)
-var _rpKeyEl = document.getElementById('runpod-apikey');
-if (_rpKeyEl) {
-  var _rpSaved = localStorage.getItem('apikey_runpod-apikey');
-  if (_rpSaved && !_rpKeyEl.value) _rpKeyEl.value = _rpSaved;
-  _rpKeyEl.addEventListener('input', function() {
-    var v = _rpKeyEl.value.trim();
-    if (v) localStorage.setItem('apikey_runpod-apikey', v);
-    else localStorage.removeItem('apikey_runpod-apikey');
-  });
-}
+var _apiKeyIds = ['runway-apikey', 'decart-apikey', 'marble-apikey', 'kiri-apikey', 'runpod-apikey'];
 if (_proxyUrl) {
   _apiKeyIds.forEach(function(id) {
     var el = document.getElementById(id); if (!el) return;
@@ -5104,27 +5093,18 @@ function _slsUpdateEndpointInfo() {
   }
 }
 
-function _getRunpodKey() {
-  var el = document.getElementById('runpod-apikey');
-  return el ? el.value.trim() : '';
-}
-
 async function _serverlessApi(method, path, body) {
-  var key = _getRunpodKey();
-  if (!key) throw new Error('Enter your RunPod API key');
-  var opts = { method: method, headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key } };
+  var opts = { method: method, headers: { 'Content-Type': 'application/json' } };
   if (body) opts.body = JSON.stringify(body);
-  return fetch('https://api.runpod.ai/v2' + path, opts);
+  return proxiedFetch('https://api.runpod.ai/v2' + path, opts);
 }
 
 async function _runpodGql(query, variables) {
-  var key = _getRunpodKey();
-  if (!key) throw new Error('Enter your RunPod API key');
   var reqBody = { query: query, variables: variables || {} };
   _slsLogApi('GQL REQUEST', { query: query.replace(/\s+/g, ' ').trim(), variables: variables });
-  var res = await fetch('https://api.runpod.io/graphql', {
+  var res = await proxiedFetch('https://api.runpod.io/graphql', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(reqBody)
   });
   var text = await res.text();
