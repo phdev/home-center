@@ -5096,6 +5096,14 @@ function _slsUpdateEndpointInfo() {
 async function _serverlessApi(method, path, body) {
   var opts = { method: method, headers: { 'Content-Type': 'application/json' } };
   if (body) opts.body = JSON.stringify(body);
+  // Bypass proxy for large payloads (CF Workers have 10MB body limit)
+  if (opts.body && opts.body.length > 5 * 1024 * 1024) {
+    var rpKey = document.getElementById('runpod-apikey').value.trim();
+    if (!rpKey) throw new Error('RunPod API key required for large payloads (> 5MB). Enter it in the Splat tab.');
+    opts.headers['Authorization'] = 'Bearer ' + rpKey;
+    _slsLogApi('DIRECT (bypass proxy, ' + (opts.body.length / 1e6).toFixed(1) + 'MB)', method + ' ' + path);
+    return fetch('https://api.runpod.ai/v2' + path, opts);
+  }
   return proxiedFetch('https://api.runpod.ai/v2' + path, opts);
 }
 
