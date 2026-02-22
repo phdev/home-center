@@ -374,6 +374,11 @@
       </div>
     </div>
     <div id="v2s-progress" style="display:none;font-size:11px;color:var(--accent2);margin-top:4px;line-height:1.6"></div>
+    <div id="runpod-pending" style="display:none;margin-top:6px;padding:8px;background:var(--surface2);border:1px solid var(--accent2);border-radius:4px;font-size:11px">
+      <div style="color:var(--accent2);margin-bottom:4px">Pending RunPod training job</div>
+      <div id="runpod-pending-info" style="color:var(--text-dim);margin-bottom:6px"></div>
+      <div class="btn-group"><button class="btn btn-accent2" onclick="serverlessCheckStatus()">Check Status</button><button class="btn" onclick="clearSlsPending()">Dismiss</button></div>
+    </div>
     <div id="runpod-status" style="display:none;margin-top:6px;padding:6px;background:var(--surface2);border:1px solid var(--border);border-radius:4px;font-family:monospace;font-size:10px;color:var(--text-dim);line-height:1.6;white-space:pre-wrap"></div>
     <details id="sls-api-log-wrap" style="margin-top:6px">
       <summary style="cursor:pointer;font-size:10px;color:var(--text-dim);user-select:none">API Response Log <span onclick="event.stopPropagation();document.getElementById('sls-api-log').textContent='';toast('Log cleared')" style="margin-left:8px;color:var(--accent);cursor:pointer">[clear]</span></summary>
@@ -1305,6 +1310,7 @@ document.addEventListener('visibilitychange', function() {
     showRunwayPending();
     showDecartPending();
     showMarblePending();
+    showSlsPending();
   }
 });
 
@@ -5083,6 +5089,30 @@ async function runpodTerminate() {
 var _serverlessState = { endpointId: null, templateId: null, jobId: null, phase: null };
 var _SLS_DOCKER_IMAGE = 'runpod/pytorch:2.4.1-py3.11-cuda12.4.1-devel-ubuntu22.04';
 var _SLS_STORAGE_KEY = 'runpod_sls_endpoint';
+var _SLS_JOB_KEY = 'runpod_sls_job';
+
+// ---- RunPod serverless job persistence ----
+function saveSlsPending(jobId, endpointId) {
+  localStorage.setItem(_SLS_JOB_KEY, JSON.stringify({ jobId: jobId, endpointId: endpointId, time: Date.now() }));
+}
+function clearSlsPending() {
+  localStorage.removeItem(_SLS_JOB_KEY);
+  _serverlessState.jobId = null;
+  _serverlessState.phase = null;
+  var el = document.getElementById('runpod-pending'); if (el) el.style.display = 'none';
+}
+function showSlsPending() {
+  var raw = localStorage.getItem(_SLS_JOB_KEY); if (!raw) return;
+  try { var p = JSON.parse(raw); } catch(e) { return; }
+  var age = Math.round((Date.now() - p.time) / 60000);
+  if (age > 120) { clearSlsPending(); return; } // expire after 2 hours
+  // Restore in-memory state
+  _serverlessState.jobId = p.jobId;
+  if (p.endpointId) _serverlessState.endpointId = p.endpointId;
+  var el = document.getElementById('runpod-pending'); if (!el) return;
+  document.getElementById('runpod-pending-info').textContent = 'Job: ' + p.jobId + ' (' + age + ' min ago)';
+  el.style.display = 'block';
+}
 
 function toggleRunpodMode() {
   var mode = document.getElementById('runpod-mode').value;
@@ -5384,6 +5414,7 @@ async function runpodServerlessTrain() {
     if (!jobId) throw new Error('No job ID returned. Response: ' + JSON.stringify(submitData).slice(0, 300));
     _serverlessState.jobId = jobId;
     _serverlessState.phase = 'queued';
+    saveSlsPending(jobId, endpointId);
     updateProg('Job submitted: ' + jobId + '. Waiting for worker...');
 
     // --- Phase 5: Poll for completion ---
@@ -5413,65 +5444,20 @@ async function runpodServerlessTrain() {
       var elapsed = Math.round((pi + 1) * 5 / 60);
 
       if (jobStatus === 'COMPLETED') {
-        _serverlessState.phase = 'completed';
+        clearSlsPending();
         _slsLogApi('JOB COMPLETED', statusData);
         updateProg('Job completed! Processing result...');
-
-        // --- Phase 6: Extract result ---
-        var output = statusData.output;
-        if (!output) throw new Error('Job completed but no output returned. Full response: ' + JSON.stringify(statusData).slice(0, 500));
-
-        var plyBytes = null;
-        if (output.ply_b64) {
-          var raw = atob(output.ply_b64);
-          plyBytes = new Uint8Array(raw.length);
-          for (var bi = 0; bi < raw.length; bi++) plyBytes[bi] = raw.charCodeAt(bi);
-        } else if (output.ply_url) {
-          updateProg('Downloading PLY from ' + output.ply_url.substring(0, 60) + '...');
-          var dlRes = await proxiedFetch(output.ply_url);
-          if (!dlRes.ok) throw new Error('PLY download failed: ' + dlRes.status);
-          plyBytes = new Uint8Array(await dlRes.arrayBuffer());
-        } else if (output.splat_b64) {
-          var raw = atob(output.splat_b64);
-          plyBytes = new Uint8Array(raw.length);
-          for (var bi = 0; bi < raw.length; bi++) plyBytes[bi] = raw.charCodeAt(bi);
-        } else if (output.splat_url) {
-          updateProg('Downloading splat from ' + output.splat_url.substring(0, 60) + '...');
-          var dlRes = await proxiedFetch(output.splat_url);
-          if (!dlRes.ok) throw new Error('Splat download failed: ' + dlRes.status);
-          plyBytes = new Uint8Array(await dlRes.arrayBuffer());
-        } else {
-          throw new Error('No PLY or splat in job output. Keys: ' + Object.keys(output).join(', '));
-        }
-
-        updateProg('Downloaded splat (' + (plyBytes.length / 1e6).toFixed(1) + ' MB). Loading into viewer...');
-
-        // --- Phase 7: Load into Spark.js ---
-        await ensureSparkLoaded();
-        if (_splatMesh) { scene.remove(_splatMesh); if (_splatMesh.dispose) _splatMesh.dispose(); _splatMesh = null; }
-        var Spark = window.Spark;
-        _splatMesh = new Spark.SplatMesh({
-          fileBytes: plyBytes,
-          onLoad: function(mesh) {
-            var numSplats = mesh.numSplats || 'unknown';
-            document.getElementById('splat-info').textContent = 'Serverless 3DGS: ' + numSplats + ' splats (' + (plyBytes.length / 1e6).toFixed(1) + ' MB)';
-            toast('Splat loaded (' + numSplats + ' splats)');
-            syncSplatSlidersToMesh();
-          }
-        });
-        scene.add(_splatMesh);
-
-        _serverlessState.phase = 'done';
-        updateProg('Done! Splat loaded in viewer. Job: ' + jobId);
-        toast('Serverless training complete — splat loaded!');
+        await _slsHandleCompletedOutput(statusData.output, updateProg, jobId);
         break;
 
       } else if (jobStatus === 'FAILED') {
+        clearSlsPending();
         _slsLogApi('JOB FAILED', statusData);
         var errMsg = statusData.error || (statusData.output && statusData.output.error) || JSON.stringify(statusData).slice(0, 500);
         throw new Error('Job failed: ' + errMsg);
 
       } else if (jobStatus === 'CANCELLED') {
+        clearSlsPending();
         _slsLogApi('JOB CANCELLED', statusData);
         throw new Error('Job was cancelled');
 
@@ -5502,7 +5488,10 @@ async function serverlessCheckStatus() {
   var jobId = _serverlessState.jobId;
   if (!endpointId || !jobId) { toast('No active serverless job'); return; }
   var prog = document.getElementById('v2s-progress');
+  var pendEl = document.getElementById('runpod-pending');
   prog.style.display = 'block';
+  if (pendEl) pendEl.style.display = 'none';
+  function updateProg(msg) { prog.textContent = msg; _runpodLog(msg); }
   try {
     var res = await _serverlessApi('GET', '/' + endpointId + '/status/' + jobId);
     var text = await res.text();
@@ -5524,10 +5513,102 @@ async function serverlessCheckStatus() {
     }
     if (data.error) lines.push('Error: ' + data.error);
     _runpodLog(lines.join('\n'));
-    prog.textContent = 'Job ' + data.status + (data.output && data.output.progress ? ' — ' + data.output.progress : '');
+
+    if (data.status === 'COMPLETED') {
+      clearSlsPending();
+      updateProg('Job completed! Processing result...');
+      await _slsHandleCompletedOutput(data.output, updateProg, jobId);
+    } else if (data.status === 'FAILED') {
+      clearSlsPending();
+      prog.textContent = 'Job failed: ' + (data.error || (data.output && data.output.error) || 'unknown');
+      toast('RunPod job failed');
+    } else if (data.status === 'CANCELLED') {
+      clearSlsPending();
+      prog.textContent = 'Job was cancelled';
+    } else {
+      // Still running — resume polling
+      updateProg('Job ' + data.status + ' — resuming poll...');
+      var maxPolls = 720;
+      for (var pi = 0; pi < maxPolls; pi++) {
+        await pollSleep(5000);
+        var statusRes = await _serverlessApi('GET', '/' + endpointId + '/status/' + jobId);
+        var statusText = await statusRes.text();
+        var statusData;
+        try { statusData = JSON.parse(statusText); } catch(e) { statusData = null; }
+        if (statusData && (pi % 6 === 0)) _slsLogApi('STATUS ' + statusRes.status + ' (poll #' + (pi + 1) + ')', statusData);
+        if (!statusRes.ok || !statusData) { updateProg('Poll retry...'); continue; }
+        var jobStatus = statusData.status;
+        var elapsed = Math.round((pi + 1) * 5 / 60);
+        if (jobStatus === 'COMPLETED') {
+          clearSlsPending();
+          updateProg('Job completed! Processing result...');
+          await _slsHandleCompletedOutput(statusData.output, updateProg, jobId);
+          break;
+        } else if (jobStatus === 'FAILED') {
+          clearSlsPending();
+          updateProg('Job failed: ' + (statusData.error || 'unknown'));
+          toast('RunPod job failed');
+          break;
+        } else if (jobStatus === 'CANCELLED') {
+          clearSlsPending();
+          updateProg('Job was cancelled');
+          break;
+        } else {
+          var detail = '';
+          if (statusData.output && statusData.output.progress) detail = ' — ' + statusData.output.progress;
+          if (statusData.executionTime) detail += ' (exec: ' + Math.round(statusData.executionTime / 1000) + 's)';
+          updateProg('Job ' + jobStatus + detail + ' (' + elapsed + ' min)');
+        }
+      }
+    }
   } catch (err) {
     prog.textContent = 'Status error: ' + err.message;
   }
+}
+
+// Shared handler for COMPLETED output — extracts PLY and loads into viewer
+async function _slsHandleCompletedOutput(output, updateProg, jobId) {
+  if (!output) throw new Error('Job completed but no output returned');
+  var plyBytes = null;
+  if (output.ply_b64) {
+    var raw = atob(output.ply_b64);
+    plyBytes = new Uint8Array(raw.length);
+    for (var bi = 0; bi < raw.length; bi++) plyBytes[bi] = raw.charCodeAt(bi);
+  } else if (output.ply_url) {
+    updateProg('Downloading PLY from ' + output.ply_url.substring(0, 60) + '...');
+    var dlRes = await proxiedFetch(output.ply_url);
+    if (!dlRes.ok) throw new Error('PLY download failed: ' + dlRes.status);
+    plyBytes = new Uint8Array(await dlRes.arrayBuffer());
+  } else if (output.splat_b64) {
+    var raw = atob(output.splat_b64);
+    plyBytes = new Uint8Array(raw.length);
+    for (var bi = 0; bi < raw.length; bi++) plyBytes[bi] = raw.charCodeAt(bi);
+  } else if (output.splat_url) {
+    updateProg('Downloading splat from ' + output.splat_url.substring(0, 60) + '...');
+    var dlRes = await proxiedFetch(output.splat_url);
+    if (!dlRes.ok) throw new Error('Splat download failed: ' + dlRes.status);
+    plyBytes = new Uint8Array(await dlRes.arrayBuffer());
+  } else {
+    throw new Error('No PLY or splat in job output. Keys: ' + Object.keys(output).join(', '));
+  }
+
+  updateProg('Downloaded splat (' + (plyBytes.length / 1e6).toFixed(1) + ' MB). Loading into viewer...');
+  await ensureSparkLoaded();
+  if (_splatMesh) { scene.remove(_splatMesh); if (_splatMesh.dispose) _splatMesh.dispose(); _splatMesh = null; }
+  var Spark = window.Spark;
+  _splatMesh = new Spark.SplatMesh({
+    fileBytes: plyBytes,
+    onLoad: function(mesh) {
+      var numSplats = mesh.numSplats || 'unknown';
+      document.getElementById('splat-info').textContent = 'Serverless 3DGS: ' + numSplats + ' splats (' + (plyBytes.length / 1e6).toFixed(1) + ' MB)';
+      toast('Splat loaded (' + numSplats + ' splats)');
+      syncSplatSlidersToMesh();
+    }
+  });
+  scene.add(_splatMesh);
+  _serverlessState.phase = 'done';
+  updateProg('Done! Splat loaded in viewer. Job: ' + jobId);
+  toast('Serverless training complete — splat loaded!');
 }
 
 async function serverlessCancel() {
@@ -5544,8 +5625,7 @@ async function serverlessCancel() {
     _slsLogApi('CANCEL ' + res.status, data);
     _runpodLog('Job ' + jobId + ' cancelled.');
     prog.textContent = 'Job cancelled.';
-    _serverlessState.jobId = null;
-    _serverlessState.phase = null;
+    clearSlsPending();
     toast('Job cancelled');
   } catch (err) {
     prog.textContent = 'Cancel error: ' + err.message;
@@ -5600,8 +5680,8 @@ var vp=rndr.getSize(new THREE.Vector2());rndr.setViewport(vp.x-s-10,vp.y-s-10,s,
 }
 
 // Expose for inline HTML handlers
-Object.assign(window,{switchTab,toggleDrawer,fitView,loadFile,exportTrack,undoAll,handleFile,handleImageUpload,setEditMode,smoothSelection,smoothAll,applyElevation,extractControlPoints,rebuildFromSpline,updateCPFromInput,insertCPAfter,deleteSelectedCP,onDefaultWidthChange,setAllWidths,onCPWidthChange,widthPreset,rebuildWithWidth,previewLoop,makeLoop,removeLoop,generateTerrain,clearTerrain,toggleSpeedPads,placeSpeedPads,toggleAICars,placeAICars,generateScenery,clearScenery,toggleScenery,exportAll,startGame,stopGame,generateMarbleWorld,trackAwarePrompt,loadSplatFromURL,loadSplatFromFile,removeSplat,splatBackdropPreset,splatResetTransform,checkMarbleOperation,clearMarblePending,checkRunwayOperation,clearRunwayPending,exportTrainingViews,previewPanoCaptures,batchPanoMarble,loadPanoSection,exportPanoSections,recordFlythrough,downloadFlythrough,runRunwayStylize,runMarbleFromVideo,runFullPipeline,onProviderChange,onModelChange,runStylize,checkPendingOperation,clearAllPending,generateKiri,checkKiriStatus,clearKiriPending,exportFlythroughTraining,extractStylizedTraining,runpodTrain,runpodCheckStatus,runpodTerminate,useStylizedVideo,toggleRunpodMode,runpodServerlessTrain,serverlessCheckStatus,serverlessCancel,serverlessDeleteEndpoint});
-init();fitView();showMarblePending();showRunwayPending();showDecartPending();showKiriPending();onRunwayModelChange();
+Object.assign(window,{switchTab,toggleDrawer,fitView,loadFile,exportTrack,undoAll,handleFile,handleImageUpload,setEditMode,smoothSelection,smoothAll,applyElevation,extractControlPoints,rebuildFromSpline,updateCPFromInput,insertCPAfter,deleteSelectedCP,onDefaultWidthChange,setAllWidths,onCPWidthChange,widthPreset,rebuildWithWidth,previewLoop,makeLoop,removeLoop,generateTerrain,clearTerrain,toggleSpeedPads,placeSpeedPads,toggleAICars,placeAICars,generateScenery,clearScenery,toggleScenery,exportAll,startGame,stopGame,generateMarbleWorld,trackAwarePrompt,loadSplatFromURL,loadSplatFromFile,removeSplat,splatBackdropPreset,splatResetTransform,checkMarbleOperation,clearMarblePending,checkRunwayOperation,clearRunwayPending,exportTrainingViews,previewPanoCaptures,batchPanoMarble,loadPanoSection,exportPanoSections,recordFlythrough,downloadFlythrough,runRunwayStylize,runMarbleFromVideo,runFullPipeline,onProviderChange,onModelChange,runStylize,checkPendingOperation,clearAllPending,generateKiri,checkKiriStatus,clearKiriPending,exportFlythroughTraining,extractStylizedTraining,runpodTrain,runpodCheckStatus,runpodTerminate,useStylizedVideo,toggleRunpodMode,runpodServerlessTrain,serverlessCheckStatus,serverlessCancel,serverlessDeleteEndpoint,clearSlsPending});
+init();fitView();showMarblePending();showRunwayPending();showDecartPending();showKiriPending();showSlsPending();_slsUpdateEndpointInfo();onRunwayModelChange();
 </script>
 
 </body>
