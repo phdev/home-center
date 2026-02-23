@@ -14,7 +14,9 @@ compatibility_date = "2024-12-01"
 OPENAI_MODEL = "gpt-4o-mini"
 OPENAI_IMAGE_MODEL = "dall-e-3"
 ALLOWED_ORIGIN = "*"
-# Comma-separated iCal URLs (public or private webcal/https)
-CALENDAR_URLS = ""
-# iCloud Shared Album token (from share URL)
-PHOTOS_ALBUM_TOKEN = ""
+
+# IMPORTANT: Set these via `wrangler secret put <NAME>` (NOT as [vars]).
+# Empty string vars here would shadow your secrets!
+#
+#   CALENDAR_URLS        - Comma-separated iCal URLs (public or private webcal/https)
+#   PHOTOS_ALBUM_TOKEN   - iCloud Shared Album token (from share URL)

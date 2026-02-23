@@ -3,7 +3,7 @@ import { Panel } from "./Panel";
 import { useCycler } from "../hooks/useCycler";
 import { PHOTOS } from "../data/mockData";
 
-export function PhotoPanel({ t, photos, photosLoading }) {
+export function PhotoPanel({ t, photos, photosLoading, photosError }) {
   const items = photos && photos.length > 0 ? photos : PHOTOS;
   const showMock = !photos;
   const [photo, photoIndex] = useCycler(items, 6000);
@@ -32,6 +32,27 @@ export function PhotoPanel({ t, photos, photosLoading }) {
           }}
         >
           Loading photos…
+        </div>
+      )}
+      {photosError && (
+        <div
+          style={{
+            position: "absolute",
+            bottom: 8,
+            left: 8,
+            right: 8,
+            padding: "6px 10px",
+            borderRadius: t.radius / 3,
+            background: "rgba(0,0,0,0.7)",
+            backdropFilter: "blur(6px)",
+            fontFamily: t.bodyFont,
+            fontSize: "0.62rem",
+            color: t.warm,
+            lineHeight: 1.4,
+            zIndex: 3,
+          }}
+        >
+          {photosError}
         </div>
       )}
       <img

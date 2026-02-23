@@ -143,6 +143,7 @@ export default function App() {
               t={t}
               photos={photos.photos}
               photosLoading={photos.loading}
+              photosError={photos.error}
             />
           </div>
           <FactPanel t={t} />

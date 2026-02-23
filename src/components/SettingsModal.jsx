@@ -3,6 +3,32 @@ import { useState } from "react";
 export function SettingsModal({ t, settings, onSave, onClose }) {
   const [local, setLocal] = useState(JSON.parse(JSON.stringify(settings)));
   const [newCalUrl, setNewCalUrl] = useState("");
+  const [health, setHealth] = useState(null);
+  const [healthLoading, setHealthLoading] = useState(false);
+  const [healthError, setHealthError] = useState(null);
+
+  const testConnection = async () => {
+    const url = local.worker.url?.trim();
+    if (!url) return;
+    setHealthLoading(true);
+    setHealth(null);
+    setHealthError(null);
+    try {
+      const headers = {};
+      if (local.worker.token) headers.Authorization = `Bearer ${local.worker.token}`;
+      const res = await fetch(`${url}/api/health`, { headers });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        setHealthError(err.error || `HTTP ${res.status}`);
+      } else {
+        setHealth(await res.json());
+      }
+    } catch (e) {
+      setHealthError(`Network error: ${e.message}`);
+    } finally {
+      setHealthLoading(false);
+    }
+  };
 
   const update = (section, key, value) => {
     setLocal((prev) => ({
@@ -187,6 +213,83 @@ export function SettingsModal({ t, settings, onSave, onClose }) {
             >
               Worker mode active — calendar, photos & LLM sections below are
               only used as fallbacks if the worker is unavailable.
+            </div>
+          )}
+          {local.worker.url && (
+            <div style={{ marginTop: 10 }}>
+              <button
+                onClick={testConnection}
+                disabled={healthLoading}
+                style={{
+                  background: `${t.accent}15`,
+                  border: `1px solid ${t.accent}30`,
+                  borderRadius: t.radius / 3,
+                  padding: "6px 14px",
+                  color: t.accent,
+                  fontFamily: t.bodyFont,
+                  fontSize: "0.72rem",
+                  fontWeight: 600,
+                  cursor: healthLoading ? "wait" : "pointer",
+                  opacity: healthLoading ? 0.6 : 1,
+                }}
+              >
+                {healthLoading ? "Testing…" : "Test Connection"}
+              </button>
+              {healthError && (
+                <div
+                  style={{
+                    marginTop: 8,
+                    padding: "8px 10px",
+                    borderRadius: t.radius / 3,
+                    background: `${t.warm}10`,
+                    border: `1px solid ${t.warm}25`,
+                    fontFamily: t.bodyFont,
+                    fontSize: "0.68rem",
+                    color: t.warm,
+                    lineHeight: 1.5,
+                  }}
+                >
+                  {healthError}
+                </div>
+              )}
+              {health && (
+                <div
+                  style={{
+                    marginTop: 8,
+                    padding: "8px 10px",
+                    borderRadius: t.radius / 3,
+                    background: `${t.text}06`,
+                    border: `1px solid ${t.panelBorder}`,
+                    fontFamily: t.bodyFont,
+                    fontSize: "0.68rem",
+                    color: t.text,
+                    lineHeight: 1.8,
+                  }}
+                >
+                  {[
+                    ["Auth", health.auth === "ok" ? "ok" : health.auth],
+                    ["OpenAI Key", health.hasOpenAI],
+                    ["CalDAV (iCloud)", health.hasCalDAV],
+                    ["Calendar URLs", health.hasCalendarUrls],
+                    ["Photos Token", health.hasPhotos],
+                    ["Model", health.openaiModel],
+                  ].map(([label, val]) => (
+                    <div key={label} style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                      {typeof val === "boolean" ? (
+                        <span style={{ color: val ? "#4ECDC4" : t.warm }}>{val ? "✓" : "✗"}</span>
+                      ) : (
+                        <span style={{ color: val === "ok" ? "#4ECDC4" : t.warm }}>
+                          {val === "ok" ? "✓" : "!"}
+                        </span>
+                      )}
+                      <span style={{ color: t.textMuted, minWidth: 90 }}>{label}:</span>
+                      <span style={{ color: t.text }}>
+                        {typeof val === "boolean" ? (val ? "configured" : "not set") : val}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>

@@ -26,7 +26,7 @@ export function usePhotos(photoSettings, workerSettings) {
         const res = await fetch(`${workerSettings.url}/api/photos`, { headers });
         if (!res.ok) {
           const err = await res.json().catch(() => ({}));
-          throw new Error(err.error || `Worker error: ${res.status}`);
+          throw new Error(err.error || `Photos: worker returned ${res.status}`);
         }
         const data = await res.json();
         if (!data.photos || data.photos.length === 0) {

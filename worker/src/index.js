@@ -8,11 +8,19 @@ export default {
       return corsResponse(env, new Response(null, { status: 204 }));
     }
 
-    // Auth check (only if AUTH_TOKEN secret is set AND request provides a token)
-    if (env.AUTH_TOKEN) {
+    // Auth check — if AUTH_TOKEN is configured, require it on every request
+    // (except /api/health which is always open for diagnostics)
+    if (env.AUTH_TOKEN && path !== "/api/health") {
       const auth = request.headers.get("Authorization");
-      if (auth && auth !== `Bearer ${env.AUTH_TOKEN}`) {
-        return corsResponse(env, json({ error: "Unauthorized" }, 401));
+      if (!auth) {
+        return corsResponse(env, json({
+          error: "Unauthorized — no token sent. Set the Auth Token in Settings to match your worker's AUTH_TOKEN secret.",
+        }, 401));
+      }
+      if (auth !== `Bearer ${env.AUTH_TOKEN}`) {
+        return corsResponse(env, json({
+          error: "Unauthorized — token mismatch. The Auth Token in Settings does not match the AUTH_TOKEN secret on your worker.",
+        }, 401));
       }
     }
 
@@ -27,12 +35,23 @@ export default {
         return corsResponse(env, await handlePhotos(env));
       }
       if (path === "/api/health") {
+        // Auth status: check if a valid token was provided (but don't block)
+        const auth = request.headers.get("Authorization");
+        let authStatus = "no AUTH_TOKEN configured (open access)";
+        if (env.AUTH_TOKEN) {
+          if (!auth) authStatus = "AUTH_TOKEN set but no token sent — requests will fail";
+          else if (auth === `Bearer ${env.AUTH_TOKEN}`) authStatus = "ok";
+          else authStatus = "token mismatch — requests will fail";
+        }
         return corsResponse(env, json({
           ok: true,
+          auth: authStatus,
+          hasAuthToken: !!env.AUTH_TOKEN,
           hasOpenAI: !!env.OPENAI_API_KEY,
           hasCalDAV: !!(env.ICLOUD_APPLE_ID && env.ICLOUD_APP_PASSWORD),
           hasCalendarUrls: !!(env.CALENDAR_URLS),
           hasPhotos: !!env.PHOTOS_ALBUM_TOKEN,
+          openaiModel: env.OPENAI_MODEL || "gpt-4o-mini",
         }));
       }
       return corsResponse(env, json({ error: "Not found" }, 404));
@@ -148,6 +167,14 @@ async function handleAsk(request, env) {
 // ── Calendar ────────────────────────────────────────────────────────
 
 async function handleCalendar(env) {
+  const hasCalDAV = !!(env.ICLOUD_APPLE_ID && env.ICLOUD_APP_PASSWORD);
+  const hasUrls = !!(env.CALENDAR_URLS);
+  if (!hasCalDAV && !hasUrls) {
+    return json({
+      error: "No calendar sources configured. Set ICLOUD_APPLE_ID + ICLOUD_APP_PASSWORD for CalDAV, or CALENDAR_URLS for iCal feeds (wrangler secret put).",
+    }, 500);
+  }
+
   const events = [];
 
   // Try CalDAV (private iCloud calendars) first
@@ -293,7 +320,7 @@ async function fetchCalDAV(appleId, appPassword) {
 async function handlePhotos(env) {
   const token = env.PHOTOS_ALBUM_TOKEN;
   if (!token) {
-    return json({ photos: [] });
+    return json({ error: "PHOTOS_ALBUM_TOKEN not configured on worker. Set it via: wrangler secret put PHOTOS_ALBUM_TOKEN" }, 500);
   }
 
   const partitions = [25, 26, 27, 28, 29, 30, 47, 48, 49, 50, 51, 52];
