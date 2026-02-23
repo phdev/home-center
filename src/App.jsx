@@ -27,7 +27,9 @@ export default function App() {
   const t = THEMES[themeIndex];
   const { timers, addTimer, togglePause, removeTimer, resetTimer, dismissAlert } =
     useTimers();
-  const { isMobile } = usePreviewMode();
+  const { isMobile, scale, tvWidth, tvHeight } = usePreviewMode();
+  const [viewMode, setViewMode] = useState("responsive"); // "responsive" | "tv"
+  const useMobileLayout = isMobile && viewMode === "responsive";
   const { settings, update: updateSettings } = useSettings();
 
   // Real API data hooks (pass worker settings for server-side proxy)
@@ -38,7 +40,7 @@ export default function App() {
   const dashboard = (
     <>
       <style>{`
-        body { overflow: ${isMobile ? "auto" : "hidden"} }
+        body { overflow: ${useMobileLayout ? "auto" : "hidden"} }
         ::-webkit-scrollbar { width: 3px }
         ::-webkit-scrollbar-track { background: transparent }
         ::-webkit-scrollbar-thumb { background: ${t.text}15; border-radius: 3px }
@@ -54,13 +56,13 @@ export default function App() {
       <div
         style={{
           width: "100%",
-          minHeight: isMobile ? "100vh" : undefined,
-          height: isMobile ? "auto" : "calc(100vh - 56px)",
+          minHeight: useMobileLayout ? "100vh" : undefined,
+          height: useMobileLayout ? "auto" : "calc(100vh - 56px)",
           background: t.bg,
-          padding: isMobile ? "12px 12px 80px" : "20px 44px 12px",
+          padding: useMobileLayout ? "12px 12px 80px" : "20px 44px 12px",
           display: "flex",
           flexDirection: "column",
-          overflow: isMobile ? "visible" : "hidden",
+          overflow: useMobileLayout ? "visible" : "hidden",
           position: "relative",
           transition: "background 0.6s ease",
         }}
@@ -111,17 +113,17 @@ export default function App() {
           onTimerTabSwitch={() => {}}
           weatherData={weather.data}
           onOpenSettings={() => setShowSettings(true)}
-          isMobile={isMobile}
+          isMobile={useMobileLayout}
         />
 
         {/* Top row */}
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: isMobile ? "1fr" : "1fr 1.3fr 1fr 0.8fr",
-            gap: isMobile ? 10 : 14,
-            flexShrink: isMobile ? undefined : 0,
-            height: isMobile ? "auto" : "36%",
+            gridTemplateColumns: useMobileLayout ? "1fr" : "1fr 1.3fr 1fr 0.8fr",
+            gap: useMobileLayout ? 10 : 14,
+            flexShrink: useMobileLayout ? undefined : 0,
+            height: useMobileLayout ? "auto" : "36%",
           }}
         >
           <CalendarPanel
@@ -136,7 +138,7 @@ export default function App() {
             loading={weather.loading}
             error={weather.error}
           />
-          <div style={isMobile ? { height: 220 } : { height: "100%" }}>
+          <div style={useMobileLayout ? { height: 220 } : { height: "100%" }}>
             <PhotoPanel
               t={t}
               photos={photos.photos}
@@ -149,16 +151,16 @@ export default function App() {
         {/* Bottom row — all sections visible */}
         <div
           style={{
-            display: isMobile ? "flex" : "grid",
-            flexDirection: isMobile ? "column" : undefined,
-            gridTemplateColumns: isMobile ? undefined : "1fr 1fr 1.2fr",
-            gap: isMobile ? 10 : 14,
-            flex: isMobile ? undefined : 1,
-            marginTop: isMobile ? 10 : 14,
+            display: useMobileLayout ? "flex" : "grid",
+            flexDirection: useMobileLayout ? "column" : undefined,
+            gridTemplateColumns: useMobileLayout ? undefined : "1fr 1fr 1.2fr",
+            gap: useMobileLayout ? 10 : 14,
+            flex: useMobileLayout ? undefined : 1,
+            marginTop: useMobileLayout ? 10 : 14,
             minHeight: 0,
           }}
         >
-          {isMobile ? (
+          {useMobileLayout ? (
             <>
               <AgentTasksPanel t={t} />
               <EventsPanel t={t} />
@@ -267,6 +269,7 @@ export default function App() {
         zIndex: 99999,
         display: "flex",
         justifyContent: "center",
+        alignItems: "center",
         gap: 6,
         padding: "10px 12px 14px",
         background: "rgba(10,10,10,0.92)",
@@ -276,6 +279,26 @@ export default function App() {
         flexWrap: "wrap",
       }}
     >
+      {isMobile && (
+        <button
+          onClick={() => setViewMode(viewMode === "responsive" ? "tv" : "responsive")}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 4,
+            padding: "8px 10px",
+            borderRadius: 10,
+            border: `1px solid ${t.accent}40`,
+            background: `${t.accent}15`,
+            cursor: "pointer",
+            WebkitAppearance: "none",
+            appearance: "none",
+            marginRight: 4,
+          }}
+        >
+          <span style={{ fontSize: "1rem", lineHeight: 1 }}>{viewMode === "responsive" ? "📺" : "📱"}</span>
+        </button>
+      )}
       {THEMES.map((th, i) => (
         <button
           key={th.id}
@@ -317,6 +340,48 @@ export default function App() {
       ))}
     </div>
   );
+
+  if (isMobile && viewMode === "tv") {
+    return (
+      <>
+        <div
+          style={{
+            width: "100vw",
+            minHeight: "100vh",
+            background: "#0A0A0A",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            paddingTop: 4,
+            paddingBottom: 60,
+          }}
+        >
+          <div
+            style={{
+              width: tvWidth * scale,
+              height: tvHeight * scale,
+              overflow: "hidden",
+              borderRadius: 8,
+              boxShadow: "0 2px 24px rgba(0,0,0,0.5)",
+              flexShrink: 0,
+            }}
+          >
+            <div
+              style={{
+                width: tvWidth,
+                height: tvHeight,
+                transform: `scale(${scale})`,
+                transformOrigin: "top left",
+              }}
+            >
+              {dashboard}
+            </div>
+          </div>
+        </div>
+        {themePicker}
+      </>
+    );
+  }
 
   return (
     <>
