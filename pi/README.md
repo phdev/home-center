@@ -9,6 +9,7 @@ wake word detection that turns on your TV via HDMI-CEC.
 |-----------|---------|
 | Raspberry Pi 5 (4GB+) | Runs the dashboard and wake word detection |
 | ReSpeaker 2-Mics Pi HAT | Always-on microphone for wake word listening |
+| Mini speaker (8Ω 3W, JST-PH 2.0) | Audio acknowledgement chime on wake word activation |
 | microSD card (32GB+) | OS and application storage |
 | HDMI cable | Connects Pi to TV (carries CEC signals) |
 | USB-C power supply (27W) | Powers the Pi 5 |
@@ -40,9 +41,10 @@ wake word detection that turns on your TV via HDMI-CEC.
 
 1. Insert the microSD into the Pi
 2. Attach the ReSpeaker 2-Mics Pi HAT to the GPIO header
-3. Connect the Pi to your TV via HDMI
-4. Plug in the USB-C power supply
-5. Wait ~60 seconds for first boot, then from your Mac terminal:
+3. Plug the mini speaker into the HAT's JST-PH 2.0 speaker connector
+4. Connect the Pi to your TV via HDMI
+5. Plug in the USB-C power supply
+6. Wait ~60 seconds for first boot, then from your Mac terminal:
 
 ```bash
 ssh pi@homecenter.local
@@ -84,7 +86,9 @@ After reboot, the Pi will:
 ## How It Works
 
 ```
-Microphone → openWakeWord → "Hey Homer" detected → cec-client → TV turns on
+Microphone → openWakeWord → "Hey Homer" detected → chime plays via speaker
+                                                         ↓
+                                                  cec-client → TV turns on
                                                          ↓
                                               Pi becomes active HDMI source
                                                          ↓
