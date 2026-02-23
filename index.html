@@ -4843,7 +4843,7 @@ async function runpodTrain() {
 
     var createRes = await _runpodApi('POST', '/pods', {
       name: 'accel-driv-3dgs-' + Date.now().toString(36).slice(-4),
-      imageName: 'runpod/pytorch:2.4.1-py3.11-cuda12.4.1-devel-ubuntu22.04',
+      imageName: 'dromni/nerfstudio:1.1.5',
       gpuTypeIds: [gpuType],
       gpuCount: 1,
       cloudType: 'COMMUNITY',
@@ -5087,8 +5087,8 @@ async function runpodTerminate() {
 // RUNPOD SERVERLESS 3DGS TRAINING
 // ============================================================
 var _serverlessState = { endpointId: null, templateId: null, jobId: null, phase: null };
-var _SLS_DOCKER_IMAGE = 'runpod/pytorch:2.4.1-py3.11-cuda12.4.1-devel-ubuntu22.04';
-var _SLS_STORAGE_KEY = 'runpod_sls_endpoint';
+var _SLS_DOCKER_IMAGE = 'dromni/nerfstudio:1.1.5';
+var _SLS_STORAGE_KEY = 'runpod_sls_endpoint_v2'; // v2: dromni/nerfstudio pre-baked image
 var _SLS_JOB_KEY = 'runpod_sls_job';
 
 // ---- RunPod serverless job persistence ----
@@ -5121,6 +5121,8 @@ function toggleRunpodMode() {
 }
 
 function _slsUpdateEndpointInfo() {
+  // Clean up old v1 endpoint cache (used bare pytorch image)
+  localStorage.removeItem('runpod_sls_endpoint');
   var el = document.getElementById('sls-endpoint-info');
   if (!el) return;
   var cached = localStorage.getItem(_SLS_STORAGE_KEY);
@@ -5162,10 +5164,11 @@ async function _runpodGql(query, variables) {
 }
 
 // Handler script that runs inside the serverless worker container.
-// Receives frames + transforms via input, trains splatfacto, returns PLY as base64.
+// Image: dromni/nerfstudio:1.1.5 — ns-train, ns-export, gsplat all pre-installed.
+// Only `runpod` pip package is installed at startup (tiny, <5s).
 function _slsHandlerScript() {
   return [
-    'import runpod, os, json, base64, subprocess, glob, shutil',
+    'import runpod, os, json, base64, subprocess, glob, shutil, sys',
     '',
     'def handler(event):',
     '    inp = event["input"]',
@@ -5173,27 +5176,24 @@ function _slsHandlerScript() {
     '    transforms = inp.get("transforms", {})',
     '    frames = inp.get("frames", [])',
     '',
-    '    # Write training data to /workspace/data',
+    '    # Write training data',
     '    os.makedirs("/workspace/data/images", exist_ok=True)',
     '    with open("/workspace/data/transforms.json", "w") as f:',
     '        json.dump(transforms, f)',
     '    for fr in frames:',
-    '        path = "/workspace/data/images/" + fr["name"]',
-    '        with open(path, "wb") as f:',
+    '        with open("/workspace/data/images/" + fr["name"], "wb") as f:',
     '            f.write(base64.b64decode(fr["b64"]))',
+    '    print(f"Wrote {len(frames)} frames, training {iters} iterations...", flush=True)',
     '',
-    '    # Install nerfstudio + gsplat (cached after first cold start)',
-    '    if not shutil.which("ns-train"):',
-    '        subprocess.run(["pip", "install", "nerfstudio", "gsplat"], check=True)',
-    '',
-    '    # Train splatfacto',
+    '    # Train splatfacto (ns-train is pre-installed in dromni/nerfstudio image)',
     '    subprocess.run([',
     '        "ns-train", "splatfacto",',
     '        "--data", "/workspace/data",',
     '        "--max-num-iterations", str(iters),',
     '        "--output-dir", "/workspace/ns-output",',
     '        "--viewer.quit-on-train-completion", "True",',
-    '        "--pipeline.datamanager.dataparser", "nerfstudio-data"',
+    '        "--pipeline.datamanager.dataparser", "nerfstudio-data",',
+    '        "--pipeline.model.num-downscales", "0"',
     '    ], check=True)',
     '',
     '    # Export gaussian splat',
@@ -5244,7 +5244,9 @@ async function _slsEnsureEndpoint(prog) {
 
   prog('Creating serverless template...');
 
-  // Encode handler as base64 for docker start command
+  // Encode handler script into docker start command.
+  // dromni/nerfstudio:1.1.5 has ns-train/ns-export pre-installed.
+  // Only need to pip install the tiny runpod package for the handler loop.
   var handlerPy = _slsHandlerScript();
   var startCmd = 'pip install runpod && python -u /handler.py';
   var dockerArgs = 'bash -c "echo \'' + handlerPy.replace(/'/g, "'\\''") + '\' > /handler.py && ' + startCmd + '"';
@@ -5252,13 +5254,13 @@ async function _slsEnsureEndpoint(prog) {
   var gqlDockerArgs = dockerArgs.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n');
   var tmplName = 'accel-driv-3dgs-' + Date.now().toString(36).slice(-4);
 
-  // Create template (inline values — RunPod doesn't document typed input variables)
+  // Create template — 50GB disk for nerfstudio image (~25GB) + training data + checkpoints
   var tmplData = await _runpodGql(
     'mutation { saveTemplate(input: {' +
       ' name: "' + tmplName + '",' +
       ' imageName: "' + _SLS_DOCKER_IMAGE + '",' +
       ' isServerless: true,' +
-      ' containerDiskInGb: 40,' +
+      ' containerDiskInGb: 50,' +
       ' volumeInGb: 0,' +
       ' dockerArgs: "' + gqlDockerArgs + '",' +
       ' env: []' +
@@ -5267,12 +5269,12 @@ async function _slsEnsureEndpoint(prog) {
   var templateId = tmplData.saveTemplate.id;
   prog('Template created: ' + templateId + '. Creating endpoint...');
 
-  // Create serverless endpoint (inline values)
+  // Create serverless endpoint — AMPERE_24 (RTX 4090/3090/A5000, more available than 48GB)
   var epData = await _runpodGql(
     'mutation { saveEndpoint(input: {' +
       ' name: "accel-driv-3dgs",' +
       ' templateId: "' + templateId + '",' +
-      ' gpuIds: "AMPERE_48",' +
+      ' gpuIds: "AMPERE_24",' +
       ' workersMin: 0,' +
       ' workersMax: 1,' +
       ' idleTimeout: 5,' +
