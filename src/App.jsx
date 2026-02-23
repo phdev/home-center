@@ -27,7 +27,7 @@ export default function App() {
   const t = THEMES[themeIndex];
   const { timers, addTimer, togglePause, removeTimer, resetTimer, dismissAlert } =
     useTimers();
-  const { preview, scale, tvWidth, tvHeight } = usePreviewMode();
+  const { isMobile } = usePreviewMode();
   const { settings, update: updateSettings } = useSettings();
 
   // Real API data hooks (pass worker settings for server-side proxy)
@@ -38,7 +38,7 @@ export default function App() {
   const dashboard = (
     <>
       <style>{`
-        body { overflow: ${preview ? "auto" : "hidden"} }
+        body { overflow: ${isMobile ? "auto" : "hidden"} }
         ::-webkit-scrollbar { width: 3px }
         ::-webkit-scrollbar-track { background: transparent }
         ::-webkit-scrollbar-thumb { background: ${t.text}15; border-radius: 3px }
@@ -53,13 +53,14 @@ export default function App() {
       `}</style>
       <div
         style={{
-          width: preview ? tvWidth : "100vw",
-          height: preview ? tvHeight : "calc(100vh - 56px)",
+          width: "100%",
+          minHeight: isMobile ? "100vh" : undefined,
+          height: isMobile ? "auto" : "calc(100vh - 56px)",
           background: t.bg,
-          padding: "20px 44px 12px",
+          padding: isMobile ? "12px 12px 80px" : "20px 44px 12px",
           display: "flex",
           flexDirection: "column",
-          overflow: "hidden",
+          overflow: isMobile ? "visible" : "hidden",
           position: "relative",
           transition: "background 0.6s ease",
         }}
@@ -110,16 +111,17 @@ export default function App() {
           onTimerTabSwitch={() => {}}
           weatherData={weather.data}
           onOpenSettings={() => setShowSettings(true)}
+          isMobile={isMobile}
         />
 
         {/* Top row */}
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "1fr 1.3fr 1fr 0.8fr",
-            gap: 14,
-            flexShrink: 0,
-            height: "36%",
+            gridTemplateColumns: isMobile ? "1fr" : "1fr 1.3fr 1fr 0.8fr",
+            gap: isMobile ? 10 : 14,
+            flexShrink: isMobile ? undefined : 0,
+            height: isMobile ? "auto" : "36%",
           }}
         >
           <CalendarPanel
@@ -134,55 +136,32 @@ export default function App() {
             loading={weather.loading}
             error={weather.error}
           />
-          <PhotoPanel
-            t={t}
-            photos={photos.photos}
-            photosLoading={photos.loading}
-          />
+          <div style={isMobile ? { height: 220 } : { height: "100%" }}>
+            <PhotoPanel
+              t={t}
+              photos={photos.photos}
+              photosLoading={photos.loading}
+            />
+          </div>
           <FactPanel t={t} />
         </div>
 
         {/* Bottom row — all sections visible */}
         <div
           style={{
-            display: "grid",
-            gridTemplateColumns: "1fr 1fr 1.2fr",
-            gap: 14,
-            flex: 1,
-            marginTop: 14,
+            display: isMobile ? "flex" : "grid",
+            flexDirection: isMobile ? "column" : undefined,
+            gridTemplateColumns: isMobile ? undefined : "1fr 1fr 1.2fr",
+            gap: isMobile ? 10 : 14,
+            flex: isMobile ? undefined : 1,
+            marginTop: isMobile ? 10 : 14,
             minHeight: 0,
           }}
         >
-          {/* Left column: Agents + Birthdays stacked */}
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              gap: 14,
-              minHeight: 0,
-            }}
-          >
-            <div style={{ flex: 1, minHeight: 0 }}>
+          {isMobile ? (
+            <>
               <AgentTasksPanel t={t} />
-            </div>
-            <div style={{ flex: 1, minHeight: 0 }}>
-              <BirthdaysPanel t={t} />
-            </div>
-          </div>
-
-          {/* Middle column: Events + Timers stacked */}
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              gap: 14,
-              minHeight: 0,
-            }}
-          >
-            <div style={{ flex: 1, minHeight: 0 }}>
               <EventsPanel t={t} />
-            </div>
-            <div style={{ flex: 1, minHeight: 0 }}>
               <TimersPanel
                 t={t}
                 timers={timers}
@@ -192,11 +171,59 @@ export default function App() {
                 resetTimer={resetTimer}
                 dismissAlert={dismissAlert}
               />
-            </div>
-          </div>
+              <BirthdaysPanel t={t} />
+              <div style={{ minHeight: 350 }}>
+                <SearchPanel t={t} llmSettings={settings.llm} workerSettings={settings.worker} />
+              </div>
+            </>
+          ) : (
+            <>
+              {/* Left column: Agents + Birthdays stacked */}
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 14,
+                  minHeight: 0,
+                }}
+              >
+                <div style={{ flex: 1, minHeight: 0 }}>
+                  <AgentTasksPanel t={t} />
+                </div>
+                <div style={{ flex: 1, minHeight: 0 }}>
+                  <BirthdaysPanel t={t} />
+                </div>
+              </div>
 
-          {/* Right column: Ask Anything (with History tab) */}
-          <SearchPanel t={t} llmSettings={settings.llm} workerSettings={settings.worker} />
+              {/* Middle column: Events + Timers stacked */}
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 14,
+                  minHeight: 0,
+                }}
+              >
+                <div style={{ flex: 1, minHeight: 0 }}>
+                  <EventsPanel t={t} />
+                </div>
+                <div style={{ flex: 1, minHeight: 0 }}>
+                  <TimersPanel
+                    t={t}
+                    timers={timers}
+                    addTimer={addTimer}
+                    togglePause={togglePause}
+                    removeTimer={removeTimer}
+                    resetTimer={resetTimer}
+                    dismissAlert={dismissAlert}
+                  />
+                </div>
+              </div>
+
+              {/* Right column: Ask Anything (with History tab) */}
+              <SearchPanel t={t} llmSettings={settings.llm} workerSettings={settings.worker} />
+            </>
+          )}
         </div>
 
         {/* Theme name footer */}
@@ -256,8 +283,8 @@ export default function App() {
           style={{
             display: "flex",
             alignItems: "center",
-            gap: 6,
-            padding: "8px 14px",
+            gap: isMobile ? 0 : 6,
+            padding: isMobile ? "8px 10px" : "8px 14px",
             borderRadius: 10,
             border:
               themeIndex === i
@@ -271,70 +298,29 @@ export default function App() {
             appearance: "none",
           }}
         >
-          <span style={{ fontSize: "1rem", lineHeight: 1 }}>{th.emoji}</span>
-          <span
-            style={{
-              fontFamily: "'DM Sans', sans-serif",
-              fontSize: "0.8rem",
-              fontWeight: 600,
-              color:
-                themeIndex === i ? th.accent : "rgba(255,255,255,0.8)",
-              whiteSpace: "nowrap",
-            }}
-          >
-            {th.name}
-          </span>
+          <span style={{ fontSize: isMobile ? "1.2rem" : "1rem", lineHeight: 1 }}>{th.emoji}</span>
+          {!isMobile && (
+            <span
+              style={{
+                fontFamily: "'DM Sans', sans-serif",
+                fontSize: "0.8rem",
+                fontWeight: 600,
+                color:
+                  themeIndex === i ? th.accent : "rgba(255,255,255,0.8)",
+                whiteSpace: "nowrap",
+              }}
+            >
+              {th.name}
+            </span>
+          )}
         </button>
       ))}
     </div>
   );
 
-  if (!preview) {
-    return (
-      <>
-        {dashboard}
-        {themePicker}
-      </>
-    );
-  }
-
   return (
     <>
-      <div
-        style={{
-          width: "100vw",
-          minHeight: "100vh",
-          background: "#0A0A0A",
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          paddingTop: 4,
-          paddingBottom: 60,
-        }}
-      >
-        {/* Scaled dashboard preview */}
-        <div
-          style={{
-            width: tvWidth * scale,
-            height: tvHeight * scale,
-            overflow: "hidden",
-            borderRadius: 8,
-            boxShadow: "0 2px 24px rgba(0,0,0,0.5)",
-            flexShrink: 0,
-          }}
-        >
-          <div
-            style={{
-              width: tvWidth,
-              height: tvHeight,
-              transform: `scale(${scale})`,
-              transformOrigin: "top left",
-            }}
-          >
-            {dashboard}
-          </div>
-        </div>
-      </div>
+      {dashboard}
       {themePicker}
     </>
   );

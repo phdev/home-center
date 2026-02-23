@@ -16,7 +16,7 @@ export function PhotoPanel({ t, photos, photosLoading }) {
   }, [photoIndex]);
 
   return (
-    <Panel t={t} noPad style={{ position: "relative" }}>
+    <Panel t={t} noPad style={{ position: "relative", height: "100%" }}>
       {photosLoading && (
         <div
           style={{

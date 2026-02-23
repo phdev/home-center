@@ -102,8 +102,8 @@ export function SettingsModal({ t, settings, onSave, onClose }) {
     >
       <div
         style={{
-          width: 480,
-          maxHeight: "80vh",
+          width: "min(480px, calc(100vw - 24px))",
+          maxHeight: "85vh",
           background: t.panelBg,
           border: `1px solid ${t.panelBorder}`,
           borderRadius: t.radius,
