@@ -176,6 +176,7 @@ async function handleCalendar(env) {
   }
 
   const events = [];
+  const errors = [];
 
   // Try CalDAV (private iCloud calendars) first
   if (env.ICLOUD_APPLE_ID && env.ICLOUD_APP_PASSWORD) {
@@ -184,6 +185,7 @@ async function handleCalendar(env) {
       events.push(...caldavEvents);
     } catch (e) {
       console.error("CalDAV error:", e);
+      errors.push(`CalDAV: ${e.message}`);
     }
   }
 
@@ -207,7 +209,10 @@ async function handleCalendar(env) {
   // Sort by start time
   events.sort((a, b) => (a.startDate || 0) - (b.startDate || 0));
 
-  return json({ events: events.map(({ startDate, ...rest }) => rest) });
+  return json({
+    events: events.map(({ startDate, ...rest }) => rest),
+    ...(errors.length > 0 && { errors }),
+  });
 }
 
 async function fetchCalDAV(appleId, appPassword) {
