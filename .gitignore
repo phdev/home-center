@@ -6,3 +6,4 @@ dist
 # Pi wake word
 pi/.venv/
 pi/models/*.tflite
+pi/sounds/

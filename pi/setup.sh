@@ -32,6 +32,7 @@ sudo apt-get install -y \
   xdotool \
   unclutter \
   cec-utils \
+  alsa-utils \
   python3-venv \
   python3-pip \
   python3-dev \
