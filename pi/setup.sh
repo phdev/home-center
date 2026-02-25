@@ -28,7 +28,7 @@ log "Installing core dependencies..."
 sudo apt-get install -y \
   git \
   curl \
-  chromium-browser \
+  chromium \
   xdotool \
   unclutter \
   cec-utils \
