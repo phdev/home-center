@@ -260,8 +260,12 @@ def get_or_train_model() -> Model:
     except (ImportError, Exception) as e:
         log.warning("Auto-training not available (%s). Falling back to built-in models.", e)
         log.info("Using 'hey jarvis' as a stand-in. See pi/README.md to train a custom model.")
-        # Fall back to a built-in model for demo purposes
-        return Model(inference_framework=framework)
+
+    # Fall back to a built-in model — download pre-trained models first
+    import openwakeword
+    log.info("Downloading pre-trained openWakeWord models (one-time)...")
+    openwakeword.utils.download_models()
+    return Model(inference_framework=framework)
 
 
 # ---------------------------------------------------------------------------
