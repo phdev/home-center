@@ -20,6 +20,21 @@ import numpy as np
 import pyaudio
 from openwakeword.model import Model
 
+
+def _inference_framework() -> str:
+    """Return the best available inference framework for openWakeWord."""
+    try:
+        import tflite_runtime  # noqa: F401
+        return "tflite"
+    except ImportError:
+        pass
+    try:
+        import onnxruntime  # noqa: F401
+        return "onnx"
+    except ImportError:
+        pass
+    return "tflite"  # let openwakeword raise a clear error
+
 # ---------------------------------------------------------------------------
 # Configuration
 # ---------------------------------------------------------------------------
@@ -218,9 +233,12 @@ def get_or_train_model() -> Model:
 
     custom_model = custom_model_dir / "hey_homer.tflite"
 
+    framework = _inference_framework()
+    log.info("Using inference framework: %s", framework)
+
     if custom_model.exists():
         log.info("Loading custom wake word model: %s", custom_model)
-        return Model(wakeword_models=[str(custom_model)])
+        return Model(wakeword_models=[str(custom_model)], inference_framework=framework)
 
     # Use openWakeWord's automatic model generation for custom phrases.
     # This generates synthetic training data via text-to-speech and trains
@@ -238,12 +256,12 @@ def get_or_train_model() -> Model:
             epochs=50,
         )
         log.info("Custom model saved to: %s", model_path)
-        return Model(wakeword_models=[str(model_path)])
+        return Model(wakeword_models=[str(model_path)], inference_framework=framework)
     except (ImportError, Exception) as e:
         log.warning("Auto-training not available (%s). Falling back to built-in models.", e)
         log.info("Using 'hey jarvis' as a stand-in. See pi/README.md to train a custom model.")
         # Fall back to a built-in model for demo purposes
-        return Model(inference_framework="tflite")
+        return Model(inference_framework=framework)
 
 
 # ---------------------------------------------------------------------------

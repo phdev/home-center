@@ -78,6 +78,16 @@ python3 -m venv "$VENV_DIR"
 source "$VENV_DIR/bin/activate"
 
 pip install --upgrade pip
+
+# tflite-runtime (needed by openwakeword) is often missing from PyPI/piwheels
+# for newer Python versions. Try Google's Coral repo first, then fall back to
+# onnxruntime which openwakeword also supports.
+pip install tflite-runtime --extra-index-url https://google-coral.github.io/py-repo/ 2>/dev/null || {
+  log "tflite-runtime not available for this Python — installing onnxruntime instead"
+  pip install onnxruntime
+}
+
+pip install --no-deps openwakeword>=0.6.0
 pip install -r "$SCRIPT_DIR/requirements.txt"
 
 deactivate
