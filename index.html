@@ -5244,18 +5244,25 @@ async function _slsEnsureEndpoint(prog) {
 
   prog('Creating serverless template...');
 
-  // Clean up any old accel-driv endpoints that are eating the worker quota
+  // Clean up ALL serverless endpoints to free worker quota
+  var totalFreed = 0;
   try {
-    prog('Checking for stale endpoints...');
-    var epList = await _runpodGql('query { myself { serverlessDiscount endpoints { id name workersMax } } }');
+    prog('Cleaning up old serverless endpoints...');
+    var epList = await _runpodGql('query { myself { endpoints { id name workersMax } } }');
     var endpoints = (epList.myself && epList.myself.endpoints) || [];
-    var stale = endpoints.filter(function(ep) { return ep.name && ep.name.indexOf('accel-driv') === 0; });
-    for (var si = 0; si < stale.length; si++) {
-      prog('Deleting stale endpoint: ' + stale[si].id + ' (' + stale[si].name + ')...');
-      try { await _runpodGql('mutation { deleteEndpoint(id: "' + stale[si].id + '") }'); } catch(e) { console.warn('Failed to delete endpoint ' + stale[si].id, e); }
+    _slsLogApi('EXISTING ENDPOINTS', endpoints);
+    for (var si = 0; si < endpoints.length; si++) {
+      prog('Deleting endpoint: ' + endpoints[si].id + ' (' + (endpoints[si].name || 'unnamed') + ', max workers: ' + endpoints[si].workersMax + ')...');
+      try {
+        await _runpodGql('mutation { deleteEndpoint(id: "' + endpoints[si].id + '") }');
+        totalFreed += (endpoints[si].workersMax || 0);
+      } catch(e) { _slsLogApi('DELETE FAILED ' + endpoints[si].id, e.message); }
     }
-    if (stale.length) prog('Cleaned up ' + stale.length + ' old endpoint(s). Creating fresh template...');
-  } catch(e) { console.warn('Endpoint cleanup failed (non-fatal):', e.message); }
+    if (endpoints.length) prog('Deleted ' + endpoints.length + ' old endpoint(s), freed ' + totalFreed + ' worker slots. Creating fresh...');
+  } catch(e) {
+    _slsLogApi('ENDPOINT CLEANUP ERROR', e.message);
+    prog('Could not list endpoints (' + e.message + '). Trying to create anyway...');
+  }
 
   // Encode handler script into docker start command.
   // dromni/nerfstudio:1.1.5 has ns-train/ns-export pre-installed.
@@ -5283,18 +5290,40 @@ async function _slsEnsureEndpoint(prog) {
   prog('Template created: ' + templateId + '. Creating endpoint...');
 
   // Create serverless endpoint — AMPERE_24 (RTX 4090/3090/A5000, more available than 48GB)
-  var epData = await _runpodGql(
-    'mutation { saveEndpoint(input: {' +
-      ' name: "accel-driv-3dgs",' +
-      ' templateId: "' + templateId + '",' +
-      ' gpuIds: "AMPERE_24",' +
-      ' workersMin: 0,' +
-      ' workersMax: 1,' +
-      ' idleTimeout: 5,' +
-      ' scalerType: "QUEUE_DELAY",' +
-      ' scalerValue: 1' +
-    ' }) { id name } }'
-  );
+  var epData;
+  try {
+    epData = await _runpodGql(
+      'mutation { saveEndpoint(input: {' +
+        ' name: "accel-driv-3dgs",' +
+        ' templateId: "' + templateId + '",' +
+        ' gpuIds: "AMPERE_24",' +
+        ' workersMin: 0,' +
+        ' workersMax: 1,' +
+        ' idleTimeout: 5,' +
+        ' scalerType: "QUEUE_DELAY",' +
+        ' scalerValue: 1' +
+      ' }) { id name } }'
+    );
+  } catch(e) {
+    // Quota still exceeded — try with workersMax: 0 (flash workers only, no dedicated)
+    if (e.message && e.message.indexOf('workers quota') !== -1) {
+      prog('Worker quota full — retrying with flash workers only...');
+      _slsLogApi('QUOTA RETRY', 'workersMax: 0 (flash workers)');
+      epData = await _runpodGql(
+        'mutation { saveEndpoint(input: {' +
+          ' name: "accel-driv-3dgs",' +
+          ' templateId: "' + templateId + '",' +
+          ' gpuIds: "AMPERE_24",' +
+          ' workersMin: 0,' +
+          ' workersMax: 0,' +
+          ' flashboot: true,' +
+          ' idleTimeout: 5,' +
+          ' scalerType: "QUEUE_DELAY",' +
+          ' scalerValue: 1' +
+        ' }) { id name } }'
+      );
+    } else { throw e; }
+  }
   var endpointId = epData.saveEndpoint.id;
 
   // Cache
