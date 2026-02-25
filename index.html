@@ -1289,7 +1289,12 @@ async function proxiedFetch(url, opts) {
       // Strip auth headers — Worker adds them server-side
       var h = {};
       if (opts.headers) { for (var k in opts.headers) { var kl = k.toLowerCase(); if (kl !== 'authorization' && kl !== 'wlt-api-key' && kl !== 'x-api-key' && kl !== 'x-runway-version') h[k] = opts.headers[k]; } }
-      return fetch(_proxyUrl + workerPath, Object.assign({}, opts, { headers: h }));
+      var proxyFullUrl = _proxyUrl + workerPath;
+      try { return await fetch(proxyFullUrl, Object.assign({}, opts, { headers: h })); }
+      catch (e) {
+        console.warn('Proxy fetch failed (' + proxyFullUrl + '):', e.message, '— falling back to CORS proxy');
+        return fetch('https://corsproxy.io/?' + encodeURIComponent(url), opts);
+      }
     }
     // Non-API URL: try direct, fallback to Worker generic proxy
     try { return await fetch(url, opts); }
@@ -3882,7 +3887,7 @@ if(vlbl)sl.addEventListener('input',function(){vlbl.textContent=sl.value});
 var _proxyParam = new URLSearchParams(window.location.search).get('proxy');
 if (_proxyParam === '' || _proxyParam === 'clear') { localStorage.removeItem('proxy_url'); }
 else if (_proxyParam) { var _pu = _proxyParam.replace(/\/+$/, ''); localStorage.setItem('proxy_url', _pu); _proxyUrl = _pu; }
-else { var _stored = localStorage.getItem('proxy_url'); if (_stored) _proxyUrl = _stored; }
+else { var _stored = localStorage.getItem('proxy_url'); if (_stored) _proxyUrl = _stored.trim(); }
 // API key persistence: load from localStorage, URL params override
 var _apiKeyIds = ['runway-apikey', 'decart-apikey', 'marble-apikey', 'kiri-apikey', 'runpod-apikey'];
 if (_proxyUrl) {
@@ -5701,7 +5706,8 @@ async function serverlessCheckStatus() {
       }
     }
   } catch (err) {
-    prog.textContent = 'Status error: ' + err.message;
+    console.error('serverlessCheckStatus error:', err, 'proxyUrl:', _proxyUrl, 'podId:', podId);
+    prog.textContent = 'Status error: ' + err.message + (err.message.indexOf('pattern') !== -1 ? ' (proxy: ' + (_proxyUrl || 'none') + ')' : '');
   }
 }
 
