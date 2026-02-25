@@ -327,6 +327,8 @@ def main() -> None:
 
             # Check each wake word score
             for ww_name in wake_words:
+                if len(model.prediction_buffer[ww_name]) == 0:
+                    continue
                 score = model.prediction_buffer[ww_name][-1]
 
                 if args.debug and score > 0.1:
