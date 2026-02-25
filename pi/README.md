@@ -54,7 +54,7 @@ ssh pi@homecenter.local
 
 ```bash
 # Clone the repo
-git clone https://github.com/phuang1024/home-center.git
+git clone https://github.com/phdev/home-center.git
 cd home-center
 
 # Make scripts executable
