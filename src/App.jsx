@@ -8,6 +8,7 @@ import { useSettings } from "./hooks/useSettings";
 import { useWeather } from "./hooks/useWeather";
 import { useCalendar } from "./hooks/useCalendar";
 import { usePhotos } from "./hooks/usePhotos";
+import { useNotifications } from "./hooks/useNotifications";
 import { Header } from "./components/Header";
 import { CalendarPanel } from "./components/CalendarPanel";
 import { WeatherPanel } from "./components/WeatherPanel";
@@ -18,6 +19,7 @@ import { EventsPanel } from "./components/EventsPanel";
 import { BirthdaysPanel } from "./components/BirthdaysPanel";
 import { TimersPanel } from "./components/TimersPanel";
 import { SearchPanel } from "./components/SearchPanel";
+import { NotificationsPanel } from "./components/NotificationsPanel";
 import { SettingsModal } from "./components/SettingsModal";
 
 export default function App() {
@@ -36,6 +38,7 @@ export default function App() {
   const weather = useWeather(settings.weather);
   const calendar = useCalendar(settings.calendar, settings.worker);
   const photos = usePhotos(settings.photos, settings.worker);
+  const notifs = useNotifications(settings.worker);
 
   const dashboard = (
     <>
@@ -154,7 +157,7 @@ export default function App() {
           style={{
             display: useMobileLayout ? "flex" : "grid",
             flexDirection: useMobileLayout ? "column" : undefined,
-            gridTemplateColumns: useMobileLayout ? undefined : "1fr 1fr 1.2fr",
+            gridTemplateColumns: useMobileLayout ? undefined : "0.9fr 1fr 0.8fr 1.2fr",
             gap: useMobileLayout ? 10 : 14,
             flex: useMobileLayout ? undefined : 1,
             marginTop: useMobileLayout ? 10 : 14,
@@ -163,6 +166,13 @@ export default function App() {
         >
           {useMobileLayout ? (
             <>
+              <NotificationsPanel
+                t={t}
+                notifications={notifs.notifications}
+                loading={notifs.loading}
+                error={notifs.error}
+                onDismiss={notifs.dismiss}
+              />
               <AgentTasksPanel t={t} />
               <EventsPanel t={t} />
               <TimersPanel
@@ -181,7 +191,7 @@ export default function App() {
             </>
           ) : (
             <>
-              {/* Left column: Agents + Birthdays stacked */}
+              {/* Left column: Notifications + Agents stacked */}
               <div
                 style={{
                   display: "flex",
@@ -191,10 +201,16 @@ export default function App() {
                 }}
               >
                 <div style={{ flex: 1, minHeight: 0 }}>
-                  <AgentTasksPanel t={t} />
+                  <NotificationsPanel
+                    t={t}
+                    notifications={notifs.notifications}
+                    loading={notifs.loading}
+                    error={notifs.error}
+                    onDismiss={notifs.dismiss}
+                  />
                 </div>
                 <div style={{ flex: 1, minHeight: 0 }}>
-                  <BirthdaysPanel t={t} />
+                  <AgentTasksPanel t={t} />
                 </div>
               </div>
 
@@ -222,6 +238,9 @@ export default function App() {
                   />
                 </div>
               </div>
+
+              {/* Third column: Birthdays */}
+              <BirthdaysPanel t={t} />
 
               {/* Right column: Ask Anything (with History tab) */}
               <SearchPanel t={t} llmSettings={settings.llm} workerSettings={settings.worker} />

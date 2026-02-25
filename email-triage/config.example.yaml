@@ -1,0 +1,46 @@
+# Email Triage Configuration
+# Copy to config.yaml and fill in your values
+
+gmail:
+  credentials_file: credentials.json   # OAuth2 credentials from Google Cloud Console
+  token_file: token.json               # Auto-generated after first OAuth flow
+  poll_interval_seconds: 300           # 5 minutes
+  max_results: 20                      # Max emails per poll
+
+llm:
+  # Hybrid mode: local first-pass, cloud for ambiguous (confidence < threshold)
+  confidence_threshold: 0.7
+
+  local:
+    enabled: true
+    model_path: models/phi-3-mini-4k-instruct-q4_k_m.gguf
+    server_url: http://localhost:8411/v1
+    max_tokens: 256
+    timeout_seconds: 10
+    # If local inference > timeout, batch-classify every 15 min instead
+    batch_fallback_interval: 900
+
+  cloud:
+    provider: anthropic          # openai | anthropic
+    # API keys via environment variables:
+    #   OPENAI_API_KEY
+    #   ANTHROPIC_API_KEY
+    max_classifications_per_hour: 100
+
+notifications:
+  # Home center worker for TV display cards
+  worker_url: https://home-center-api.phhowell.workers.dev
+  worker_token: ""               # AUTH_TOKEN for the worker
+
+  # WhatsApp via NanoClaw messaging pipeline
+  nanoclaw:
+    enabled: false
+    webhook_url: ""              # NanoClaw webhook endpoint
+    target_chat: ""              # WhatsApp chat/group ID
+
+database:
+  path: email_triage.db
+
+logging:
+  level: INFO
+  file: email_triage.log

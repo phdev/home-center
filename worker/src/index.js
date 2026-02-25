@@ -34,6 +34,16 @@ export default {
       if (path === "/api/photos") {
         return corsResponse(env, await handlePhotos(env));
       }
+      if (path === "/api/notifications" && request.method === "POST") {
+        return corsResponse(env, await handleNotificationPost(request, env));
+      }
+      if (path === "/api/notifications" && request.method === "GET") {
+        return corsResponse(env, await handleNotificationGet(env));
+      }
+      if (path.startsWith("/api/notifications/") && request.method === "DELETE") {
+        const id = decodeURIComponent(path.split("/api/notifications/")[1]);
+        return corsResponse(env, await handleNotificationDelete(id, env));
+      }
       if (path === "/api/health") {
         // Auth status: check if a valid token was provided (but don't block)
         const auth = request.headers.get("Authorization");
@@ -51,6 +61,7 @@ export default {
           hasCalDAV: !!(env.ICLOUD_APPLE_ID && env.ICLOUD_APP_PASSWORD),
           hasCalendarUrls: !!(env.CALENDAR_URLS),
           hasPhotos: !!env.PHOTOS_ALBUM_TOKEN,
+          hasNotifications: !!env.NOTIFICATIONS,
           openaiModel: env.OPENAI_MODEL || "gpt-4o-mini",
         }));
       }
@@ -74,7 +85,7 @@ function corsResponse(env, response) {
   const origin = env.ALLOWED_ORIGIN || "*";
   const headers = new Headers(response.headers);
   headers.set("Access-Control-Allow-Origin", origin);
-  headers.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  headers.set("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS");
   headers.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
   return new Response(response.body, {
     status: response.status,
@@ -403,6 +414,53 @@ function pickBestDerivative(derivatives) {
     }
   }
   return best || Object.values(derivatives)[0];
+}
+
+// ── Notifications (KV-backed) ────────────────────────────────────────
+
+const NOTIF_KEY = "notifications";
+const MAX_NOTIFICATIONS = 50;
+
+async function handleNotificationPost(request, env) {
+  if (!env.NOTIFICATIONS) {
+    return json({ error: "NOTIFICATIONS KV namespace not configured" }, 500);
+  }
+
+  const notification = await request.json();
+  if (!notification.id || !notification.title) {
+    return json({ error: "Notification requires id and title" }, 400);
+  }
+
+  const existing = await env.NOTIFICATIONS.get(NOTIF_KEY, { type: "json" }) || [];
+  // Deduplicate by id
+  const filtered = existing.filter((n) => n.id !== notification.id);
+  filtered.unshift(notification);
+  // Cap at max
+  const capped = filtered.slice(0, MAX_NOTIFICATIONS);
+  await env.NOTIFICATIONS.put(NOTIF_KEY, JSON.stringify(capped));
+
+  return json({ ok: true, count: capped.length });
+}
+
+async function handleNotificationGet(env) {
+  if (!env.NOTIFICATIONS) {
+    return json({ notifications: [] });
+  }
+
+  const notifications = await env.NOTIFICATIONS.get(NOTIF_KEY, { type: "json" }) || [];
+  return json({ notifications });
+}
+
+async function handleNotificationDelete(id, env) {
+  if (!env.NOTIFICATIONS) {
+    return json({ error: "NOTIFICATIONS KV namespace not configured" }, 500);
+  }
+
+  const existing = await env.NOTIFICATIONS.get(NOTIF_KEY, { type: "json" }) || [];
+  const filtered = existing.filter((n) => n.id !== id);
+  await env.NOTIFICATIONS.put(NOTIF_KEY, JSON.stringify(filtered));
+
+  return json({ ok: true, removed: existing.length - filtered.length });
 }
 
 // ── iCal Parsing ────────────────────────────────────────────────────
