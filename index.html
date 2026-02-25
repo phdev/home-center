@@ -5244,6 +5244,19 @@ async function _slsEnsureEndpoint(prog) {
 
   prog('Creating serverless template...');
 
+  // Clean up any old accel-driv endpoints that are eating the worker quota
+  try {
+    prog('Checking for stale endpoints...');
+    var epList = await _runpodGql('query { myself { serverlessDiscount endpoints { id name workersMax } } }');
+    var endpoints = (epList.myself && epList.myself.endpoints) || [];
+    var stale = endpoints.filter(function(ep) { return ep.name && ep.name.indexOf('accel-driv') === 0; });
+    for (var si = 0; si < stale.length; si++) {
+      prog('Deleting stale endpoint: ' + stale[si].id + ' (' + stale[si].name + ')...');
+      try { await _runpodGql('mutation { deleteEndpoint(id: "' + stale[si].id + '") }'); } catch(e) { console.warn('Failed to delete endpoint ' + stale[si].id, e); }
+    }
+    if (stale.length) prog('Cleaned up ' + stale.length + ' old endpoint(s). Creating fresh template...');
+  } catch(e) { console.warn('Endpoint cleanup failed (non-fatal):', e.message); }
+
   // Encode handler script into docker start command.
   // dromni/nerfstudio:1.1.5 has ns-train/ns-export pre-installed.
   // Only need to pip install the tiny runpod package for the handler loop.
