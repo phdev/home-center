@@ -16,9 +16,25 @@ import time
 import wave
 from pathlib import Path
 
+import alsaaudio
 import numpy as np
-import pyaudio
 from openwakeword.model import Model
+
+
+def _inference_framework() -> str:
+    """Return the best available inference framework for openWakeWord."""
+    try:
+        import tflite_runtime  # noqa: F401
+        return "tflite"
+    except ImportError:
+        pass
+    try:
+        import onnxruntime  # noqa: F401
+        return "onnx"
+    except ImportError:
+        pass
+    return "tflite"  # let openwakeword raise a clear error
+
 
 # ---------------------------------------------------------------------------
 # Configuration
@@ -26,8 +42,7 @@ from openwakeword.model import Model
 WAKE_WORD = "hey_homer"
 SAMPLE_RATE = 16000
 CHUNK_SIZE = 1280  # 80ms at 16kHz — required by openWakeWord
-CHANNELS = 1
-FORMAT = pyaudio.paInt16
+CHANNELS = 2  # ReSpeaker 2-Mic HAT is stereo; we downmix to mono
 DETECTION_THRESHOLD = 0.5
 COOLDOWN_SECONDS = 10  # Prevent repeated triggers
 
@@ -167,37 +182,46 @@ def play_acknowledgement() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Microphone helpers
+# Microphone helpers (ALSA)
 # ---------------------------------------------------------------------------
 
-def find_mic_index(pa: pyaudio.PyAudio) -> int | None:
-    """Find the best input device index. Prefers ReSpeaker, falls back to default."""
-    respeaker_idx = None
-    default_idx = None
+def find_respeaker_device() -> str | None:
+    """Find the ReSpeaker ALSA capture device.
 
-    for i in range(pa.get_device_count()):
-        info = pa.get_device_info_by_index(i)
-        if info["maxInputChannels"] < 1:
-            continue
-
-        name = info["name"].lower()
-        log.debug("Audio device %d: %s (%d ch)", i, info["name"], info["maxInputChannels"])
-
-        # Prefer ReSpeaker / seeed / wm8960
-        if any(kw in name for kw in ("respeaker", "seeed", "wm8960", "2mic")):
-            respeaker_idx = i
-        elif default_idx is None:
-            default_idx = i
-
-    if respeaker_idx is not None:
-        log.info("Using ReSpeaker mic (device %d)", respeaker_idx)
-        return respeaker_idx
-
-    if default_idx is not None:
-        log.info("ReSpeaker not found — using default mic (device %d)", default_idx)
-        return default_idx
-
+    Returns device string like 'hw:2,0' or None if not found.
+    """
+    try:
+        result = subprocess.run(
+            ["arecord", "-l"],
+            capture_output=True, text=True, timeout=5,
+        )
+        for line in result.stdout.splitlines():
+            lower = line.lower()
+            if lower.startswith("card") and any(
+                kw in lower for kw in ("respeaker", "seeed", "wm8960", "2mic")
+            ):
+                # Extract card number from "card N:" format
+                card_num = lower.split(":")[0].replace("card", "").strip()
+                device = f"hw:{card_num},0"
+                log.info("Found ReSpeaker at %s", device)
+                return device
+    except Exception as e:
+        log.warning("Error scanning for ReSpeaker: %s", e)
     return None
+
+
+def open_alsa_capture(device: str, channels: int, rate: int, period_size: int) -> alsaaudio.PCM:
+    """Open an ALSA PCM device for capture."""
+    pcm = alsaaudio.PCM(
+        type=alsaaudio.PCM_CAPTURE,
+        mode=alsaaudio.PCM_NORMAL,
+        device=device,
+        channels=channels,
+        rate=rate,
+        format=alsaaudio.PCM_FORMAT_S16_LE,
+        periodsize=period_size,
+    )
+    return pcm
 
 
 # ---------------------------------------------------------------------------
@@ -218,9 +242,12 @@ def get_or_train_model() -> Model:
 
     custom_model = custom_model_dir / "hey_homer.tflite"
 
+    framework = _inference_framework()
+    log.info("Using inference framework: %s", framework)
+
     if custom_model.exists():
         log.info("Loading custom wake word model: %s", custom_model)
-        return Model(wakeword_models=[str(custom_model)])
+        return Model(wakeword_models=[str(custom_model)], inference_framework=framework)
 
     # Use openWakeWord's automatic model generation for custom phrases.
     # This generates synthetic training data via text-to-speech and trains
@@ -238,12 +265,16 @@ def get_or_train_model() -> Model:
             epochs=50,
         )
         log.info("Custom model saved to: %s", model_path)
-        return Model(wakeword_models=[str(model_path)])
+        return Model(wakeword_models=[str(model_path)], inference_framework=framework)
     except (ImportError, Exception) as e:
         log.warning("Auto-training not available (%s). Falling back to built-in models.", e)
         log.info("Using 'hey jarvis' as a stand-in. See pi/README.md to train a custom model.")
-        # Fall back to a built-in model for demo purposes
-        return Model(inference_framework="tflite")
+
+    # Fall back to a built-in model — download pre-trained models first
+    import openwakeword
+    log.info("Downloading pre-trained openWakeWord models (one-time)...")
+    openwakeword.utils.download_models()
+    return Model(inference_framework=framework)
 
 
 # ---------------------------------------------------------------------------
@@ -259,6 +290,8 @@ def main() -> None:
     parser.add_argument("--debug", action="store_true", help="Enable debug logging")
     parser.add_argument("--dry-run", action="store_true",
                         help="Print detections without sending CEC commands")
+    parser.add_argument("--device", type=str, default=None,
+                        help="ALSA device to use (e.g., hw:2,0). Auto-detected if not specified.")
     args = parser.parse_args()
 
     if args.debug:
@@ -275,36 +308,42 @@ def main() -> None:
     wake_words = list(model.models.keys())
     log.info("Listening for wake words: %s (threshold=%.2f)", wake_words, args.threshold)
 
-    # Setup audio
-    pa = pyaudio.PyAudio()
-    mic_idx = find_mic_index(pa)
-    if mic_idx is None:
-        log.error("No microphone found! Check your ReSpeaker HAT or plug in a USB mic.")
-        pa.terminate()
+    # Find the ReSpeaker device
+    device = args.device or find_respeaker_device()
+    if device is None:
+        log.error("No ReSpeaker found! Check your HAT connection or specify --device")
         sys.exit(1)
 
-    stream = pa.open(
-        format=FORMAT,
-        channels=CHANNELS,
-        rate=SAMPLE_RATE,
-        input=True,
-        input_device_index=mic_idx,
-        frames_per_buffer=CHUNK_SIZE,
-    )
+    # Open ALSA capture
+    log.info("Opening ALSA capture on %s (%d ch, %d Hz)", device, CHANNELS, SAMPLE_RATE)
+    try:
+        pcm = open_alsa_capture(device, CHANNELS, SAMPLE_RATE, CHUNK_SIZE)
+    except alsaaudio.ALSAAudioError as e:
+        log.error("Failed to open ALSA device %s: %s", device, e)
+        sys.exit(1)
 
     log.info("Microphone stream open. Listening...")
     last_trigger = 0.0
 
     try:
         while True:
-            audio_data = stream.read(CHUNK_SIZE, exception_on_overflow=False)
-            audio_array = np.frombuffer(audio_data, dtype=np.int16)
+            length, data = pcm.read()
+            if length <= 0:
+                continue
+
+            audio_array = np.frombuffer(data, dtype=np.int16)
+
+            # Downmix stereo to mono
+            if CHANNELS > 1:
+                audio_array = audio_array.reshape(-1, CHANNELS).mean(axis=1).astype(np.int16)
 
             # Feed audio to the model
             model.predict(audio_array)
 
             # Check each wake word score
             for ww_name in wake_words:
+                if len(model.prediction_buffer[ww_name]) == 0:
+                    continue
                 score = model.prediction_buffer[ww_name][-1]
 
                 if args.debug and score > 0.1:
@@ -328,9 +367,7 @@ def main() -> None:
     except KeyboardInterrupt:
         log.info("Shutting down...")
     finally:
-        stream.stop_stream()
-        stream.close()
-        pa.terminate()
+        pcm.close()
 
 
 if __name__ == "__main__":
