@@ -186,6 +186,7 @@ let trackData = null;
 let curve = null;
 let trackLength = 0;
 let scene, camera, renderer, composer, bloomPass;
+let _pageHidden = false, _contextLost = false;
 const inIframe = window.parent !== window;
 let roadMesh, groundMesh;
 let carGroup, carBody;
@@ -360,6 +361,20 @@ function setupScene() {
   renderer.domElement.style.left = '0';
   renderer.domElement.style.zIndex = '0';
   document.body.appendChild(renderer.domElement);
+  // Handle WebGL context loss (mobile Safari kills GPU when backgrounded)
+  renderer.domElement.addEventListener('webglcontextlost', function(e) {
+    e.preventDefault(); _contextLost = true;
+    console.warn('[HorizonDrive] WebGL context lost — pausing render');
+  });
+  renderer.domElement.addEventListener('webglcontextrestored', function() {
+    _contextLost = false;
+    console.log('[HorizonDrive] WebGL context restored — resuming render');
+    if (!_pageHidden) requestAnimationFrame(animate);
+  });
+  document.addEventListener('visibilitychange', function() {
+    _pageHidden = document.hidden;
+    if (!document.hidden && !_contextLost) requestAnimationFrame(animate);
+  });
 
   // Lighting
   const ambient = new THREE.AmbientLight(0x4040a0, 1.26);
@@ -1943,6 +1958,7 @@ function updateFPSCounter(now) {
 }
 
 function animate(now = 0) {
+  if (_pageHidden || _contextLost) return; // stop loop when hidden or GPU lost
   requestAnimationFrame(animate);
   const dt = Math.min((now - lastTime) / 1000, 0.05);
   frameDt = dt;
