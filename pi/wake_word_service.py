@@ -185,10 +185,13 @@ def play_acknowledgement() -> None:
 # Microphone helpers
 # ---------------------------------------------------------------------------
 
-def find_mic_index(pa: pyaudio.PyAudio) -> int | None:
-    """Find the best input device index. Prefers ReSpeaker, falls back to default."""
-    respeaker_idx = None
-    default_idx = None
+def find_mic_index(pa: pyaudio.PyAudio) -> tuple[int, int] | None:
+    """Find the best input device index. Prefers ReSpeaker, falls back to default.
+
+    Returns (device_index, channel_count) or None.
+    """
+    respeaker = None
+    default = None
 
     for i in range(pa.get_device_count()):
         info = pa.get_device_info_by_index(i)
@@ -196,21 +199,22 @@ def find_mic_index(pa: pyaudio.PyAudio) -> int | None:
             continue
 
         name = info["name"].lower()
-        log.debug("Audio device %d: %s (%d ch)", i, info["name"], info["maxInputChannels"])
+        channels = int(info["maxInputChannels"])
+        log.debug("Audio device %d: %s (%d ch)", i, info["name"], channels)
 
         # Prefer ReSpeaker / seeed / wm8960
         if any(kw in name for kw in ("respeaker", "seeed", "wm8960", "2mic")):
-            respeaker_idx = i
-        elif default_idx is None:
-            default_idx = i
+            respeaker = (i, channels)
+        elif default is None:
+            default = (i, channels)
 
-    if respeaker_idx is not None:
-        log.info("Using ReSpeaker mic (device %d)", respeaker_idx)
-        return respeaker_idx
+    if respeaker is not None:
+        log.info("Using ReSpeaker mic (device %d, %d ch)", *respeaker)
+        return respeaker
 
-    if default_idx is not None:
-        log.info("ReSpeaker not found — using default mic (device %d)", default_idx)
-        return default_idx
+    if default is not None:
+        log.info("ReSpeaker not found — using default mic (device %d, %d ch)", *default)
+        return default
 
     return None
 
@@ -299,15 +303,18 @@ def main() -> None:
 
     # Setup audio
     pa = pyaudio.PyAudio()
-    mic_idx = find_mic_index(pa)
-    if mic_idx is None:
+    mic_result = find_mic_index(pa)
+    if mic_result is None:
         log.error("No microphone found! Check your ReSpeaker HAT or plug in a USB mic.")
         pa.terminate()
         sys.exit(1)
 
+    mic_idx, mic_channels = mic_result
+    log.info("Opening mic with %d channel(s)", mic_channels)
+
     stream = pa.open(
         format=FORMAT,
-        channels=CHANNELS,
+        channels=mic_channels,
         rate=SAMPLE_RATE,
         input=True,
         input_device_index=mic_idx,
@@ -321,6 +328,10 @@ def main() -> None:
         while True:
             audio_data = stream.read(CHUNK_SIZE, exception_on_overflow=False)
             audio_array = np.frombuffer(audio_data, dtype=np.int16)
+
+            # Downmix to mono if multi-channel
+            if mic_channels > 1:
+                audio_array = audio_array.reshape(-1, mic_channels).mean(axis=1).astype(np.int16)
 
             # Feed audio to the model
             model.predict(audio_array)
