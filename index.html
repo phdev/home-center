@@ -5162,12 +5162,12 @@ function _slsUpdateEndpointInfo() {
 async function _podFetch(proxyUrl, path, opts) {
   opts = opts || {};
   var url = proxyUrl + path;
-  // Try direct first, fall back to CORS proxy
-  try { return await fetch(url, opts); }
-  catch (e) {
-    _slsLogApi('POD FETCH CORS FALLBACK', url);
-    return fetch('https://corsproxy.io/?' + encodeURIComponent(url), opts);
+  // Validate URL before attempting fetch
+  try { new URL(url); } catch(e) {
+    throw new Error('Invalid pod URL: ' + url);
   }
+  // Route through CF Worker proxy for CORS support
+  return proxiedFetch(url, opts);
 }
 
 async function _runpodGql(query, variables) {
@@ -5706,8 +5706,8 @@ async function serverlessCheckStatus() {
       }
     }
   } catch (err) {
-    console.error('serverlessCheckStatus error:', err, 'proxyUrl:', _proxyUrl, 'podId:', podId);
-    prog.textContent = 'Status error: ' + err.message + (err.message.indexOf('pattern') !== -1 ? ' (proxy: ' + (_proxyUrl || 'none') + ')' : '');
+    console.error('serverlessCheckStatus error:', err, 'podProxyUrl:', proxyUrl, 'podId:', podId, 'workerProxy:', _proxyUrl);
+    prog.textContent = 'Status error: ' + err.message + ' (pod: ' + (proxyUrl || 'none') + ')';
   }
 }
 
