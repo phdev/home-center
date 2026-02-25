@@ -1,0 +1,21 @@
+[Unit]
+Description=Llama.cpp Local LLM Server (Phi-3-mini)
+After=network.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/home-center/email-triage
+ExecStart=/usr/bin/python3 -m llama_cpp.server \
+    --model models/phi-3-mini-4k-instruct-q4_k_m.gguf \
+    --port 8411 \
+    --host 127.0.0.1 \
+    --n_ctx 4096 \
+    --n_threads 4
+Restart=on-failure
+RestartSec=10
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target

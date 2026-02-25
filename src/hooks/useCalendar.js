@@ -29,6 +29,10 @@ export function useCalendar(calendarSettings, workerSettings) {
           throw new Error(err.error || `Calendar: worker returned ${res.status}`);
         }
         const data = await res.json();
+        if (data.errors?.length) {
+          console.warn("Calendar backend errors:", data.errors);
+          setError(data.errors.join("; "));
+        }
         setEvents(data.events || []);
       } else {
         const result = await fetchCalendarEvents(
