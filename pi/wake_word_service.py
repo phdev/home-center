@@ -44,7 +44,7 @@ WAKE_WORD_OFF = "hey_homer_turn_off"
 SAMPLE_RATE = 16000
 CHUNK_SIZE = 1280  # 80ms at 16kHz — required by openWakeWord
 CHANNELS = 2  # ReSpeaker 2-Mic HAT is stereo; we downmix to mono
-DETECTION_THRESHOLD = 0.5
+DETECTION_THRESHOLD = 0.4
 TURN_OFF_THRESHOLD = 0.7  # Higher threshold for "turn off" to reduce false positives
 COOLDOWN_SECONDS = 10  # Prevent repeated triggers
 DEBOUNCE_WINDOW = 1.5  # Seconds to wait after "hey homer" for possible "turn off"
@@ -138,11 +138,11 @@ def generate_chime(path: Path) -> None:
         return signal
 
     chime = np.concatenate([
-        tone(523.25, 0.12),          # C5
+        tone(523.25, 0.15),          # C5
         np.zeros(int(sr * 0.03)),    # 30 ms gap
-        tone(659.25, 0.18),          # E5
+        tone(659.25, 0.22),          # E5
     ])
-    chime = (chime / np.max(np.abs(chime)) * 28000).astype(np.int16)
+    chime = (chime / np.max(np.abs(chime)) * 32000).astype(np.int16)
 
     with wave.open(str(path), "w") as wf:
         wf.setnchannels(1)
@@ -171,10 +171,30 @@ def find_speaker_device() -> str | None:
     return None
 
 
+def set_speaker_volume(percent: int = 100) -> None:
+    """Set the ReSpeaker HAT speaker volume via amixer."""
+    try:
+        subprocess.run(
+            ["amixer", "-q", "sset", "Speaker", f"{percent}%"],
+            capture_output=True, timeout=5,
+        )
+    except Exception:
+        # Try alternative mixer name
+        try:
+            subprocess.run(
+                ["amixer", "-q", "sset", "Playback", f"{percent}%"],
+                capture_output=True, timeout=5,
+            )
+        except Exception:
+            pass
+
+
 def play_acknowledgement() -> None:
     """Play a short chime through the ReSpeaker HAT speaker (non-blocking)."""
     if not CHIME_PATH.exists():
         generate_chime(CHIME_PATH)
+
+    set_speaker_volume(100)
 
     device = find_speaker_device()
     cmd = ["aplay", "-q"]
