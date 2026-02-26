@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Train a custom "hey homer" wake word model for openWakeWord.
+Train a custom wake word model for openWakeWord.
 
 Generates synthetic speech samples using edge-tts, computes audio features
 using openwakeword's AudioFeatures pipeline (melspec → embedding), trains a
@@ -8,6 +8,10 @@ small DNN, and exports to ONNX format.
 
 Usage:
     python train_hey_homer.py [--samples 1500] [--epochs 100] [--output-dir models]
+    python train_hey_homer.py --name hey_homer_turn_off \\
+        --positive-phrases "hey homer turn off,hey homer off" \\
+        --negative-phrases "hey homer,turn off,turn on" \\
+        --clip-duration 3.0
 """
 
 import argparse
@@ -476,7 +480,13 @@ def _export_onnx_manual(model: WakeWordDNN, output_path: str, input_shape=(16, 9
 # ---------------------------------------------------------------------------
 
 def main():
-    parser = argparse.ArgumentParser(description="Train 'hey homer' wake word model")
+    parser = argparse.ArgumentParser(description="Train a custom wake word model")
+    parser.add_argument("--name", type=str, default="hey_homer",
+                        help="Model name (used for output filenames, e.g. 'hey_homer_turn_off')")
+    parser.add_argument("--positive-phrases", type=str, default=None,
+                        help="Comma-separated positive phrases (overrides built-in defaults)")
+    parser.add_argument("--negative-phrases", type=str, default=None,
+                        help="Comma-separated negative phrases (overrides built-in defaults)")
     parser.add_argument("--positive-samples", type=int, default=500,
                         help="Number of positive TTS clips to generate")
     parser.add_argument("--negative-samples", type=int, default=750,
@@ -496,9 +506,11 @@ def main():
     output_dir = Path(__file__).parent / args.output_dir
     output_dir.mkdir(exist_ok=True)
 
+    model_name = args.name
+
     # Export-only mode: load checkpoint and export
     if args.export_only:
-        checkpoint_path = output_dir / "hey_homer.pt"
+        checkpoint_path = output_dir / f"{model_name}.pt"
         if not checkpoint_path.exists():
             log.error("No checkpoint found at %s", checkpoint_path)
             return
@@ -507,22 +519,37 @@ def main():
         input_shape = ckpt["input_shape"]
         model = WakeWordDNN(input_shape=input_shape)
         model.load_state_dict(ckpt["state_dict"])
-        output_path = output_dir / "hey_homer.onnx"
+        output_path = output_dir / f"{model_name}.onnx"
         export_onnx(model, str(output_path), input_shape=input_shape)
         log.info("Done! Model saved to %s", output_path)
         return
 
+    # Resolve phrase lists: CLI overrides > built-in defaults
+    if args.positive_phrases:
+        pos_phrases = [p.strip() for p in args.positive_phrases.split(",")]
+    else:
+        pos_phrases = list(POSITIVE_PHRASES)
+
+    if args.negative_phrases:
+        neg_phrases = [p.strip() for p in args.negative_phrases.split(",")]
+    else:
+        neg_phrases = list(NEGATIVE_PHRASES)
+
+    log.info("Training model '%s'", model_name)
+    log.info("Positive phrases: %s", pos_phrases)
+    log.info("Negative phrases: %s", neg_phrases)
+
     clip_duration_samples = int(args.clip_duration * 16000)
 
     # Step 1: Generate positive samples
-    log.info("=== Generating %d positive samples ('hey homer') ===", args.positive_samples)
-    pos_clips = asyncio.run(generate_samples(POSITIVE_PHRASES, args.positive_samples,
+    log.info("=== Generating %d positive samples ===", args.positive_samples)
+    pos_clips = asyncio.run(generate_samples(pos_phrases, args.positive_samples,
                                              desc="Positive clips"))
     log.info("Generated %d positive clips", len(pos_clips))
 
     # Step 2: Generate negative samples
     log.info("=== Generating %d negative samples ===", args.negative_samples)
-    neg_clips = asyncio.run(generate_samples(NEGATIVE_PHRASES, args.negative_samples,
+    neg_clips = asyncio.run(generate_samples(neg_phrases, args.negative_samples,
                                              desc="Negative clips"))
 
     # Also add pure noise clips as negatives
@@ -554,13 +581,13 @@ def main():
     model = train(pos_features, neg_features, epochs=args.epochs)
 
     # Step 5: Save checkpoint (so model is never lost if export fails)
-    checkpoint_path = output_dir / "hey_homer.pt"
+    checkpoint_path = output_dir / f"{model_name}.pt"
     input_shape = (pos_features.shape[1], pos_features.shape[2])
     torch.save({"state_dict": model.state_dict(), "input_shape": input_shape}, checkpoint_path)
     log.info("Checkpoint saved to %s", checkpoint_path)
 
     # Step 6: Export to ONNX
-    output_path = output_dir / "hey_homer.onnx"
+    output_path = output_dir / f"{model_name}.onnx"
     export_onnx(model, str(output_path), input_shape=input_shape)
     log.info("Done! Model saved to %s", output_path)
     log.info("Restart wake-word service to use the new model:")

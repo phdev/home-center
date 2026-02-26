@@ -40,11 +40,13 @@ def _inference_framework() -> str:
 # Configuration
 # ---------------------------------------------------------------------------
 WAKE_WORD = "hey_homer"
+WAKE_WORD_OFF = "hey_homer_turn_off"
 SAMPLE_RATE = 16000
 CHUNK_SIZE = 1280  # 80ms at 16kHz — required by openWakeWord
 CHANNELS = 2  # ReSpeaker 2-Mic HAT is stereo; we downmix to mono
 DETECTION_THRESHOLD = 0.5
 COOLDOWN_SECONDS = 10  # Prevent repeated triggers
+DEBOUNCE_WINDOW = 1.5  # Seconds to wait after "hey homer" for possible "turn off"
 
 SOUNDS_DIR = Path(__file__).parent / "sounds"
 CHIME_PATH = SOUNDS_DIR / "acknowledge.wav"
@@ -92,6 +94,13 @@ def turn_on_tv() -> None:
     time.sleep(1)
     cec_send(CEC_ACTIVE_CMD)
     log.info("TV should now be on and showing this Pi's HDMI output.")
+
+
+def turn_off_tv() -> None:
+    """Turn off the TV via HDMI-CEC standby command."""
+    log.info("Turning TV OFF via HDMI-CEC...")
+    cec_send(f"standby {CEC_DEVICE}")
+    log.info("TV should now be off.")
 
 
 def is_tv_on() -> bool:
@@ -243,17 +252,24 @@ def get_or_train_model() -> Model:
     framework = _inference_framework()
     log.info("Using inference framework: %s", framework)
 
-    # Check for custom model (ONNX preferred, tflite also supported)
-    custom_onnx = custom_model_dir / "hey_homer.onnx"
-    custom_tflite = custom_model_dir / "hey_homer.tflite"
+    # Collect all custom models (ONNX preferred, tflite fallback)
+    model_names = ["hey_homer", "hey_homer_turn_off"]
+    wakeword_models = []
+    for name in model_names:
+        onnx_path = custom_model_dir / f"{name}.onnx"
+        tflite_path = custom_model_dir / f"{name}.tflite"
+        if onnx_path.exists():
+            log.info("Found custom model: %s", onnx_path)
+            wakeword_models.append(str(onnx_path))
+        elif tflite_path.exists():
+            log.info("Found custom model: %s", tflite_path)
+            wakeword_models.append(str(tflite_path))
 
-    if custom_onnx.exists():
-        log.info("Loading custom wake word model: %s", custom_onnx)
-        return Model(wakeword_models=[str(custom_onnx)], inference_framework="onnx")
-
-    if custom_tflite.exists():
-        log.info("Loading custom wake word model: %s", custom_tflite)
-        return Model(wakeword_models=[str(custom_tflite)], inference_framework="tflite")
+    if wakeword_models:
+        # Use ONNX framework if any ONNX models present, else tflite
+        fw = "onnx" if any(m.endswith(".onnx") for m in wakeword_models) else "tflite"
+        log.info("Loading %d custom wake word model(s)", len(wakeword_models))
+        return Model(wakeword_models=wakeword_models, inference_framework=fw)
 
     # No custom model found — fall back to built-in models
     log.warning("No custom 'hey homer' model found in %s", custom_model_dir)
@@ -312,6 +328,8 @@ def main() -> None:
 
     log.info("Microphone stream open. Listening...")
     last_trigger = 0.0
+    pending_action = None  # "turn_on" when hey_homer detected, awaiting debounce
+    pending_time = 0.0
 
     try:
         while True:
@@ -328,6 +346,8 @@ def main() -> None:
             # Feed audio to the model
             model.predict(audio_array)
 
+            now = time.time()
+
             # Check each wake word score
             for ww_name in wake_words:
                 if len(model.prediction_buffer[ww_name]) == 0:
@@ -338,19 +358,39 @@ def main() -> None:
                     log.debug("%s score: %.3f", ww_name, score)
 
                 if score >= args.threshold:
-                    now = time.time()
                     if now - last_trigger < args.cooldown:
                         log.debug("Cooldown active, ignoring detection")
                         continue
 
-                    last_trigger = now
-                    log.info("Wake word '%s' detected! (score=%.3f)", ww_name, score)
+                    if WAKE_WORD_OFF in ww_name:
+                        # "Turn off" takes priority — execute immediately
+                        pending_action = None
+                        last_trigger = now
+                        log.info("Wake word '%s' detected! (score=%.3f)", ww_name, score)
+                        if args.dry_run:
+                            log.info("[DRY RUN] Would turn off TV via CEC")
+                        else:
+                            play_acknowledgement()
+                            turn_off_tv()
 
-                    if args.dry_run:
-                        log.info("[DRY RUN] Would turn on TV via CEC")
-                    else:
-                        play_acknowledgement()
-                        turn_on_tv()
+                    elif WAKE_WORD in ww_name and pending_action is None:
+                        # "Hey homer" detected — start debounce window
+                        log.info("Wake word '%s' detected (score=%.3f), "
+                                 "waiting %.1fs for possible 'turn off'...",
+                                 ww_name, score, DEBOUNCE_WINDOW)
+                        pending_action = "turn_on"
+                        pending_time = now
+
+            # Check if debounce window expired — execute pending turn-on
+            if pending_action and (now - pending_time) > DEBOUNCE_WINDOW:
+                last_trigger = now
+                log.info("Debounce expired, executing turn-on")
+                if args.dry_run:
+                    log.info("[DRY RUN] Would turn on TV via CEC")
+                else:
+                    play_acknowledgement()
+                    turn_on_tv()
+                pending_action = None
 
     except KeyboardInterrupt:
         log.info("Shutting down...")
