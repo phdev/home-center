@@ -45,6 +45,7 @@ SAMPLE_RATE = 16000
 CHUNK_SIZE = 1280  # 80ms at 16kHz — required by openWakeWord
 CHANNELS = 2  # ReSpeaker 2-Mic HAT is stereo; we downmix to mono
 DETECTION_THRESHOLD = 0.5
+TURN_OFF_THRESHOLD = 0.7  # Higher threshold for "turn off" to reduce false positives
 COOLDOWN_SECONDS = 10  # Prevent repeated triggers
 DEBOUNCE_WINDOW = 1.5  # Seconds to wait after "hey homer" for possible "turn off"
 
@@ -357,7 +358,10 @@ def main() -> None:
                 if args.debug and score > 0.1:
                     log.debug("%s score: %.3f", ww_name, score)
 
-                if score >= args.threshold:
+                # Use higher threshold for turn-off to reduce false positives
+                effective_threshold = TURN_OFF_THRESHOLD if WAKE_WORD_OFF in ww_name else args.threshold
+
+                if score >= effective_threshold:
                     if now - last_trigger < args.cooldown:
                         log.debug("Cooldown active, ignoring detection")
                         continue
