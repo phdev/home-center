@@ -44,7 +44,7 @@ WAKE_WORD_OFF = "hey_homer_turn_off"
 SAMPLE_RATE = 16000
 CHUNK_SIZE = 1280  # 80ms at 16kHz — required by openWakeWord
 CHANNELS = 2  # ReSpeaker 2-Mic HAT is stereo; we downmix to mono
-DETECTION_THRESHOLD = 0.4
+DETECTION_THRESHOLD = 0.5
 TURN_OFF_THRESHOLD = 0.7  # Higher threshold for "turn off" to reduce false positives
 COOLDOWN_SECONDS = 10  # Prevent repeated triggers
 DEBOUNCE_WINDOW = 1.5  # Seconds to wait after "hey homer" for possible "turn off"
@@ -171,18 +171,18 @@ def find_speaker_device() -> str | None:
     return None
 
 
-def set_speaker_volume(percent: int = 100) -> None:
-    """Set the ReSpeaker HAT speaker volume via amixer."""
-    try:
-        subprocess.run(
-            ["amixer", "-q", "sset", "Speaker", f"{percent}%"],
-            capture_output=True, timeout=5,
-        )
-    except Exception:
-        # Try alternative mixer name
+def set_speaker_volume() -> None:
+    """Max out the ReSpeaker HAT (WM8960) speaker volume."""
+    device = find_speaker_device()
+    if not device:
+        return
+    card = device.split(":")[0].replace("plughw", "").replace("hw", "")
+    # Max out all relevant playback volumes on the WM8960
+    for control in ["Speaker", "Playback", "HP Playback",
+                    "Line Playback", "PCM Playback"]:
         try:
             subprocess.run(
-                ["amixer", "-q", "sset", "Playback", f"{percent}%"],
+                ["amixer", "-c", card, "-q", "sset", control, "100%"],
                 capture_output=True, timeout=5,
             )
         except Exception:
