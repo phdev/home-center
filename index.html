@@ -5281,6 +5281,83 @@ function _podServerScript() {
   ].join('\n');
 }
 
+// Fallback: start the training HTTP server via JupyterLab when dockerArgs didn't execute it.
+// Uploads the server script, starts it via kernel WebSocket, then waits for port 8000 health check.
+async function _startServerViaJupyter(podId, token, proxyUrl, prog) {
+  prog('Starting server via JupyterLab fallback...');
+  // Wait for JupyterLab to become responsive
+  var jupyterReady = false;
+  for (var ji = 0; ji < 24; ji++) {
+    await pollSleep(5000);
+    try {
+      var jRes = await _jupyterApi(podId, token, 'GET', '/api');
+      if (jRes.ok) { jupyterReady = true; break; }
+    } catch(e) {
+      if (ji % 6 === 0) prog('Waiting for JupyterLab... (' + ((ji + 1) * 5) + 's)');
+    }
+  }
+  if (!jupyterReady) {
+    _slsLogApi('JUPYTER FALLBACK', 'JupyterLab not available after 120s');
+    return false;
+  }
+  prog('JupyterLab ready. Uploading training server...');
+  var serverPy = _podServerScript();
+  await _jupyterPut(podId, token, 'train_server.py', serverPy);
+  // Create kernel to start the server
+  var kernelRes = await _jupyterApi(podId, token, 'POST', '/api/kernels', { name: 'python3' });
+  if (!kernelRes.ok) {
+    _slsLogApi('JUPYTER KERNEL FAIL', kernelRes.status);
+    return false;
+  }
+  var kernelData = await kernelRes.json();
+  var kernelId = kernelData.id;
+  // Execute server start via kernel WebSocket
+  await new Promise(function(resolve) {
+    var wsUrl = 'wss://' + podId + '-8888.proxy.runpod.net/api/kernels/' + kernelId + '/channels?token=' + token;
+    var ws = new WebSocket(wsUrl);
+    var sent = false;
+    ws.onopen = function() {
+      var msgId = 'srv-' + Date.now();
+      ws.send(JSON.stringify({
+        header: { msg_id: msgId, msg_type: 'execute_request', username: '', session: msgId, version: '5.3' },
+        parent_header: {},
+        metadata: {},
+        content: { code: 'import subprocess; subprocess.Popen(["python", "-u", "train_server.py"]); print("SERVER_STARTED")', silent: false, store_history: false, user_expressions: {}, allow_stdin: false },
+        channel: 'shell'
+      }));
+      sent = true;
+    };
+    ws.onmessage = function(e) {
+      try {
+        var msg = JSON.parse(e.data);
+        if ((msg.msg_type === 'stream' && msg.content && msg.content.text && msg.content.text.indexOf('SERVER_STARTED') >= 0) ||
+            msg.msg_type === 'execute_reply') {
+          ws.close(); resolve();
+        }
+      } catch(ex) {}
+    };
+    ws.onerror = function() { if (!sent) resolve(); };
+    setTimeout(function() { try { ws.close(); } catch(ex) {} resolve(); }, 15000);
+  });
+  // Wait for port 8000 health check
+  prog('Server process started. Waiting for HTTP health check...');
+  for (var hi = 0; hi < 36; hi++) {
+    await pollSleep(5000);
+    try {
+      var hc = await _podFetch(proxyUrl, '/health');
+      if (hc.ok) {
+        _slsLogApi('JUPYTER FALLBACK', 'Server started via JupyterLab');
+        prog('Pod ready at ' + proxyUrl);
+        return true;
+      }
+    } catch(e) {
+      if (hi % 6 === 0) prog('HTTP server starting... (' + ((hi + 1) * 5) + 's)');
+    }
+  }
+  _slsLogApi('JUPYTER FALLBACK', 'Server still not responding after Jupyter start');
+  return false;
+}
+
 // Auto-provision: create GPU pod via GraphQL, wait for ready, return proxy URL
 async function _ensureTrainingPod(prog) {
   // Check for cached running pod
@@ -5301,9 +5378,20 @@ async function _ensureTrainingPod(prog) {
                 _serverlessState.proxyUrl = pUrl;
                 _slsLogApi('POD (cached, healthy)', d);
                 prog('Pod ready: ' + d.podId);
-                return { podId: d.podId, proxyUrl: pUrl };
+                return { podId: d.podId, proxyUrl: pUrl, token: d.token || null };
               }
             } catch(e) { _slsLogApi('POD HEALTH FAIL', e.message); }
+            // Port 8000 not responding — try JupyterLab fallback if we have a token
+            if (d.token) {
+              try {
+                var fallbackOk = await _startServerViaJupyter(d.podId, d.token, pUrl, prog);
+                if (fallbackOk) {
+                  _serverlessState.podId = d.podId;
+                  _serverlessState.proxyUrl = pUrl;
+                  return { podId: d.podId, proxyUrl: pUrl, token: d.token };
+                }
+              } catch(e) { _slsLogApi('JUPYTER FALLBACK FAIL (cached)', e.message); }
+            }
           }
         } catch(e) { _slsLogApi('POD CHECK FAIL', e.message); }
         // Pod gone or unhealthy — terminate and clean up
@@ -5326,10 +5414,16 @@ async function _ensureTrainingPod(prog) {
 
   prog('Creating GPU pod...');
 
+  // Generate JupyterLab token for fallback access
+  var token = 'ad' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+
   // Encode server script as base64 for clean docker embedding (no quote escaping needed)
   var serverPy = _podServerScript();
   var b64Script = btoa(serverPy);
-  var dockerArgs = 'bash -c "echo ' + b64Script + ' | base64 -d > /server.py && python -u /server.py"';
+  // Start server in background, then delegate to image's default startup script.
+  // This ensures the server starts even if the ENTRYPOINT calls exec "$@", and
+  // JupyterLab/SSH still start via the image's own /start.sh.
+  var dockerArgs = 'bash -c "echo ' + b64Script + ' | base64 -d > /server.py; nohup python -u /server.py > /var/log/train-server.log 2>&1 & if [ -f /start.sh ]; then exec /start.sh; else sleep infinity; fi"';
   var gqlDockerArgs = dockerArgs.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
 
   // Try GPU types in order of availability
@@ -5351,7 +5445,8 @@ async function _ensureTrainingPod(prog) {
           ' minVcpuCount: 4,' +
           ' minMemoryInGb: 16,' +
           ' dockerArgs: "' + gqlDockerArgs + '",' +
-          ' ports: "8000/http"' +
+          ' ports: "8000/http,8888/http",' +
+          ' env: [{key: "JUPYTER_TOKEN", value: "' + token + '"}, {key: "JUPYTER_PASSWORD", value: "' + token + '"}]' +
         ' }) { id desiredStatus imageName machine { podHostId } } }'
       );
       if (podData.podFindAndDeployOnDemand && podData.podFindAndDeployOnDemand.id) {
@@ -5368,8 +5463,8 @@ async function _ensureTrainingPod(prog) {
   var podId = pod.id;
   var proxyUrl = 'https://' + podId + '-8000.proxy.runpod.net';
 
-  // Cache pod info immediately
-  localStorage.setItem(_SLS_STORAGE_KEY, JSON.stringify({ podId: podId, created: Date.now() }));
+  // Cache pod info immediately (include token for JupyterLab fallback)
+  localStorage.setItem(_SLS_STORAGE_KEY, JSON.stringify({ podId: podId, created: Date.now(), token: token }));
   _serverlessState.podId = podId;
   _serverlessState.proxyUrl = proxyUrl;
   _slsUpdateEndpointInfo();
@@ -5388,21 +5483,31 @@ async function _ensureTrainingPod(prog) {
       prog('Pod ' + st + (uptime ? ' (up ' + uptime + 's)' : '') + '... (' + elapsed + ' min)');
 
       if (st === 'RUNNING') {
-        // Pod is running — now wait for HTTP server
-        prog('Pod running! Waiting for HTTP server...');
-        for (var hi = 0; hi < 60; hi++) {
+        // Phase 1: Quick check for HTTP server on port 8000 (60 seconds)
+        // This works when dockerArgs successfully started the server in the background
+        prog('Pod running! Checking HTTP server...');
+        for (var hi = 0; hi < 12; hi++) {
           await pollSleep(5000);
           try {
             var hc = await _podFetch(proxyUrl, '/health');
             if (hc.ok) {
               prog('Pod ready at ' + proxyUrl);
-              return { podId: podId, proxyUrl: proxyUrl };
+              return { podId: podId, proxyUrl: proxyUrl, token: token };
             }
           } catch(e) {
-            if (hi % 6 === 0) prog('HTTP server starting... (' + ((hi + 1) * 5) + 's)');
+            if (hi % 3 === 0) prog('HTTP server starting... (' + ((hi + 1) * 5) + 's)');
           }
         }
-        throw new Error('Pod running but HTTP server never started (5 min timeout)');
+        // Phase 2: JupyterLab fallback — start server via Jupyter kernel
+        // This handles images where the ENTRYPOINT doesn't execute dockerArgs (CMD)
+        _slsLogApi('PORT 8000 TIMEOUT', 'Trying JupyterLab fallback for pod ' + podId);
+        try {
+          var fallbackOk = await _startServerViaJupyter(podId, token, proxyUrl, prog);
+          if (fallbackOk) return { podId: podId, proxyUrl: proxyUrl, token: token };
+        } catch(e) {
+          _slsLogApi('JUPYTER FALLBACK ERROR', e.message);
+        }
+        throw new Error('Pod running but HTTP server never started. Check pod ' + podId + ' logs in RunPod dashboard.');
       }
       if (st === 'EXITED' || st === 'TERMINATED') {
         throw new Error('Pod ' + st + ' unexpectedly. Check RunPod dashboard for logs.');
