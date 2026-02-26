@@ -240,39 +240,27 @@ def get_or_train_model() -> Model:
     custom_model_dir = Path(__file__).parent / "models"
     custom_model_dir.mkdir(exist_ok=True)
 
-    custom_model = custom_model_dir / "hey_homer.tflite"
-
     framework = _inference_framework()
     log.info("Using inference framework: %s", framework)
 
-    if custom_model.exists():
-        log.info("Loading custom wake word model: %s", custom_model)
-        return Model(wakeword_models=[str(custom_model)], inference_framework=framework)
+    # Check for custom model (ONNX preferred, tflite also supported)
+    custom_onnx = custom_model_dir / "hey_homer.onnx"
+    custom_tflite = custom_model_dir / "hey_homer.tflite"
 
-    # Use openWakeWord's automatic model generation for custom phrases.
-    # This generates synthetic training data via text-to-speech and trains
-    # a small model on-device.
-    log.info("No pre-trained model found. Training 'hey homer' model on-device...")
-    log.info("This uses openWakeWord's automatic training and may take a few minutes on first run.")
+    if custom_onnx.exists():
+        log.info("Loading custom wake word model: %s", custom_onnx)
+        return Model(wakeword_models=[str(custom_onnx)], inference_framework="onnx")
 
-    try:
-        from openwakeword.train import train_custom_model
+    if custom_tflite.exists():
+        log.info("Loading custom wake word model: %s", custom_tflite)
+        return Model(wakeword_models=[str(custom_tflite)], inference_framework="tflite")
 
-        model_path = train_custom_model(
-            phrase="hey homer",
-            output_dir=str(custom_model_dir),
-            num_samples=1500,
-            epochs=50,
-        )
-        log.info("Custom model saved to: %s", model_path)
-        return Model(wakeword_models=[str(model_path)], inference_framework=framework)
-    except (ImportError, Exception) as e:
-        log.warning("Auto-training not available (%s). Falling back to built-in models.", e)
-        log.info("Using 'hey jarvis' as a stand-in. See pi/README.md to train a custom model.")
+    # No custom model found — fall back to built-in models
+    log.warning("No custom 'hey homer' model found in %s", custom_model_dir)
+    log.info("Train one with: python pi/train_hey_homer.py")
+    log.info("Falling back to built-in models ('hey jarvis' etc.) as stand-in.")
 
-    # Fall back to a built-in model — download pre-trained models first
     import openwakeword
-    log.info("Downloading pre-trained openWakeWord models (one-time)...")
     openwakeword.utils.download_models()
     return Model(inference_framework=framework)
 
