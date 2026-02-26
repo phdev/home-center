@@ -194,7 +194,7 @@ def play_acknowledgement() -> None:
     if not CHIME_PATH.exists():
         generate_chime(CHIME_PATH)
 
-    set_speaker_volume(100)
+    set_speaker_volume()
 
     device = find_speaker_device()
     cmd = ["aplay", "-q"]
