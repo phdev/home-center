@@ -2,8 +2,17 @@ node_modules
 dist
 .DS_Store
 *.local
+.pencil-queue.json
 
 # Pi wake word
 pi/.venv/
+pi/.env
 pi/models/*.tflite
+pi/models/*.onnx
+pi/models/*.ppn
 pi/sounds/
+
+# School updates agent
+school-updates/credentials.json
+school-updates/token.json
+school-updates/data/
