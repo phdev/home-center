@@ -1296,6 +1296,11 @@ async function proxiedFetch(url, opts) {
         return fetch('https://corsproxy.io/?' + encodeURIComponent(url), opts);
       }
     }
+    // RunPod pod proxy URLs: route through CF Worker first (more reliable after tab backgrounding)
+    if (url.indexOf('.proxy.runpod.net') !== -1) {
+      try { return await fetch(_proxyUrl + '/fetch?url=' + encodeURIComponent(url), opts); }
+      catch (e) { return fetch(url, opts); } // fallback to direct if Worker fails
+    }
     // Non-API URL: try direct, fallback to Worker generic proxy
     try { return await fetch(url, opts); }
     catch (e) { return fetch(_proxyUrl + '/fetch?url=' + encodeURIComponent(url), opts); }
@@ -1331,6 +1336,11 @@ document.addEventListener('visibilitychange', function() {
     showSlsPending();
     // Resume animation loop if it was paused
     if (!_contextLost) requestAnimationFrame(animate);
+    // Auto-resume RunPod training status check when returning to the page
+    if (_serverlessState.podId && _serverlessState.phase &&
+        _serverlessState.phase !== 'done' && _serverlessState.phase !== 'idle') {
+      setTimeout(function() { serverlessCheckStatus(); }, 800);
+    }
   }
 });
 
@@ -5131,6 +5141,8 @@ function showSlsPending() {
   var el = document.getElementById('runpod-pending'); if (!el) return;
   document.getElementById('runpod-pending-info').textContent = 'Pod: ' + p.podId + ' (' + age + ' min ago)';
   el.style.display = 'block';
+  // Auto-check status on page load if a training job was pending
+  if (p.podId) setTimeout(function() { serverlessCheckStatus(); }, 1500);
 }
 
 function toggleRunpodMode() {
@@ -5158,7 +5170,8 @@ function _slsUpdateEndpointInfo() {
   }
 }
 
-// Fetch wrapper for pod HTTP server (goes through RunPod proxy, needs CORS)
+// Fetch wrapper for pod HTTP server — retries with backoff for transient failures.
+// After a tab is backgrounded, browsers kill connections — this ensures we reconnect.
 async function _podFetch(proxyUrl, path, opts) {
   opts = opts || {};
   var url = proxyUrl + path;
@@ -5166,8 +5179,18 @@ async function _podFetch(proxyUrl, path, opts) {
   try { new URL(url); } catch(e) {
     throw new Error('Invalid pod URL: ' + url);
   }
-  // Route through CF Worker proxy for CORS support
-  return proxiedFetch(url, opts);
+  var lastErr;
+  for (var attempt = 0; attempt < 3; attempt++) {
+    try {
+      var res = await proxiedFetch(url, opts);
+      return res;
+    } catch(e) {
+      lastErr = e;
+      _slsLogApi('POD FETCH RETRY ' + (attempt + 1) + '/3', { url: url, error: e.message });
+      if (attempt < 2) await pollSleep(2000 * (attempt + 1)); // 2s, 4s backoff
+    }
+  }
+  throw lastErr;
 }
 
 async function _runpodGql(query, variables) {
@@ -5247,18 +5270,23 @@ function _podServerScript() {
     '        status = {"state":"training","progress":f"0/{iters}","frames":len(frames)}',
     '        proc = subprocess.Popen(["ns-train","splatfacto","--data","/workspace/data",',
     '            "--max-num-iterations",str(iters),"--output-dir","/workspace/ns-output",',
-    '            "--viewer.quit-on-train-completion","True",',
+    '            "--vis","none",',
     '            "--pipeline.datamanager.dataparser","nerfstudio-data",',
     '            "--pipeline.model.num-downscales","0"],',
     '            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)',
+    '        last_lines = []',
     '        for line in proc.stdout:',
     '            line = line.strip()',
+    '            if line: last_lines = (last_lines + [line])[-20:]',
     '            if "%" in line:',
     '                try: status["progress"] = line.split("%")[0].split("(")[-1].strip() + "% of " + str(iters)',
     '                except: pass',
+    '            elif "step" in line.lower() or "iter" in line.lower():',
+    '                status["progress"] = line[:80]',
     '        proc.wait()',
     '        if proc.returncode != 0:',
-    '            status = {"state":"failed","error":f"ns-train exited {proc.returncode}"}; return',
+    '            tail = "\\n".join(last_lines[-5:])',
+    '            status = {"state":"failed","error":f"ns-train exited {proc.returncode}: {tail}"}; return',
     '        status = {"state":"exporting"}',
     '        configs = glob.glob("/workspace/ns-output/**/splatfacto/**/config.yml", recursive=True)',
     '        if not configs: status = {"state":"failed","error":"No config.yml found"}; return',
@@ -5420,14 +5448,13 @@ async function _ensureTrainingPod(prog) {
   // Encode server script as base64 for clean docker embedding (no quote escaping needed)
   var serverPy = _podServerScript();
   var b64Script = btoa(serverPy);
-  // Start server in background, then delegate to image's default startup script.
-  // This ensures the server starts even if the ENTRYPOINT calls exec "$@", and
-  // JupyterLab/SSH still start via the image's own /start.sh.
-  var dockerArgs = 'bash -c "echo ' + b64Script + ' | base64 -d > /server.py; nohup python -u /server.py > /var/log/train-server.log 2>&1 & if [ -f /start.sh ]; then exec /start.sh; else sleep infinity; fi"';
+  // Start server in background with a watchdog that restarts it if it crashes.
+  // Then delegate to image's default startup script so JupyterLab/SSH still start.
+  var dockerArgs = 'bash -c "echo ' + b64Script + ' | base64 -d > /server.py; (while true; do python -u /server.py >> /var/log/train-server.log 2>&1; echo RESTART >> /var/log/train-server.log; sleep 2; done) & if [ -f /start.sh ]; then exec /start.sh; else sleep infinity; fi"';
   var gqlDockerArgs = dockerArgs.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
 
-  // Try GPU types in order of availability
-  var gpuTypes = ['NVIDIA GeForce RTX 4090', 'NVIDIA RTX A5000', 'NVIDIA GeForce RTX 3090'];
+  // Try GPU types in order — A6000 has 48GB VRAM and is very reliable for 3DGS
+  var gpuTypes = ['NVIDIA RTX A6000', 'NVIDIA GeForce RTX 4090', 'NVIDIA RTX A5000', 'NVIDIA GeForce RTX 3090'];
   var podData = null;
   for (var gi = 0; gi < gpuTypes.length; gi++) {
     var gpu = gpuTypes[gi];
@@ -5440,10 +5467,10 @@ async function _ensureTrainingPod(prog) {
           ' gpuTypeId: "' + gpu + '",' +
           ' cloudType: ALL,' +
           ' gpuCount: 1,' +
-          ' containerDiskInGb: 50,' +
+          ' containerDiskInGb: 75,' +
           ' volumeInGb: 0,' +
           ' minVcpuCount: 4,' +
-          ' minMemoryInGb: 16,' +
+          ' minMemoryInGb: 24,' +
           ' dockerArgs: "' + gqlDockerArgs + '",' +
           ' ports: "8000/http,8888/http",' +
           ' env: [{key: "JUPYTER_TOKEN", value: "' + token + '"}, {key: "JUPYTER_PASSWORD", value: "' + token + '"}]' +
@@ -5639,11 +5666,13 @@ async function runpodServerlessTrain() {
 
     // --- Phase 5: Poll pod /status for completion ---
     var maxPolls = 720; // 60 min at 5s intervals
+    var consecutiveErrors = 0;
     for (var pi = 0; pi < maxPolls; pi++) {
       await pollSleep(5000);
       try {
         var statusRes = await _podFetch(proxyUrl, '/status');
         var statusData = await statusRes.json();
+        consecutiveErrors = 0; // reset on success
         var st = statusData.state || 'unknown';
         if (pi % 6 === 0 || st !== _serverlessState.phase) {
           _slsLogApi('POD STATUS (poll #' + (pi + 1) + ')', statusData);
@@ -5653,37 +5682,8 @@ async function runpodServerlessTrain() {
 
         if (st === 'completed') {
           clearSlsPending();
-          updateProg('Training complete! Downloading PLY (' + (statusData.size_mb || '?') + ' MB)...');
-          // Download PLY binary from pod
-          var plyRes = await _podFetch(proxyUrl, '/result');
-          if (!plyRes.ok) throw new Error('PLY download failed: ' + plyRes.status);
-          var plyBytes = new Uint8Array(await plyRes.arrayBuffer());
-          updateProg('Downloaded PLY (' + (plyBytes.length / 1e6).toFixed(1) + ' MB). Loading into viewer...');
-          // Load into Spark.js viewer
-          await ensureSparkLoaded();
-          if (_splatMesh) { scene.remove(_splatMesh); if (_splatMesh.dispose) _splatMesh.dispose(); _splatMesh = null; }
-          var Spark = window.Spark;
-          _splatMesh = new Spark.SplatMesh({
-            fileBytes: plyBytes,
-            onLoad: function(mesh) {
-              var numSplats = mesh.numSplats || 'unknown';
-              document.getElementById('splat-info').textContent = 'GPU Pod 3DGS: ' + numSplats + ' splats (' + (plyBytes.length / 1e6).toFixed(1) + ' MB)';
-              toast('Splat loaded (' + numSplats + ' splats)');
-              syncSplatSlidersToMesh();
-            }
-          });
-          scene.add(_splatMesh);
           _serverlessState.phase = 'done';
-          updateProg('Done! Splat loaded. Terminating pod...');
-          toast('Training complete — splat loaded!');
-          // Terminate pod to stop billing
-          try {
-            await _runpodGql('mutation { podTerminate(input: { podId: "' + podInfo.podId + '" }) }');
-            _slsLogApi('POD TERMINATED', podInfo.podId);
-            localStorage.removeItem(_SLS_STORAGE_KEY);
-            _serverlessState.podId = null;
-            _slsUpdateEndpointInfo();
-          } catch(e) { _slsLogApi('POD TERMINATE FAILED', e.message); }
+          await _downloadAndLoadPly(proxyUrl, podInfo.podId, updateProg, statusData.size_mb);
           break;
 
         } else if (st === 'failed') {
@@ -5697,10 +5697,23 @@ async function runpodServerlessTrain() {
         }
       } catch(e) {
         if (e.message.indexOf('Training failed') !== -1) throw e;
-        // Pod might be temporarily unreachable
-        if (pi % 6 === 0) _slsLogApi('POD POLL ERROR', e.message);
+        consecutiveErrors++;
+        if (pi % 6 === 0) _slsLogApi('POD POLL ERROR (' + consecutiveErrors + ')', e.message);
         var elapsed2 = Math.round((pi + 1) * 5 / 60);
-        updateProg('Polling... (' + elapsed2 + ' min) — ' + e.message);
+        updateProg('Polling... (' + elapsed2 + ' min, err ' + consecutiveErrors + ') — ' + e.message);
+        // After 12 consecutive failures (60s with retries), try auto-recovery via Jupyter
+        if (consecutiveErrors === 12 && podInfo.token) {
+          updateProg('Lost connection. Attempting server restart...');
+          try {
+            var ok = await _startServerViaJupyter(podInfo.podId, podInfo.token, proxyUrl, updateProg);
+            if (ok) { updateProg('Server recovered! Resuming poll...'); consecutiveErrors = 0; }
+          } catch(ex) { _slsLogApi('AUTO-RECOVERY FAILED', ex.message); }
+        }
+        // After 36 consecutive failures (3 min), give up polling but don't terminate pod
+        if (consecutiveErrors >= 36) {
+          updateProg('Lost connection for 3 min. Training may still be running. Click "Check Status" to reconnect.');
+          break;
+        }
       }
       if (pi >= maxPolls - 1) throw new Error('Training timed out after 60 minutes');
     }
@@ -5715,10 +5728,61 @@ async function runpodServerlessTrain() {
   }
 }
 
+// Helper: download PLY from pod and load into Spark.js viewer
+async function _downloadAndLoadPly(proxyUrl, podId, updateProg, sizeMb) {
+  updateProg('Training complete! Downloading PLY (' + (sizeMb || '?') + ' MB)...');
+  var plyRes = await _podFetch(proxyUrl, '/result');
+  if (!plyRes.ok) throw new Error('PLY download failed: ' + plyRes.status);
+  var plyBytes = new Uint8Array(await plyRes.arrayBuffer());
+  updateProg('Downloaded PLY (' + (plyBytes.length / 1e6).toFixed(1) + ' MB). Loading...');
+  await ensureSparkLoaded();
+  if (_splatMesh) { scene.remove(_splatMesh); if (_splatMesh.dispose) _splatMesh.dispose(); _splatMesh = null; }
+  _splatMesh = new window.Spark.SplatMesh({
+    fileBytes: plyBytes,
+    onLoad: function(mesh) {
+      document.getElementById('splat-info').textContent = 'GPU Pod 3DGS: ' + (mesh.numSplats || '?') + ' splats';
+      toast('Splat loaded'); syncSplatSlidersToMesh();
+    }
+  });
+  scene.add(_splatMesh);
+  updateProg('Done! Splat loaded. Terminating pod...');
+  try { await _runpodGql('mutation { podTerminate(input: { podId: "' + podId + '" }) }'); } catch(e) {}
+  localStorage.removeItem(_SLS_STORAGE_KEY); _serverlessState.podId = null; _slsUpdateEndpointInfo();
+  toast('Training complete — splat loaded!');
+}
+
+// Helper: handle /status response and either finish, fail, or return 'poll' to continue
+async function _handleTrainingStatus(data, proxyUrl, podId, updateProg) {
+  var lines = ['Pod: ' + podId, 'State: ' + data.state];
+  if (data.progress) lines.push('Progress: ' + data.progress);
+  if (data.frames) lines.push('Frames: ' + data.frames);
+  if (data.size_mb) lines.push('Output: ' + data.size_mb + ' MB');
+  if (data.error) lines.push('Error: ' + data.error);
+  _runpodLog(lines.join('\n'));
+
+  if (data.state === 'completed') {
+    clearSlsPending();
+    await _downloadAndLoadPly(proxyUrl, podId, updateProg, data.size_mb);
+    return 'done';
+  } else if (data.state === 'failed') {
+    clearSlsPending();
+    updateProg('Training failed: ' + (data.error || 'unknown'));
+    return 'done';
+  } else if (data.state === 'idle') {
+    updateProg('Pod is idle (no training running). Submit a new job.');
+    return 'done';
+  }
+  return 'poll'; // keep polling
+}
+
+var _statusCheckRunning = false;
 async function serverlessCheckStatus() {
+  // Prevent duplicate concurrent status checks (e.g. from visibility change + manual click)
+  if (_statusCheckRunning) return;
+  _statusCheckRunning = true;
   var podId = _serverlessState.podId;
   var proxyUrl = _serverlessState.proxyUrl;
-  if (!podId) { toast('No active training pod'); return; }
+  if (!podId) { _statusCheckRunning = false; toast('No active training pod'); return; }
   var prog = document.getElementById('v2s-progress');
   var pendEl = document.getElementById('runpod-pending');
   prog.style.display = 'block';
@@ -5730,89 +5794,88 @@ async function serverlessCheckStatus() {
     _slsLogApi('POD STATUS CHECK', podData.pod);
     if (!podData.pod || podData.pod.desiredStatus !== 'RUNNING') {
       updateProg('Pod ' + podId + ': ' + (podData.pod ? podData.pod.desiredStatus : 'NOT FOUND'));
+      if (!podData.pod || podData.pod.desiredStatus === 'EXITED' || podData.pod.desiredStatus === 'TERMINATED') {
+        clearSlsPending(); localStorage.removeItem(_SLS_STORAGE_KEY);
+        _serverlessState.podId = null; _slsUpdateEndpointInfo();
+      }
+      _statusCheckRunning = false;
       return;
     }
     // Check training status via HTTP server
     if (!proxyUrl) proxyUrl = 'https://' + podId + '-8000.proxy.runpod.net';
-    var res = await _podFetch(proxyUrl, '/status');
-    var data = await res.json();
-    _slsLogApi('TRAINING STATUS', data);
-    var lines = ['Pod: ' + podId, 'State: ' + data.state];
-    if (data.progress) lines.push('Progress: ' + data.progress);
-    if (data.frames) lines.push('Frames: ' + data.frames);
-    if (data.size_mb) lines.push('Output: ' + data.size_mb + ' MB');
-    if (data.error) lines.push('Error: ' + data.error);
-    _runpodLog(lines.join('\n'));
-
-    if (data.state === 'completed') {
-      clearSlsPending();
-      updateProg('Training complete! Downloading PLY (' + (data.size_mb || '?') + ' MB)...');
-      var plyRes = await _podFetch(proxyUrl, '/result');
-      if (!plyRes.ok) throw new Error('PLY download failed: ' + plyRes.status);
-      var plyBytes = new Uint8Array(await plyRes.arrayBuffer());
-      updateProg('Downloaded PLY (' + (plyBytes.length / 1e6).toFixed(1) + ' MB). Loading...');
-      await ensureSparkLoaded();
-      if (_splatMesh) { scene.remove(_splatMesh); if (_splatMesh.dispose) _splatMesh.dispose(); _splatMesh = null; }
-      _splatMesh = new window.Spark.SplatMesh({
-        fileBytes: plyBytes,
-        onLoad: function(mesh) {
-          document.getElementById('splat-info').textContent = 'GPU Pod 3DGS: ' + (mesh.numSplats || '?') + ' splats';
-          toast('Splat loaded'); syncSplatSlidersToMesh();
+    var data;
+    try {
+      var res = await _podFetch(proxyUrl, '/status');
+      data = await res.json();
+      _slsLogApi('TRAINING STATUS', data);
+    } catch(fetchErr) {
+      // Pod is RUNNING but HTTP server is not responding — try to auto-recover
+      _slsLogApi('HTTP SERVER UNREACHABLE', fetchErr.message);
+      updateProg('Pod running but HTTP server not responding. Attempting auto-recovery...');
+      var cached = localStorage.getItem(_SLS_STORAGE_KEY);
+      var token = null;
+      if (cached) { try { token = JSON.parse(cached).token; } catch(e) {} }
+      if (token) {
+        var recovered = await _startServerViaJupyter(podId, token, proxyUrl, updateProg);
+        if (recovered) {
+          updateProg('Server restarted! Checking status...');
+          var res2 = await _podFetch(proxyUrl, '/status');
+          data = await res2.json();
+          _slsLogApi('TRAINING STATUS (after recovery)', data);
+        } else {
+          throw new Error('HTTP server unreachable and auto-recovery failed. Pod ' + podId + ' is running — check RunPod dashboard.');
         }
-      });
-      scene.add(_splatMesh);
-      updateProg('Done! Splat loaded. Terminating pod...');
-      try { await _runpodGql('mutation { podTerminate(input: { podId: "' + podId + '" }) }'); } catch(e) {}
-      localStorage.removeItem(_SLS_STORAGE_KEY); _serverlessState.podId = null; _slsUpdateEndpointInfo();
-      toast('Training complete — splat loaded!');
-    } else if (data.state === 'failed') {
-      clearSlsPending();
-      updateProg('Training failed: ' + (data.error || 'unknown'));
-    } else if (data.state === 'idle') {
-      updateProg('Pod is idle (no training running). Submit a new job.');
-    } else {
+      } else {
+        throw new Error('HTTP server unreachable (no Jupyter token for recovery). Pod ' + podId + ' is running — check RunPod dashboard.');
+      }
+    }
+
+    var result = await _handleTrainingStatus(data, proxyUrl, podId, updateProg);
+    if (result === 'poll') {
       // Still running — resume polling
       updateProg('Training ' + data.state + (data.progress ? ' — ' + data.progress : '') + '. Resuming poll...');
       var maxPolls = 720;
+      var consecutiveErrors = 0;
       for (var pi = 0; pi < maxPolls; pi++) {
         await pollSleep(5000);
         try {
           var sr = await _podFetch(proxyUrl, '/status');
           var sd = await sr.json();
+          consecutiveErrors = 0; // reset on success
           if (pi % 6 === 0) _slsLogApi('STATUS (poll #' + (pi + 1) + ')', sd);
           var elapsed = Math.round((pi + 1) * 5 / 60);
-          if (sd.state === 'completed') {
-            clearSlsPending();
-            updateProg('Training complete! Downloading PLY...');
-            var pr = await _podFetch(proxyUrl, '/result');
-            if (!pr.ok) throw new Error('PLY download failed');
-            var pb = new Uint8Array(await pr.arrayBuffer());
-            await ensureSparkLoaded();
-            if (_splatMesh) { scene.remove(_splatMesh); if (_splatMesh.dispose) _splatMesh.dispose(); _splatMesh = null; }
-            _splatMesh = new window.Spark.SplatMesh({ fileBytes: pb, onLoad: function(m) {
-              document.getElementById('splat-info').textContent = 'GPU Pod 3DGS: ' + (m.numSplats || '?') + ' splats';
-              toast('Splat loaded'); syncSplatSlidersToMesh();
-            }});
-            scene.add(_splatMesh);
-            try { await _runpodGql('mutation { podTerminate(input: { podId: "' + podId + '" }) }'); } catch(e) {}
-            localStorage.removeItem(_SLS_STORAGE_KEY); _serverlessState.podId = null; _slsUpdateEndpointInfo();
-            toast('Training complete — splat loaded!');
-            break;
-          } else if (sd.state === 'failed') {
-            clearSlsPending();
-            updateProg('Training failed: ' + (sd.error || 'unknown'));
-            break;
-          } else {
-            updateProg('Training: ' + sd.state + (sd.progress ? ' — ' + sd.progress : '') + ' (' + elapsed + ' min)');
-          }
+          var r = await _handleTrainingStatus(sd, proxyUrl, podId, updateProg);
+          if (r === 'done') break;
+          updateProg('Training: ' + sd.state + (sd.progress ? ' — ' + sd.progress : '') + ' (' + elapsed + ' min)');
         } catch(e) {
-          if (pi % 6 === 0) updateProg('Poll error: ' + e.message);
+          consecutiveErrors++;
+          if (pi % 6 === 0) updateProg('Poll error (' + consecutiveErrors + '): ' + e.message);
+          // After 12 consecutive failures (60s), try auto-recovery
+          if (consecutiveErrors === 12) {
+            updateProg('Lost connection to pod. Attempting auto-recovery...');
+            var c2 = localStorage.getItem(_SLS_STORAGE_KEY);
+            var t2 = null;
+            if (c2) { try { t2 = JSON.parse(c2).token; } catch(ex) {} }
+            if (t2) {
+              try {
+                var ok = await _startServerViaJupyter(podId, t2, proxyUrl, updateProg);
+                if (ok) { updateProg('Server recovered! Resuming poll...'); consecutiveErrors = 0; }
+              } catch(ex) { _slsLogApi('AUTO-RECOVERY FAILED', ex.message); }
+            }
+          }
+          // After 36 consecutive failures (3 min), give up
+          if (consecutiveErrors >= 36) {
+            updateProg('Lost connection to pod for 3 minutes. Pod may have crashed. Check RunPod dashboard.');
+            break;
+          }
         }
       }
     }
   } catch (err) {
     console.error('serverlessCheckStatus error:', err, 'podProxyUrl:', proxyUrl, 'podId:', podId, 'workerProxy:', _proxyUrl);
-    prog.textContent = 'Status error: ' + err.message + ' (pod: ' + (proxyUrl || 'none') + ')';
+    updateProg('Status error: ' + err.message + ' (pod: ' + (proxyUrl || 'none') + ')');
+  } finally {
+    _statusCheckRunning = false;
   }
 }
 
