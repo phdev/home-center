@@ -340,6 +340,7 @@
         </div>
         <div class="btn-group" style="margin-top:4px">
           <button class="btn" onclick="serverlessCheckStatus()" style="font-size:10px">Check Status</button>
+          <button class="btn" onclick="serverlessDiagnose()" style="font-size:10px" title="Test every connection in the chain and log results">Diagnose</button>
           <button class="btn btn-danger" onclick="serverlessCancel()" style="font-size:10px">Terminate Pod</button>
           <button class="btn" onclick="serverlessDeleteEndpoint()" style="font-size:10px" title="Terminate pod and clear caches">Terminate Pod</button>
           <button class="btn" onclick="extractStylizedTraining()" style="font-size:10px" id="btn-extract-stylized" title="Manual: download training ZIP">Export ZIP</button>
@@ -1298,8 +1299,17 @@ async function proxiedFetch(url, opts) {
     }
     // RunPod pod proxy URLs: route through CF Worker first (more reliable after tab backgrounding)
     if (url.indexOf('.proxy.runpod.net') !== -1) {
-      try { return await fetch(_proxyUrl + '/fetch?url=' + encodeURIComponent(url), opts); }
-      catch (e) { return fetch(url, opts); } // fallback to direct if Worker fails
+      var workerFetchUrl = _proxyUrl + '/fetch?url=' + encodeURIComponent(url);
+      try { return await fetch(workerFetchUrl, opts); }
+      catch (e) {
+        console.warn('Worker /fetch failed:', e.message, '— trying direct');
+        _slsLogApi('WORKER FETCH FAIL', { url: url, error: e.message, workerUrl: workerFetchUrl });
+        try { return await fetch(url, opts); }
+        catch (e2) {
+          _slsLogApi('DIRECT FETCH ALSO FAIL', { url: url, error: e2.message });
+          throw new Error('Pod unreachable via Worker (' + e.message + ') and direct (' + e2.message + '). URL: ' + url);
+        }
+      }
     }
     // Non-API URL: try direct, fallback to Worker generic proxy
     try { return await fetch(url, opts); }
@@ -5170,6 +5180,28 @@ function _slsUpdateEndpointInfo() {
   }
 }
 
+// Safe JSON parse from a fetch Response — reads as text first to avoid opaque errors.
+// Returns { ok, data, text, status } — call this instead of res.json() directly.
+async function _safeResJson(res, label) {
+  var text;
+  try { text = await res.text(); } catch(e) {
+    _slsLogApi((label || 'FETCH') + ' BODY READ ERROR', { status: res.status, error: e.message });
+    throw new Error((label || 'Fetch') + ': failed to read response body (' + res.status + '): ' + e.message);
+  }
+  if (!text || !text.trim()) {
+    _slsLogApi((label || 'FETCH') + ' EMPTY BODY', { status: res.status, url: res.url });
+    throw new Error((label || 'Fetch') + ': empty response body (HTTP ' + res.status + ')');
+  }
+  try {
+    return { ok: res.ok, data: JSON.parse(text), text: text, status: res.status };
+  } catch(e) {
+    // Log first 300 chars of non-JSON response for debugging
+    var preview = text.length > 300 ? text.slice(0, 300) + '...' : text;
+    _slsLogApi((label || 'FETCH') + ' JSON PARSE FAIL', { status: res.status, preview: preview, error: e.message });
+    throw new Error((label || 'Fetch') + ': response is not JSON (HTTP ' + res.status + '): ' + preview.slice(0, 120));
+  }
+}
+
 // Fetch wrapper for pod HTTP server — retries with backoff for transient failures.
 // After a tab is backgrounded, browsers kill connections — this ensures we reconnect.
 async function _podFetch(proxyUrl, path, opts) {
@@ -5183,10 +5215,14 @@ async function _podFetch(proxyUrl, path, opts) {
   for (var attempt = 0; attempt < 3; attempt++) {
     try {
       var res = await proxiedFetch(url, opts);
+      // Log non-ok responses for debugging (don't throw — caller decides)
+      if (!res.ok && attempt === 0) {
+        _slsLogApi('POD FETCH ' + res.status, { url: path, status: res.status, statusText: res.statusText });
+      }
       return res;
     } catch(e) {
       lastErr = e;
-      _slsLogApi('POD FETCH RETRY ' + (attempt + 1) + '/3', { url: url, error: e.message });
+      _slsLogApi('POD FETCH RETRY ' + (attempt + 1) + '/3', { url: url, error: e.message, type: e.constructor.name });
       if (attempt < 2) await pollSleep(2000 * (attempt + 1)); // 2s, 4s backoff
     }
   }
@@ -5196,14 +5232,24 @@ async function _podFetch(proxyUrl, path, opts) {
 async function _runpodGql(query, variables) {
   var reqBody = { query: query, variables: variables || {} };
   _slsLogApi('GQL REQUEST', { query: query.replace(/\s+/g, ' ').trim(), variables: variables });
-  var res = await proxiedFetch('https://api.runpod.io/graphql', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(reqBody)
-  });
+  var res;
+  try {
+    res = await proxiedFetch('https://api.runpod.io/graphql', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(reqBody)
+    });
+  } catch(fetchErr) {
+    _slsLogApi('GQL FETCH ERROR', { error: fetchErr.message, type: fetchErr.constructor.name });
+    throw new Error('RunPod GraphQL fetch failed: ' + fetchErr.message);
+  }
   var text = await res.text();
   var data;
-  try { data = JSON.parse(text); } catch(e) { _slsLogApi('GQL RESPONSE ' + res.status, text); throw new Error('RunPod GraphQL error: ' + res.status + ' — ' + text.slice(0, 200)); }
+  try { data = JSON.parse(text); } catch(e) {
+    var preview = text.length > 300 ? text.slice(0, 300) + '...' : text;
+    _slsLogApi('GQL RESPONSE NOT JSON ' + res.status, preview);
+    throw new Error('RunPod GraphQL error: HTTP ' + res.status + ' — response is not JSON: ' + preview.slice(0, 120));
+  }
   _slsLogApi('GQL RESPONSE ' + res.status, data);
   if (!res.ok) throw new Error('RunPod GraphQL error: ' + res.status + ' — ' + JSON.stringify(data).slice(0, 300));
   if (data.errors && data.errors.length) throw new Error('GQL: ' + data.errors[0].message);
@@ -5671,7 +5717,8 @@ async function runpodServerlessTrain() {
       await pollSleep(5000);
       try {
         var statusRes = await _podFetch(proxyUrl, '/status');
-        var statusData = await statusRes.json();
+        var statusParsed = await _safeResJson(statusRes, 'TRAIN POLL');
+        var statusData = statusParsed.data;
         consecutiveErrors = 0; // reset on success
         var st = statusData.state || 'unknown';
         if (pi % 6 === 0 || st !== _serverlessState.phase) {
@@ -5803,15 +5850,17 @@ async function serverlessCheckStatus() {
     }
     // Check training status via HTTP server
     if (!proxyUrl) proxyUrl = 'https://' + podId + '-8000.proxy.runpod.net';
+    _slsLogApi('STATUS CHECK START', { podId: podId, proxyUrl: proxyUrl });
     var data;
     try {
       var res = await _podFetch(proxyUrl, '/status');
-      data = await res.json();
+      var parsed = await _safeResJson(res, 'STATUS');
+      data = parsed.data;
       _slsLogApi('TRAINING STATUS', data);
     } catch(fetchErr) {
       // Pod is RUNNING but HTTP server is not responding — try to auto-recover
-      _slsLogApi('HTTP SERVER UNREACHABLE', fetchErr.message);
-      updateProg('Pod running but HTTP server not responding. Attempting auto-recovery...');
+      _slsLogApi('HTTP SERVER UNREACHABLE', { error: fetchErr.message, type: fetchErr.constructor.name, stack: (fetchErr.stack || '').split('\n').slice(0, 3).join(' | ') });
+      updateProg('Pod running but server not responding (' + fetchErr.message.slice(0, 80) + '). Attempting recovery...');
       var cached = localStorage.getItem(_SLS_STORAGE_KEY);
       var token = null;
       if (cached) { try { token = JSON.parse(cached).token; } catch(e) {} }
@@ -5820,7 +5869,8 @@ async function serverlessCheckStatus() {
         if (recovered) {
           updateProg('Server restarted! Checking status...');
           var res2 = await _podFetch(proxyUrl, '/status');
-          data = await res2.json();
+          var parsed2 = await _safeResJson(res2, 'STATUS (recovery)');
+          data = parsed2.data;
           _slsLogApi('TRAINING STATUS (after recovery)', data);
         } else {
           throw new Error('HTTP server unreachable and auto-recovery failed. Pod ' + podId + ' is running — check RunPod dashboard.');
@@ -5840,7 +5890,8 @@ async function serverlessCheckStatus() {
         await pollSleep(5000);
         try {
           var sr = await _podFetch(proxyUrl, '/status');
-          var sd = await sr.json();
+          var sp = await _safeResJson(sr, 'POLL');
+          var sd = sp.data;
           consecutiveErrors = 0; // reset on success
           if (pi % 6 === 0) _slsLogApi('STATUS (poll #' + (pi + 1) + ')', sd);
           var elapsed = Math.round((pi + 1) * 5 / 60);
@@ -5873,7 +5924,8 @@ async function serverlessCheckStatus() {
     }
   } catch (err) {
     console.error('serverlessCheckStatus error:', err, 'podProxyUrl:', proxyUrl, 'podId:', podId, 'workerProxy:', _proxyUrl);
-    updateProg('Status error: ' + err.message + ' (pod: ' + (proxyUrl || 'none') + ')');
+    _slsLogApi('STATUS CHECK ERROR', { message: err.message, type: err.constructor.name, stack: (err.stack || '').split('\n').slice(0, 5).join(' | '), podId: podId, proxyUrl: proxyUrl });
+    updateProg('Status error: ' + err.message);
   } finally {
     _statusCheckRunning = false;
   }
@@ -5931,6 +5983,79 @@ async function serverlessDeleteEndpoint() {
   _serverlessState.proxyUrl = null;
   _slsUpdateEndpointInfo();
   toast('Pod terminated & caches cleared');
+}
+
+// Diagnostic: test every link in the connection chain and log results
+async function serverlessDiagnose() {
+  var log = function(msg) { _slsLogApi('DIAG', msg); };
+  log('=== DIAGNOSTIC START ===');
+  log('State: ' + JSON.stringify({ podId: _serverlessState.podId, proxyUrl: _serverlessState.proxyUrl, phase: _serverlessState.phase }));
+  var cached = localStorage.getItem(_SLS_STORAGE_KEY);
+  log('Cached pod: ' + (cached || 'none'));
+  var job = localStorage.getItem(_SLS_JOB_KEY);
+  log('Cached job: ' + (job || 'none'));
+
+  // 1. Test Cloudflare Worker is reachable
+  log('--- Test 1: CF Worker reachability ---');
+  try {
+    var wRes = await fetch(_proxyUrl + '/runpod-gql', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{"query":"{ __typename }"}' });
+    var wText = await wRes.text();
+    log('Worker response: HTTP ' + wRes.status + ' body=' + wText.slice(0, 200));
+  } catch(e) { log('Worker FAILED: ' + e.message + ' (' + e.constructor.name + ')'); }
+
+  // 2. Test GQL pod query
+  var podId = _serverlessState.podId;
+  if (!podId && cached) { try { podId = JSON.parse(cached).podId; } catch(e) {} }
+  if (!podId) { log('No podId — skipping pod tests'); log('=== DIAGNOSTIC END ==='); toast('Diagnostic logged — expand API Response Log'); return; }
+
+  log('--- Test 2: GQL pod status (podId=' + podId + ') ---');
+  try {
+    var gqlRes = await _runpodGql('query { pod(input: { podId: "' + podId + '" }) { id desiredStatus runtime { uptimeInSeconds gpus { id } } } }');
+    log('GQL result: ' + JSON.stringify(gqlRes.pod));
+    if (!gqlRes.pod) { log('Pod not found — may have been terminated'); log('=== DIAGNOSTIC END ==='); toast('Diagnostic logged'); return; }
+    if (gqlRes.pod.desiredStatus !== 'RUNNING') { log('Pod is ' + gqlRes.pod.desiredStatus + ' — not running'); log('=== DIAGNOSTIC END ==='); toast('Diagnostic logged'); return; }
+  } catch(e) { log('GQL FAILED: ' + e.message); }
+
+  // 3. Test pod HTTP server via Worker
+  var proxyUrl = _serverlessState.proxyUrl || ('https://' + podId + '-8000.proxy.runpod.net');
+  log('--- Test 3: Pod /health via Worker (proxyUrl=' + proxyUrl + ') ---');
+  var workerFetchUrl = _proxyUrl + '/fetch?url=' + encodeURIComponent(proxyUrl + '/health');
+  try {
+    var hRes = await fetch(workerFetchUrl);
+    var hText = await hRes.text();
+    log('Worker→Pod /health: HTTP ' + hRes.status + ' body=' + hText.slice(0, 200));
+  } catch(e) { log('Worker→Pod FAILED: ' + e.message + ' (' + e.constructor.name + ')'); }
+
+  // 4. Test pod HTTP server directly
+  log('--- Test 4: Pod /health direct ---');
+  try {
+    var dRes = await fetch(proxyUrl + '/health');
+    var dText = await dRes.text();
+    log('Direct /health: HTTP ' + dRes.status + ' body=' + dText.slice(0, 200));
+  } catch(e) { log('Direct FAILED: ' + e.message + ' (' + e.constructor.name + ') — expected if CORS blocks'); }
+
+  // 5. Test pod /status via Worker
+  log('--- Test 5: Pod /status via Worker ---');
+  try {
+    var sRes = await fetch(_proxyUrl + '/fetch?url=' + encodeURIComponent(proxyUrl + '/status'));
+    var sText = await sRes.text();
+    log('Worker→Pod /status: HTTP ' + sRes.status + ' body=' + sText.slice(0, 500));
+    try { var sd = JSON.parse(sText); log('Parsed status: ' + JSON.stringify(sd)); } catch(e) { log('Status is NOT valid JSON: ' + e.message); }
+  } catch(e) { log('Worker→Pod /status FAILED: ' + e.message); }
+
+  // 6. Test pod /status via _podFetch (full retry chain)
+  log('--- Test 6: Pod /status via _podFetch ---');
+  try {
+    var pfRes = await _podFetch(proxyUrl, '/status');
+    var pfParsed = await _safeResJson(pfRes, 'DIAG');
+    log('_podFetch /status: ' + JSON.stringify(pfParsed.data));
+  } catch(e) { log('_podFetch FAILED: ' + e.message); }
+
+  log('=== DIAGNOSTIC END ===');
+  toast('Diagnostic logged — expand API Response Log');
+  // Open the log details element
+  var logWrap = document.getElementById('sls-api-log-wrap');
+  if (logWrap) logWrap.open = true;
 }
 
 // ============================================================
