@@ -6,6 +6,7 @@ import { useWeather } from "./hooks/useWeather";
 import { useCalendar } from "./hooks/useCalendar";
 import { usePhotos } from "./hooks/usePhotos";
 import { useBirthdays } from "./hooks/useBirthdays";
+import { useSchoolUpdates } from "./hooks/useSchoolUpdates";
 import { Header } from "./components/Header";
 import { CalendarPanel } from "./components/CalendarPanel";
 import { WeatherPanel } from "./components/WeatherPanel";
@@ -26,6 +27,7 @@ export default function App() {
   const calendar = useCalendar(settings.calendar, settings.worker);
   const photos = usePhotos(settings.photos, settings.worker);
   const bdays = useBirthdays(settings.worker);
+  const school = useSchoolUpdates(settings.worker);
 
   return (
     <>
@@ -59,7 +61,7 @@ export default function App() {
               <PhotoPanel photos={photos.photos} photosLoading={photos.loading} photosError={photos.error} />
             </div>
             <BirthdaysPanel birthdays={bdays.birthdays} loading={bdays.loading} error={bdays.error} />
-            <EventsPanel />
+            <EventsPanel updates={school.updates} loading={school.loading} error={school.error} />
             <AgentTasksPanel />
             <TimersPanel timers={timers} togglePause={togglePause} />
             <FactPanel />
@@ -86,7 +88,7 @@ export default function App() {
                   <PhotoPanel photos={photos.photos} photosLoading={photos.loading} photosError={photos.error} />
                 </div>
                 <div style={{ width: 340, flexShrink: 0, minHeight: 0 }}>
-                  <EventsPanel />
+                  <EventsPanel updates={school.updates} loading={school.loading} error={school.error} />
                 </div>
               </div>
             </div>

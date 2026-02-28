@@ -34,6 +34,12 @@ export default {
       if (path === "/api/birthdays") {
         return corsResponse(env, await handleBirthdays(env));
       }
+      if (path === "/api/school-updates" && request.method === "POST") {
+        return corsResponse(env, await handleSchoolUpdatesPost(request, env));
+      }
+      if (path === "/api/school-updates" && request.method === "GET") {
+        return corsResponse(env, await handleSchoolUpdatesGet(env));
+      }
       if (path === "/api/photos") {
         return corsResponse(env, await handlePhotos(env));
       }
@@ -597,6 +603,44 @@ function parseBirthdayEvents(icsText, today, isBirthdayCal) {
   }
 
   return events;
+}
+
+// ── School Updates (KV-backed) ───────────────────────────────────────
+
+const SCHOOL_UPDATES_KEY = "school_updates";
+
+async function handleSchoolUpdatesPost(request, env) {
+  if (!env.NOTIFICATIONS) {
+    return json({ error: "NOTIFICATIONS KV namespace not configured" }, 500);
+  }
+
+  const body = await request.json();
+  const updates = body.updates;
+  if (!Array.isArray(updates)) {
+    return json({ error: "Request body must have an 'updates' array" }, 400);
+  }
+
+  // Store with timestamp
+  const data = {
+    updates: updates.slice(0, 10), // Cap at 10 items
+    updatedAt: Date.now(),
+  };
+  await env.NOTIFICATIONS.put(SCHOOL_UPDATES_KEY, JSON.stringify(data));
+
+  return json({ ok: true, count: data.updates.length });
+}
+
+async function handleSchoolUpdatesGet(env) {
+  if (!env.NOTIFICATIONS) {
+    return json({ updates: [], updatedAt: null });
+  }
+
+  const data = await env.NOTIFICATIONS.get(SCHOOL_UPDATES_KEY, { type: "json" });
+  if (!data) {
+    return json({ updates: [], updatedAt: null });
+  }
+
+  return json(data);
 }
 
 // ── Photos ──────────────────────────────────────────────────────────
