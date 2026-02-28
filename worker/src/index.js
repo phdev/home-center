@@ -31,6 +31,9 @@ export default {
       if (path === "/api/calendar") {
         return corsResponse(env, await handleCalendar(env, url));
       }
+      if (path === "/api/birthdays") {
+        return corsResponse(env, await handleBirthdays(env));
+      }
       if (path === "/api/photos") {
         return corsResponse(env, await handlePhotos(env));
       }
@@ -360,6 +363,240 @@ async function fetchCalDAV(appleId, appPassword, debug = false) {
 
   if (debug) diag.totalEvents = allEvents.length;
   return { events: allEvents, diag };
+}
+
+// ── Birthdays ────────────────────────────────────────────────────────
+
+async function handleBirthdays(env) {
+  if (!env.ICLOUD_APPLE_ID || !env.ICLOUD_APP_PASSWORD) {
+    return json({ error: "CalDAV not configured. Set ICLOUD_APPLE_ID + ICLOUD_APP_PASSWORD." }, 500);
+  }
+
+  try {
+    const birthdays = await fetchBirthdays(env.ICLOUD_APPLE_ID, env.ICLOUD_APP_PASSWORD);
+    return json({ birthdays });
+  } catch (e) {
+    return json({ error: `Birthdays: ${e.message}`, birthdays: [] }, 500);
+  }
+}
+
+async function fetchBirthdays(appleId, appPassword) {
+  const auth = btoa(`${appleId}:${appPassword}`);
+  const headers = {
+    Authorization: `Basic ${auth}`,
+    "Content-Type": "application/xml; charset=utf-8",
+    Depth: "0",
+  };
+
+  // Reuse CalDAV discovery: principal → home → list calendars
+  const principalRes = await fetch("https://caldav.icloud.com/", {
+    method: "PROPFIND",
+    headers,
+    body: `<?xml version="1.0" encoding="utf-8"?>
+<d:propfind xmlns:d="DAV:">
+  <d:prop><d:current-user-principal/></d:prop>
+</d:propfind>`,
+  });
+  if (!principalRes.ok) throw new Error(`CalDAV auth failed: ${principalRes.status}`);
+
+  const principalXml = await principalRes.text();
+  const principalHref = extractHref(principalXml, "current-user-principal");
+  if (!principalHref) throw new Error("Could not find principal URL");
+
+  const homeUrl = principalHref.startsWith("http")
+    ? principalHref
+    : `https://caldav.icloud.com${principalHref}`;
+  const homeRes = await fetch(homeUrl, {
+    method: "PROPFIND",
+    headers,
+    body: `<?xml version="1.0" encoding="utf-8"?>
+<d:propfind xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav">
+  <d:prop><c:calendar-home-set/></d:prop>
+</d:propfind>`,
+  });
+
+  const homeXml = await homeRes.text();
+  const homeHref = extractHref(homeXml, "calendar-home-set");
+  if (!homeHref) throw new Error("Could not find calendar home");
+
+  const listUrl = homeHref.startsWith("http")
+    ? homeHref
+    : `https://caldav.icloud.com${homeHref}`;
+  const listRes = await fetch(listUrl, {
+    method: "PROPFIND",
+    headers: { ...headers, Depth: "1" },
+    body: `<?xml version="1.0" encoding="utf-8"?>
+<d:propfind xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav" xmlns:cs="http://calendarserver.org/ns/">
+  <d:prop>
+    <d:displayname/>
+    <d:resourcetype/>
+    <cs:getctag/>
+  </d:prop>
+</d:propfind>`,
+  });
+
+  const listXml = await listRes.text();
+  const calendarHrefs = extractCalendarHrefs(listXml, homeHref);
+
+  // Query all calendars for events in the next 90 days that look like birthdays
+  const today = new Date();
+  const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const endRange = new Date(startOfDay.getTime() + 90 * 86400000);
+  const dtStart = toIcalDate(startOfDay);
+  const dtEnd = toIcalDate(endRange);
+
+  const allBirthdays = [];
+
+  for (const calHref of calendarHrefs) {
+    try {
+      const reportUrl = calHref.startsWith("http")
+        ? calHref
+        : `https://caldav.icloud.com${calHref}`;
+      const reportRes = await fetch(reportUrl, {
+        method: "REPORT",
+        headers: { ...headers, Depth: "1" },
+        body: `<?xml version="1.0" encoding="utf-8"?>
+<c:calendar-query xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav">
+  <d:prop>
+    <d:getetag/>
+    <c:calendar-data/>
+  </d:prop>
+  <c:filter>
+    <c:comp-filter name="VCALENDAR">
+      <c:comp-filter name="VEVENT">
+        <c:time-range start="${dtStart}" end="${dtEnd}"/>
+      </c:comp-filter>
+    </c:comp-filter>
+  </c:filter>
+</c:calendar-query>`,
+      });
+
+      if (reportRes.ok) {
+        const reportXml = await reportRes.text();
+        const icsBlocks = extractCalendarData(reportXml);
+        // Check if this is the Birthdays calendar (iCloud names it "Birthdays")
+        const isBirthdayCal = /birthdays?/i.test(calHref) ||
+          listXml.includes("Birthdays") && calHref.includes(extractBirthdayCalId(listXml));
+        for (const ics of icsBlocks) {
+          const events = parseBirthdayEvents(ics, today, isBirthdayCal);
+          allBirthdays.push(...events);
+        }
+      }
+    } catch {
+      // Skip individual calendar errors
+    }
+  }
+
+  // Deduplicate by name + date
+  const seen = new Set();
+  const unique = allBirthdays.filter((b) => {
+    const key = `${b.name.toLowerCase()}|${b.date}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+
+  // Sort by days until
+  unique.sort((a, b) => a.daysUntil - b.daysUntil);
+
+  return unique;
+}
+
+function extractBirthdayCalId(listXml) {
+  // Try to find the calendar ID associated with "Birthdays" display name
+  const responses = listXml.split(/<(?:[a-zA-Z0-9]+:)?response[\s>]/i);
+  for (const resp of responses) {
+    if (/<(?:[a-zA-Z0-9]+:)?displayname[^>]*>\s*Birthdays?\s*</i.test(resp)) {
+      const hrefMatch = resp.match(/<(?:[a-zA-Z0-9]+:)?href[^>]*>([^<]+)/i);
+      if (hrefMatch) return hrefMatch[1].trim();
+    }
+  }
+  return "";
+}
+
+function parseBirthdayEvents(icsText, today, isBirthdayCal) {
+  const unfolded = icsText.replace(/\r\n[ \t]/g, "").replace(/\n[ \t]/g, "");
+  const lines = unfolded.split(/\r?\n/);
+  const events = [];
+  let inEvent = false;
+  let current = {};
+
+  const EMOJIS = ["🎂", "🎉", "🎈", "🎁", "🥳", "✨"];
+
+  for (const line of lines) {
+    if (line === "BEGIN:VEVENT") {
+      inEvent = true;
+      current = {};
+      continue;
+    }
+    if (line === "END:VEVENT") {
+      inEvent = false;
+      if (current.summary && current.dtstart) {
+        // Check if this event is a birthday
+        const summary = unescapeIcal(current.summary);
+        const isBirthday = isBirthdayCal ||
+          /birthday/i.test(summary) ||
+          /\bbday\b/i.test(summary) ||
+          /\bb-?day\b/i.test(summary) ||
+          /born/i.test(summary) ||
+          (current.categories && /birthday/i.test(current.categories));
+
+        if (isBirthday) {
+          const start = parseIcalDate(current.dtstart);
+          if (start) {
+            // Calculate days until from today
+            const eventDate = new Date(today.getFullYear(), start.getMonth(), start.getDate());
+            // If the date already passed this year, look at next year
+            if (eventDate < today) {
+              eventDate.setFullYear(eventDate.getFullYear() + 1);
+            }
+            const diffMs = eventDate.getTime() - new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
+            const daysUntil = Math.round(diffMs / 86400000);
+
+            // Clean up the name: remove "Birthday", "'s Birthday", etc.
+            // Handle both straight and smart apostrophes
+            let name = summary;
+            // Handle reminder-style: "Wish X a happy birthday" → "X"
+            const wishMatch = name.match(/^(?:wish|remind|remember|tell|text|call)\s+(.+?)\s+(?:a\s+)?happy\s*(?:birthday|bday|b-day)/i);
+            if (wishMatch) {
+              name = wishMatch[1].trim();
+            } else {
+              name = name
+                .replace(/['\u2019]s\s+(?:birthday|bday|b-day)\s*(party)?/i, "")
+                .replace(/\s*(?:birthday|bday|b-day)\s*(party)?/i, "")
+                .trim();
+            }
+            // If cleaning left nothing useful, use original
+            if (!name || name.length < 2) name = summary.trim();
+            // Remove trailing possessive that got orphaned
+            name = name.replace(/['\u2019]s\s*$/, "").trim();
+
+            const monthDay = start.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+
+            events.push({
+              name,
+              date: monthDay,
+              daysUntil,
+              avatar: EMOJIS[events.length % EMOJIS.length],
+            });
+          }
+        }
+      }
+      continue;
+    }
+    if (!inEvent) continue;
+
+    const colonIdx = line.indexOf(":");
+    if (colonIdx < 0) continue;
+    const key = line.substring(0, colonIdx).split(";")[0].toUpperCase();
+    const value = line.substring(colonIdx + 1);
+
+    if (key === "SUMMARY") current.summary = value;
+    if (key === "DTSTART") current.dtstart = line;
+    if (key === "CATEGORIES") current.categories = value;
+  }
+
+  return events;
 }
 
 // ── Photos ──────────────────────────────────────────────────────────

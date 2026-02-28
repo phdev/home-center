@@ -1,155 +1,60 @@
+import { Cake } from "lucide-react";
 import { Panel, PanelHeader } from "./Panel";
 import { BIRTHDAYS } from "../data/mockData";
 
-export function BirthdaysPanel({ t }) {
-  const giftColor = (g) => {
-    if (g === "Opened!" || g === "Delivered") return t.accent2;
-    if (g === "Shipped") return t.accent;
-    if (g === "Need to buy") return t.warm;
-    return t.accent3;
-  };
+const F = "'Geist','Inter',system-ui,sans-serif";
 
-  const upcoming = BIRTHDAYS.filter((b) => !b.passed);
+export function BirthdaysPanel({ birthdays, loading, error }) {
+  const items = birthdays && birthdays.length > 0 ? birthdays : BIRTHDAYS;
 
   return (
-    <Panel t={t} style={{ height: "100%" }}>
+    <Panel style={{ height: "100%" }}>
       <PanelHeader
-        t={t}
-        icon={"\u{1F382}"}
-        label="Feb Birthdays"
-        right={
-          <span
-            style={{
-              fontFamily: t.bodyFont,
-              fontSize: "0.6rem",
-              padding: "2px 8px",
-              borderRadius: 10,
-              background: `${t.warm}15`,
-              color: t.warm,
-              fontWeight: 600,
-            }}
-          >
-            {upcoming.length} upcoming
-          </span>
-        }
+        icon={<Cake size={30} color="#FFFFFF" />}
+        label="Birthdays"
       />
-      <div
-        style={{
-          flex: 1,
-          overflowY: "auto",
-          display: "flex",
-          flexDirection: "column",
-          gap: 6,
-        }}
-      >
-        {upcoming.length > 0 && (
-          <>
-            {upcoming.map((b, i) => (
-              <div
-                key={i}
-                style={{
-                  padding: "10px 12px",
-                  borderRadius: t.radius / 2,
-                  background: i === 0 ? `${t.warm}08` : `${t.text}04`,
-                  border: `1px solid ${i === 0 ? t.warm + "20" : t.panelBorder}`,
-                  position: "relative",
-                  overflow: "hidden",
-                }}
-              >
-                {i === 0 && (
-                  <div
-                    style={{
-                      position: "absolute",
-                      top: 0,
-                      right: 0,
-                      background: `${t.warm}20`,
-                      padding: "4px 12px",
-                      borderRadius: `0 0 0 ${t.radius / 2}px`,
-                      fontFamily: t.bodyFont,
-                      fontSize: "0.6rem",
-                      fontWeight: 700,
-                      color: t.warm,
-                    }}
-                  >
-                    {b.daysUntil === 1
-                      ? "\u{1F389} TOMORROW!"
-                      : `${b.daysUntil} days`}
-                  </div>
-                )}
-                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  <div
-                    style={{
-                      width: 42,
-                      height: 42,
-                      borderRadius: "50%",
-                      background: `${b.c}15`,
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      fontSize: "1.5rem",
-                      flexShrink: 0,
-                      border: i === 0 ? `2px solid ${t.warm}40` : "none",
-                    }}
-                  >
-                    {b.avatar}
-                  </div>
-                  <div style={{ flex: 1 }}>
-                    <div
-                      style={{
-                        fontFamily: t.bodyFont,
-                        fontSize: "0.88rem",
-                        fontWeight: 600,
-                        color: t.text,
-                      }}
-                    >
-                      {b.name}
-                    </div>
-                    <div
-                      style={{
-                        fontFamily: t.bodyFont,
-                        fontSize: "0.65rem",
-                        color: t.textDim,
-                      }}
-                    >
-                      {b.date} · Turning {b.age}
-                      {i > 0 ? ` · ${b.daysUntil}d` : ""}
-                    </div>
-                  </div>
-                  <div
-                    style={{
-                      fontFamily: t.bodyFont,
-                      fontSize: "0.6rem",
-                      padding: "2px 8px",
-                      borderRadius: 8,
-                      background: `${giftColor(b.gift)}15`,
-                      color: giftColor(b.gift),
-                      fontWeight: 600,
-                    }}
-                  >
-                    {b.gift}
-                  </div>
-                </div>
-                <div
-                  style={{
-                    marginTop: 6,
-                    padding: "5px 8px",
-                    borderRadius: t.radius / 3,
-                    background: `${t.text}04`,
-                  }}
-                >
-                  <div
-                    style={{
-                      fontFamily: t.bodyFont,
-                      fontSize: "0.68rem",
-                      color: t.textMuted,
-                    }}
-                  >
-                    {"\u{1F381}"} {b.giftIdea}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </>
+      {loading && (
+        <div style={{ fontFamily: F, fontSize: 16.5, color: "#FFFFFF66", textAlign: "center", padding: "8px 0" }}>
+          Loading birthdays…
+        </div>
+      )}
+      {error && (
+        <div style={{ fontFamily: F, fontSize: 16.5, color: "#FFFFFF66", padding: 8 }}>
+          {error}
+        </div>
+      )}
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 10 }}>
+        {!loading && items.map((b, i) => (
+          <div key={i} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div
+              style={{
+                width: 36,
+                height: 36,
+                borderRadius: "50%",
+                background: "#FFFFFF15",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: 24,
+                flexShrink: 0,
+              }}
+            >
+              {b.avatar}
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+              <span style={{ fontFamily: F, fontSize: 19.5, fontWeight: 500, color: "#FFFFFF" }}>
+                {b.name}
+              </span>
+              <span style={{ fontFamily: F, fontSize: 16.5, color: "#FFFFFF66" }}>
+                {b.date} — {b.daysUntil} day{b.daysUntil !== 1 ? "s" : ""}{b.daysUntil <= 10 ? "!" : ""}
+              </span>
+            </div>
+          </div>
+        ))}
+        {!loading && items.length === 0 && (
+          <div style={{ fontFamily: F, fontSize: 16.5, color: "#FFFFFF66", textAlign: "center", padding: "12px 0" }}>
+            No upcoming birthdays
+          </div>
         )}
       </div>
     </Panel>
