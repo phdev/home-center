@@ -1,65 +1,36 @@
+import { Calendar } from "lucide-react";
 import { Panel, PanelHeader } from "./Panel";
 import { CALENDAR } from "../data/mockData";
 
+const F = "'Geist','Inter',system-ui,sans-serif";
+const M = "'JetBrains Mono',ui-monospace,monospace";
+
 export function CalendarPanel({ t, events, loading, error }) {
   const items = events || CALENDAR;
-  const showMock = !events;
 
   return (
-    <Panel t={t}>
+    <Panel style={{ height: "100%" }}>
       <PanelHeader
-        t={t}
-        icon={"📅"}
-        label="Today"
-        right={
-          showMock && (
-            <span
-              style={{
-                fontFamily: t.bodyFont,
-                fontSize: "0.5rem",
-                color: t.textDim,
-                textTransform: "none",
-                letterSpacing: 0,
-              }}
-            >
-              demo
-            </span>
-          )
-        }
+        icon={<Calendar size={30} color="#FFFFFF" />}
+        label="Calendar"
+        subtitle="February 2026"
       />
       <div
         style={{
           display: "flex",
           flexDirection: "column",
-          gap: 5,
+          gap: 12,
           flex: 1,
           overflowY: "auto",
         }}
       >
         {loading && (
-          <div
-            style={{
-              fontFamily: t.bodyFont,
-              fontSize: "0.75rem",
-              color: t.textDim,
-              padding: "12px 0",
-              textAlign: "center",
-            }}
-          >
+          <div style={{ fontFamily: F, fontSize: 16.5, color: "#FFFFFF66", padding: "12px 0", textAlign: "center" }}>
             Loading calendar…
           </div>
         )}
         {error && (
-          <div
-            style={{
-              fontFamily: t.bodyFont,
-              fontSize: "0.7rem",
-              color: t.warm,
-              padding: "8px",
-              background: `${t.warm}10`,
-              borderRadius: t.radius / 3,
-            }}
-          >
+          <div style={{ fontFamily: F, fontSize: 16.5, color: "#FFFFFF66", padding: 8 }}>
             {error}
           </div>
         )}
@@ -70,57 +41,35 @@ export function CalendarPanel({ t, events, loading, error }) {
               style={{
                 display: "flex",
                 alignItems: "center",
-                gap: 8,
-                padding: "6px 8px",
-                borderRadius: t.radius / 2.5,
-                background: `${t.text}06`,
-                borderLeft: `3px solid ${t.id === "terminal" ? t.accent : e.c}`,
+                gap: 12,
+                padding: "10px 14px",
+                borderRadius: 5,
+                border: "1px solid #FFFFFF30",
               }}
             >
               <span
                 style={{
-                  fontFamily: t.bodyFont,
-                  fontSize: "0.75rem",
+                  fontFamily: M,
+                  fontSize: 19.5,
                   fontWeight: 600,
-                  color: t.id === "terminal" ? t.accent : e.c,
-                  minWidth: 60,
+                  color: "#FFFFFF",
+                  flexShrink: 0,
                 }}
               >
                 {e.time}
               </span>
-              <div>
-                <div
-                  style={{
-                    fontFamily: t.bodyFont,
-                    fontSize: "0.82rem",
-                    fontWeight: 500,
-                    color: t.text,
-                  }}
-                >
+              <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
+                <span style={{ fontFamily: F, fontSize: 19.5, fontWeight: 500, color: "#FFFFFF" }}>
                   {e.title}
-                </div>
-                <div
-                  style={{
-                    fontFamily: t.bodyFont,
-                    fontSize: "0.6rem",
-                    color: t.textDim,
-                  }}
-                >
-                  {e.who}
-                </div>
+                </span>
+                <span style={{ fontFamily: F, fontSize: 16.5, color: "#FFFFFF66" }}>
+                  {e.sub || e.who || ""}
+                </span>
               </div>
             </div>
           ))}
         {!loading && items.length === 0 && (
-          <div
-            style={{
-              fontFamily: t.bodyFont,
-              fontSize: "0.75rem",
-              color: t.textDim,
-              textAlign: "center",
-              padding: "20px 0",
-            }}
-          >
+          <div style={{ fontFamily: F, fontSize: 16.5, color: "#FFFFFF66", textAlign: "center", padding: "20px 0" }}>
             No events today
           </div>
         )}

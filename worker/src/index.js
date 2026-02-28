@@ -29,7 +29,7 @@ export default {
         return corsResponse(env, await handleAsk(request, env));
       }
       if (path === "/api/calendar") {
-        return corsResponse(env, await handleCalendar(env));
+        return corsResponse(env, await handleCalendar(env, url));
       }
       if (path === "/api/photos") {
         return corsResponse(env, await handlePhotos(env));
@@ -177,7 +177,8 @@ async function handleAsk(request, env) {
 
 // ── Calendar ────────────────────────────────────────────────────────
 
-async function handleCalendar(env) {
+async function handleCalendar(env, url) {
+  const debug = url?.searchParams?.get("debug") === "true";
   const hasCalDAV = !!(env.ICLOUD_APPLE_ID && env.ICLOUD_APP_PASSWORD);
   const hasUrls = !!(env.CALENDAR_URLS);
   if (!hasCalDAV && !hasUrls) {
@@ -188,12 +189,14 @@ async function handleCalendar(env) {
 
   const events = [];
   const errors = [];
+  let debugInfo = null;
 
   // Try CalDAV (private iCloud calendars) first
   if (env.ICLOUD_APPLE_ID && env.ICLOUD_APP_PASSWORD) {
     try {
-      const caldavEvents = await fetchCalDAV(env.ICLOUD_APPLE_ID, env.ICLOUD_APP_PASSWORD);
-      events.push(...caldavEvents);
+      const result = await fetchCalDAV(env.ICLOUD_APPLE_ID, env.ICLOUD_APP_PASSWORD, debug);
+      events.push(...result.events);
+      if (debug) debugInfo = result.diag;
     } catch (e) {
       console.error("CalDAV error:", e);
       errors.push(`CalDAV: ${e.message}`);
@@ -223,16 +226,18 @@ async function handleCalendar(env) {
   return json({
     events: events.map(({ startDate, ...rest }) => rest),
     ...(errors.length > 0 && { errors }),
+    ...(debug && debugInfo && { debug: debugInfo }),
   });
 }
 
-async function fetchCalDAV(appleId, appPassword) {
+async function fetchCalDAV(appleId, appPassword, debug = false) {
   const auth = btoa(`${appleId}:${appPassword}`);
   const headers = {
     Authorization: `Basic ${auth}`,
     "Content-Type": "application/xml; charset=utf-8",
     Depth: "0",
   };
+  const diag = {};
 
   // Step 1: Find principal URL
   const principalRes = await fetch("https://caldav.icloud.com/", {
@@ -251,9 +256,14 @@ async function fetchCalDAV(appleId, appPassword) {
   const principalXml = await principalRes.text();
   const principalHref = extractHref(principalXml, "current-user-principal");
   if (!principalHref) throw new Error("Could not find principal URL");
+  if (debug) diag.principalHref = principalHref;
 
   // Step 2: Find calendar home set
-  const homeRes = await fetch(`https://caldav.icloud.com${principalHref}`, {
+  // iCloud may redirect to a partition-specific host
+  const homeUrl = principalHref.startsWith("http")
+    ? principalHref
+    : `https://caldav.icloud.com${principalHref}`;
+  const homeRes = await fetch(homeUrl, {
     method: "PROPFIND",
     headers,
     body: `<?xml version="1.0" encoding="utf-8"?>
@@ -265,9 +275,14 @@ async function fetchCalDAV(appleId, appPassword) {
   const homeXml = await homeRes.text();
   const homeHref = extractHref(homeXml, "calendar-home-set");
   if (!homeHref) throw new Error("Could not find calendar home");
+  if (debug) diag.homeHref = homeHref;
 
   // Step 3: List calendars
-  const listRes = await fetch(`https://caldav.icloud.com${homeHref}`, {
+  // The home-set URL from iCloud is usually a full URL with the correct host
+  const listUrl = homeHref.startsWith("http")
+    ? homeHref
+    : `https://caldav.icloud.com${homeHref}`;
+  const listRes = await fetch(listUrl, {
     method: "PROPFIND",
     headers: { ...headers, Depth: "1" },
     body: `<?xml version="1.0" encoding="utf-8"?>
@@ -281,7 +296,9 @@ async function fetchCalDAV(appleId, appPassword) {
   });
 
   const listXml = await listRes.text();
+  if (debug) diag.listStatus = listRes.status;
   const calendarHrefs = extractCalendarHrefs(listXml, homeHref);
+  if (debug) diag.calendarHrefs = calendarHrefs;
 
   // Step 4: Fetch today's events from each calendar
   const today = new Date();
@@ -289,12 +306,16 @@ async function fetchCalDAV(appleId, appPassword) {
   const endOfDay = new Date(startOfDay.getTime() + 86400000);
   const dtStart = toIcalDate(startOfDay);
   const dtEnd = toIcalDate(endOfDay);
+  if (debug) diag.dateRange = { dtStart, dtEnd, todayISO: today.toISOString() };
 
   const allEvents = [];
 
   for (const calHref of calendarHrefs) {
     try {
-      const reportRes = await fetch(`https://caldav.icloud.com${calHref}`, {
+      const reportUrl = calHref.startsWith("http")
+        ? calHref
+        : `https://caldav.icloud.com${calHref}`;
+      const reportRes = await fetch(reportUrl, {
         method: "REPORT",
         headers: {
           ...headers,
@@ -316,19 +337,29 @@ async function fetchCalDAV(appleId, appPassword) {
 </c:calendar-query>`,
       });
 
+      if (debug) {
+        diag[`report_${calHref.split("/").pop()}`] = {
+          status: reportRes.status,
+        };
+      }
+
       if (reportRes.ok) {
         const reportXml = await reportRes.text();
         const icsBlocks = extractCalendarData(reportXml);
+        if (debug) {
+          diag[`report_${calHref.split("/").pop()}`].icsBlockCount = icsBlocks.length;
+        }
         for (const ics of icsBlocks) {
           allEvents.push(...parseIcalToday(ics));
         }
       }
-    } catch {
-      // Skip individual calendar errors
+    } catch (e) {
+      if (debug) diag[`error_${calHref}`] = e.message;
     }
   }
 
-  return allEvents;
+  if (debug) diag.totalEvents = allEvents.length;
+  return { events: allEvents, diag };
 }
 
 // ── Photos ──────────────────────────────────────────────────────────
@@ -339,28 +370,40 @@ async function handlePhotos(env) {
     return json({ error: "PHOTOS_ALBUM_TOKEN not configured on worker. Set it via: wrangler secret put PHOTOS_ALBUM_TOKEN" }, 500);
   }
 
-  const partitions = [25, 26, 27, 28, 29, 30, 47, 48, 49, 50, 51, 52];
+  // Discover the correct partition via iCloud's 330 redirect
+  let host = `p25-sharedstreams.icloud.com`;
   let streamData = null;
   let baseUrl = null;
 
-  for (const p of partitions) {
+  for (let attempt = 0; attempt < 3; attempt++) {
     try {
-      const url = `https://p${p}-sharedstreams.icloud.com/${token}/sharedstreams/webstream`;
+      const url = `https://${host}/${token}/sharedstreams/webstream`;
       const res = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "text/plain" },
         body: JSON.stringify({ streamCtag: null }),
+        redirect: "manual",
       });
+      if (res.status === 330) {
+        // iCloud returns the correct host in the response body or header
+        const body = await res.json().catch(() => ({}));
+        const redirectHost = body["X-Apple-MMe-Host"] || res.headers.get("X-Apple-MMe-Host");
+        if (redirectHost) {
+          host = redirectHost;
+          continue;
+        }
+        break;
+      }
       if (res.ok) {
         const data = await res.json();
         if (data.photos) {
           streamData = data;
-          baseUrl = `https://p${p}-sharedstreams.icloud.com/${token}/sharedstreams`;
+          baseUrl = `https://${host}/${token}/sharedstreams`;
           break;
         }
       }
     } catch {
-      continue;
+      break;
     }
   }
 
@@ -573,16 +616,22 @@ function extractHref(xml, tagName) {
 
 function extractCalendarHrefs(xml, homeHref) {
   const hrefs = [];
-  const responses = xml.split(/<d:response>|<D:response>/i);
+  // Split on any <response> tag regardless of namespace prefix
+  const responses = xml.split(/<(?:[a-zA-Z0-9]+:)?response[\s>]/i);
   for (const resp of responses) {
-    if (resp.includes("<d:collection") || resp.includes("<D:collection")) {
-      if (resp.includes("calendar") || resp.includes("VCALENDAR")) {
-        const hrefMatch = resp.match(/<(?:d|D):href>([^<]+)/);
-        if (hrefMatch) {
-          const href = hrefMatch[1].trim();
-          if (href !== homeHref) {
-            hrefs.push(href);
-          }
+    // Check if this response describes a calendar collection
+    const isCollection = /<(?:[a-zA-Z0-9]+:)?collection/i.test(resp);
+    const isCalendar = /calendar/i.test(resp) || /VCALENDAR/i.test(resp);
+    if (isCollection && isCalendar) {
+      // Extract href from any namespace
+      const hrefMatch = resp.match(/<(?:[a-zA-Z0-9]+:)?href[^>]*>([^<]+)/i);
+      if (hrefMatch) {
+        const href = hrefMatch[1].trim();
+        // Skip the home href itself (it's the parent, not a calendar)
+        const normalizedHref = href.replace(/\/$/, "");
+        const normalizedHome = (homeHref || "").replace(/\/$/, "");
+        if (normalizedHref !== normalizedHome) {
+          hrefs.push(href);
         }
       }
     }
