@@ -70,15 +70,22 @@ function wmoDesc(code) {
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
+const CARDINALS = ["N","NNE","NE","ENE","E","ESE","SE","SSE","S","SSW","SW","WSW","W","WNW","NW","NNW"];
+function degreesToCardinal(deg) {
+  return CARDINALS[Math.round(deg / 22.5) % 16];
+}
+
 export async function fetchWeather(lat, lng, units = "fahrenheit") {
   const tempUnit = units === "fahrenheit" ? "fahrenheit" : "celsius";
+  const windUnit = units === "fahrenheit" ? "mph" : "kmh";
   const url =
     `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}` +
     `&hourly=temperature_2m,weathercode,precipitation_probability` +
-    `&daily=temperature_2m_max,temperature_2m_min,weathercode` +
-    `&current=temperature_2m,weathercode` +
+    `&daily=temperature_2m_max,temperature_2m_min,weathercode,precipitation_probability_max` +
+    `&current=temperature_2m,weathercode,apparent_temperature,wind_speed_10m,wind_direction_10m,relative_humidity_2m` +
     `&temperature_unit=${tempUnit}` +
-    `&timezone=auto&forecast_days=5`;
+    `&wind_speed_unit=${windUnit}` +
+    `&timezone=auto&forecast_days=7`;
 
   const res = await fetch(url);
   if (!res.ok) throw new Error(`Weather API error: ${res.status}`);
@@ -86,7 +93,7 @@ export async function fetchWeather(lat, lng, units = "fahrenheit") {
 
   const nowHour = new Date().getHours();
   const hourly = [];
-  for (let i = 0; i < Math.min(8, data.hourly.time.length); i++) {
+  for (let i = 0; i < Math.min(8, data.hourly.time.length - nowHour); i++) {
     const hDate = new Date(data.hourly.time[nowHour + i]);
     const hHour = hDate.getHours();
     const label =
@@ -114,15 +121,23 @@ export async function fetchWeather(lat, lng, units = "fahrenheit") {
       hi: Math.round(data.daily.temperature_2m_max[i]),
       lo: Math.round(data.daily.temperature_2m_min[i]),
       i: wmoIcon(data.daily.weathercode[i]),
+      desc: wmoDesc(data.daily.weathercode[i]),
+      precip: data.daily.precipitation_probability_max?.[i] || 0,
     };
   });
 
+  const cur = data.current;
   const current = {
-    temp: Math.round(data.current.temperature_2m),
-    icon: wmoIcon(data.current.weathercode),
-    desc: wmoDesc(data.current.weathercode),
+    temp: Math.round(cur.temperature_2m),
+    icon: wmoIcon(cur.weathercode),
+    desc: wmoDesc(cur.weathercode),
     hi: daily[0]?.hi,
     lo: daily[0]?.lo,
+    feelsLike: Math.round(cur.apparent_temperature),
+    windSpeed: Math.round(cur.wind_speed_10m),
+    windDir: degreesToCardinal(cur.wind_direction_10m),
+    humidity: Math.round(cur.relative_humidity_2m),
+    windUnit: units === "fahrenheit" ? "mph" : "km/h",
   };
 
   return { hourly, daily, current };
@@ -133,7 +148,10 @@ async function getLocationFromIP() {
   if (!res.ok) throw new Error("IP geolocation failed");
   const data = await res.json();
   if (data.latitude && data.longitude) {
-    return { lat: data.latitude, lng: data.longitude };
+    const locationName = data.city && data.region_code
+      ? `${data.city}, ${data.region_code}`
+      : data.city || null;
+    return { lat: data.latitude, lng: data.longitude, locationName };
   }
   throw new Error("IP geolocation returned no coordinates");
 }
@@ -147,7 +165,7 @@ export async function getLocationCoords() {
         return;
       }
       navigator.geolocation.getCurrentPosition(
-        (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+        (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude, locationName: null }),
         (err) => reject(err),
         { timeout: 5000 },
       );

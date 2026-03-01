@@ -5,6 +5,7 @@ export function useWeather(weatherSettings) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [locationName, setLocationName] = useState(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -18,6 +19,7 @@ export function useWeather(weatherSettings) {
             const coords = await getLocationCoords();
             lat = coords.lat;
             lng = coords.lng;
+            if (coords.locationName) setLocationName(coords.locationName);
           } catch {
             throw new Error("Location unavailable. Set coordinates in settings.");
           }
@@ -41,5 +43,5 @@ export function useWeather(weatherSettings) {
     return () => clearInterval(interval);
   }, [load]);
 
-  return { data, loading, error, refresh: load };
+  return { data, loading, error, refresh: load, locationName };
 }

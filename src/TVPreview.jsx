@@ -15,6 +15,7 @@ const LIVE_VIEWS = [
   { slug: "weekly-calendar", label: "Weekly Calendar", params: "?page=calendar&view=weekly" },
   { slug: "daily-calendar", label: "Daily Calendar", params: "?page=calendar&view=daily" },
   { slug: "monthly-calendar", label: "Monthly Calendar", params: "?page=calendar&view=monthly" },
+  { slug: "weather", label: "Weather Page", params: "?page=weather" },
 ];
 
 export default function TVPreview() {
@@ -79,7 +80,7 @@ export default function TVPreview() {
           }}
         >
           <option value="app">Live Dashboard</option>
-          <optgroup label="Calendar Views">
+          <optgroup label="Full Pages">
             {LIVE_VIEWS.map((p) => (
               <option key={p.slug} value={p.slug}>{p.label}</option>
             ))}
