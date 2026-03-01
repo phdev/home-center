@@ -316,16 +316,36 @@
       </div>
     </div>
     <div style="border:1px solid var(--border);border-radius:6px;padding:8px;margin-bottom:8px">
-      <div style="color:var(--accent);font-weight:600;font-size:11px;margin-bottom:6px">RunPod 3DGS Training</div>
+      <div style="color:var(--accent);font-weight:600;font-size:11px;margin-bottom:6px">3DGS Training</div>
       <div class="slider-group" style="margin-bottom:6px">
         <div class="slider-label"><span>Mode</span></div>
         <select id="runpod-mode" onchange="toggleRunpodMode()" style="width:100%;background:var(--surface2);color:var(--text);border:1px solid var(--border);padding:4px 8px;border-radius:4px;font-size:11px">
-          <option value="serverless" selected>GPU Pod (recommended)</option>
-          <option value="pod">Pod (manual)</option>
+          <option value="modal" selected>Modal (serverless GPU)</option>
+          <option value="serverless">RunPod GPU Pod</option>
+          <option value="pod">RunPod Pod (manual)</option>
         </select>
       </div>
-      <!-- Serverless config -->
-      <div id="runpod-serverless-cfg">
+      <!-- Modal config (default) -->
+      <div id="modal-cfg">
+        <div id="modal-status-info" style="font-size:10px;color:var(--text-dim);margin-bottom:6px;padding:4px 8px;background:var(--surface2);border-radius:4px;font-family:'JetBrains Mono',monospace">Serverless — no pods to manage</div>
+        <div class="slider-group">
+          <div class="slider-label"><span>Training iterations</span><span id="v-modal-iters">7000</span></div>
+          <input type="range" id="s-modal-iters" min="1000" max="60000" value="7000" step="1000">
+        </div>
+        <div class="slider-group">
+          <div class="slider-label"><span>Max frames</span><span id="v-modal-maxframes">150</span></div>
+          <input type="range" id="s-modal-maxframes" min="20" max="500" value="150" step="10">
+        </div>
+        <div class="btn-group">
+          <button class="btn btn-accent" onclick="modalTrain()" id="btn-modal-train" style="width:100%">Train (Modal)</button>
+        </div>
+        <div class="btn-group" style="margin-top:4px">
+          <button class="btn" onclick="modalCheckStatus()" style="font-size:10px">Check Status</button>
+          <button class="btn" onclick="extractStylizedTraining()" style="font-size:10px" id="btn-extract-stylized-modal" title="Manual: download training ZIP">Export ZIP</button>
+        </div>
+      </div>
+      <!-- RunPod Serverless config (hidden by default) -->
+      <div id="runpod-serverless-cfg" style="display:none">
         <div id="sls-endpoint-info" style="font-size:10px;color:var(--text-dim);margin-bottom:6px;padding:4px 8px;background:var(--surface2);border-radius:4px;font-family:'JetBrains Mono',monospace">Pod: created on demand</div>
         <div class="slider-group">
           <div class="slider-label"><span>Training iterations</span><span id="v-serverless-iters">7000</span></div>
@@ -1344,8 +1364,14 @@ document.addEventListener('visibilitychange', function() {
     showDecartPending();
     showMarblePending();
     showSlsPending();
+    showModalPending();
     // Resume animation loop if it was paused
     if (!_contextLost) requestAnimationFrame(animate);
+    // Auto-resume Modal training status check when returning to the page
+    if (_modalState.jobId && _modalState.phase &&
+        _modalState.phase !== 'done' && _modalState.phase !== 'completed') {
+      setTimeout(function() { modalCheckStatus(); }, 800);
+    }
     // Auto-resume RunPod training status check when returning to the page
     if (_serverlessState.podId && _serverlessState.phase &&
         _serverlessState.phase !== 'done' && _serverlessState.phase !== 'idle') {
@@ -5124,6 +5150,320 @@ async function runpodTerminate() {
 }
 
 // ============================================================
+// MODAL SERVERLESS 3DGS TRAINING
+// ============================================================
+var _modalState = { jobId: null, phase: null };
+var _MODAL_STORAGE_KEY = 'modal_3dgs_job';
+
+function _modalFetch(path, opts) {
+  opts = opts || {};
+  var url = _proxyUrl + '/modal' + path;
+  return fetch(url, opts);
+}
+
+async function _modalFetchRetry(path, opts) {
+  opts = opts || {};
+  var lastErr;
+  for (var attempt = 0; attempt < 3; attempt++) {
+    try {
+      var res = await _modalFetch(path, opts);
+      if (!res.ok && attempt === 0) {
+        _slsLogApi('MODAL FETCH ' + res.status, { url: path, status: res.status, statusText: res.statusText });
+      }
+      return res;
+    } catch(e) {
+      lastErr = e;
+      _slsLogApi('MODAL FETCH RETRY ' + (attempt + 1) + '/3', { url: path, error: e.message });
+      if (attempt < 2) await pollSleep(2000 * (attempt + 1));
+    }
+  }
+  throw lastErr;
+}
+
+function saveModalJob(jobId) {
+  localStorage.setItem(_MODAL_STORAGE_KEY, JSON.stringify({ jobId: jobId, time: Date.now() }));
+}
+function clearModalJob() {
+  localStorage.removeItem(_MODAL_STORAGE_KEY);
+  _modalState.jobId = null;
+  _modalState.phase = null;
+  var el = document.getElementById('modal-pending');
+  if (el) el.style.display = 'none';
+}
+function showModalPending() {
+  var raw = localStorage.getItem(_MODAL_STORAGE_KEY); if (!raw) return;
+  try { var p = JSON.parse(raw); } catch(e) { return; }
+  var age = Math.round((Date.now() - p.time) / 60000);
+  if (age > 180) { clearModalJob(); return; }
+  if (p.jobId) _modalState.jobId = p.jobId;
+  _updateModalStatusInfo();
+  if (p.jobId) setTimeout(function() { modalCheckStatus(); }, 1500);
+}
+
+function _updateModalStatusInfo() {
+  var el = document.getElementById('modal-status-info');
+  if (!el) return;
+  if (_modalState.jobId) {
+    el.textContent = 'Job: ' + _modalState.jobId + (_modalState.phase ? ' (' + _modalState.phase + ')' : '');
+    el.style.color = 'var(--accent)';
+  } else {
+    el.textContent = 'Serverless — no pods to manage';
+    el.style.color = 'var(--text-dim)';
+  }
+}
+
+async function modalTrain() {
+  var btn = document.getElementById('btn-modal-train');
+  var prog = document.getElementById('v2s-progress');
+
+  function updateProg(msg) { prog.style.display = 'block'; prog.textContent = msg; _runpodLog(msg); _slsLogApi('MODAL', msg); }
+
+  var hasVideo = (document.getElementById('v2s-video-input').files[0]) || _runwayVideoUrl;
+  if (!hasVideo) {
+    updateProg('No video selected — choose a stylized video or run Stage 2 first');
+    toast('Choose a stylized video or run Stage 2 first');
+    return;
+  }
+
+  var iterations = parseInt(document.getElementById('s-modal-iters').value);
+  var maxFrames = parseInt(document.getElementById('s-modal-maxframes').value);
+  btn.disabled = true; btn.textContent = 'Starting...';
+
+  try {
+    updateProg('Starting Modal training (' + iterations + ' iters, max ' + maxFrames + ' frames)...');
+
+    // --- Phase 1: Ensure camera poses exist ---
+    if (!_flyPoses.length || !_flyCamParams) {
+      updateProg('Generating camera poses from track...');
+      _generatePosesFromTrack();
+    }
+    updateProg('Generated ' + _flyPoses.length + ' poses. Extracting frames...');
+
+    // --- Phase 2: Extract frames from video ---
+    var data = await _buildTrainingFrames(function(m) { updateProg(m); });
+
+    // Subsample if over maxFrames
+    if (data.frames.length > maxFrames) {
+      updateProg('Subsampling ' + data.frames.length + ' frames to ' + maxFrames + '...');
+      var step = data.frames.length / maxFrames;
+      var sampled = [];
+      for (var si = 0; si < maxFrames; si++) {
+        sampled.push(data.frames[Math.round(si * step)]);
+      }
+      data.frames = sampled;
+      var tw = data.transforms.w || _flyCamParams.w;
+      var th = data.transforms.h || _flyCamParams.h;
+      data.transforms = _buildTransformsJson(
+        data.frames.map(function(f) { return { elements: f.elements }; }),
+        tw, th, _flyCamParams.fov
+      );
+      for (var fi = 0; fi < data.transforms.frames.length; fi++) {
+        data.transforms.frames[fi].file_path = 'images/' + data.frames[fi].name;
+      }
+    }
+
+    // --- Phase 3: Check payload size, downscale if over 10MB ---
+    var _MAX_PAYLOAD = 9.5 * 1024 * 1024;
+    var framesList = data.frames.map(function(f) { return { name: f.name, b64: f.b64 }; });
+    var payloadSize = JSON.stringify({ frames: framesList }).length;
+    updateProg('Extracted ' + data.frames.length + ' frames (' + (payloadSize / 1e6).toFixed(1) + 'MB)...');
+    if (payloadSize > _MAX_PAYLOAD) {
+      updateProg('Payload ' + (payloadSize / 1e6).toFixed(1) + 'MB exceeds 10MB. Re-encoding at lower quality...');
+      var dsCanvas = document.createElement('canvas');
+      var tmpImg = new Image();
+      var qualities = [0.65, 0.50, 0.35];
+      for (var qi = 0; qi < qualities.length; qi++) {
+        var q = qualities[qi];
+        for (var di = 0; di < data.frames.length; di++) {
+          if (di % 10 === 0) updateProg('Re-encoding frame ' + (di + 1) + '/' + data.frames.length + ' (q=' + q + ')...');
+          await new Promise(function(resolve) {
+            tmpImg.onload = resolve;
+            tmpImg.src = 'data:image/jpeg;base64,' + data.frames[di].b64;
+          });
+          dsCanvas.width = tmpImg.naturalWidth; dsCanvas.height = tmpImg.naturalHeight;
+          dsCanvas.getContext('2d').drawImage(tmpImg, 0, 0);
+          data.frames[di].b64 = dsCanvas.toDataURL('image/jpeg', q).split(',')[1];
+          if (di % 4 === 0) await new Promise(function(r) { setTimeout(r, 0); });
+        }
+        framesList = data.frames.map(function(f) { return { name: f.name, b64: f.b64 }; });
+        payloadSize = JSON.stringify({ frames: framesList }).length;
+        if (payloadSize <= _MAX_PAYLOAD) break;
+      }
+      updateProg('Re-encoded (' + (payloadSize / 1e6).toFixed(1) + 'MB). Sending to Modal...');
+    } else {
+      updateProg('Payload fits (' + (payloadSize / 1e6).toFixed(1) + 'MB). Sending to Modal...');
+    }
+
+    // Build payload
+    var nFrames = framesList.length;
+    var bodyStr = JSON.stringify({
+      iterations: iterations,
+      transforms: data.transforms,
+      frames: framesList
+    });
+    data.frames.length = 0; data.frames = null; data = null;
+    framesList.length = 0; framesList = null;
+
+    // --- Phase 4: POST to Modal /train ---
+    _modalState.phase = 'submitting';
+    _slsLogApi('MODAL SUBMIT', { frames: nFrames, bodyMB: (bodyStr.length / 1e6).toFixed(1), iterations: iterations });
+    var submitRes = await _modalFetchRetry('/train', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: bodyStr
+    });
+    bodyStr = null;
+    var submitData = await submitRes.json();
+    _slsLogApi('MODAL SUBMIT RESPONSE ' + submitRes.status, submitData);
+    if (!submitRes.ok) {
+      throw new Error('Modal submit failed (' + submitRes.status + '): ' + JSON.stringify(submitData).slice(0, 300));
+    }
+
+    var jobId = submitData.job_id;
+    _modalState.jobId = jobId;
+    _modalState.phase = 'training';
+    saveModalJob(jobId);
+    _updateModalStatusInfo();
+    updateProg('Training started (job ' + jobId + '). Polling status...');
+
+    // --- Phase 5: Poll /status for completion ---
+    await _pollModalJob(jobId, updateProg);
+
+  } catch (err) {
+    _slsLogApi('MODAL ERROR', { message: err.message, stack: err.stack });
+    updateProg('Error: ' + err.message);
+    toast('Training error: ' + err.message);
+    console.error('Modal training error:', err);
+  } finally {
+    btn.disabled = false; btn.textContent = 'Train (Modal)';
+  }
+}
+
+async function _pollModalJob(jobId, updateProg) {
+  var maxPolls = 720; // 60 min at 5s intervals
+  var consecutiveErrors = 0;
+  for (var pi = 0; pi < maxPolls; pi++) {
+    await pollSleep(5000);
+    try {
+      var statusRes = await _modalFetchRetry('/status?job_id=' + encodeURIComponent(jobId));
+      var statusData = await statusRes.json();
+      consecutiveErrors = 0;
+      var st = statusData.state || 'unknown';
+      if (pi % 6 === 0 || st !== _modalState.phase) {
+        _slsLogApi('MODAL STATUS (poll #' + (pi + 1) + ')', statusData);
+      }
+      var elapsed = Math.round((pi + 1) * 5 / 60);
+      _modalState.phase = st;
+      _updateModalStatusInfo();
+
+      if (st === 'completed') {
+        clearModalJob();
+        _modalState.phase = 'done';
+        _updateModalStatusInfo();
+        await _downloadModalPly(jobId, updateProg, statusData.size_mb);
+        break;
+
+      } else if (st === 'failed') {
+        clearModalJob();
+        _slsLogApi('MODAL TRAINING FAILED', statusData);
+        throw new Error('Training failed: ' + (statusData.error || 'unknown'));
+
+      } else {
+        var detail = statusData.progress ? ' — ' + statusData.progress : '';
+        updateProg('Training: ' + st + detail + ' (' + elapsed + ' min)');
+      }
+    } catch(e) {
+      if (e.message.indexOf('Training failed') !== -1) throw e;
+      consecutiveErrors++;
+      if (pi % 6 === 0) _slsLogApi('MODAL POLL ERROR (' + consecutiveErrors + ')', e.message);
+      var elapsed2 = Math.round((pi + 1) * 5 / 60);
+      updateProg('Polling... (' + elapsed2 + ' min, err ' + consecutiveErrors + ') — ' + e.message);
+      if (consecutiveErrors >= 36) {
+        updateProg('Lost connection for 3 min. Training may still be running on Modal. Click "Check Status" to reconnect.');
+        break;
+      }
+    }
+    if (pi >= maxPolls - 1) throw new Error('Training timed out after 60 minutes');
+  }
+}
+
+async function _downloadModalPly(jobId, updateProg, sizeMb) {
+  updateProg('Training complete! Downloading PLY (' + (sizeMb || '?') + ' MB)...');
+  var plyRes = await _modalFetchRetry('/result?job_id=' + encodeURIComponent(jobId));
+  if (!plyRes.ok) throw new Error('PLY download failed: ' + plyRes.status);
+  var plyBytes = new Uint8Array(await plyRes.arrayBuffer());
+  updateProg('Downloaded PLY (' + (plyBytes.length / 1e6).toFixed(1) + ' MB). Loading...');
+  await ensureSparkLoaded();
+  if (_splatMesh) { scene.remove(_splatMesh); if (_splatMesh.dispose) _splatMesh.dispose(); _splatMesh = null; }
+  _splatMesh = new window.Spark.SplatMesh({
+    fileBytes: plyBytes,
+    onLoad: function(mesh) {
+      document.getElementById('splat-info').textContent = 'Modal 3DGS: ' + (mesh.numSplats || '?') + ' splats';
+      toast('Splat loaded'); syncSplatSlidersToMesh();
+    }
+  });
+  scene.add(_splatMesh);
+  // Clean up remote data
+  try {
+    await _modalFetch('/cleanup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ job_id: jobId })
+    });
+  } catch(e) {}
+  updateProg('Done! Splat loaded.');
+  _updateModalStatusInfo();
+  toast('Training complete — splat loaded!');
+}
+
+var _modalStatusRunning = false;
+async function modalCheckStatus() {
+  if (_modalStatusRunning) return;
+  _modalStatusRunning = true;
+  var jobId = _modalState.jobId;
+  if (!jobId) {
+    // Check localStorage
+    var raw = localStorage.getItem(_MODAL_STORAGE_KEY);
+    if (raw) { try { jobId = JSON.parse(raw).jobId; } catch(e) {} }
+  }
+  if (!jobId) { _modalStatusRunning = false; toast('No active Modal training job'); return; }
+  var prog = document.getElementById('v2s-progress');
+  prog.style.display = 'block';
+  function updateProg(msg) { prog.textContent = msg; _runpodLog(msg); }
+  try {
+    _slsLogApi('MODAL STATUS CHECK', { jobId: jobId });
+    var statusRes = await _modalFetchRetry('/status?job_id=' + encodeURIComponent(jobId));
+    var data = await statusRes.json();
+    _slsLogApi('MODAL STATUS', data);
+    var st = data.state || 'unknown';
+    _modalState.jobId = jobId;
+    _modalState.phase = st;
+    _updateModalStatusInfo();
+
+    if (st === 'completed') {
+      clearModalJob();
+      await _downloadModalPly(jobId, updateProg, data.size_mb);
+    } else if (st === 'failed') {
+      clearModalJob();
+      updateProg('Training failed: ' + (data.error || 'unknown'));
+    } else if (st === 'unknown') {
+      clearModalJob();
+      updateProg('Job not found (may have expired). Start a new training run.');
+    } else {
+      // Still running — resume polling
+      var detail = data.progress ? ' — ' + data.progress : '';
+      updateProg('Training: ' + st + detail + '. Resuming poll...');
+      await _pollModalJob(jobId, updateProg);
+    }
+  } catch (err) {
+    _slsLogApi('MODAL STATUS ERROR', { message: err.message });
+    updateProg('Status error: ' + err.message);
+  } finally {
+    _modalStatusRunning = false;
+  }
+}
+
+// ============================================================
 // RUNPOD GPU POD 3DGS TRAINING
 // ============================================================
 var _serverlessState = { podId: null, proxyUrl: null, phase: null };
@@ -5157,6 +5497,7 @@ function showSlsPending() {
 
 function toggleRunpodMode() {
   var mode = document.getElementById('runpod-mode').value;
+  document.getElementById('modal-cfg').style.display = mode === 'modal' ? '' : 'none';
   document.getElementById('runpod-serverless-cfg').style.display = mode === 'serverless' ? '' : 'none';
   document.getElementById('runpod-pod-cfg').style.display = mode === 'pod' ? '' : 'none';
 }
@@ -6074,8 +6415,8 @@ var vp=rndr.getSize(new THREE.Vector2());rndr.setViewport(vp.x-s-10,vp.y-s-10,s,
 }
 
 // Expose for inline HTML handlers
-Object.assign(window,{switchTab,toggleDrawer,fitView,loadFile,exportTrack,undoAll,handleFile,handleImageUpload,setEditMode,smoothSelection,smoothAll,applyElevation,extractControlPoints,rebuildFromSpline,updateCPFromInput,insertCPAfter,deleteSelectedCP,onDefaultWidthChange,setAllWidths,onCPWidthChange,widthPreset,rebuildWithWidth,previewLoop,makeLoop,removeLoop,generateTerrain,clearTerrain,toggleSpeedPads,placeSpeedPads,toggleAICars,placeAICars,generateScenery,clearScenery,toggleScenery,exportAll,startGame,stopGame,generateMarbleWorld,trackAwarePrompt,loadSplatFromURL,loadSplatFromFile,removeSplat,splatBackdropPreset,splatResetTransform,checkMarbleOperation,clearMarblePending,checkRunwayOperation,clearRunwayPending,exportTrainingViews,previewPanoCaptures,batchPanoMarble,loadPanoSection,exportPanoSections,recordFlythrough,downloadFlythrough,runRunwayStylize,runMarbleFromVideo,runFullPipeline,onProviderChange,onModelChange,runStylize,checkPendingOperation,clearAllPending,generateKiri,checkKiriStatus,clearKiriPending,exportFlythroughTraining,extractStylizedTraining,runpodTrain,runpodCheckStatus,runpodTerminate,useStylizedVideo,toggleRunpodMode,runpodServerlessTrain,serverlessCheckStatus,serverlessCancel,serverlessDeleteEndpoint,clearSlsPending});
-init();fitView();showMarblePending();showRunwayPending();showDecartPending();showKiriPending();showSlsPending();_slsUpdateEndpointInfo();onRunwayModelChange();
+Object.assign(window,{switchTab,toggleDrawer,fitView,loadFile,exportTrack,undoAll,handleFile,handleImageUpload,setEditMode,smoothSelection,smoothAll,applyElevation,extractControlPoints,rebuildFromSpline,updateCPFromInput,insertCPAfter,deleteSelectedCP,onDefaultWidthChange,setAllWidths,onCPWidthChange,widthPreset,rebuildWithWidth,previewLoop,makeLoop,removeLoop,generateTerrain,clearTerrain,toggleSpeedPads,placeSpeedPads,toggleAICars,placeAICars,generateScenery,clearScenery,toggleScenery,exportAll,startGame,stopGame,generateMarbleWorld,trackAwarePrompt,loadSplatFromURL,loadSplatFromFile,removeSplat,splatBackdropPreset,splatResetTransform,checkMarbleOperation,clearMarblePending,checkRunwayOperation,clearRunwayPending,exportTrainingViews,previewPanoCaptures,batchPanoMarble,loadPanoSection,exportPanoSections,recordFlythrough,downloadFlythrough,runRunwayStylize,runMarbleFromVideo,runFullPipeline,onProviderChange,onModelChange,runStylize,checkPendingOperation,clearAllPending,generateKiri,checkKiriStatus,clearKiriPending,exportFlythroughTraining,extractStylizedTraining,runpodTrain,runpodCheckStatus,runpodTerminate,useStylizedVideo,toggleRunpodMode,runpodServerlessTrain,serverlessCheckStatus,serverlessCancel,serverlessDeleteEndpoint,clearSlsPending,modalTrain,modalCheckStatus,clearModalJob});
+init();fitView();showMarblePending();showRunwayPending();showDecartPending();showKiriPending();showModalPending();showSlsPending();_slsUpdateEndpointInfo();onRunwayModelChange();
 </script>
 
 </body>

@@ -10,6 +10,7 @@
 //        wrangler secret put MARBLE_KEY
 //        wrangler secret put DECART_KEY
 //        wrangler secret put KIRI_API_KEY
+//        wrangler secret put MODAL_URL    (e.g. https://phdev--accel-driv-3dgs-web.modal.run)
 //
 // Then set the Worker URL in the editor (one-time):
 //   https://phdev.github.io/accel-driv/?proxy=https://accel-driv-proxy.<you>.workers.dev
@@ -19,6 +20,7 @@
 //   /marble/*  -> https://api.worldlabs.ai/marble/v1/*  (adds WLT-Api-Key)
 //   /decart/*  -> https://api.decart.ai/v1/*  (adds X-API-KEY)
 //   /kiri/*    -> https://api.kiriengine.app/api/*  (adds Authorization: Bearer)
+//   /modal/*   -> MODAL_URL/*  (Modal serverless 3DGS training)
 //   /runpod-sls/*  -> https://api.runpod.ai/v2/*  (adds Authorization: Bearer, serverless API)
 //   /runpod-gql    -> https://api.runpod.io/graphql  (adds Authorization: Bearer, template/endpoint mgmt)
 //   /fetch?url=<encoded>  -> generic CORS proxy (no auth added)
@@ -51,6 +53,10 @@ const API_ROUTES = {
     authFn: function(env) {
       return { 'Authorization': 'Bearer ' + env.KIRI_API_KEY };
     }
+  },
+  '/modal/': {
+    target: null, // set dynamically from env.MODAL_URL
+    authFn: function(env) { return {}; }
   },
   '/runpod/': {
     target: 'https://rest.runpod.io/v1/',
@@ -117,7 +123,18 @@ export default {
       var prefix = prefixes[i];
       if (path.indexOf(prefix) === 0) {
         var route = API_ROUTES[prefix];
-        targetUrl = route.target + path.slice(prefix.length) + url.search;
+        // Modal route: target URL comes from env.MODAL_URL
+        var routeTarget = route.target;
+        if (prefix === '/modal/' && env.MODAL_URL) {
+          routeTarget = env.MODAL_URL.replace(/\/$/, '') + '/';
+        }
+        if (!routeTarget) {
+          return new Response(JSON.stringify({ error: 'MODAL_URL not configured — run: wrangler secret put MODAL_URL' }), {
+            status: 500,
+            headers: Object.assign({ 'Content-Type': 'application/json' }, corsHeaders(origin))
+          });
+        }
+        targetUrl = routeTarget + path.slice(prefix.length) + url.search;
         authHeaders = route.authFn(env);
         // Guard: check that all auth values are actually set
         var authVals = Object.values(authHeaders);
