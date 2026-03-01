@@ -16,6 +16,7 @@ import { AgentTasksPanel } from "./components/AgentTasksPanel";
 import { EventsPanel } from "./components/EventsPanel";
 import { BirthdaysPanel } from "./components/BirthdaysPanel";
 import { TimersPanel } from "./components/TimersPanel";
+import { WorldClockPanel } from "./components/WorldClockPanel";
 
 export default function App() {
   const now = useTime();
@@ -60,6 +61,7 @@ export default function App() {
             <div style={{ height: 220 }}>
               <PhotoPanel photos={photos.photos} photosLoading={photos.loading} photosError={photos.error} />
             </div>
+            <WorldClockPanel />
             <BirthdaysPanel birthdays={bdays.birthdays} loading={bdays.loading} error={bdays.error} />
             <EventsPanel updates={school.updates} loading={school.loading} error={school.error} />
             <AgentTasksPanel />
@@ -76,11 +78,14 @@ export default function App() {
             {/* Middle column */}
             <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 16, minHeight: 0 }}>
               <div style={{ display: "flex", gap: 16, height: 270, flexShrink: 0 }}>
+                <div style={{ width: 340, flexShrink: 0, minHeight: 0 }}>
+                  <BirthdaysPanel birthdays={bdays.birthdays} loading={bdays.loading} error={bdays.error} />
+                </div>
                 <div style={{ flex: 1, minHeight: 0 }}>
                   <WeatherPanel weatherData={weather.data} loading={weather.loading} error={weather.error} />
                 </div>
-                <div style={{ width: 340, flexShrink: 0, minHeight: 0 }}>
-                  <BirthdaysPanel birthdays={bdays.birthdays} loading={bdays.loading} error={bdays.error} />
+                <div style={{ width: 280, flexShrink: 0, minHeight: 0 }}>
+                  <WorldClockPanel />
                 </div>
               </div>
               <div style={{ display: "flex", gap: 16, flex: 1, minHeight: 0 }}>
