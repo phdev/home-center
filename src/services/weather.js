@@ -128,16 +128,32 @@ export async function fetchWeather(lat, lng, units = "fahrenheit") {
   return { hourly, daily, current };
 }
 
+async function getLocationFromIP() {
+  const res = await fetch("https://ipapi.co/json/");
+  if (!res.ok) throw new Error("IP geolocation failed");
+  const data = await res.json();
+  if (data.latitude && data.longitude) {
+    return { lat: data.latitude, lng: data.longitude };
+  }
+  throw new Error("IP geolocation returned no coordinates");
+}
+
 export async function getLocationCoords() {
-  return new Promise((resolve, reject) => {
-    if (!navigator.geolocation) {
-      reject(new Error("Geolocation not supported"));
-      return;
-    }
-    navigator.geolocation.getCurrentPosition(
-      (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-      (err) => reject(err),
-      { timeout: 10000 },
-    );
-  });
+  // Try browser geolocation first, fall back to IP-based
+  try {
+    const coords = await new Promise((resolve, reject) => {
+      if (!navigator.geolocation) {
+        reject(new Error("Geolocation not supported"));
+        return;
+      }
+      navigator.geolocation.getCurrentPosition(
+        (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+        (err) => reject(err),
+        { timeout: 5000 },
+      );
+    });
+    return coords;
+  } catch {
+    return getLocationFromIP();
+  }
 }
