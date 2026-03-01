@@ -17,6 +17,7 @@ Hardware: ReSpeaker 2-Mics Pi HAT (or any ALSA-compatible microphone)
 """
 
 import argparse
+import collections
 import io
 import json
 import logging
@@ -61,12 +62,13 @@ COOLDOWN_SECONDS = 10  # Prevent repeated triggers
 
 # Robustness against false positives
 MIN_RMS_ENERGY = 300
-MIN_CONSECUTIVE = 3
+MIN_CONSECUTIVE = 5
 SCORE_SMOOTH_WINDOW = 3
-POST_ACTION_MUTE = 3.0
+POST_ACTION_MUTE = 15.0
 
 # STT recording
 RECORD_SECONDS = 3.5  # How long to record after wake word for command
+VERIFY_BUFFER_SECONDS = 3.0  # Rolling buffer for Whisper verification
 
 # Alarm polling
 ALARM_POLL_INTERVAL = 5  # Seconds between timer checks
@@ -325,7 +327,7 @@ def parse_command(text: str) -> dict:
     log.info("Transcribed: '%s'", text)
 
     if not text:
-        return {"action": "turn_on"}
+        return {"action": "none"}
 
     # Stop / dismiss / cancel
     if re.search(r'\b(stop|dismiss|cancel|quiet|shut up|silence)\b', text):
@@ -565,6 +567,12 @@ def main() -> None:
     last_action_time = 0.0
     consecutive_hits = {ww: 0 for ww in wake_words}
 
+    # Rolling buffer: stores last ~VERIFY_BUFFER_SECONDS of mono audio chunks
+    # for Whisper verification before acting on a detection
+    # Each chunk after mono downmix = CHUNK_SIZE samples (80ms at 16kHz)
+    verify_buf_max = int(VERIFY_BUFFER_SECONDS * SAMPLE_RATE / CHUNK_SIZE)
+    verify_buffer = collections.deque(maxlen=verify_buf_max)
+
     try:
         while True:
             length, data = pcm.read()
@@ -574,6 +582,9 @@ def main() -> None:
             audio_array = np.frombuffer(data, dtype=np.int16)
             if CHANNELS > 1:
                 audio_array = audio_array.reshape(-1, CHANNELS).mean(axis=1).astype(np.int16)
+
+            # Append to rolling verification buffer
+            verify_buffer.append(audio_array.copy())
 
             now = time.time()
 
@@ -618,21 +629,41 @@ def main() -> None:
                         log.debug("Cooldown active, ignoring detection")
                         continue
 
-                    # ── Wake word detected! ──
-                    last_trigger = now
-                    log.info("Wake word '%s' detected! (score=%.3f, consec=%d)",
+                    # ── Wake word candidate detected! ──
+                    log.info("Wake word candidate '%s' (score=%.3f, consec=%d) — verifying with Whisper...",
                              ww_name, score, consecutive_hits[ww_name])
+
+                    # Reset model state early to stop accumulating
+                    model.reset()
+                    for ww in consecutive_hits:
+                        consecutive_hits[ww] = 0
+
+                    # ── Stage 2: Whisper verification ──
+                    # Run the rolling buffer through Whisper to confirm
+                    # "homer" was actually spoken (not ambient noise)
+                    buf_audio = np.concatenate(list(verify_buffer)) if verify_buffer else np.array([], dtype=np.int16)
+                    if len(buf_audio) > 0:
+                        verify_text = transcribe(buf_audio).lower()
+                        log.info("Verification transcription: '%s'", verify_text)
+                        if "homer" not in verify_text:
+                            log.info("Verification FAILED — 'homer' not in transcript, ignoring.")
+                            last_trigger = now
+                            last_action_time = time.time()
+                            break
+                    else:
+                        log.info("Verification FAILED — empty audio buffer, ignoring.")
+                        last_trigger = now
+                        break
+
+                    # ── Verified! Proceed. ──
+                    last_trigger = now
+                    log.info("Verification PASSED — wake word confirmed!")
 
                     # Play chime
                     if not args.dry_run:
                         play_acknowledgement()
 
-                    # Reset model state
-                    model.reset()
-                    for ww in consecutive_hits:
-                        consecutive_hits[ww] = 0
-
-                    # Record and transcribe if worker is configured
+                    # Record and transcribe command if worker is configured
                     if args.worker_url:
                         log.info("Recording %.1fs for command...", RECORD_SECONDS)
                         audio_clip = record_audio(pcm, RECORD_SECONDS)
@@ -645,6 +676,11 @@ def main() -> None:
 
                     # Dispatch
                     action = command["action"]
+                    if action == "none":
+                        log.info("No command recognized, doing nothing.")
+                        last_action_time = time.time()
+                        break
+
                     if action == "set_timer" and args.worker_url:
                         label = command.get("label", "timer")
                         duration = command.get("duration", 60)
