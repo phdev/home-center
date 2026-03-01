@@ -21,9 +21,9 @@ import { WorldClockPanel } from "./components/WorldClockPanel";
 
 export default function App() {
   const now = useTime();
-  const { timers, expiredTimers, dismissTimer, dismissAll } = useTimers(settings.worker);
   const { isMobile } = usePreviewMode();
   const { settings } = useSettings();
+  const { timers, expiredTimers, dismissTimer, dismissAll } = useTimers(settings.worker);
 
   const weather = useWeather(settings.weather);
   const calendar = useCalendar(settings.calendar, settings.worker);
