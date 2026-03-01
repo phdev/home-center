@@ -1,8 +1,17 @@
-import { Clock } from "./Clock";
-import { WeatherStrip } from "./WeatherStrip";
-import { TimerStrip } from "./TimerStrip";
+import { LayoutDashboard, Mic } from "lucide-react";
 
-export function Header({ t, now, timers, onTimerTabSwitch, weatherData, onOpenSettings, isMobile }) {
+export function Header({ now, isMobile }) {
+  const time = now.toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  });
+  const date = now.toLocaleDateString("en-US", {
+    weekday: "long",
+    month: "short",
+    day: "numeric",
+  });
+
   if (isMobile) {
     return (
       <div
@@ -12,40 +21,31 @@ export function Header({ t, now, timers, onTimerTabSwitch, weatherData, onOpenSe
           alignItems: "center",
           marginBottom: 10,
           flexShrink: 0,
-          ...(t.headerBorder
-            ? { borderBottom: `2px solid ${t.text}`, paddingBottom: 8 }
-            : {}),
         }}
       >
-        <div
-          style={{
-            fontFamily: t.displayFont,
-            fontSize: t.id === "terminal" ? "1.2rem" : "1.1rem",
-            fontWeight: 700,
-            color: t.text,
-          }}
-        >
-          {t.id === "terminal" ? "> HOME_" : "Home"}
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <Clock t={t} now={now} />
-          <button
-            onClick={onOpenSettings}
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <LayoutDashboard size={30} color="#FFFFFF" />
+          <span
             style={{
-              background: `${t.text}06`,
-              border: `1px solid ${t.panelBorder}`,
-              borderRadius: t.radius / 2,
-              padding: "6px 8px",
-              color: t.textDim,
-              fontSize: "1rem",
-              cursor: "pointer",
-              lineHeight: 1,
-              transition: "all 0.2s",
+              fontFamily: "'Geist','Inter',system-ui,sans-serif",
+              fontSize: 24,
+              fontWeight: 700,
+              color: "#FFFFFF",
             }}
           >
-            ⚙
-          </button>
+            The Howell Hub
+          </span>
         </div>
+        <span
+          style={{
+            fontFamily: "'JetBrains Mono',ui-monospace,monospace",
+            fontSize: 28,
+            fontWeight: 600,
+            color: "#FFFFFF",
+          }}
+        >
+          {time}
+        </span>
       </div>
     );
   }
@@ -56,45 +56,70 @@ export function Header({ t, now, timers, onTimerTabSwitch, weatherData, onOpenSe
         display: "flex",
         justifyContent: "space-between",
         alignItems: "center",
-        marginBottom: 16,
+        height: 70,
+        padding: "0 24px",
+        borderBottom: "1px solid #FFFFFF30",
         flexShrink: 0,
-        ...(t.headerBorder
-          ? { borderBottom: `2px solid ${t.text}`, paddingBottom: 12 }
-          : {}),
       }}
     >
-      <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
+      {/* Left: Brand */}
+      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        <LayoutDashboard size={36} color="#FFFFFF" />
+        <span
+          style={{
+            fontFamily: "'Geist','Inter',system-ui,sans-serif",
+            fontSize: 33,
+            fontWeight: 700,
+            color: "#FFFFFF",
+          }}
+        >
+          The Howell Hub
+        </span>
+      </div>
+
+      {/* Center: Voice */}
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <Mic size={30} color="#FFFFFF" />
+        <span
+          style={{
+            fontFamily: "'Geist','Inter',system-ui,sans-serif",
+            fontSize: 21,
+            color: "#FFFFFF66",
+          }}
+        >
+          "Hey Dashboard..."
+        </span>
         <div
           style={{
-            fontFamily: t.displayFont,
-            fontSize: t.id === "terminal" ? "1.6rem" : "1.5rem",
-            fontWeight: 700,
-            color: t.text,
+            width: 12,
+            height: 12,
+            borderRadius: "50%",
+            background: "#FFFFFF",
           }}
-        >
-          {t.id === "terminal" ? "> HOME_" : "Home"}
-        </div>
-        <WeatherStrip t={t} weatherData={weatherData} />
+        />
       </div>
-      <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-        <TimerStrip t={t} timers={timers} onTabSwitch={onTimerTabSwitch} />
-        <Clock t={t} now={now} />
-        <button
-          onClick={onOpenSettings}
+
+      {/* Right: Date + Clock */}
+      <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+        <span
           style={{
-            background: `${t.text}06`,
-            border: `1px solid ${t.panelBorder}`,
-            borderRadius: t.radius / 2,
-            padding: "6px 8px",
-            color: t.textDim,
-            fontSize: "1rem",
-            cursor: "pointer",
-            lineHeight: 1,
-            transition: "all 0.2s",
+            fontFamily: "'Geist','Inter',system-ui,sans-serif",
+            fontSize: 22.5,
+            color: "#FFFFFF88",
           }}
         >
-          ⚙
-        </button>
+          {date}
+        </span>
+        <span
+          style={{
+            fontFamily: "'JetBrains Mono',ui-monospace,monospace",
+            fontSize: 42,
+            fontWeight: 600,
+            color: "#FFFFFF",
+          }}
+        >
+          {time}
+        </span>
       </div>
     </div>
   );

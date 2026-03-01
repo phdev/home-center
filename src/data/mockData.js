@@ -1,10 +1,8 @@
 export const CALENDAR = [
-  { time: "8:30 AM", title: "School Drop-off", who: "Mom", c: "#FF6B6B" },
-  { time: "10:00 AM", title: "Dentist \u2014 Lily", who: "Dad", c: "#4ECDC4" },
-  { time: "12:00 PM", title: "Lunch w/ Grandma", who: "Everyone", c: "#FFE66D" },
-  { time: "3:30 PM", title: "Soccer Practice", who: "Jake", c: "#6BCB77" },
-  { time: "5:00 PM", title: "Piano Lesson", who: "Lily", c: "#9B59B6" },
-  { time: "7:00 PM", title: "Movie Night", who: "Everyone", c: "#FF8A5C" },
+  { time: "9:00", title: "Soccer Practice", sub: "Elm Creek Park" },
+  { time: "11:30", title: "Piano Lesson — Emma", sub: "Mrs. Chen's Studio" },
+  { time: "3:00", title: "Dentist — Jack", sub: "Maple Grove Dental" },
+  { time: "6:30", title: "Family Movie Night", sub: "Living Room" },
 ];
 
 export const HOURLY = [
@@ -46,197 +44,37 @@ export const PHOTOS = [
 ];
 
 export const FACTS = [
-  { e: "\u{1F419}", f: "An octopus has three hearts and blue blood." },
-  { e: "\u{1F319}", f: "The Moon drifts 1.5 inches from Earth every year." },
-  { e: "\u{1F36F}", f: "Honey never spoils \u2014 3,000-year-old honey is still edible." },
-  { e: "\u26A1", f: "Lightning is 5\u00D7 hotter than the Sun\u2019s surface." },
-  { e: "\u{1F995}", f: "Some dinosaurs had feathers like parrots." },
-];
-
-export const CONVOS = [
-  {
-    q: "Recipe for banana pancakes?",
-    a: "Mash 2 bananas, mix with 2 eggs, cinnamon, \u00BD cup oat flour.",
-    who: "Mom",
-    av: "\u{1F469}",
-    ts: "9:15 AM",
-  },
-  {
-    q: "How far is Mars?",
-    a: "About 140M miles on average \u2014 a 7-month trip!",
-    who: "Jake",
-    av: "\u{1F466}",
-    ts: "8:02 AM",
-  },
-  {
-    q: "Thank you note for Grandma",
-    a: "Dear Grandma, thank you for the sweater\u2026",
-    who: "Lily",
-    av: "\u{1F467}",
-    ts: "Yesterday",
-  },
-  {
-    q: "Weekend projects for kids?",
-    a: "Baking soda volcano, bird feeder, stop-motion LEGO\u2026",
-    who: "Dad",
-    av: "\u{1F468}",
-    ts: "Yesterday",
-  },
-  {
-    q: "Explain photosynthesis for age 8",
-    a: "Plants are tiny chefs cooking food with sunlight!",
-    who: "Jake",
-    av: "\u{1F466}",
-    ts: "2 days ago",
-  },
-];
-
-export const TASKS = [
-  {
-    title: "Order groceries",
-    status: "active",
-    prog: 65,
-    agent: "Shopping",
-    detail: "18/24 items added",
-    icon: "\u{1F6D2}",
-    c: "#4ECDC4",
-  },
-  {
-    title: "Book campsite",
-    status: "waiting",
-    agent: "Travel",
-    detail: "3 Yosemite options \u2014 needs vote",
-    icon: "\u26FA",
-    c: "#FFE66D",
-    opts: ["Site A $45", "Site B $62", "Site C $38"],
-  },
-  {
-    title: "Frame Lily\u2019s art",
-    status: "done",
-    agent: "Tasks",
-    detail: "Pickup ready Tue 2 PM",
-    icon: "\u{1F5BC}\uFE0F",
-    c: "#6BCB77",
-  },
-  {
-    title: "Car maintenance",
-    status: "active",
-    prog: 30,
-    agent: "Auto",
-    detail: "Comparing 3 shop quotes",
-    icon: "\u{1F697}",
-    c: "#FF8A5C",
-  },
-];
-
-export const EVENTS = [
-  {
-    title: "Farmers Market",
-    where: "Downtown Sq",
-    when: "Sat 8AM\u20131PM",
-    icon: "\u{1F955}",
-    c: "#6BCB77",
-    dist: "1.2mi",
-    price: "Free",
-    desc: "Produce, baked goods, kids crafts",
-  },
-  {
-    title: "Dinosaur Exhibit",
-    where: "History Museum",
-    when: "Now\u2013Mar 15",
-    icon: "\u{1F996}",
-    c: "#FF6B6B",
-    dist: "3.4mi",
-    price: "$12/$8",
-    desc: "Animatronics, fossil dig, VR",
-  },
-  {
-    title: "Astronomy Night",
-    where: "Observatory",
-    when: "Fri 7:30PM",
-    icon: "\u{1F52D}",
-    c: "#9B59B6",
-    dist: "5.1mi",
-    price: "Free",
-    desc: "Jupiter & Saturn viewing",
-  },
-  {
-    title: "Kids Cooking",
-    where: "Community Ctr",
-    when: "Next Sat 2PM",
-    icon: "\u{1F468}\u200D\u{1F373}",
-    c: "#FFE66D",
-    dist: "0.8mi",
-    price: "$15",
-    desc: "Pasta & pizza, ages 6\u201312",
-  },
-  {
-    title: "Outdoor Movie",
-    where: "Riverside Park",
-    when: "Next Fri dusk",
-    icon: "\u{1F3AC}",
-    c: "#4ECDC4",
-    dist: "2.0mi",
-    price: "Free",
-    desc: "Encanto \u2014 bring blankets",
-  },
+  { f: "Honey never spoils \u2014 3,000-year-old honey is still edible.", s: "National Geographic" },
+  { f: "An octopus has three hearts and blue blood.", s: "Smithsonian" },
+  { f: "The Moon drifts 1.5 inches from Earth every year.", s: "NASA" },
+  { f: "Lightning is 5\u00D7 hotter than the Sun\u2019s surface.", s: "NOAA" },
+  { f: "Some dinosaurs had feathers like parrots.", s: "Nature" },
 ];
 
 export const BIRTHDAYS = [
-  {
-    name: "Grandma Rose",
-    date: "Feb 3",
-    avatar: "\u{1F475}",
-    age: 72,
-    passed: true,
-    gift: "Delivered",
-    giftIdea: "Knitting basket & yarn set",
-    c: "#FF6B6B",
-  },
-  {
-    name: "Jake",
-    date: "Feb 14",
-    avatar: "\u{1F466}",
-    age: 10,
-    passed: true,
-    gift: "Opened!",
-    giftIdea: "LEGO Space Shuttle + telescope",
-    c: "#4ECDC4",
-  },
-  {
-    name: "Uncle Marco",
-    date: "Feb 22",
-    avatar: "\u{1F468}\u200D\u{1F9B1}",
-    age: 38,
-    passed: false,
-    daysUntil: 1,
-    gift: "Shipped",
-    giftIdea: "Italian cookbook & olive oil set",
-    c: "#FFE66D",
-  },
-  {
-    name: "Lily\u2019s friend Mia",
-    date: "Feb 25",
-    avatar: "\u{1F467}",
-    age: 9,
-    passed: false,
-    daysUntil: 4,
-    gift: "Need to buy",
-    giftIdea: "Art supplies kit",
-    c: "#FF8ED4",
-  },
-  {
-    name: "Cousin Sam",
-    date: "Feb 28",
-    avatar: "\u{1F9D1}",
-    age: 15,
-    passed: false,
-    daysUntil: 7,
-    gift: "Idea phase",
-    giftIdea: "Gaming headset?",
-    c: "#9B59B6",
-  },
+  { name: "Grandma Sue", avatar: "\u{1F382}", date: "Mar 5", daysUntil: 8 },
+  { name: "Uncle Mike", avatar: "\u{1F389}", date: "Mar 18", daysUntil: 19 },
+  { name: "Cousin Lily", avatar: "\u{1F388}", date: "Apr 2", daysUntil: 34 },
 ];
+
+export const SCHOOL_UPDATES = [
+  { label: "DUE TOMORROW", date: "Feb 28", title: "Science Fair Project \u2014 Emma", desc: "Board display due Friday" },
+  { label: "EVENT", date: "Mar 4", title: "Spring Book Fair", desc: "Volunteers needed 2\u20134 PM" },
+  { label: "HOMEWORK", date: "Mar 3", title: "Math Chapter 7 Test \u2014 Jack", desc: "Study guide attached" },
+];
+
+export const TASKS = [
+  { title: "Grocery list from recipes", detail: "Scanning meal plan...", status: "active" },
+  { title: "Schedule vet appointment", detail: "Checking availability...", status: "active" },
+  { title: "Compare flight prices SEA\u2192DEN", detail: "Found 4 options under $250", status: "done" },
+];
+
+export const CONVOS = [
+  { q: "Recipe for banana pancakes?", a: "Mash 2 bananas, mix with 2 eggs, cinnamon, \u00BD cup oat flour.", who: "Mom", av: "\u{1F469}", ts: "9:15 AM" },
+  { q: "How far is Mars?", a: "About 140M miles on average \u2014 a 7-month trip!", who: "Jake", av: "\u{1F466}", ts: "8:02 AM" },
+];
+
+export const EVENTS = [];
 
 export const TIMER_PRESETS = [
   { label: "1 min", sec: 60, icon: "\u26A1" },

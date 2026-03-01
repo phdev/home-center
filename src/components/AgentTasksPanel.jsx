@@ -1,129 +1,71 @@
+import { Bot } from "lucide-react";
 import { Panel, PanelHeader } from "./Panel";
 import { TASKS } from "../data/mockData";
 
+const F = "'Geist','Inter',system-ui,sans-serif";
+const M = "'JetBrains Mono',ui-monospace,monospace";
+
 export function AgentTasksPanel({ t }) {
-  const statusColors = { active: t.accent, waiting: t.warm, done: t.accent2 };
+  const activeCount = TASKS.filter((tk) => tk.status === "active").length;
 
   return (
-    <Panel t={t} style={{ height: "100%" }}>
-      <PanelHeader t={t} icon={"\u{1F916}"} label="Agent Tasks" />
-      <div
-        style={{
-          flex: 1,
-          overflowY: "auto",
-          display: "flex",
-          flexDirection: "column",
-          gap: 7,
-        }}
-      >
+    <Panel style={{ height: "100%" }}>
+      <PanelHeader
+        icon={<Bot size={30} color="#FFFFFF" />}
+        label="OpenClaw"
+        right={
+          <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+            <div
+              style={{
+                width: 12,
+                height: 12,
+                borderRadius: "50%",
+                background: "#FFFFFF",
+              }}
+            />
+            <span style={{ fontFamily: F, fontSize: 16.5, fontWeight: 500, color: "#FFFFFF88" }}>
+              {activeCount} active
+            </span>
+          </div>
+        }
+      />
+      <div style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: 8 }}>
         {TASKS.map((tk, i) => (
           <div
             key={i}
             style={{
-              padding: "8px 10px",
-              borderRadius: t.radius / 2,
-              background: `${t.text}04`,
-              border: `1px solid ${t.panelBorder}`,
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              padding: "10px 14px",
+              borderRadius: 5,
+              border: "1px solid #FFFFFF30",
             }}
           >
-            <div
+            <div style={{ display: "flex", flexDirection: "column", gap: 2, flex: 1, minWidth: 0 }}>
+              <span style={{ fontFamily: F, fontSize: 19.5, fontWeight: 500, color: "#FFFFFF" }}>
+                {tk.title}
+              </span>
+              <span style={{ fontFamily: F, fontSize: 16.5, color: "#FFFFFF66" }}>
+                {tk.detail}
+              </span>
+            </div>
+            <span
               style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                marginBottom: 4,
+                fontFamily: M,
+                fontSize: 15,
+                fontWeight: 600,
+                color: "#FFFFFF88",
+                padding: "4px 10px",
+                borderRadius: 999,
+                background: "#FFFFFF15",
+                border: "1px solid #FFFFFF40",
+                flexShrink: 0,
+                marginLeft: 10,
               }}
             >
-              <span style={{ fontSize: "1.2rem" }}>{tk.icon}</span>
-              <div style={{ flex: 1 }}>
-                <div
-                  style={{
-                    fontFamily: t.bodyFont,
-                    fontSize: "0.82rem",
-                    fontWeight: 500,
-                    color: t.text,
-                  }}
-                >
-                  {tk.title}
-                </div>
-                <div
-                  style={{
-                    fontFamily: t.bodyFont,
-                    fontSize: "0.55rem",
-                    color: t.textDim,
-                  }}
-                >
-                  {tk.agent} Agent
-                </div>
-              </div>
-              <span
-                style={{
-                  width: 7,
-                  height: 7,
-                  borderRadius: "50%",
-                  background: statusColors[tk.status],
-                  boxShadow: `0 0 6px ${statusColors[tk.status]}50`,
-                }}
-              />
-            </div>
-            <div
-              style={{
-                fontFamily: t.bodyFont,
-                fontSize: "0.68rem",
-                color: t.textMuted,
-                lineHeight: 1.4,
-              }}
-            >
-              {tk.detail}
-            </div>
-            {tk.prog && (
-              <div
-                style={{
-                  height: 3,
-                  borderRadius: 2,
-                  background: `${t.text}08`,
-                  marginTop: 6,
-                  overflow: "hidden",
-                }}
-              >
-                <div
-                  style={{
-                    height: "100%",
-                    width: `${tk.prog}%`,
-                    borderRadius: 2,
-                    background: statusColors[tk.status],
-                  }}
-                />
-              </div>
-            )}
-            {tk.opts && (
-              <div
-                style={{
-                  display: "flex",
-                  gap: 4,
-                  marginTop: 6,
-                  flexWrap: "wrap",
-                }}
-              >
-                {tk.opts.map((o, oi) => (
-                  <button
-                    key={oi}
-                    style={{
-                      fontFamily: t.bodyFont,
-                      fontSize: "0.62rem",
-                      padding: "3px 8px",
-                      borderRadius: t.radius / 3,
-                      background: `${t.text}06`,
-                      border: `1px solid ${t.panelBorder}`,
-                      color: t.textMuted,
-                      cursor: "pointer",
-                    }}
-                  >
-                    {o}
-                  </button>
-                ))}
-              </div>
-            )}
+              {tk.status === "done" ? "Done" : "Running"}
+            </span>
           </div>
         ))}
       </div>

@@ -213,6 +213,9 @@ async function handleCalendar(env, url) {
   }
 
   // Also fetch any configured iCal URLs
+  const icalNow = new Date();
+  const icalStart = new Date(icalNow.getFullYear(), icalNow.getMonth(), icalNow.getDate());
+  const icalEnd = new Date(icalStart.getTime() + 7 * 86400000);
   if (env.CALENDAR_URLS) {
     const urls = env.CALENDAR_URLS.split(",").map((u) => u.trim()).filter(Boolean);
     for (const url of urls) {
@@ -221,7 +224,7 @@ async function handleCalendar(env, url) {
         const res = await fetch(icsUrl);
         if (res.ok) {
           const text = await res.text();
-          events.push(...parseIcalToday(text));
+          events.push(...parseIcalEvents(text, icalStart, icalEnd));
         }
       } catch (e) {
         console.error("iCal fetch error:", url, e);
@@ -306,24 +309,36 @@ async function fetchCalDAV(appleId, appPassword, debug = false) {
 
   const listXml = await listRes.text();
   if (debug) diag.listStatus = listRes.status;
-  const calendarHrefs = extractCalendarHrefs(listXml, homeHref);
-  if (debug) diag.calendarHrefs = calendarHrefs;
+  const allCalendars = extractCalendarHrefs(listXml, homeHref);
+  if (debug) diag.allCalendars = allCalendars;
 
-  // Step 4: Fetch today's events from each calendar
+  // Only use the "Howell Family" calendar (skip iPhone reminders etc.)
+  const CALENDAR_FILTER = "Howell Family";
+  const calendarHrefs = allCalendars.filter(
+    (c) => c.name.toLowerCase() === CALENDAR_FILTER.toLowerCase()
+  );
+  if (debug) diag.filteredCalendars = calendarHrefs;
+
+  // Fallback: if no match, use all real calendars (skip inbox/outbox/notification)
+  const activeCals = calendarHrefs.length > 0
+    ? calendarHrefs
+    : allCalendars.filter((c) => !/(inbox|outbox|notification)/.test(c.href));
+
+  // Step 4: Fetch events for the next 7 days from each calendar
   const today = new Date();
   const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-  const endOfDay = new Date(startOfDay.getTime() + 86400000);
+  const endOfWeek = new Date(startOfDay.getTime() + 7 * 86400000);
   const dtStart = toIcalDate(startOfDay);
-  const dtEnd = toIcalDate(endOfDay);
+  const dtEnd = toIcalDate(endOfWeek);
   if (debug) diag.dateRange = { dtStart, dtEnd, todayISO: today.toISOString() };
 
   const allEvents = [];
 
-  for (const calHref of calendarHrefs) {
+  for (const cal of activeCals) {
     try {
-      const reportUrl = calHref.startsWith("http")
-        ? calHref
-        : `https://caldav.icloud.com${calHref}`;
+      const reportUrl = cal.href.startsWith("http")
+        ? cal.href
+        : `https://caldav.icloud.com${cal.href}`;
       const reportRes = await fetch(reportUrl, {
         method: "REPORT",
         headers: {
@@ -347,7 +362,7 @@ async function fetchCalDAV(appleId, appPassword, debug = false) {
       });
 
       if (debug) {
-        diag[`report_${calHref.split("/").pop()}`] = {
+        diag[`report_${cal.name || cal.href.split("/").pop()}`] = {
           status: reportRes.status,
         };
       }
@@ -356,14 +371,14 @@ async function fetchCalDAV(appleId, appPassword, debug = false) {
         const reportXml = await reportRes.text();
         const icsBlocks = extractCalendarData(reportXml);
         if (debug) {
-          diag[`report_${calHref.split("/").pop()}`].icsBlockCount = icsBlocks.length;
+          diag[`report_${cal.name || cal.href.split("/").pop()}`].icsBlockCount = icsBlocks.length;
         }
         for (const ics of icsBlocks) {
-          allEvents.push(...parseIcalToday(ics));
+          allEvents.push(...parseIcalEvents(ics, startOfDay, endOfWeek));
         }
       }
     } catch (e) {
-      if (debug) diag[`error_${calHref}`] = e.message;
+      if (debug) diag[`error_${cal.href}`] = e.message;
     }
   }
 
@@ -453,11 +468,11 @@ async function fetchBirthdays(appleId, appPassword) {
 
   const allBirthdays = [];
 
-  for (const calHref of calendarHrefs) {
+  for (const cal of calendarHrefs) {
     try {
-      const reportUrl = calHref.startsWith("http")
-        ? calHref
-        : `https://caldav.icloud.com${calHref}`;
+      const reportUrl = cal.href.startsWith("http")
+        ? cal.href
+        : `https://caldav.icloud.com${cal.href}`;
       const reportRes = await fetch(reportUrl, {
         method: "REPORT",
         headers: { ...headers, Depth: "1" },
@@ -481,8 +496,7 @@ async function fetchBirthdays(appleId, appPassword) {
         const reportXml = await reportRes.text();
         const icsBlocks = extractCalendarData(reportXml);
         // Check if this is the Birthdays calendar (iCloud names it "Birthdays")
-        const isBirthdayCal = /birthdays?/i.test(calHref) ||
-          listXml.includes("Birthdays") && calHref.includes(extractBirthdayCalId(listXml));
+        const isBirthdayCal = /birthdays?/i.test(cal.name) || /birthdays?/i.test(cal.href);
         for (const ics of icsBlocks) {
           const events = parseBirthdayEvents(ics, today, isBirthdayCal);
           allBirthdays.push(...events);
@@ -789,13 +803,15 @@ async function handleNotificationDelete(id, env) {
 
 // ── iCal Parsing ────────────────────────────────────────────────────
 
-function parseIcalToday(icsText) {
+function parseIcalEvents(icsText, rangeStart, rangeEnd) {
   const unfolded = icsText.replace(/\r\n[ \t]/g, "").replace(/\n[ \t]/g, "");
   const lines = unfolded.split(/\r?\n/);
   const events = [];
   let inEvent = false;
   let current = {};
   const today = new Date();
+  const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
   const COLORS = [
     "#FF6B6B", "#4ECDC4", "#FFE66D", "#6BCB77",
@@ -812,13 +828,18 @@ function parseIcalToday(icsText) {
       inEvent = false;
       if (current.summary && current.dtstart) {
         const start = parseIcalDate(current.dtstart);
-        if (start && isSameDay(start, today)) {
+        if (start && start >= rangeStart && start < rangeEnd) {
+          const isToday = isSameDay(start, today);
+          const dayLabel = isToday
+            ? "Today"
+            : `${DAYS[start.getDay()]}, ${MONTHS[start.getMonth()]} ${start.getDate()}`;
           events.push({
             time: formatTime(start),
             title: unescapeIcal(current.summary),
             who: current.location ? unescapeIcal(current.location) : "",
             c: COLORS[events.length % COLORS.length],
             startDate: start.getTime(),
+            day: dayLabel,
           });
         }
       }
@@ -912,7 +933,10 @@ function extractCalendarHrefs(xml, homeHref) {
         const normalizedHref = href.replace(/\/$/, "");
         const normalizedHome = (homeHref || "").replace(/\/$/, "");
         if (normalizedHref !== normalizedHome) {
-          hrefs.push(href);
+          // Extract display name
+          const nameMatch = resp.match(/<(?:[a-zA-Z0-9]+:)?displayname[^>]*>([^<]*)/i);
+          const name = nameMatch ? nameMatch[1].trim() : "";
+          hrefs.push({ href, name });
         }
       }
     }

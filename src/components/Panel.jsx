@@ -1,17 +1,14 @@
-export function Panel({ t, children, style = {}, noPad }) {
+export function Panel({ children, style = {} }) {
   return (
     <div
       style={{
-        background: t.panelBg,
-        backdropFilter: t.blur ? "blur(16px) saturate(1.4)" : undefined,
-        WebkitBackdropFilter: t.blur ? "blur(16px) saturate(1.4)" : undefined,
-        border: `1px solid ${t.panelBorder}`,
-        borderRadius: t.radius,
-        padding: noPad ? 0 : 18,
+        borderRadius: 8,
+        border: "1px solid #FFFFFF",
+        padding: 16,
+        background: "transparent",
         display: "flex",
         flexDirection: "column",
         overflow: "hidden",
-        boxShadow: t.shadow || "none",
         ...style,
       }}
     >
@@ -20,25 +17,39 @@ export function Panel({ t, children, style = {}, noPad }) {
   );
 }
 
-export function PanelHeader({ t, icon, label, right }) {
+export function PanelHeader({ icon, label, subtitle, right }) {
   return (
     <div
       style={{
         display: "flex",
         alignItems: "center",
-        gap: 7,
-        fontFamily: t.bodyFont,
-        fontSize: t.id === "terminal" ? "0.9rem" : "0.8rem",
-        fontWeight: 600,
-        color: t.textMuted,
-        textTransform: "uppercase",
-        letterSpacing: "0.06em",
-        marginBottom: 10,
+        gap: 8,
+        marginBottom: 12,
         flexShrink: 0,
       }}
     >
-      <span style={{ fontSize: "1rem" }}>{icon}</span>
-      <span>{t.id === "terminal" ? `> ${label}` : label}</span>
+      {icon}
+      <span
+        style={{
+          fontFamily: "'Geist','Inter',system-ui,sans-serif",
+          fontSize: 24,
+          fontWeight: 600,
+          color: "#FFFFFF",
+        }}
+      >
+        {label}
+      </span>
+      {subtitle && (
+        <span
+          style={{
+            fontFamily: "'Geist','Inter',system-ui,sans-serif",
+            fontSize: 16.5,
+            color: "#FFFFFF66",
+          }}
+        >
+          {subtitle}
+        </span>
+      )}
       {right && <div style={{ marginLeft: "auto" }}>{right}</div>}
     </div>
   );

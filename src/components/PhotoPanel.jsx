@@ -1,139 +1,54 @@
-import { useState, useEffect } from "react";
-import { Panel } from "./Panel";
-import { useCycler } from "../hooks/useCycler";
+import { ImageIcon } from "lucide-react";
+import { Panel, PanelHeader } from "./Panel";
 import { PHOTOS } from "../data/mockData";
+
+const F = "'Geist','Inter',system-ui,sans-serif";
 
 export function PhotoPanel({ t, photos, photosLoading, photosError }) {
   const items = photos && photos.length > 0 ? photos : PHOTOS;
-  const showMock = !photos;
-  const [photo, photoIndex] = useCycler(items, 6000);
-  const [fade, setFade] = useState(true);
-
-  useEffect(() => {
-    setFade(false);
-    const x = setTimeout(() => setFade(true), 50);
-    return () => clearTimeout(x);
-  }, [photoIndex]);
 
   return (
-    <Panel t={t} noPad style={{ position: "relative", height: "100%" }}>
+    <Panel style={{ height: "100%" }}>
+      <PanelHeader
+        icon={<ImageIcon size={30} color="#FFFFFF" />}
+        label="Family Photos"
+        right={
+          <span style={{ fontFamily: F, fontSize: 16.5, color: "#FFFFFF44" }}>
+            Google Photos
+          </span>
+        }
+      />
       {photosLoading && (
-        <div
-          style={{
-            position: "absolute",
-            inset: 0,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            fontFamily: t.bodyFont,
-            fontSize: "0.75rem",
-            color: t.textDim,
-            zIndex: 2,
-          }}
-        >
+        <div style={{ fontFamily: F, fontSize: 16.5, color: "#FFFFFF66", flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
           Loading photos…
         </div>
       )}
       {photosError && (
-        <div
-          style={{
-            position: "absolute",
-            bottom: 8,
-            left: 8,
-            right: 8,
-            padding: "6px 10px",
-            borderRadius: t.radius / 3,
-            background: "rgba(0,0,0,0.7)",
-            backdropFilter: "blur(6px)",
-            fontFamily: t.bodyFont,
-            fontSize: "0.62rem",
-            color: t.warm,
-            lineHeight: 1.4,
-            zIndex: 3,
-          }}
-        >
+        <div style={{ fontFamily: F, fontSize: 16.5, color: "#FFFFFF66", padding: 8 }}>
           {photosError}
         </div>
       )}
-      <img
-        src={photo.url}
-        alt=""
-        style={{
-          width: "100%",
-          height: "100%",
-          objectFit: "cover",
-          opacity: fade ? 1 : 0,
-          transition: "opacity 0.8s",
-          borderRadius: t.radius,
-          ...(t.id === "terminal"
-            ? { filter: "grayscale(0.6) contrast(1.2) brightness(0.8)" }
-            : {}),
-        }}
-      />
-      <div
-        style={{
-          position: "absolute",
-          bottom: 0,
-          left: 0,
-          right: 0,
-          background:
-            t.id === "paper"
-              ? "linear-gradient(transparent,rgba(245,240,232,0.9))"
-              : "linear-gradient(transparent,rgba(10,10,15,0.85))",
-          padding: "24px 14px 10px",
-          borderRadius: `0 0 ${t.radius}px ${t.radius}px`,
-        }}
-      >
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-          }}
-        >
+      <div style={{ display: "flex", gap: 8, flex: 1 }}>
+        {items.slice(0, 3).map((p, i) => (
           <div
+            key={i}
             style={{
-              fontFamily: t.bodyFont,
-              fontSize: "0.8rem",
-              color: t.id === "paper" ? t.text : "#F0EDE6",
               flex: 1,
+              borderRadius: 5,
+              border: "1px solid #FFFFFF30",
+              overflow: "hidden",
+              background: "#00000000",
             }}
           >
-            {photo.cap}
+            {p.url ? (
+              <img
+                src={p.url}
+                alt={p.cap || ""}
+                style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+              />
+            ) : null}
           </div>
-          {showMock && (
-            <span
-              style={{
-                fontFamily: t.bodyFont,
-                fontSize: "0.45rem",
-                color: `${t.id === "paper" ? t.text : "#F0EDE6"}80`,
-                textTransform: "uppercase",
-                letterSpacing: "0.05em",
-              }}
-            >
-              demo
-            </span>
-          )}
-        </div>
-        <div style={{ display: "flex", gap: 4, marginTop: 5 }}>
-          {items.map((_, i) => (
-            <div
-              key={i}
-              style={{
-                width: i === photoIndex ? 16 : 5,
-                height: 5,
-                borderRadius: 3,
-                background:
-                  i === photoIndex
-                    ? t.id === "paper"
-                      ? t.text
-                      : "#F0EDE6"
-                    : `${t.id === "paper" ? t.text : "#F0EDE6"}40`,
-                transition: "all 0.3s",
-              }}
-            />
-          ))}
-        </div>
+        ))}
       </div>
     </Panel>
   );
