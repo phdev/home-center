@@ -600,11 +600,12 @@ def main() -> None:
                     continue
 
                 n = min(SCORE_SMOOTH_WINDOW, len(buf))
-                score = float(np.mean(buf[-n:]))
+                scores = list(buf)[-n:]
+                score = float(np.mean(scores))
 
                 if args.debug and score > 0.1:
                     log.debug("%s score: %.3f (raw=%.3f, rms=%.0f, consec=%d)",
-                              ww_name, score, float(buf[-1]), rms,
+                              ww_name, score, float(list(buf)[-1]), rms,
                               consecutive_hits.get(ww_name, 0))
 
                 if score >= args.threshold:
