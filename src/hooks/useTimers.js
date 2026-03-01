@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback } from "react";
 
 export function useTimers(workerSettings) {
   const [timers, setTimers] = useState([]);
