@@ -16,6 +16,7 @@ const LIVE_VIEWS = [
   { slug: "daily-calendar", label: "Daily Calendar", params: "?page=calendar&view=daily" },
   { slug: "monthly-calendar", label: "Monthly Calendar", params: "?page=calendar&view=monthly" },
   { slug: "weather", label: "Weather Page", params: "?page=weather" },
+  { slug: "photos", label: "Photos Page", params: "?page=photos" },
 ];
 
 export default function TVPreview() {

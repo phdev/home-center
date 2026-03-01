@@ -5,7 +5,7 @@ export const PANEL_ORDER = [
   { id: "birthdays",  fullscreenPage: null },
   { id: "weather",    fullscreenPage: "weather" },
   { id: "worldclock", fullscreenPage: null },
-  { id: "photo",      fullscreenPage: null },
+  { id: "photo",      fullscreenPage: "photos" },
   { id: "events",     fullscreenPage: null },
   { id: "timers",     fullscreenPage: null },
   { id: "agenttasks", fullscreenPage: null },

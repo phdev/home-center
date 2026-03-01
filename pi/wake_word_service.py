@@ -379,13 +379,17 @@ def parse_command(text: str) -> dict:
     if re.search(r'\b(open|show|go\s+to)\s+(the\s+)?weather\b', text):
         return {"action": "navigate", "page": "weather"}
 
+    # Navigate to photos
+    if re.search(r'\b(open|show|go\s+to)\s+(the\s+)?(photos?|pictures?|gallery)\b', text):
+        return {"action": "navigate", "page": "photos"}
+
     # Switch calendar view
     view_match = re.search(r'\b(monthly|weekly|daily)\s*(view)?\b', text)
     if view_match:
         return {"action": "navigate", "view": view_match.group(1)}
 
     # Go back / go home (return to dashboard)
-    if re.search(r'\b(go\s+(back|home)|back\s+to\s+(dashboard|home)|close\s+(calendar|weather))\b', text):
+    if re.search(r'\b(go\s+(back|home)|back\s+to\s+(dashboard|home)|close\s+(calendar|weather|photos?))\b', text):
         return {"action": "navigate", "page": "dashboard"}
 
     # Turn on (explicit)

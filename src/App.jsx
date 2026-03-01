@@ -22,6 +22,7 @@ import { AlarmOverlay } from "./components/AlarmOverlay";
 import { WorldClockPanel } from "./components/WorldClockPanel";
 import { FullCalendarPage } from "./components/FullCalendarPage";
 import { FullWeatherPage } from "./components/FullWeatherPage";
+import { FullPhotosPage } from "./components/FullPhotosPage";
 
 export default function App() {
   const now = useTime();
@@ -66,6 +67,20 @@ export default function App() {
           loading={weather.loading}
           error={weather.error}
           locationName={weather.locationName}
+          onBack={() => goTo("dashboard")}
+        />
+        <AlarmOverlay expiredTimers={expiredTimers} onDismissAll={dismissAll} />
+      </>
+    );
+  }
+
+  if (forcePage === "photos" && !isMobile) {
+    return (
+      <>
+        <FullPhotosPage
+          photos={photos.photos}
+          loading={photos.loading}
+          error={photos.error}
           onBack={() => goTo("dashboard")}
         />
         <AlarmOverlay expiredTimers={expiredTimers} onDismissAll={dismissAll} />
