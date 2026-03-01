@@ -53,6 +53,20 @@ export default {
         const id = decodeURIComponent(path.split("/api/notifications/")[1]);
         return corsResponse(env, await handleNotificationDelete(id, env));
       }
+      // ── Timers ──
+      if (path === "/api/timers" && request.method === "POST") {
+        return corsResponse(env, await handleTimerPost(request, env));
+      }
+      if (path === "/api/timers" && request.method === "GET") {
+        return corsResponse(env, await handleTimerGet(env));
+      }
+      if (path === "/api/timers/dismiss-all" && request.method === "POST") {
+        return corsResponse(env, await handleTimerDismissAll(env));
+      }
+      if (path.startsWith("/api/timers/") && path.endsWith("/dismiss") && request.method === "POST") {
+        const id = decodeURIComponent(path.split("/api/timers/")[1].replace("/dismiss", ""));
+        return corsResponse(env, await handleTimerDismiss(id, env));
+      }
       if (path === "/api/health") {
         // Auth status: check if a valid token was provided (but don't block)
         const auth = request.headers.get("Authorization");
@@ -215,7 +229,7 @@ async function handleCalendar(env, url) {
   // Also fetch any configured iCal URLs
   const icalNow = new Date();
   const icalStart = new Date(icalNow.getFullYear(), icalNow.getMonth(), icalNow.getDate());
-  const icalEnd = new Date(icalStart.getTime() + 7 * 86400000);
+  const icalEnd = new Date(icalStart.getTime() + 14 * 86400000);
   if (env.CALENDAR_URLS) {
     const urls = env.CALENDAR_URLS.split(",").map((u) => u.trim()).filter(Boolean);
     for (const url of urls) {
@@ -324,10 +338,10 @@ async function fetchCalDAV(appleId, appPassword, debug = false) {
     ? calendarHrefs
     : allCalendars.filter((c) => !/(inbox|outbox|notification)/.test(c.href));
 
-  // Step 4: Fetch events for the next 7 days from each calendar
+  // Step 4: Fetch events for the next 14 days from each calendar
   const today = new Date();
   const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-  const endOfWeek = new Date(startOfDay.getTime() + 7 * 86400000);
+  const endOfWeek = new Date(startOfDay.getTime() + 14 * 86400000);
   const dtStart = toIcalDate(startOfDay);
   const dtEnd = toIcalDate(endOfWeek);
   if (debug) diag.dateRange = { dtStart, dtEnd, todayISO: today.toISOString() };
@@ -799,6 +813,87 @@ async function handleNotificationDelete(id, env) {
   await env.NOTIFICATIONS.put(NOTIF_KEY, JSON.stringify(filtered));
 
   return json({ ok: true, removed: existing.length - filtered.length });
+}
+
+// ── Timers (KV-backed) ──────────────────────────────────────────────
+
+const TIMERS_KEY = "timers";
+
+async function handleTimerPost(request, env) {
+  if (!env.NOTIFICATIONS) {
+    return json({ error: "NOTIFICATIONS KV namespace not configured" }, 500);
+  }
+
+  const body = await request.json();
+  const { name, totalSeconds, source } = body;
+  if (!name || !totalSeconds || typeof totalSeconds !== "number" || totalSeconds <= 0) {
+    return json({ error: "Requires name (string) and totalSeconds (positive number)" }, 400);
+  }
+
+  const timer = {
+    id: `timer_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+    name,
+    totalSeconds,
+    expiresAt: Date.now() + totalSeconds * 1000,
+    dismissed: false,
+    source: source || "manual",
+  };
+
+  const existing = await env.NOTIFICATIONS.get(TIMERS_KEY, { type: "json" }) || [];
+  existing.push(timer);
+  await env.NOTIFICATIONS.put(TIMERS_KEY, JSON.stringify(existing));
+
+  return json({ ok: true, timer });
+}
+
+async function handleTimerGet(env) {
+  if (!env.NOTIFICATIONS) {
+    return json({ timers: [], serverTime: Date.now() });
+  }
+
+  let timers = await env.NOTIFICATIONS.get(TIMERS_KEY, { type: "json" }) || [];
+  // Prune dismissed timers older than 1 minute
+  const cutoff = Date.now() - 60_000;
+  timers = timers.filter(t => !t.dismissed || t.expiresAt > cutoff);
+  await env.NOTIFICATIONS.put(TIMERS_KEY, JSON.stringify(timers));
+
+  return json({ timers, serverTime: Date.now() });
+}
+
+async function handleTimerDismiss(id, env) {
+  if (!env.NOTIFICATIONS) {
+    return json({ error: "NOTIFICATIONS KV namespace not configured" }, 500);
+  }
+
+  const timers = await env.NOTIFICATIONS.get(TIMERS_KEY, { type: "json" }) || [];
+  let found = false;
+  for (const t of timers) {
+    if (t.id === id) {
+      t.dismissed = true;
+      found = true;
+    }
+  }
+  await env.NOTIFICATIONS.put(TIMERS_KEY, JSON.stringify(timers));
+
+  return json({ ok: true, found });
+}
+
+async function handleTimerDismissAll(env) {
+  if (!env.NOTIFICATIONS) {
+    return json({ error: "NOTIFICATIONS KV namespace not configured" }, 500);
+  }
+
+  const timers = await env.NOTIFICATIONS.get(TIMERS_KEY, { type: "json" }) || [];
+  let count = 0;
+  for (const t of timers) {
+    if (!t.dismissed && t.expiresAt <= Date.now()) {
+      t.dismissed = true;
+      count++;
+    }
+  }
+  await env.NOTIFICATIONS.put(TIMERS_KEY, JSON.stringify(timers));
+
+  return json({ ok: true, dismissed: count });
 }
 
 // ── iCal Parsing ────────────────────────────────────────────────────

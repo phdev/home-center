@@ -2,16 +2,29 @@
 """
 Wake Word Detection Service for Home Center
 
-Listens continuously for the wake word "Hey Homer" using openWakeWord,
-then turns on the TV via HDMI-CEC.
+Listens for "Hey Homer" via openWakeWord, then records a short audio clip
+and transcribes it with faster-whisper to parse voice commands:
+
+  - "set a timer for X minutes for Y" → creates a timer via worker API
+  - "stop" / "dismiss" / "cancel" → dismisses all expired timers
+  - "turn off" → TV standby via HDMI-CEC
+  - "turn on" (or no command) → TV on via HDMI-CEC
+
+Also runs a background alarm thread that polls for expired timers and
+plays an alarm sound on the Pi speaker until dismissed.
 
 Hardware: ReSpeaker 2-Mics Pi HAT (or any ALSA-compatible microphone)
 """
 
 import argparse
+import io
+import json
 import logging
+import re
 import subprocess
 import sys
+import tempfile
+import threading
 import time
 import wave
 from pathlib import Path
@@ -33,28 +46,38 @@ def _inference_framework() -> str:
         return "onnx"
     except ImportError:
         pass
-    return "tflite"  # let openwakeword raise a clear error
+    return "tflite"
 
 
 # ---------------------------------------------------------------------------
 # Configuration
 # ---------------------------------------------------------------------------
 WAKE_WORD = "hey_homer"
-WAKE_WORD_OFF = "hey_homer_turn_off"
 SAMPLE_RATE = 16000
 CHUNK_SIZE = 1280  # 80ms at 16kHz — required by openWakeWord
 CHANNELS = 2  # ReSpeaker 2-Mic HAT is stereo; we downmix to mono
 DETECTION_THRESHOLD = 0.5
-TURN_OFF_THRESHOLD = 0.7  # Higher threshold for "turn off" to reduce false positives
 COOLDOWN_SECONDS = 10  # Prevent repeated triggers
-DEBOUNCE_WINDOW = 1.5  # Seconds to wait after "hey homer" for possible "turn off"
+
+# Robustness against false positives
+MIN_RMS_ENERGY = 300
+MIN_CONSECUTIVE = 3
+SCORE_SMOOTH_WINDOW = 3
+POST_ACTION_MUTE = 3.0
+
+# STT recording
+RECORD_SECONDS = 3.5  # How long to record after wake word for command
+
+# Alarm polling
+ALARM_POLL_INTERVAL = 5  # Seconds between timer checks
 
 SOUNDS_DIR = Path(__file__).parent / "sounds"
 CHIME_PATH = SOUNDS_DIR / "acknowledge.wav"
+ALARM_PATH = SOUNDS_DIR / "alarm.wav"
 
-CEC_DEVICE = "0"  # TV logical address on CEC bus
+CEC_DEVICE = "0"
 CEC_ON_CMD = "on {dev}"
-CEC_ACTIVE_CMD = "as"  # Set Pi as active source
+CEC_ACTIVE_CMD = "as"
 
 logging.basicConfig(
     level=logging.INFO,
@@ -69,14 +92,11 @@ log = logging.getLogger("wake-word")
 # ---------------------------------------------------------------------------
 
 def cec_send(command: str) -> bool:
-    """Send a CEC command via cec-client. Returns True on success."""
     try:
         proc = subprocess.run(
             ["cec-client", "-s", "-d", "1"],
             input=command + "\n",
-            capture_output=True,
-            text=True,
-            timeout=10,
+            capture_output=True, text=True, timeout=10,
         )
         log.debug("CEC response: %s", proc.stdout.strip())
         return proc.returncode == 0
@@ -89,7 +109,6 @@ def cec_send(command: str) -> bool:
 
 
 def turn_on_tv() -> None:
-    """Turn on the TV and set the Pi as the active HDMI source."""
     log.info("Turning TV ON via HDMI-CEC...")
     cec_send(CEC_ON_CMD.format(dev=CEC_DEVICE))
     time.sleep(1)
@@ -98,29 +117,13 @@ def turn_on_tv() -> None:
 
 
 def turn_off_tv() -> None:
-    """Turn off the TV via HDMI-CEC standby command."""
     log.info("Turning TV OFF via HDMI-CEC...")
     cec_send(f"standby {CEC_DEVICE}")
     log.info("TV should now be off.")
 
 
-def is_tv_on() -> bool:
-    """Check if the TV is currently powered on."""
-    try:
-        proc = subprocess.run(
-            ["cec-client", "-s", "-d", "1"],
-            input="pow 0\n",
-            capture_output=True,
-            text=True,
-            timeout=10,
-        )
-        return "power status: on" in proc.stdout.lower()
-    except Exception:
-        return False
-
-
 # ---------------------------------------------------------------------------
-# Audio acknowledgement
+# Audio helpers
 # ---------------------------------------------------------------------------
 
 def generate_chime(path: Path) -> None:
@@ -138,9 +141,9 @@ def generate_chime(path: Path) -> None:
         return signal
 
     chime = np.concatenate([
-        tone(523.25, 0.15),          # C5
-        np.zeros(int(sr * 0.03)),    # 30 ms gap
-        tone(659.25, 0.22),          # E5
+        tone(523.25, 0.15),
+        np.zeros(int(sr * 0.03)),
+        tone(659.25, 0.22),
     ])
     chime = (chime / np.max(np.abs(chime)) * 32000).astype(np.int16)
 
@@ -152,12 +155,34 @@ def generate_chime(path: Path) -> None:
     log.info("Generated acknowledgement chime: %s", path)
 
 
+def generate_alarm(path: Path) -> None:
+    """Generate an alarm WAV file (alternating tones, ~1.2s)."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    sr = 22050
+    duration_per_tone = 0.3
+    tones = [880, 660, 880, 660]
+    samples = []
+    for freq in tones:
+        t = np.linspace(0, duration_per_tone, int(sr * duration_per_tone), endpoint=False)
+        env = np.minimum(t / 0.01, 1.0) * np.maximum(1.0 - t / (duration_per_tone * 1.1), 0.0)
+        # Square-ish wave
+        signal = env * np.sign(np.sin(2 * np.pi * freq * t)) * 0.5
+        samples.append(signal)
+    alarm = np.concatenate(samples)
+    alarm = (alarm / np.max(np.abs(alarm)) * 28000).astype(np.int16)
+
+    with wave.open(str(path), "w") as wf:
+        wf.setnchannels(1)
+        wf.setsampwidth(2)
+        wf.setframerate(sr)
+        wf.writeframes(alarm.tobytes())
+    log.info("Generated alarm sound: %s", path)
+
+
 def find_speaker_device() -> str | None:
-    """Find the ALSA playback device for the ReSpeaker HAT / WM8960."""
     try:
         result = subprocess.run(
-            ["aplay", "-l"],
-            capture_output=True, text=True, timeout=5,
+            ["aplay", "-l"], capture_output=True, text=True, timeout=5,
         )
         for line in result.stdout.splitlines():
             lower = line.lower()
@@ -172,12 +197,10 @@ def find_speaker_device() -> str | None:
 
 
 def set_speaker_volume() -> None:
-    """Max out the ReSpeaker HAT (WM8960) speaker volume."""
     device = find_speaker_device()
     if not device:
         return
     card = device.split(":")[0].replace("plughw", "").replace("hw", "")
-    # Max out all relevant playback volumes on the WM8960
     for control in ["Speaker", "Playback", "HP Playback",
                     "Line Playback", "PCM Playback"]:
         try:
@@ -189,26 +212,28 @@ def set_speaker_volume() -> None:
             pass
 
 
-def play_acknowledgement() -> None:
-    """Play a short chime through the ReSpeaker HAT speaker (non-blocking)."""
-    if not CHIME_PATH.exists():
-        generate_chime(CHIME_PATH)
-
+def play_sound(path: Path) -> subprocess.Popen | None:
+    """Play a WAV file through the ReSpeaker HAT speaker (non-blocking)."""
+    if not path.exists():
+        return None
     set_speaker_volume()
-
     device = find_speaker_device()
     cmd = ["aplay", "-q"]
     if device:
         cmd.extend(["-D", device])
-    cmd.append(str(CHIME_PATH))
-
+    cmd.append(str(path))
     try:
-        subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        log.info("Playing acknowledgement chime")
-    except FileNotFoundError:
-        log.warning("aplay not found — cannot play acknowledgement sound")
+        return subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     except Exception as e:
-        log.warning("Failed to play acknowledgement: %s", e)
+        log.warning("Failed to play %s: %s", path, e)
+        return None
+
+
+def play_acknowledgement() -> None:
+    if not CHIME_PATH.exists():
+        generate_chime(CHIME_PATH)
+    play_sound(CHIME_PATH)
+    log.info("Playing acknowledgement chime")
 
 
 # ---------------------------------------------------------------------------
@@ -216,21 +241,15 @@ def play_acknowledgement() -> None:
 # ---------------------------------------------------------------------------
 
 def find_respeaker_device() -> str | None:
-    """Find the ReSpeaker ALSA capture device.
-
-    Returns device string like 'hw:2,0' or None if not found.
-    """
     try:
         result = subprocess.run(
-            ["arecord", "-l"],
-            capture_output=True, text=True, timeout=5,
+            ["arecord", "-l"], capture_output=True, text=True, timeout=5,
         )
         for line in result.stdout.splitlines():
             lower = line.lower()
             if lower.startswith("card") and any(
                 kw in lower for kw in ("respeaker", "seeed", "wm8960", "2mic")
             ):
-                # Extract card number from "card N:" format
                 card_num = lower.split(":")[0].replace("card", "").strip()
                 device = f"hw:{card_num},0"
                 log.info("Found ReSpeaker at %s", device)
@@ -241,8 +260,7 @@ def find_respeaker_device() -> str | None:
 
 
 def open_alsa_capture(device: str, channels: int, rate: int, period_size: int) -> alsaaudio.PCM:
-    """Open an ALSA PCM device for capture."""
-    pcm = alsaaudio.PCM(
+    return alsaaudio.PCM(
         type=alsaaudio.PCM_CAPTURE,
         mode=alsaaudio.PCM_NORMAL,
         device=device,
@@ -251,51 +269,228 @@ def open_alsa_capture(device: str, channels: int, rate: int, period_size: int) -
         format=alsaaudio.PCM_FORMAT_S16_LE,
         periodsize=period_size,
     )
-    return pcm
+
+
+def record_audio(pcm: alsaaudio.PCM, seconds: float) -> np.ndarray:
+    """Record audio from an open ALSA PCM device, return mono int16 array."""
+    chunks = []
+    total_samples = int(SAMPLE_RATE * seconds)
+    collected = 0
+    while collected < total_samples:
+        length, data = pcm.read()
+        if length <= 0:
+            continue
+        audio = np.frombuffer(data, dtype=np.int16)
+        if CHANNELS > 1:
+            audio = audio.reshape(-1, CHANNELS).mean(axis=1).astype(np.int16)
+        chunks.append(audio)
+        collected += len(audio)
+    return np.concatenate(chunks)[:total_samples]
 
 
 # ---------------------------------------------------------------------------
-# Custom wake word model setup
+# Speech-to-text (faster-whisper)
+# ---------------------------------------------------------------------------
+
+_whisper_model = None
+
+
+def get_whisper_model():
+    global _whisper_model
+    if _whisper_model is None:
+        from faster_whisper import WhisperModel
+        log.info("Loading faster-whisper tiny model (int8)...")
+        _whisper_model = WhisperModel("tiny", compute_type="int8", device="cpu")
+        log.info("Whisper model loaded.")
+    return _whisper_model
+
+
+def transcribe(audio: np.ndarray) -> str:
+    """Transcribe int16 mono audio array to text."""
+    model = get_whisper_model()
+    # faster-whisper expects float32 normalized to [-1, 1]
+    audio_f32 = audio.astype(np.float32) / 32768.0
+    segments, _ = model.transcribe(audio_f32, beam_size=1, language="en")
+    text = " ".join(seg.text.strip() for seg in segments).strip()
+    return text
+
+
+# ---------------------------------------------------------------------------
+# Command parsing
+# ---------------------------------------------------------------------------
+
+def parse_command(text: str) -> dict:
+    """Parse transcribed text into a command dict."""
+    text = text.lower().strip()
+    log.info("Transcribed: '%s'", text)
+
+    if not text:
+        return {"action": "turn_on"}
+
+    # Stop / dismiss / cancel
+    if re.search(r'\b(stop|dismiss|cancel|quiet|shut up|silence)\b', text):
+        return {"action": "stop"}
+
+    # Turn off
+    if re.search(r'\bturn\s*(it\s+)?off\b', text):
+        return {"action": "turn_off"}
+
+    # Set a timer
+    timer_match = re.search(
+        r'(?:set\s+(?:a\s+)?timer|remind\s+me|timer)\s+'
+        r'(?:for\s+)?(\d+)\s*'
+        r'(second|sec|minute|min|hour|hr)s?\b'
+        r'(?:\s+(?:for|to|called?|named?|labele?d?)\s+(.+))?',
+        text
+    )
+    if timer_match:
+        amount = int(timer_match.group(1))
+        unit = timer_match.group(2).lower()
+        label = (timer_match.group(3) or "timer").strip().rstrip(".")
+        if unit.startswith("hour") or unit.startswith("hr"):
+            seconds = amount * 3600
+        elif unit.startswith("min"):
+            seconds = amount * 60
+        else:
+            seconds = amount
+        return {"action": "set_timer", "label": label, "duration": seconds}
+
+    # Turn on (explicit)
+    if re.search(r'\bturn\s*(it\s+)?on\b', text):
+        return {"action": "turn_on"}
+
+    # Default: treat as turn on (just said "hey homer" with no clear command)
+    return {"action": "turn_on"}
+
+
+# ---------------------------------------------------------------------------
+# Worker API client
+# ---------------------------------------------------------------------------
+
+def worker_post(url: str, token: str | None, path: str, data: dict | None = None) -> dict | None:
+    """POST to worker API. Returns parsed JSON or None on failure."""
+    import requests
+    headers = {"Content-Type": "application/json"}
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    try:
+        resp = requests.post(
+            f"{url}{path}",
+            headers=headers,
+            json=data or {},
+            timeout=10,
+        )
+        if resp.ok:
+            return resp.json()
+        log.warning("Worker POST %s failed: %d %s", path, resp.status_code, resp.text[:200])
+    except Exception as e:
+        log.warning("Worker POST %s error: %s", path, e)
+    return None
+
+
+def worker_get(url: str, token: str | None, path: str) -> dict | None:
+    """GET from worker API. Returns parsed JSON or None on failure."""
+    import requests
+    headers = {}
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    try:
+        resp = requests.get(f"{url}{path}", headers=headers, timeout=10)
+        if resp.ok:
+            return resp.json()
+    except Exception as e:
+        log.debug("Worker GET %s error: %s", path, e)
+    return None
+
+
+# ---------------------------------------------------------------------------
+# Alarm thread
+# ---------------------------------------------------------------------------
+
+class AlarmThread(threading.Thread):
+    """Background thread that polls for expired timers and plays alarm."""
+
+    def __init__(self, worker_url: str, worker_token: str | None, dry_run: bool = False):
+        super().__init__(daemon=True)
+        self.worker_url = worker_url
+        self.worker_token = worker_token
+        self.dry_run = dry_run
+        self._stop_event = threading.Event()
+        self._alarm_proc = None
+
+    def stop(self):
+        self._stop_event.set()
+        self._kill_alarm()
+
+    def _kill_alarm(self):
+        if self._alarm_proc and self._alarm_proc.poll() is None:
+            self._alarm_proc.terminate()
+            self._alarm_proc = None
+
+    def run(self):
+        if not ALARM_PATH.exists():
+            generate_alarm(ALARM_PATH)
+
+        alarming = False
+        while not self._stop_event.is_set():
+            try:
+                data = worker_get(self.worker_url, self.worker_token, "/api/timers")
+                if data:
+                    timers = data.get("timers", [])
+                    now_ms = time.time() * 1000
+                    expired_undismissed = [
+                        t for t in timers
+                        if t.get("expiresAt", 0) <= now_ms and not t.get("dismissed", False)
+                    ]
+
+                    if expired_undismissed and not alarming:
+                        log.info("Expired timer(s) detected, starting alarm on Pi speaker")
+                        alarming = True
+                    elif not expired_undismissed and alarming:
+                        log.info("All timers dismissed, stopping alarm")
+                        alarming = False
+                        self._kill_alarm()
+
+                    # Play alarm sound in a loop while active
+                    if alarming and (self._alarm_proc is None or self._alarm_proc.poll() is not None):
+                        if not self.dry_run:
+                            self._alarm_proc = play_sound(ALARM_PATH)
+                        else:
+                            log.info("[DRY RUN] Would play alarm sound")
+            except Exception as e:
+                log.debug("Alarm thread error: %s", e)
+
+            self._stop_event.wait(ALARM_POLL_INTERVAL)
+
+
+# ---------------------------------------------------------------------------
+# Wake word model setup
 # ---------------------------------------------------------------------------
 
 def get_or_train_model() -> Model:
-    """
-    Load the openWakeWord model.
-
-    openWakeWord ships with several pre-trained models. For a custom wake word
-    like "Hey Homer", we use openWakeWord's built-in text-to-speech generated
-    model training. If a pre-trained model path is supplied, it uses that.
-    Otherwise, it attempts on-the-fly generation (requires internet on first run).
-    """
     custom_model_dir = Path(__file__).parent / "models"
     custom_model_dir.mkdir(exist_ok=True)
 
     framework = _inference_framework()
     log.info("Using inference framework: %s", framework)
 
-    # Collect all custom models (ONNX preferred, tflite fallback)
-    model_names = ["hey_homer", "hey_homer_turn_off"]
+    # Only load hey_homer model (STT handles all disambiguation)
     wakeword_models = []
-    for name in model_names:
-        onnx_path = custom_model_dir / f"{name}.onnx"
-        tflite_path = custom_model_dir / f"{name}.tflite"
-        if onnx_path.exists():
-            log.info("Found custom model: %s", onnx_path)
-            wakeword_models.append(str(onnx_path))
-        elif tflite_path.exists():
-            log.info("Found custom model: %s", tflite_path)
-            wakeword_models.append(str(tflite_path))
+    for ext in (".onnx", ".tflite"):
+        path = custom_model_dir / f"hey_homer{ext}"
+        if path.exists():
+            log.info("Found custom model: %s", path)
+            wakeword_models.append(str(path))
+            break
 
     if wakeword_models:
-        # Use ONNX framework if any ONNX models present, else tflite
-        fw = "onnx" if any(m.endswith(".onnx") for m in wakeword_models) else "tflite"
-        log.info("Loading %d custom wake word model(s)", len(wakeword_models))
+        fw = "onnx" if wakeword_models[0].endswith(".onnx") else "tflite"
+        log.info("Loading custom wake word model")
         return Model(wakeword_models=wakeword_models, inference_framework=fw)
 
-    # No custom model found — fall back to built-in models
-    log.warning("No custom 'hey homer' model found in %s", custom_model_dir)
+    log.warning("No custom 'hey_homer' model found in %s", custom_model_dir)
     log.info("Train one with: python pi/train_hey_homer.py")
-    log.info("Falling back to built-in models ('hey jarvis' etc.) as stand-in.")
+    log.info("Falling back to built-in models as stand-in.")
 
     import openwakeword
     openwakeword.utils.download_models()
@@ -314,22 +509,33 @@ def main() -> None:
                         help="Seconds to wait between triggers")
     parser.add_argument("--debug", action="store_true", help="Enable debug logging")
     parser.add_argument("--dry-run", action="store_true",
-                        help="Print detections without sending CEC commands")
+                        help="Print detections without executing actions")
     parser.add_argument("--device", type=str, default=None,
-                        help="ALSA device to use (e.g., hw:2,0). Auto-detected if not specified.")
+                        help="ALSA device (e.g., hw:2,0). Auto-detected if not specified.")
+    parser.add_argument("--worker-url", type=str, default=None,
+                        help="Worker API base URL (e.g., https://your-worker.workers.dev)")
+    parser.add_argument("--worker-token", type=str, default=None,
+                        help="Worker API auth token")
     args = parser.parse_args()
 
     if args.debug:
         logging.getLogger().setLevel(logging.DEBUG)
 
-    # Pre-generate acknowledgement chime so first trigger is instant
+    # Pre-generate sounds
     if not CHIME_PATH.exists():
         generate_chime(CHIME_PATH)
+    if not ALARM_PATH.exists():
+        generate_alarm(ALARM_PATH)
+
+    # Pre-load whisper model so first command is fast
+    if args.worker_url:
+        try:
+            get_whisper_model()
+        except Exception as e:
+            log.warning("Could not pre-load whisper model: %s", e)
 
     # Load wake word model
     model = get_or_train_model()
-
-    # List the wake words the model is listening for
     wake_words = list(model.models.keys())
     log.info("Listening for wake words: %s (threshold=%.2f)", wake_words, args.threshold)
 
@@ -347,10 +553,17 @@ def main() -> None:
         log.error("Failed to open ALSA device %s: %s", device, e)
         sys.exit(1)
 
+    # Start alarm polling thread if worker configured
+    alarm_thread = None
+    if args.worker_url:
+        alarm_thread = AlarmThread(args.worker_url, args.worker_token, args.dry_run)
+        alarm_thread.start()
+        log.info("Alarm polling thread started (every %ds)", ALARM_POLL_INTERVAL)
+
     log.info("Microphone stream open. Listening...")
     last_trigger = 0.0
-    pending_action = None  # "turn_on" when hey_homer detected, awaiting debounce
-    pending_time = 0.0
+    last_action_time = 0.0
+    consecutive_hits = {ww: 0 for ww in wake_words}
 
     try:
         while True:
@@ -359,67 +572,129 @@ def main() -> None:
                 continue
 
             audio_array = np.frombuffer(data, dtype=np.int16)
-
-            # Downmix stereo to mono
             if CHANNELS > 1:
                 audio_array = audio_array.reshape(-1, CHANNELS).mean(axis=1).astype(np.int16)
 
-            # Feed audio to the model
-            model.predict(audio_array)
-
             now = time.time()
 
-            # Check each wake word score
+            # Post-action mute
+            if now - last_action_time < POST_ACTION_MUTE:
+                model.predict(audio_array)
+                continue
+
+            # RMS energy gate
+            rms = np.sqrt(np.mean(audio_array.astype(np.float64) ** 2))
+            if rms < MIN_RMS_ENERGY:
+                model.predict(audio_array)
+                if args.debug:
+                    log.debug("RMS %.0f below threshold %d, skipping", rms, MIN_RMS_ENERGY)
+                for ww in consecutive_hits:
+                    consecutive_hits[ww] = 0
+                continue
+
+            model.predict(audio_array)
+
             for ww_name in wake_words:
-                if len(model.prediction_buffer[ww_name]) == 0:
+                buf = model.prediction_buffer[ww_name]
+                if len(buf) == 0:
                     continue
-                score = model.prediction_buffer[ww_name][-1]
+
+                n = min(SCORE_SMOOTH_WINDOW, len(buf))
+                score = float(np.mean(buf[-n:]))
 
                 if args.debug and score > 0.1:
-                    log.debug("%s score: %.3f", ww_name, score)
+                    log.debug("%s score: %.3f (raw=%.3f, rms=%.0f, consec=%d)",
+                              ww_name, score, float(buf[-1]), rms,
+                              consecutive_hits.get(ww_name, 0))
 
-                # Use higher threshold for turn-off to reduce false positives
-                effective_threshold = TURN_OFF_THRESHOLD if WAKE_WORD_OFF in ww_name else args.threshold
+                if score >= args.threshold:
+                    consecutive_hits[ww_name] = consecutive_hits.get(ww_name, 0) + 1
 
-                if score >= effective_threshold:
+                    if consecutive_hits[ww_name] < MIN_CONSECUTIVE:
+                        continue
+
                     if now - last_trigger < args.cooldown:
                         log.debug("Cooldown active, ignoring detection")
                         continue
 
-                    if WAKE_WORD_OFF in ww_name:
-                        # "Turn off" takes priority — execute immediately
-                        pending_action = None
-                        last_trigger = now
-                        log.info("Wake word '%s' detected! (score=%.3f)", ww_name, score)
+                    # ── Wake word detected! ──
+                    last_trigger = now
+                    log.info("Wake word '%s' detected! (score=%.3f, consec=%d)",
+                             ww_name, score, consecutive_hits[ww_name])
+
+                    # Play chime
+                    if not args.dry_run:
+                        play_acknowledgement()
+
+                    # Reset model state
+                    model.reset()
+                    for ww in consecutive_hits:
+                        consecutive_hits[ww] = 0
+
+                    # Record and transcribe if worker is configured
+                    if args.worker_url:
+                        log.info("Recording %.1fs for command...", RECORD_SECONDS)
+                        audio_clip = record_audio(pcm, RECORD_SECONDS)
+                        command = parse_command(transcribe(audio_clip))
+                    else:
+                        # No worker → default to turn_on (legacy behavior)
+                        command = {"action": "turn_on"}
+
+                    log.info("Command: %s", command)
+
+                    # Dispatch
+                    action = command["action"]
+                    if action == "set_timer" and args.worker_url:
+                        label = command.get("label", "timer")
+                        duration = command.get("duration", 60)
+                        if args.dry_run:
+                            log.info("[DRY RUN] Would create timer: %s (%ds)", label, duration)
+                        else:
+                            result = worker_post(
+                                args.worker_url, args.worker_token,
+                                "/api/timers",
+                                {"name": label, "totalSeconds": duration, "source": "voice"},
+                            )
+                            if result:
+                                log.info("Timer created: %s for %ds", label, duration)
+                            else:
+                                log.error("Failed to create timer")
+
+                    elif action == "stop":
+                        if args.worker_url:
+                            if args.dry_run:
+                                log.info("[DRY RUN] Would dismiss all timers")
+                            else:
+                                worker_post(
+                                    args.worker_url, args.worker_token,
+                                    "/api/timers/dismiss-all",
+                                )
+                                log.info("Dismissed all timers")
+
+                    elif action == "turn_off":
                         if args.dry_run:
                             log.info("[DRY RUN] Would turn off TV via CEC")
                         else:
-                            play_acknowledgement()
                             turn_off_tv()
 
-                    elif WAKE_WORD in ww_name and pending_action is None:
-                        # "Hey homer" detected — start debounce window
-                        log.info("Wake word '%s' detected (score=%.3f), "
-                                 "waiting %.1fs for possible 'turn off'...",
-                                 ww_name, score, DEBOUNCE_WINDOW)
-                        pending_action = "turn_on"
-                        pending_time = now
+                    else:  # turn_on
+                        if args.dry_run:
+                            log.info("[DRY RUN] Would turn on TV via CEC")
+                        else:
+                            turn_on_tv()
 
-            # Check if debounce window expired — execute pending turn-on
-            if pending_action and (now - pending_time) > DEBOUNCE_WINDOW:
-                last_trigger = now
-                log.info("Debounce expired, executing turn-on")
-                if args.dry_run:
-                    log.info("[DRY RUN] Would turn on TV via CEC")
+                    last_action_time = time.time()
+                    break  # Only handle one wake word per cycle
+
                 else:
-                    play_acknowledgement()
-                    turn_on_tv()
-                pending_action = None
+                    consecutive_hits[ww_name] = 0
 
     except KeyboardInterrupt:
         log.info("Shutting down...")
     finally:
         pcm.close()
+        if alarm_thread:
+            alarm_thread.stop()
 
 
 if __name__ == "__main__":

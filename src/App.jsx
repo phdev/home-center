@@ -16,11 +16,12 @@ import { AgentTasksPanel } from "./components/AgentTasksPanel";
 import { EventsPanel } from "./components/EventsPanel";
 import { BirthdaysPanel } from "./components/BirthdaysPanel";
 import { TimersPanel } from "./components/TimersPanel";
+import { AlarmOverlay } from "./components/AlarmOverlay";
 import { WorldClockPanel } from "./components/WorldClockPanel";
 
 export default function App() {
   const now = useTime();
-  const { timers, togglePause } = useTimers();
+  const { timers, expiredTimers, dismissTimer, dismissAll } = useTimers(settings.worker);
   const { isMobile } = usePreviewMode();
   const { settings } = useSettings();
 
@@ -65,7 +66,7 @@ export default function App() {
             <BirthdaysPanel birthdays={bdays.birthdays} loading={bdays.loading} error={bdays.error} />
             <EventsPanel updates={school.updates} loading={school.loading} error={school.error} />
             <AgentTasksPanel />
-            <TimersPanel timers={timers} togglePause={togglePause} />
+            <TimersPanel timers={timers} dismissTimer={dismissTimer} />
             <FactPanel />
           </div>
         ) : (
@@ -81,11 +82,13 @@ export default function App() {
                 <div style={{ width: 340, flexShrink: 0, minHeight: 0 }}>
                   <BirthdaysPanel birthdays={bdays.birthdays} loading={bdays.loading} error={bdays.error} />
                 </div>
-                <div style={{ flex: 1, minHeight: 0 }}>
-                  <WeatherPanel weatherData={weather.data} loading={weather.loading} error={weather.error} />
-                </div>
-                <div style={{ width: 280, flexShrink: 0, minHeight: 0 }}>
-                  <WorldClockPanel />
+                <div style={{ flex: 1, display: "flex", gap: 16, minHeight: 0 }}>
+                  <div style={{ flex: 1, minHeight: 0 }}>
+                    <WeatherPanel weatherData={weather.data} loading={weather.loading} error={weather.error} />
+                  </div>
+                  <div style={{ flex: 1, minHeight: 0 }}>
+                    <WorldClockPanel />
+                  </div>
                 </div>
               </div>
               <div style={{ display: "flex", gap: 16, flex: 1, minHeight: 0 }}>
@@ -101,7 +104,7 @@ export default function App() {
             {/* Right column */}
             <div style={{ width: 400, flexShrink: 0, display: "flex", flexDirection: "column", gap: 16, minHeight: 0 }}>
               <div style={{ height: 270, flexShrink: 0 }}>
-                <TimersPanel timers={timers} togglePause={togglePause} />
+                <TimersPanel timers={timers} dismissTimer={dismissTimer} />
               </div>
               <div style={{ flex: 1, minHeight: 0 }}>
                 <AgentTasksPanel />
@@ -111,6 +114,7 @@ export default function App() {
           </div>
         )}
       </div>
+      <AlarmOverlay expiredTimers={expiredTimers} onDismissAll={dismissAll} />
     </>
   );
 }

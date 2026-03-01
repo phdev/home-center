@@ -1,91 +1,95 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 
-let _timerId = 0;
-
-export function useTimers() {
+export function useTimers(workerSettings) {
   const [timers, setTimers] = useState([]);
+  const workerUrl = workerSettings?.url;
+  const workerToken = workerSettings?.token;
+
+  const headers = useCallback(() => {
+    const h = { "Content-Type": "application/json" };
+    if (workerToken) h.Authorization = `Bearer ${workerToken}`;
+    return h;
+  }, [workerToken]);
+
+  // Poll server every 5s
+  const poll = useCallback(async () => {
+    if (!workerUrl) return;
+    try {
+      const res = await fetch(`${workerUrl}/api/timers`, { headers: headers() });
+      if (!res.ok) return;
+      const data = await res.json();
+      setTimers(data.timers || []);
+    } catch {
+      // silent
+    }
+  }, [workerUrl, headers]);
 
   useEffect(() => {
-    const id = setInterval(() => {
-      setTimers((prev) =>
-        prev.map((t) => {
-          if (t.paused || t.remaining <= 0) return t;
-          const next = t.remaining - 1;
-          if (next <= 0 && !t.alerted) {
-            // Play alert sound
-            try {
-              const ac = new (window.AudioContext ||
-                window.webkitAudioContext)();
-              const playBeep = (freq, time) => {
-                const osc = ac.createOscillator();
-                const gain = ac.createGain();
-                osc.connect(gain);
-                gain.connect(ac.destination);
-                osc.frequency.value = freq;
-                osc.type = "sine";
-                gain.gain.setValueAtTime(0.3, ac.currentTime + time);
-                gain.gain.exponentialRampToValueAtTime(
-                  0.001,
-                  ac.currentTime + time + 0.3,
-                );
-                osc.start(ac.currentTime + time);
-                osc.stop(ac.currentTime + time + 0.3);
-              };
-              playBeep(880, 0);
-              playBeep(880, 0.4);
-              playBeep(1100, 0.8);
-            } catch (e) {
-              // ignore
-            }
-            return { ...t, remaining: 0, alerted: true };
-          }
-          return { ...t, remaining: next };
-        }),
-      );
-    }, 1000);
+    poll();
+    const id = setInterval(poll, 5000);
+    return () => clearInterval(id);
+  }, [poll]);
+
+  // Tick every 1s to recompute `remaining` for display
+  const [tick, setTick] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setTick((t) => t + 1), 1000);
     return () => clearInterval(id);
   }, []);
 
-  const addTimer = (name, seconds) => {
-    setTimers((prev) => [
-      ...prev,
-      {
-        id: ++_timerId,
-        name,
-        total: seconds,
-        remaining: seconds,
-        paused: false,
-        alerted: false,
-        created: Date.now(),
-      },
-    ]);
-  };
+  // Compute remaining + expired for each timer
+  const computed = timers.map((t) => {
+    const remaining = Math.max(0, Math.floor((t.expiresAt - Date.now()) / 1000));
+    return { ...t, remaining, expired: remaining === 0 && !t.dismissed };
+  });
 
-  const togglePause = (id) => {
-    setTimers((prev) =>
-      prev.map((t) => (t.id === id ? { ...t, paused: !t.paused } : t)),
-    );
-  };
+  const expiredTimers = computed.filter((t) => t.expired);
 
-  const removeTimer = (id) => {
-    setTimers((prev) => prev.filter((t) => t.id !== id));
-  };
+  const addTimer = useCallback(
+    async (name, seconds) => {
+      if (!workerUrl) return;
+      try {
+        await fetch(`${workerUrl}/api/timers`, {
+          method: "POST",
+          headers: headers(),
+          body: JSON.stringify({ name, totalSeconds: seconds, source: "dashboard" }),
+        });
+        poll();
+      } catch {
+        // silent
+      }
+    },
+    [workerUrl, headers, poll],
+  );
 
-  const resetTimer = (id) => {
-    setTimers((prev) =>
-      prev.map((t) =>
-        t.id === id
-          ? { ...t, remaining: t.total, paused: false, alerted: false }
-          : t,
-      ),
-    );
-  };
+  const dismissTimer = useCallback(
+    async (id) => {
+      if (!workerUrl) return;
+      try {
+        await fetch(`${workerUrl}/api/timers/${encodeURIComponent(id)}/dismiss`, {
+          method: "POST",
+          headers: headers(),
+        });
+        poll();
+      } catch {
+        // silent
+      }
+    },
+    [workerUrl, headers, poll],
+  );
 
-  const dismissAlert = (id) => {
-    setTimers((prev) =>
-      prev.map((t) => (t.id === id ? { ...t, alerted: false } : t)),
-    );
-  };
+  const dismissAll = useCallback(async () => {
+    if (!workerUrl) return;
+    try {
+      await fetch(`${workerUrl}/api/timers/dismiss-all`, {
+        method: "POST",
+        headers: headers(),
+      });
+      poll();
+    } catch {
+      // silent
+    }
+  }, [workerUrl, headers, poll]);
 
-  return { timers, addTimer, togglePause, removeTimer, resetTimer, dismissAlert };
+  return { timers: computed, expiredTimers, addTimer, dismissTimer, dismissAll };
 }
