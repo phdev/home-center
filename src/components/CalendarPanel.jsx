@@ -15,7 +15,7 @@ function dedup(events) {
   });
 }
 
-export function CalendarPanel({ t, events, loading, error }) {
+export function CalendarPanel({ t, events, loading, error, selected }) {
   const items = dedup(events || CALENDAR);
 
   // Group events by day label
@@ -36,7 +36,7 @@ export function CalendarPanel({ t, events, loading, error }) {
   const subtitle = `${MONTHS[now.getMonth()]} ${now.getFullYear()}`;
 
   return (
-    <Panel style={{ height: "100%" }}>
+    <Panel style={{ height: "100%" }} selected={selected}>
       <PanelHeader
         icon={<Calendar size={30} color="#FFFFFF" />}
         label="Calendar"

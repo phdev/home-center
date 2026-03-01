@@ -4,11 +4,11 @@ import { PHOTOS } from "../data/mockData";
 
 const F = "'Geist','Inter',system-ui,sans-serif";
 
-export function PhotoPanel({ t, photos, photosLoading, photosError }) {
+export function PhotoPanel({ t, photos, photosLoading, photosError, selected }) {
   const items = photos && photos.length > 0 ? photos : PHOTOS;
 
   return (
-    <Panel style={{ height: "100%" }}>
+    <Panel style={{ height: "100%" }} selected={selected}>
       <PanelHeader
         icon={<ImageIcon size={30} color="#FFFFFF" />}
         label="Family Photos"

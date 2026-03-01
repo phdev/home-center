@@ -4,11 +4,11 @@ import { BIRTHDAYS } from "../data/mockData";
 
 const F = "'Geist','Inter',system-ui,sans-serif";
 
-export function BirthdaysPanel({ birthdays, loading, error }) {
+export function BirthdaysPanel({ birthdays, loading, error, selected }) {
   const items = birthdays && birthdays.length > 0 ? birthdays : BIRTHDAYS;
 
   return (
-    <Panel style={{ height: "100%" }}>
+    <Panel style={{ height: "100%" }} selected={selected}>
       <PanelHeader
         icon={<Cake size={30} color="#FFFFFF" />}
         label="Birthdays"

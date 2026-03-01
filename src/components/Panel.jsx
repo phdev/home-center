@@ -1,14 +1,16 @@
-export function Panel({ children, style = {} }) {
+export function Panel({ children, style = {}, selected = false }) {
   return (
     <div
       style={{
         borderRadius: 8,
-        border: "1px solid #FFFFFF",
+        border: selected ? "4px solid #FFFFFF" : "1px solid #FFFFFF",
+        margin: selected ? -3 : 0,
         padding: 16,
         background: "transparent",
         display: "flex",
         flexDirection: "column",
         overflow: "hidden",
+        transition: "border-width 150ms ease, margin 150ms ease",
         ...style,
       }}
     >

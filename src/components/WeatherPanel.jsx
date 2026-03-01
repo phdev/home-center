@@ -4,7 +4,7 @@ import { Panel, PanelHeader } from "./Panel";
 const F = "'Geist','Inter',system-ui,sans-serif";
 const M = "'JetBrains Mono',ui-monospace,monospace";
 
-export function WeatherPanel({ t, weatherData, loading, error }) {
+export function WeatherPanel({ t, weatherData, loading, error, selected }) {
   const current = weatherData?.current;
   const temp = current?.temp ?? "34";
   const condition = current?.condition ?? "Partly Cloudy";
@@ -15,7 +15,7 @@ export function WeatherPanel({ t, weatherData, loading, error }) {
   const lo = current?.lo ?? "24";
 
   return (
-    <Panel style={{ height: "100%" }}>
+    <Panel style={{ height: "100%" }} selected={selected}>
       <PanelHeader
         icon={<CloudSun size={30} color="#FFFFFF" />}
         label="Weather"

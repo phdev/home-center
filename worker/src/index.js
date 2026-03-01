@@ -60,6 +60,10 @@ export default {
       if (path === "/api/navigate" && request.method === "GET") {
         return corsResponse(env, await handleNavigateGet(env));
       }
+      // ── Gesture (HandController fast-poll) ──
+      if (path === "/api/gesture" && request.method === "GET") {
+        return corsResponse(env, await handleGestureGet(env));
+      }
       // ── Timers ──
       if (path === "/api/timers" && request.method === "POST") {
         return corsResponse(env, await handleTimerPost(request, env));
@@ -798,7 +802,29 @@ async function handleNotificationPost(request, env) {
   const capped = filtered.slice(0, MAX_NOTIFICATIONS);
   await env.NOTIFICATIONS.put(NOTIF_KEY, JSON.stringify(capped));
 
+  // If this is a gesture from HandController, also update the fast-poll gesture key
+  if (notification.type === "gesture" && notification.from === "HandController") {
+    const m = notification.title?.match(/(L|R) Hand: (\w+)/);
+    if (m) {
+      await env.NOTIFICATIONS.put("gesture_latest", JSON.stringify({
+        gesture: m[2],
+        hand: m[1],
+        timestamp: notification.timestamp || Date.now(),
+        id: notification.id,
+      }));
+    }
+  }
+
   return json({ ok: true, count: capped.length });
+}
+
+async function handleGestureGet(env) {
+  if (!env.NOTIFICATIONS) {
+    return json({ gesture: null });
+  }
+  const raw = await env.NOTIFICATIONS.get("gesture_latest");
+  if (!raw) return json({ gesture: null });
+  return json({ gesture: JSON.parse(raw) });
 }
 
 async function handleNotificationGet(env) {

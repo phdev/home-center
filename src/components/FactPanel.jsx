@@ -9,7 +9,7 @@ const F = "'Geist','Inter',system-ui,sans-serif";
 // Update this to the OpenClaw WhatsApp chat link once NanoClaw is configured
 const QR_URL = "https://wa.me/?text=Hey%20OpenClaw";
 
-export function FactPanel({ t }) {
+export function FactPanel({ t, selected }) {
   const [fact, factIndex] = useCycler(FACTS, 8000);
   const [visible, setVisible] = useState(true);
 
@@ -20,7 +20,7 @@ export function FactPanel({ t }) {
   }, [factIndex]);
 
   return (
-    <Panel>
+    <Panel selected={selected}>
       <div style={{ display: "flex", gap: 14, alignItems: "flex-start" }}>
         <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
           <PanelHeader

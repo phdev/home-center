@@ -29,7 +29,7 @@ function formatTime(tz, now) {
   });
 }
 
-export function WorldClockPanel() {
+export function WorldClockPanel({ selected } = {}) {
   const [now, setNow] = useState(new Date());
 
   useEffect(() => {
@@ -38,7 +38,7 @@ export function WorldClockPanel() {
   }, []);
 
   return (
-    <Panel style={{ height: "100%" }}>
+    <Panel style={{ height: "100%" }} selected={selected}>
       <PanelHeader
         icon={<Globe size={30} color="#FFFFFF" />}
         label="World Clock"

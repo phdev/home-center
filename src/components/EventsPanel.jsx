@@ -5,11 +5,11 @@ import { SCHOOL_UPDATES } from "../data/mockData";
 const F = "'Geist','Inter',system-ui,sans-serif";
 const M = "'JetBrains Mono',ui-monospace,monospace";
 
-export function EventsPanel({ updates, loading, error }) {
+export function EventsPanel({ updates, loading, error, selected }) {
   const items = updates && updates.length > 0 ? updates : SCHOOL_UPDATES;
 
   return (
-    <Panel style={{ height: "100%" }}>
+    <Panel style={{ height: "100%" }} selected={selected}>
       <PanelHeader
         icon={<Mail size={30} color="#FFFFFF" />}
         label="School Updates"

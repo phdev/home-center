@@ -5,11 +5,11 @@ import { TASKS } from "../data/mockData";
 const F = "'Geist','Inter',system-ui,sans-serif";
 const M = "'JetBrains Mono',ui-monospace,monospace";
 
-export function AgentTasksPanel({ t }) {
+export function AgentTasksPanel({ t, selected }) {
   const activeCount = TASKS.filter((tk) => tk.status === "active").length;
 
   return (
-    <Panel style={{ height: "100%" }}>
+    <Panel style={{ height: "100%" }} selected={selected}>
       <PanelHeader
         icon={<Bot size={30} color="#FFFFFF" />}
         label="OpenClaw"

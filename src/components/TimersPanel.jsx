@@ -5,9 +5,9 @@ import { formatTime } from "../utils/formatTime";
 const F = "'Geist','Inter',system-ui,sans-serif";
 const M = "'JetBrains Mono',ui-monospace,monospace";
 
-export function TimersPanel({ t, timers, dismissTimer }) {
+export function TimersPanel({ t, timers, dismissTimer, selected }) {
   return (
-    <Panel style={{ height: "100%" }}>
+    <Panel style={{ height: "100%" }} selected={selected}>
       <PanelHeader
         icon={<Timer size={30} color="#FFFFFF" />}
         label="Timers"

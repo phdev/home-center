@@ -497,6 +497,50 @@ class AlarmThread(threading.Thread):
 
 
 # ---------------------------------------------------------------------------
+# Gesture thread (HandController → CEC TV on)
+# ---------------------------------------------------------------------------
+
+class GestureThread(threading.Thread):
+    """Background thread that polls for hand gestures and triggers CEC TV on."""
+
+    def __init__(self, worker_url: str, worker_token: str | None, dry_run: bool = False):
+        super().__init__(daemon=True)
+        self.worker_url = worker_url
+        self.worker_token = worker_token
+        self.dry_run = dry_run
+        self._stop_event = threading.Event()
+        self._last_gesture_id = None
+
+    def stop(self):
+        self._stop_event.set()
+
+    def run(self):
+        while not self._stop_event.is_set():
+            try:
+                data = worker_get(self.worker_url, self.worker_token, "/api/gesture")
+                if data and data.get("gesture"):
+                    g = data["gesture"]
+                    gesture_id = g.get("id")
+                    gesture_type = g.get("gesture")
+                    timestamp = g.get("timestamp", 0)
+
+                    # Only process new gestures within the last 10s
+                    age_ms = time.time() * 1000 - timestamp
+                    if gesture_id != self._last_gesture_id:
+                        self._last_gesture_id = gesture_id
+                        if gesture_type == "middleThumbPinch" and age_ms < 10000:
+                            log.info("Gesture middleThumbPinch — turning TV on via CEC")
+                            if not self.dry_run:
+                                turn_on_tv()
+                            else:
+                                log.info("[DRY RUN] Would turn on TV via CEC (gesture)")
+            except Exception as e:
+                log.debug("Gesture thread error: %s", e)
+
+            self._stop_event.wait(2)  # Poll every 2 seconds
+
+
+# ---------------------------------------------------------------------------
 # Wake word model setup
 # ---------------------------------------------------------------------------
 
@@ -588,10 +632,14 @@ def main() -> None:
 
     # Start alarm polling thread if worker configured
     alarm_thread = None
+    gesture_thread = None
     if args.worker_url:
         alarm_thread = AlarmThread(args.worker_url, args.worker_token, args.dry_run)
         alarm_thread.start()
         log.info("Alarm polling thread started (every %ds)", ALARM_POLL_INTERVAL)
+        gesture_thread = GestureThread(args.worker_url, args.worker_token, args.dry_run)
+        gesture_thread.start()
+        log.info("Gesture polling thread started (every 2s)")
 
     log.info("Microphone stream open. Listening...")
     last_trigger = 0.0
@@ -781,6 +829,8 @@ def main() -> None:
         pcm.close()
         if alarm_thread:
             alarm_thread.stop()
+        if gesture_thread:
+            gesture_thread.stop()
 
 
 if __name__ == "__main__":
