@@ -6,10 +6,10 @@ const DEFAULTS = {
     token: "",
   },
   weather: {
-    lat: null,
-    lng: null,
+    lat: 33.849,
+    lng: -118.388,
     units: "fahrenheit",
-    autoLocate: true,
+    autoLocate: false,
   },
   calendar: {
     urls: [],
