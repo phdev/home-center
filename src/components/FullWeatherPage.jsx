@@ -130,7 +130,7 @@ function VerticalTempBar({ lo, hi, globalMin, globalMax }) {
       <div style={{
         position: "absolute", left: 0, width: "100%", borderRadius: 24,
         bottom: `${bottomPct}%`, height: `${Math.max(heightPct, 5)}%`,
-        background: "linear-gradient(to top, #60A5FA, #F97316)",
+        background: "#FFFFFF",
       }} />
     </div>
   );
