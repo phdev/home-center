@@ -8,6 +8,10 @@ const STATUS_H = 36;
 const PENCIL_PAGES = [
   { slug: "family-tv-dashboard", label: "Family TV Dashboard", nodeId: "8pkH2" },
   { slug: "full-calendar-page", label: "Full Calendar Page", nodeId: "85GSD" },
+  { slug: "weekly-calendar-design", label: "Weekly Calendar Design", nodeId: "ZPJSg" },
+  { slug: "daily-calendar-design", label: "Daily Calendar Design", nodeId: "jRHG1" },
+  { slug: "full-weather-page", label: "Full Weather Page Design", nodeId: "VD32B" },
+  { slug: "full-photos-page", label: "Full Photos Page Design", nodeId: "ZOFqi" },
 ];
 
 // Live view pages (rendered via iframe with URL params)

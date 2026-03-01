@@ -10,6 +10,10 @@ fs.mkdirSync(OUT_DIR, { recursive: true });
 const pages = [
   { slug: "family-tv-dashboard", nodeId: "8pkH2" },
   { slug: "full-calendar-page", nodeId: "85GSD" },
+  { slug: "weekly-calendar-design", nodeId: "ZPJSg" },
+  { slug: "daily-calendar-design", nodeId: "jRHG1" },
+  { slug: "full-weather-page", nodeId: "VD32B" },
+  { slug: "full-photos-page", nodeId: "ZOFqi" },
 ];
 
 let msgId = 0;
