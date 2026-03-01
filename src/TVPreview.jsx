@@ -9,6 +9,8 @@ const STATUS_H = 36;
 const PENCIL_PAGES = [
   { slug: "family-tv-dashboard", label: "Family TV Dashboard", nodeId: "8pkH2" },
   { slug: "full-calendar-page", label: "Full Calendar Page", nodeId: "85GSD" },
+  { slug: "weekly-calendar-page", label: "Weekly Calendar Page", nodeId: "ZPJSg" },
+  { slug: "daily-calendar-page", label: "Daily Calendar Page", nodeId: "jRHG1" },
 ];
 
 export default function TVPreview() {
