@@ -28,19 +28,24 @@ export default function App() {
   const { timers, expiredTimers, dismissTimer, dismissAll } = useTimers(settings.worker);
   const { page, calendarView, goTo } = useNavigation(settings.worker);
 
+  // URL params can force a specific page/view (used by TV preview)
+  const urlParams = new URLSearchParams(window.location.search);
+  const forcePage = urlParams.get("page") || page;
+  const forceView = urlParams.get("view") || calendarView;
+
   const weather = useWeather(settings.weather);
   const calendar = useCalendar(settings.calendar, settings.worker);
   const photos = usePhotos(settings.photos, settings.worker);
   const bdays = useBirthdays(settings.worker);
   const school = useSchoolUpdates(settings.worker);
 
-  if (page === "calendar" && !isMobile) {
+  if (forcePage === "calendar" && !isMobile) {
     return (
       <>
         <FullCalendarPage
           events={calendar.events}
           loading={calendar.loading}
-          view={calendarView}
+          view={forceView}
           onViewChange={(v) => goTo(null, v)}
           onBack={() => goTo("dashboard")}
         />
