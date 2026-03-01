@@ -124,11 +124,11 @@ function VerticalTempBar({ lo, hi, globalMin, globalMax }) {
 
   return (
     <div style={{
-      width: 8, flex: 1, borderRadius: 4, position: "relative",
+      width: 48, flex: 1, borderRadius: 24, position: "relative",
       background: "#FFFFFF10",
     }}>
       <div style={{
-        position: "absolute", left: 0, width: "100%", borderRadius: 4,
+        position: "absolute", left: 0, width: "100%", borderRadius: 24,
         bottom: `${bottomPct}%`, height: `${Math.max(heightPct, 5)}%`,
         background: "linear-gradient(to top, #60A5FA, #F97316)",
       }} />
