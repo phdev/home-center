@@ -68,7 +68,7 @@ POST_ACTION_MUTE = 15.0
 
 # STT recording
 RECORD_SECONDS = 3.5  # How long to record after wake word for command
-VERIFY_BUFFER_SECONDS = 3.0  # Rolling buffer for Whisper verification
+VERIFY_BUFFER_SECONDS = 1.5  # Rolling buffer for Whisper verification
 
 # Alarm polling
 ALARM_POLL_INTERVAL = 5  # Seconds between timer checks
@@ -312,7 +312,7 @@ def transcribe(audio: np.ndarray) -> str:
     model = get_whisper_model()
     # faster-whisper expects float32 normalized to [-1, 1]
     audio_f32 = audio.astype(np.float32) / 32768.0
-    segments, _ = model.transcribe(audio_f32, beam_size=1, language="en")
+    segments, _ = model.transcribe(audio_f32, beam_size=1, language="en", vad_filter=True)
     text = " ".join(seg.text.strip() for seg in segments).strip()
     return text
 
