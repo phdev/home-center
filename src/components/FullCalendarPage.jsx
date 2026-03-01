@@ -161,8 +161,37 @@ function MiniCalendar({ today, monthGrid }) {
   );
 }
 
-function Sidebar({ today, events, monthGrid }) {
+function getWeekRange(today) {
+  const sun = new Date(today);
+  sun.setDate(today.getDate() - today.getDay());
+  const sat = new Date(sun);
+  sat.setDate(sun.getDate() + 6);
+  const fmt = (d) => `${SHORT_MONTHS[d.getMonth()]} ${d.getDate()}`;
+  return fmt(sun) + " – " + fmt(sat);
+}
+
+function getWeekNumber(today) {
+  const start = new Date(today.getFullYear(), 0, 1);
+  const diff = today - start + ((start.getTimezoneOffset() - today.getTimezoneOffset()) * 60000);
+  return Math.ceil((diff / 86400000 + start.getDay() + 1) / 7);
+}
+
+function Sidebar({ today, events, monthGrid, view }) {
+  const weekDates = useMemo(() => getWeekDates(today), [today]);
   const todayEvents = events.filter((e) => e.start && isSameDay(new Date(e.start), today));
+  const weekEvents = useMemo(() => {
+    const start = weekDates[0], end = weekDates[6];
+    return events.filter((e) => {
+      if (!e.start) return false;
+      const d = new Date(e.start);
+      return d >= start && d <= new Date(end.getTime() + 86400000);
+    });
+  }, [events, weekDates]);
+
+  const isWeekly = view === "weekly";
+  const isDaily = view === "daily";
+  const displayEvents = isWeekly ? weekEvents : todayEvents;
+  const DAY_NAMES_FULL = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
 
   return (
     <div style={{
@@ -171,45 +200,64 @@ function Sidebar({ today, events, monthGrid }) {
     }}>
       {/* Date header */}
       <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-        <span style={{ fontFamily: F, fontSize: 27, fontWeight: 700, color: "#FFF" }}>
-          {MONTHS[today.getMonth()]} {today.getDate()}
-        </span>
-        <span style={{ fontFamily: F, fontSize: 18, color: "#FFFFFF66" }}>
-          {["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"][today.getDay()]}
-        </span>
+        {isWeekly ? (
+          <>
+            <span style={{ fontFamily: F, fontSize: 27, fontWeight: 700, color: "#FFF" }}>
+              {getWeekRange(today)}
+            </span>
+            <span style={{ fontFamily: F, fontSize: 18, color: "#FFFFFF66" }}>
+              Week {getWeekNumber(today)}
+            </span>
+          </>
+        ) : (
+          <>
+            <span style={{ fontFamily: F, fontSize: 27, fontWeight: 700, color: "#FFF" }}>
+              {MONTHS[today.getMonth()]} {today.getDate()}
+            </span>
+            <span style={{ fontFamily: F, fontSize: 18, color: "#FFFFFF66" }}>
+              {DAY_NAMES_FULL[today.getDay()]}
+            </span>
+          </>
+        )}
       </div>
 
-      {/* Mini calendar */}
-      <MiniCalendar today={today} monthGrid={monthGrid} />
+      {/* Mini calendar (monthly only) */}
+      {!isWeekly && !isDaily && <MiniCalendar today={today} monthGrid={monthGrid} />}
 
-      {/* Today's events */}
+      {/* Events list */}
       <div style={{ display: "flex", flexDirection: "column", gap: 12, flex: 1, overflow: "auto" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
           <CalendarCheck size={21} color="#FFF" />
           <span style={{ fontFamily: F, fontSize: 21, fontWeight: 600, color: "#FFF" }}>
-            Today's Events
+            {isWeekly ? "This Week's Events" : isDaily ? "Today's Schedule" : "Today's Events"}
           </span>
         </div>
-        {todayEvents.length === 0 && (
-          <span style={{ fontFamily: F, fontSize: 15, color: "#FFFFFF40" }}>No events today</span>
+        {displayEvents.length === 0 && (
+          <span style={{ fontFamily: F, fontSize: 15, color: "#FFFFFF40" }}>
+            {isWeekly ? "No events this week" : "No events today"}
+          </span>
         )}
-        {todayEvents.map((e, i) => (
-          <div key={i} style={{
-            display: "flex", alignItems: "center", gap: 12,
-            padding: "10px 14px", borderRadius: 5,
-            border: "1px solid #FFFFFF30",
-          }}>
-            <span style={{ fontFamily: M, fontSize: 18, fontWeight: 600, color: "#FFF", flexShrink: 0 }}>
-              {e.time}
-            </span>
-            <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
-              <span style={{ fontFamily: F, fontSize: 18, fontWeight: 500, color: "#FFF" }}>{e.title}</span>
-              {e.who && (
-                <span style={{ fontFamily: F, fontSize: 15, color: "#FFFFFF66" }}>{e.who}</span>
-              )}
+        {displayEvents.map((e, i) => {
+          const d = e.start ? new Date(e.start) : null;
+          const dayPrefix = isWeekly && d ? `${DAYS[d.getDay()].charAt(0)}${DAYS[d.getDay()].slice(1).toLowerCase()} ` : "";
+          return (
+            <div key={i} style={{
+              display: "flex", alignItems: "center", gap: 12,
+              padding: "10px 14px", borderRadius: 5,
+              border: "1px solid #FFFFFF30",
+            }}>
+              <span style={{ fontFamily: M, fontSize: 18, fontWeight: 600, color: "#FFF", flexShrink: 0 }}>
+                {dayPrefix}{e.time}
+              </span>
+              <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
+                <span style={{ fontFamily: F, fontSize: 18, fontWeight: 500, color: "#FFF" }}>{e.title}</span>
+                {e.who && (
+                  <span style={{ fontFamily: F, fontSize: 15, color: "#FFFFFF66" }}>{e.who}</span>
+                )}
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
@@ -330,14 +378,15 @@ function WeeklyGrid({ today, events }) {
     }}>
       {/* Day headers */}
       <div style={{
-        display: "flex", flexShrink: 0, borderBottom: "1px solid #FFFFFF20",
+        display: "flex", height: 60, flexShrink: 0, borderBottom: "1px solid #FFFFFF20",
       }}>
-        <div style={{ width: 60, flexShrink: 0, background: "#FFFFFF08" }} />
+        <div style={{ width: 80, flexShrink: 0, background: "#FFFFFF08" }} />
         {weekDates.map((d, i) => {
           const isToday = isSameDay(d, today);
           return (
             <div key={i} style={{
-              flex: 1, padding: "10px 0", textAlign: "center",
+              flex: 1, display: "flex", flexDirection: "column", alignItems: "center",
+              justifyContent: "center", gap: 2,
               background: isToday ? "#FFFFFF10" : "#FFFFFF08",
               borderRight: i < 6 ? "1px solid #FFFFFF10" : "none",
             }}>
@@ -357,12 +406,12 @@ function WeeklyGrid({ today, events }) {
       <div style={{ flex: 1, overflow: "auto" }}>
         {HOURS.map((hour) => (
           <div key={hour} style={{
-            display: "flex", height: 52, borderBottom: "1px solid #FFFFFF10",
+            display: "flex", height: 65, borderBottom: "1px solid #FFFFFF10",
           }}>
             <div style={{
-              width: 60, flexShrink: 0, display: "flex", alignItems: "flex-start",
-              justifyContent: "flex-end", padding: "4px 8px 0 0",
-              fontFamily: M, fontSize: 12, color: "#FFFFFF44",
+              width: 80, flexShrink: 0, display: "flex", alignItems: "flex-start",
+              padding: "6px 0 0 0", background: "#FFFFFF08",
+              fontFamily: M, fontSize: 15, color: "#FFFFFF44",
             }}>
               {hour === 0 ? "12 AM" : hour < 12 ? `${hour} AM` : hour === 12 ? "12 PM" : `${hour - 12} PM`}
             </div>
@@ -372,7 +421,7 @@ function WeeklyGrid({ today, events }) {
               const isToday = isSameDay(d, today);
               return (
                 <div key={di} style={{
-                  flex: 1, padding: 2, overflow: "hidden",
+                  flex: 1, padding: 4, overflow: "hidden",
                   borderRight: di < 6 ? "1px solid #FFFFFF10" : "none",
                   background: isToday ? "#FFFFFF05" : "transparent",
                 }}>
@@ -380,11 +429,11 @@ function WeeklyGrid({ today, events }) {
                     const c = hashColor(e.title);
                     return (
                       <div key={ei} style={{
-                        padding: "2px 6px", borderRadius: 3, marginBottom: 1,
-                        background: c.bg, borderLeft: `2px solid ${c.text}`,
+                        padding: "4px 8px", borderRadius: 4, marginBottom: 2,
+                        background: c.bg, borderLeft: `3px solid ${c.text}`,
                         overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis",
                       }}>
-                        <span style={{ fontFamily: F, fontSize: 11, color: c.text }}>{e.title}</span>
+                        <span style={{ fontFamily: F, fontSize: 12, fontWeight: 500, color: c.text }}>{e.title}</span>
                       </div>
                     );
                   })}
@@ -419,9 +468,10 @@ function DailyGrid({ today, events }) {
       flex: 1, display: "flex", flexDirection: "column",
       border: "1px solid #FFFFFF", borderRadius: 8, overflow: "hidden",
     }}>
-      {/* Header */}
+      {/* Day header */}
       <div style={{
-        padding: "14px 20px", background: "#FFFFFF08",
+        display: "flex", alignItems: "center",
+        padding: "0 20px", height: 50, background: "#FFFFFF08",
         borderBottom: "1px solid #FFFFFF20",
       }}>
         <span style={{ fontFamily: F, fontSize: 20, fontWeight: 600, color: "#FFF" }}>
@@ -436,29 +486,29 @@ function DailyGrid({ today, events }) {
           const hourEvents = todayEvents[hour] || [];
           return (
             <div key={hour} style={{
-              display: "flex", minHeight: 56, borderBottom: "1px solid #FFFFFF10",
+              display: "flex", minHeight: 70, borderBottom: "1px solid #FFFFFF10",
             }}>
               <div style={{
-                width: 80, flexShrink: 0, display: "flex", alignItems: "flex-start",
-                justifyContent: "flex-end", padding: "8px 12px 0 0",
-                fontFamily: M, fontSize: 14, color: "#FFFFFF44",
+                width: 100, flexShrink: 0, display: "flex", alignItems: "flex-start",
+                padding: "8px 0 0 0", background: "#FFFFFF08",
+                fontFamily: M, fontSize: 15, color: "#FFFFFF44",
               }}>
                 {hour === 0 ? "12 AM" : hour < 12 ? `${hour} AM` : hour === 12 ? "12 PM" : `${hour - 12} PM`}
               </div>
               <div style={{
-                flex: 1, padding: "4px 8px", display: "flex", flexDirection: "column", gap: 4,
+                flex: 1, padding: 6, display: "flex", flexDirection: "column", gap: 4,
               }}>
                 {hourEvents.map((e, ei) => {
                   const c = hashColor(e.title);
                   return (
                     <div key={ei} style={{
-                      padding: "8px 12px", borderRadius: 5,
+                      padding: "8px 12px", borderRadius: 4,
                       background: c.bg, borderLeft: `3px solid ${c.text}`,
                     }}>
-                      <div style={{ fontFamily: F, fontSize: 16, fontWeight: 500, color: c.text }}>
+                      <div style={{ fontFamily: F, fontSize: 17, fontWeight: 500, color: c.text }}>
                         {e.title}
                       </div>
-                      <div style={{ fontFamily: F, fontSize: 13, color: "#FFFFFF66", marginTop: 2 }}>
+                      <div style={{ fontFamily: F, fontSize: 14, color: "#FFFFFF66", marginTop: 3 }}>
                         {e.time}{e.who ? ` · ${e.who}` : ""}
                       </div>
                     </div>
@@ -496,7 +546,7 @@ export function FullCalendarPage({ events, loading, view, onViewChange, onBack }
       <div style={{
         flex: 1, display: "flex", gap: 16, padding: 16, minHeight: 0,
       }}>
-        <Sidebar today={today} events={safeEvents} monthGrid={monthGrid} />
+        <Sidebar today={today} events={safeEvents} monthGrid={monthGrid} view={view} />
         {view === "monthly" && <MonthlyGrid today={today} events={safeEvents} monthGrid={monthGrid} />}
         {view === "weekly" && <WeeklyGrid today={today} events={safeEvents} />}
         {view === "daily" && <DailyGrid today={today} events={safeEvents} />}
