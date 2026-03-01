@@ -7,6 +7,7 @@ import { useCalendar } from "./hooks/useCalendar";
 import { usePhotos } from "./hooks/usePhotos";
 import { useBirthdays } from "./hooks/useBirthdays";
 import { useSchoolUpdates } from "./hooks/useSchoolUpdates";
+import { useNavigation } from "./hooks/useNavigation";
 import { Header } from "./components/Header";
 import { CalendarPanel } from "./components/CalendarPanel";
 import { WeatherPanel } from "./components/WeatherPanel";
@@ -18,18 +19,35 @@ import { BirthdaysPanel } from "./components/BirthdaysPanel";
 import { TimersPanel } from "./components/TimersPanel";
 import { AlarmOverlay } from "./components/AlarmOverlay";
 import { WorldClockPanel } from "./components/WorldClockPanel";
+import { FullCalendarPage } from "./components/FullCalendarPage";
 
 export default function App() {
   const now = useTime();
   const { isMobile } = usePreviewMode();
   const { settings } = useSettings();
   const { timers, expiredTimers, dismissTimer, dismissAll } = useTimers(settings.worker);
+  const { page, calendarView, goTo } = useNavigation(settings.worker);
 
   const weather = useWeather(settings.weather);
   const calendar = useCalendar(settings.calendar, settings.worker);
   const photos = usePhotos(settings.photos, settings.worker);
   const bdays = useBirthdays(settings.worker);
   const school = useSchoolUpdates(settings.worker);
+
+  if (page === "calendar" && !isMobile) {
+    return (
+      <>
+        <FullCalendarPage
+          events={calendar.events}
+          loading={calendar.loading}
+          view={calendarView}
+          onViewChange={(v) => goTo(null, v)}
+          onBack={() => goTo("dashboard")}
+        />
+        <AlarmOverlay expiredTimers={expiredTimers} onDismissAll={dismissAll} />
+      </>
+    );
+  }
 
   return (
     <>

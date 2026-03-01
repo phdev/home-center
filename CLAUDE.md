@@ -101,26 +101,44 @@ A Python service (`pi/wake_word_service.py`) runs on a Raspberry Pi, continuousl
 | File | Purpose |
 |---|---|
 | `pi/wake_word_service.py` | Main service — audio capture, wake word detection, CEC control, chime playback |
-| `pi/train_hey_homer.py` | Training script for openWakeWord custom models (deprecated — switching to Porcupine) |
+| `pi/train_hey_homer.py` | Training script for openWakeWord custom models |
 | `pi/models/` | ONNX/PT model files for openWakeWord |
 | `pi/sounds/acknowledge.wav` | Two-tone chime (C5+E5) played on detection |
 
-### Current Status (as of 2026-02-27)
+### Current Status (as of 2026-03-01)
 
-**The service currently uses openWakeWord but is being migrated to Picovoice Porcupine.**
+Uses openWakeWord with custom ONNX models trained via `pi/train_hey_homer.py`. After wake word detection, uses faster-whisper (tiny model, int8, local) for speech-to-text to parse voice commands.
 
-Reason for migration: openWakeWord models trained on synthetic TTS data produce excessive false positives (0.98+ confidence on ambient noise). Multiple mitigations were added (VAD gating, consecutive-frame requirements, post-action muting, model.reset()) but the fundamental model quality issue persists.
+**Commands (via STT after wake word):**
+- "Hey Homer, set a timer for X minutes for Y" → creates timer via worker API
+- "Hey Homer, stop" → dismisses all expired timers
+- "Hey Homer, turn off" → TV standby via HDMI-CEC
+- "Hey Homer" (no command) → does nothing (previously defaulted to turn_on)
 
-The systemd service is currently running in `--debug --dry-run` mode for diagnostics. Remove those flags from the ExecStart line when ready for production.
+**Two-stage detection (DNN → Whisper verification):**
+1. openWakeWord DNN detects wake word candidate
+2. Rolling 2.5s audio buffer is fed to Whisper to verify "homer" was actually spoken
+3. Only if Whisper confirms → chime plays and command recording begins
+4. This eliminates false positives from ambient noise/TV audio
 
-### Next Step: Porcupine Migration
+**Robustness mitigations against false positives:**
+- **Whisper verification gate** — two-stage: DNN triggers → Whisper confirms "homer" in rolling buffer before acting
+- **Phonetic pattern matching** — Whisper tiny often mis-transcribes "hey homer" as "homework", "home", etc. Verification accepts these phonetic near-matches
+- **No-speech threshold raised to 0.95** — prevents Whisper from discarding short/quiet utterances as silence
+- RMS energy gate (MIN_RMS_ENERGY=300) — ignores low-energy audio chunks
+- Consecutive frame requirement — needs 5+ consecutive high-scoring frames (raised from 3)
+- Score smoothing — averages last 3 prediction scores
+- Post-action mute — 15s silence after trigger to prevent TV audio feedback loops (raised from 3s)
+- Model reset after each detection to clear prediction buffer
+- Cooldown window (10s) between triggers
+- Empty transcription returns "none" action (no longer defaults to turn_on)
 
-1. Install `pvporcupine` in the Pi venv
-2. Create a Picovoice access key (free tier, personal/non-commercial)
-3. Train custom wake words ("Hey Homer", "Hey Homer turn off/on") via Porcupine Console → produces `.ppn` keyword files
-4. Replace openWakeWord model loading and `model.predict()` / `model.prediction_buffer` with Porcupine's `porcupine.process()` API
-5. Keep all existing infrastructure: CEC control, chime, ALSA capture, VAD, debounce logic
-6. Remove `--debug --dry-run` from systemd ExecStart once working
+**Training (for retraining the DNN):**
+- `python pi/train_hey_homer.py --negative-samples 2000 --positive-samples 500 --augments 6`
+- Training script includes noise, silence, music, and phonetically-similar negatives
+- Use `--clip-duration 2.0` for "hey homer"
+
+The systemd service runs with `--debug` for diagnostics. Worker URL is configured via `--worker-url`.
 
 ### Deploying to Pi
 

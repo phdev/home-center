@@ -68,7 +68,18 @@ POST_ACTION_MUTE = 15.0
 
 # STT recording
 RECORD_SECONDS = 3.5  # How long to record after wake word for command
-VERIFY_BUFFER_SECONDS = 1.5  # Rolling buffer for Whisper verification
+VERIFY_BUFFER_SECONDS = 2.5  # Rolling buffer for Whisper verification
+
+# Whisper verification: accept these patterns as confirming "hey homer"
+# Whisper tiny often mis-transcribes "hey homer" as phonetic near-matches
+VERIFY_PATTERNS = [
+    r"homer",
+    r"homework",
+    r"home\b",
+    r"hom+er",
+    r"hummer",
+    r"humor",
+]
 
 # Alarm polling
 ALARM_POLL_INTERVAL = 5  # Seconds between timer checks
@@ -312,7 +323,10 @@ def transcribe(audio: np.ndarray) -> str:
     model = get_whisper_model()
     # faster-whisper expects float32 normalized to [-1, 1]
     audio_f32 = audio.astype(np.float32) / 32768.0
-    segments, _ = model.transcribe(audio_f32, beam_size=1, language="en", vad_filter=True)
+    segments, _ = model.transcribe(
+        audio_f32, beam_size=1, language="en",
+        no_speech_threshold=0.95,  # Don't skip segments unless very confident it's silence
+    )
     text = " ".join(seg.text.strip() for seg in segments).strip()
     return text
 
@@ -356,6 +370,19 @@ def parse_command(text: str) -> dict:
         else:
             seconds = amount
         return {"action": "set_timer", "label": label, "duration": seconds}
+
+    # Navigate to calendar
+    if re.search(r'\b(open|show|go\s+to)\s+(the\s+)?calendar\b', text):
+        return {"action": "navigate", "page": "calendar"}
+
+    # Switch calendar view
+    view_match = re.search(r'\b(monthly|weekly|daily)\s*(view)?\b', text)
+    if view_match:
+        return {"action": "navigate", "view": view_match.group(1)}
+
+    # Go back / go home (return to dashboard)
+    if re.search(r'\b(go\s+(back|home)|back\s+to\s+(dashboard|home)|close\s+calendar)\b', text):
+        return {"action": "navigate", "page": "dashboard"}
 
     # Turn on (explicit)
     if re.search(r'\bturn\s*(it\s+)?on\b', text):
@@ -645,8 +672,8 @@ def main() -> None:
                     if len(buf_audio) > 0:
                         verify_text = transcribe(buf_audio).lower()
                         log.info("Verification transcription: '%s'", verify_text)
-                        if "homer" not in verify_text:
-                            log.info("Verification FAILED — 'homer' not in transcript, ignoring.")
+                        if not any(re.search(pat, verify_text) for pat in VERIFY_PATTERNS):
+                            log.info("Verification FAILED — no homer-like pattern in transcript '%s', ignoring.", verify_text)
                             last_trigger = now
                             last_action_time = time.time()
                             break
@@ -707,6 +734,24 @@ def main() -> None:
                                     "/api/timers/dismiss-all",
                                 )
                                 log.info("Dismissed all timers")
+
+                    elif action == "navigate" and args.worker_url:
+                        nav_data = {}
+                        if command.get("page"):
+                            nav_data["page"] = command["page"]
+                        if command.get("view"):
+                            nav_data["view"] = command["view"]
+                        if args.dry_run:
+                            log.info("[DRY RUN] Would navigate: %s", nav_data)
+                        else:
+                            result = worker_post(
+                                args.worker_url, args.worker_token,
+                                "/api/navigate", nav_data,
+                            )
+                            if result:
+                                log.info("Navigation sent: %s", nav_data)
+                            else:
+                                log.error("Failed to send navigation")
 
                     elif action == "turn_off":
                         if args.dry_run:

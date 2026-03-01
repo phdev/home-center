@@ -53,6 +53,13 @@ export default {
         const id = decodeURIComponent(path.split("/api/notifications/")[1]);
         return corsResponse(env, await handleNotificationDelete(id, env));
       }
+      // ── Navigation (voice-controlled page switching) ──
+      if (path === "/api/navigate" && request.method === "POST") {
+        return corsResponse(env, await handleNavigatePost(request, env));
+      }
+      if (path === "/api/navigate" && request.method === "GET") {
+        return corsResponse(env, await handleNavigateGet(env));
+      }
       // ── Timers ──
       if (path === "/api/timers" && request.method === "POST") {
         return corsResponse(env, await handleTimerPost(request, env));
@@ -250,7 +257,7 @@ async function handleCalendar(env, url) {
   events.sort((a, b) => (a.startDate || 0) - (b.startDate || 0));
 
   return json({
-    events: events.map(({ startDate, ...rest }) => rest),
+    events: events.map(({ startDate, ...rest }) => ({ ...rest, start: startDate })),
     ...(errors.length > 0 && { errors }),
     ...(debug && debugInfo && { debug: debugInfo }),
   });
@@ -816,6 +823,35 @@ async function handleNotificationDelete(id, env) {
 }
 
 // ── Timers (KV-backed) ──────────────────────────────────────────────
+
+// ── Navigation ──────────────────────────────────────────────────────
+
+const NAV_KEY = "navigation";
+
+async function handleNavigatePost(request, env) {
+  if (!env.NOTIFICATIONS) {
+    return json({ error: "KV namespace NOTIFICATIONS not bound" }, 500);
+  }
+  const body = await request.json();
+  const nav = {
+    page: body.page || null,
+    view: body.view || null,
+    timestamp: Date.now(),
+  };
+  await env.NOTIFICATIONS.put(NAV_KEY, JSON.stringify(nav));
+  return json({ ok: true, navigation: nav });
+}
+
+async function handleNavigateGet(env) {
+  if (!env.NOTIFICATIONS) {
+    return json({ error: "KV namespace NOTIFICATIONS not bound" }, 500);
+  }
+  const raw = await env.NOTIFICATIONS.get(NAV_KEY);
+  if (!raw) return json({ navigation: null });
+  return json({ navigation: JSON.parse(raw) });
+}
+
+// ── Timers ──────────────────────────────────────────────────────────
 
 const TIMERS_KEY = "timers";
 
