@@ -887,13 +887,15 @@ async function handleTimerGet(env) {
     return json({ timers: [], serverTime: Date.now() });
   }
 
-  let timers = await env.NOTIFICATIONS.get(TIMERS_KEY, { type: "json" }) || [];
-  // Prune dismissed timers older than 1 minute
+  const timers = await env.NOTIFICATIONS.get(TIMERS_KEY, { type: "json" }) || [];
+  // Prune dismissed timers older than 1 minute — only write if something changed
   const cutoff = Date.now() - 60_000;
-  timers = timers.filter(t => !t.dismissed || t.expiresAt > cutoff);
-  await env.NOTIFICATIONS.put(TIMERS_KEY, JSON.stringify(timers));
+  const pruned = timers.filter(t => !t.dismissed || t.expiresAt > cutoff);
+  if (pruned.length !== timers.length) {
+    await env.NOTIFICATIONS.put(TIMERS_KEY, JSON.stringify(pruned));
+  }
 
-  return json({ timers, serverTime: Date.now() });
+  return json({ timers: pruned, serverTime: Date.now() });
 }
 
 async function handleTimerDismiss(id, env) {
