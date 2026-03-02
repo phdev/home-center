@@ -14,6 +14,9 @@ const pages = [
   { slug: "daily-calendar-design", nodeId: "jRHG1" },
   { slug: "full-weather-page", nodeId: "VD32B" },
   { slug: "full-photos-page", nodeId: "ZOFqi" },
+  { slug: "full-llm-response-page", nodeId: "dMUil" },
+  { slug: "full-history-page", nodeId: "Tbtje" },
+  { slug: "transcription-overlay", nodeId: "DeP7G" },
 ];
 
 let msgId = 0;
