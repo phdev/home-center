@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "http-server /home/user/accel-driv -p 8080 --cors -c-1 > /dev/null 2>&1 &"
+          }
+        ]
+      }
+    ]
+  }
+}
