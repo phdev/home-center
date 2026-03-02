@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { useTime } from "./hooks/useTime";
 import { useTimers } from "./hooks/useTimers";
 import { usePreviewMode } from "./hooks/usePreviewMode";
@@ -9,6 +10,7 @@ import { useBirthdays } from "./hooks/useBirthdays";
 import { useSchoolUpdates } from "./hooks/useSchoolUpdates";
 import { useNavigation } from "./hooks/useNavigation";
 import { useHandController } from "./hooks/useHandController";
+import { useLLMQuery } from "./hooks/useLLMQuery";
 import { Header } from "./components/Header";
 import { CalendarPanel } from "./components/CalendarPanel";
 import { WeatherPanel } from "./components/WeatherPanel";
@@ -23,6 +25,9 @@ import { WorldClockPanel } from "./components/WorldClockPanel";
 import { FullCalendarPage } from "./components/FullCalendarPage";
 import { FullWeatherPage } from "./components/FullWeatherPage";
 import { FullPhotosPage } from "./components/FullPhotosPage";
+import { FullLLMResponsePage } from "./components/FullLLMResponsePage";
+import { FullHistoryPage } from "./components/FullHistoryPage";
+import { TranscriptionOverlay } from "./components/TranscriptionOverlay";
 
 export default function App() {
   const now = useTime();
@@ -43,6 +48,14 @@ export default function App() {
   const photos = usePhotos(settings.photos, settings.worker);
   const bdays = useBirthdays(settings.worker);
   const school = useSchoolUpdates(settings.worker);
+  const llm = useLLMQuery(settings.worker);
+
+  // Auto-navigate to LLM response page when a new response arrives
+  useEffect(() => {
+    if (llm.latestResponse && forcePage !== "llm-response") {
+      goTo("llm-response");
+    }
+  }, [llm.latestResponse]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (forcePage === "calendar" && !isMobile) {
     return (
@@ -54,6 +67,7 @@ export default function App() {
           onViewChange={(v) => goTo(null, v)}
           onBack={() => goTo("dashboard")}
         />
+        <TranscriptionOverlay query={llm.latestResponse?.query} visible={!!llm.latestResponse && forcePage !== "llm-response"} />
         <AlarmOverlay expiredTimers={expiredTimers} onDismissAll={dismissAll} />
       </>
     );
@@ -69,6 +83,7 @@ export default function App() {
           locationName={weather.locationName}
           onBack={() => goTo("dashboard")}
         />
+        <TranscriptionOverlay query={llm.latestResponse?.query} visible={!!llm.latestResponse && forcePage !== "llm-response"} />
         <AlarmOverlay expiredTimers={expiredTimers} onDismissAll={dismissAll} />
       </>
     );
@@ -84,6 +99,37 @@ export default function App() {
           onBack={() => goTo("dashboard")}
           columns={hc.photoColumns}
           scrollDir={hc.photoScrollDir}
+        />
+        <TranscriptionOverlay query={llm.latestResponse?.query} visible={!!llm.latestResponse && forcePage !== "llm-response"} />
+        <AlarmOverlay expiredTimers={expiredTimers} onDismissAll={dismissAll} />
+      </>
+    );
+  }
+
+  if (forcePage === "llm-response" && !isMobile) {
+    return (
+      <>
+        <FullLLMResponsePage
+          response={llm.latestResponse}
+          onBack={() => { llm.dismissResponse(); goTo("dashboard"); }}
+        />
+        <AlarmOverlay expiredTimers={expiredTimers} onDismissAll={dismissAll} />
+      </>
+    );
+  }
+
+  if (forcePage === "history" && !isMobile) {
+    return (
+      <>
+        <FullHistoryPage
+          history={llm.history}
+          loading={llm.historyLoading}
+          onBack={() => goTo("dashboard")}
+          onSelect={(item) => {
+            // When selecting a history item, set it as latest and navigate to response
+            // For now, just show the summary since we don't store full sections in history
+            goTo("dashboard");
+          }}
         />
         <AlarmOverlay expiredTimers={expiredTimers} onDismissAll={dismissAll} />
       </>
@@ -112,7 +158,7 @@ export default function App() {
           color: "#FFFFFF",
         }}
       >
-        <Header now={now} isMobile={isMobile} />
+        <Header now={now} isMobile={isMobile} onHistory={() => { llm.fetchHistory(); goTo("history"); }} />
 
         {isMobile ? (
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -187,6 +233,7 @@ export default function App() {
           </span>
         </div>
       )}
+      <TranscriptionOverlay query={llm.latestResponse?.query} visible={!!llm.latestResponse && forcePage !== "llm-response"} />
       <AlarmOverlay expiredTimers={expiredTimers} onDismissAll={dismissAll} />
     </>
   );

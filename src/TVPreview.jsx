@@ -12,6 +12,9 @@ const PENCIL_PAGES = [
   { slug: "daily-calendar-design", label: "Daily Calendar Design", nodeId: "jRHG1" },
   { slug: "full-weather-page", label: "Full Weather Page Design", nodeId: "VD32B" },
   { slug: "full-photos-page", label: "Full Photos Page Design", nodeId: "ZOFqi" },
+  { slug: "full-llm-response-page", label: "LLM Response Page Design", nodeId: "dMUil" },
+  { slug: "full-history-page", label: "History Page Design", nodeId: "Tbtje" },
+  { slug: "transcription-overlay", label: "Transcription Overlay Design", nodeId: "DeP7G" },
 ];
 
 // Live view pages (rendered via iframe with URL params)
@@ -21,6 +24,7 @@ const LIVE_VIEWS = [
   { slug: "monthly-calendar", label: "Monthly Calendar", params: "?page=calendar&view=monthly" },
   { slug: "weather", label: "Weather Page", params: "?page=weather" },
   { slug: "photos", label: "Photos Page", params: "?page=photos" },
+  { slug: "history", label: "Query History", params: "?page=history" },
 ];
 
 export default function TVPreview() {

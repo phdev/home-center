@@ -1,6 +1,6 @@
-import { LayoutDashboard, Mic } from "lucide-react";
+import { LayoutDashboard, Mic, Clock } from "lucide-react";
 
-export function Header({ now, isMobile }) {
+export function Header({ now, isMobile, onHistory }) {
   const time = now.toLocaleTimeString("en-US", {
     hour: "numeric",
     minute: "2-digit",
@@ -77,7 +77,7 @@ export function Header({ now, isMobile }) {
         </span>
       </div>
 
-      {/* Center: Voice */}
+      {/* Center: Voice + History */}
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
         <Mic size={30} color="#FFFFFF" />
         <span
@@ -97,6 +97,25 @@ export function Header({ now, isMobile }) {
             background: "#FFFFFF",
           }}
         />
+        {onHistory && (
+          <div
+            onClick={onHistory}
+            style={{
+              marginLeft: 12,
+              width: 36,
+              height: 36,
+              borderRadius: 18,
+              background: "#FFFFFF10",
+              border: "1px solid #FFFFFF20",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              cursor: "pointer",
+            }}
+          >
+            <Clock size={18} color="#FFFFFF88" />
+          </div>
+        )}
       </div>
 
       {/* Right: Date + Clock */}

@@ -10,6 +10,7 @@ export const PANEL_ORDER = [
   { id: "timers",     fullscreenPage: null },
   { id: "agenttasks", fullscreenPage: null },
   { id: "fact",       fullscreenPage: null },
+  { id: "history",    fullscreenPage: "history" },
 ];
 
 const CONNECTED_TIMEOUT = 30_000; // 30s without gesture = disconnected

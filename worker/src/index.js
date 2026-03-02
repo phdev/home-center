@@ -53,6 +53,19 @@ export default {
         const id = decodeURIComponent(path.split("/api/notifications/")[1]);
         return corsResponse(env, await handleNotificationDelete(id, env));
       }
+      // ── LLM Query (classified knowledge queries) ──
+      if (path === "/api/ask-query" && request.method === "POST") {
+        return corsResponse(env, await handleAskQuery(request, env));
+      }
+      if (path === "/api/llm/latest" && request.method === "GET") {
+        return corsResponse(env, await handleLLMLatest(env));
+      }
+      if (path === "/api/llm/history" && request.method === "GET") {
+        return corsResponse(env, await handleLLMHistory(env));
+      }
+      if (path === "/api/llm/dismiss" && request.method === "POST") {
+        return corsResponse(env, await handleLLMDismiss(request, env));
+      }
       // ── Navigation (voice-controlled page switching) ──
       if (path === "/api/navigate" && request.method === "POST") {
         return corsResponse(env, await handleNavigatePost(request, env));
@@ -207,6 +220,167 @@ async function handleAsk(request, env) {
   }
 
   return json({ text, imageUrl });
+}
+
+// ── LLM Query (classified knowledge) ────────────────────────────────
+
+const LLM_LATEST_KEY = "llm_latest";
+const LLM_HISTORY_KEY = "llm_history";
+const MAX_LLM_HISTORY = 50;
+
+async function handleAskQuery(request, env) {
+  if (!env.OPENAI_API_KEY) {
+    return json({ error: "OPENAI_API_KEY not configured" }, 500);
+  }
+  if (!env.NOTIFICATIONS) {
+    return json({ error: "NOTIFICATIONS KV namespace not configured" }, 500);
+  }
+
+  const body = await request.json();
+  const { query } = body;
+  if (!query) return json({ error: "Missing query" }, 400);
+
+  const model = env.OPENAI_MODEL || "gpt-4o-mini";
+  const imageModel = env.OPENAI_IMAGE_MODEL || "dall-e-3";
+
+  const systemMsg = {
+    role: "system",
+    content: `You are a family knowledge assistant for a TV dashboard. Given a question, classify it and respond with valid JSON only (no markdown fencing).
+
+Response format:
+{
+  "type": "location" | "person" | "fauna" | "flora" | "event" | "concept",
+  "title": "Short title (2-5 words)",
+  "summary": "2-3 sentence overview",
+  "sections": [
+    { "heading": "Section Name", "content": "A paragraph of information..." },
+    ...3-4 sections
+  ],
+  "infographic": {
+    "type": "stats",
+    "items": [
+      { "label": "Key Stat", "value": "Value" },
+      ...3-5 items
+    ]
+  },
+  "imagePrompt": "A detailed prompt for generating an illustrative image of the subject"
+}
+
+Type-specific sections to include:
+- location: Overview, Geography, Culture, Fun Facts
+- person: Biography, Achievements, Legacy, Fun Facts
+- fauna: Description, Habitat, Diet, Fun Facts
+- flora: Description, Growing Conditions, Uses, Fun Facts
+- event: Overview, Timeline, Impact, Fun Facts
+- concept: Explanation, History, Applications, Fun Facts
+
+Keep all content family-friendly and concise. Each section should be 2-4 sentences.`,
+  };
+
+  const chatRes = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${env.OPENAI_API_KEY}`,
+    },
+    body: JSON.stringify({
+      model,
+      messages: [systemMsg, { role: "user", content: query }],
+      max_tokens: 1024,
+      response_format: { type: "json_object" },
+    }),
+  });
+
+  if (!chatRes.ok) {
+    const err = await chatRes.json().catch(() => ({}));
+    return json({ error: err.error?.message || `OpenAI error: ${chatRes.status}` }, 502);
+  }
+
+  const chatData = await chatRes.json();
+  const rawText = chatData.choices?.[0]?.message?.content || "{}";
+
+  let parsed;
+  try {
+    parsed = JSON.parse(rawText);
+  } catch {
+    return json({ error: "Failed to parse LLM response", raw: rawText }, 502);
+  }
+
+  // Generate image if imagePrompt was provided
+  let imageUrl = null;
+  if (parsed.imagePrompt) {
+    try {
+      const imgRes = await fetch("https://api.openai.com/v1/images/generations", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${env.OPENAI_API_KEY}`,
+        },
+        body: JSON.stringify({
+          model: imageModel,
+          prompt: parsed.imagePrompt,
+          n: 1,
+          size: "1024x1024",
+          quality: "standard",
+        }),
+      });
+      if (imgRes.ok) {
+        const imgData = await imgRes.json();
+        imageUrl = imgData.data?.[0]?.url || null;
+      }
+    } catch {
+      // Image generation failed silently
+    }
+  }
+
+  const response = {
+    id: `llm_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+    query,
+    type: parsed.type || "concept",
+    title: parsed.title || query,
+    summary: parsed.summary || "",
+    sections: parsed.sections || [],
+    infographic: parsed.infographic || null,
+    imageUrl,
+    timestamp: Date.now(),
+  };
+
+  // Store as latest (for dashboard polling)
+  await env.NOTIFICATIONS.put(LLM_LATEST_KEY, JSON.stringify(response));
+
+  // Append to history (summary only, no full sections to save space)
+  const history = await env.NOTIFICATIONS.get(LLM_HISTORY_KEY, { type: "json" }) || [];
+  history.unshift({
+    id: response.id,
+    query: response.query,
+    type: response.type,
+    title: response.title,
+    summary: response.summary,
+    imageUrl: response.imageUrl,
+    timestamp: response.timestamp,
+  });
+  await env.NOTIFICATIONS.put(LLM_HISTORY_KEY, JSON.stringify(history.slice(0, MAX_LLM_HISTORY)));
+
+  return json(response);
+}
+
+async function handleLLMLatest(env) {
+  if (!env.NOTIFICATIONS) return json({ response: null });
+  const raw = await env.NOTIFICATIONS.get(LLM_LATEST_KEY);
+  if (!raw) return json({ response: null });
+  return json({ response: JSON.parse(raw) });
+}
+
+async function handleLLMHistory(env) {
+  if (!env.NOTIFICATIONS) return json({ history: [] });
+  const history = await env.NOTIFICATIONS.get(LLM_HISTORY_KEY, { type: "json" }) || [];
+  return json({ history });
+}
+
+async function handleLLMDismiss(request, env) {
+  if (!env.NOTIFICATIONS) return json({ ok: false });
+  await env.NOTIFICATIONS.delete(LLM_LATEST_KEY);
+  return json({ ok: true });
 }
 
 // ── Calendar ────────────────────────────────────────────────────────

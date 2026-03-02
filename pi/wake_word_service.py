@@ -396,6 +396,10 @@ def parse_command(text: str) -> dict:
     if re.search(r'\bturn\s*(it\s+)?on\b', text):
         return {"action": "turn_on"}
 
+    # General knowledge query — question words or substantial speech
+    if re.search(r'\b(what|who|where|when|why|how|tell\s+me|explain|describe)\b', text) or len(text.split()) > 4:
+        return {"action": "ask", "query": text}
+
     # Default: treat as turn on (just said "hey homer" with no clear command)
     return {"action": "turn_on"}
 
@@ -790,6 +794,21 @@ def main() -> None:
                                     "/api/timers/dismiss-all",
                                 )
                                 log.info("Dismissed all timers")
+
+                    elif action == "ask" and args.worker_url:
+                        query_text = command.get("query", "")
+                        if args.dry_run:
+                            log.info("[DRY RUN] Would ask: %s", query_text)
+                        else:
+                            result = worker_post(
+                                args.worker_url, args.worker_token,
+                                "/api/ask-query",
+                                {"query": query_text},
+                            )
+                            if result:
+                                log.info("LLM query sent: %s", query_text)
+                            else:
+                                log.error("Failed to send LLM query")
 
                     elif action == "navigate" and args.worker_url:
                         nav_data = {}
