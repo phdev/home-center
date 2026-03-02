@@ -76,6 +76,42 @@ Bypass pull requests entirely using two sequential pushes:
 | `src/components/` | 17 panel/widget components |
 | `index.html` | Viewport config, font imports, dark background |
 
+## Pencil Designs & TV Preview
+
+### Workflow (ALWAYS follow when creating/updating pencil designs)
+
+When you create or modify a pencil design in `home-center.pen`, you MUST also:
+
+1. **Add to `src/TVPreview.jsx` PENCIL_PAGES array** — add a `{ slug, label, nodeId }` entry so it appears in the TV Preview dropdown under "Pencil Designs".
+2. **Add to `scripts/update-pencil-screenshots.mjs` pages array** — add a `{ slug, nodeId }` entry matching the TVPreview slug.
+3. **Run the screenshot script** — `node scripts/update-pencil-screenshots.mjs` to generate static PNGs in `public/pencil-screenshots/`.
+4. **If it's a live page, add to LIVE_VIEWS too** — add `{ slug, label, params }` entry in TVPreview.
+
+Do this automatically without being asked. Every pencil design must be viewable in the TV Preview at `192.168.1.103:5174/home-center/tv-preview/`.
+
+### Current Pencil Designs
+
+| Design | Node ID | Slug |
+|--------|---------|------|
+| Family TV Dashboard | `8pkH2` | `family-tv-dashboard` |
+| Full Calendar Page | `85GSD` | `full-calendar-page` |
+| Weekly Calendar Page | `ZPJSg` | `weekly-calendar-design` |
+| Daily Calendar Page | `jRHG1` | `daily-calendar-design` |
+| Full Weather Page | `VD32B` | `full-weather-page` |
+| Full Photos Page | `ZOFqi` | `full-photos-page` |
+| LLM Response Page | `dMUil` | `full-llm-response-page` |
+| History Page | `Tbtje` | `full-history-page` |
+| Transcription Overlay | `DeP7G` | `transcription-overlay` |
+
+### Key Files
+
+| File | Purpose |
+|---|---|
+| `home-center.pen` | Pencil design file (in ~/Documents/) |
+| `src/TVPreview.jsx` | TV Preview page — PENCIL_PAGES + LIVE_VIEWS arrays |
+| `scripts/update-pencil-screenshots.mjs` | Generates static PNGs from pencil designs via MCP |
+| `public/pencil-screenshots/` | Generated PNG files served by TV Preview |
+
 ## Wake Word Service (Raspberry Pi)
 
 ### Architecture
