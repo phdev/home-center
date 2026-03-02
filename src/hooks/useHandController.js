@@ -15,11 +15,16 @@ export const PANEL_ORDER = [
 const CONNECTED_TIMEOUT = 30_000; // 30s without gesture = disconnected
 const STALE_THRESHOLD = 10_000;   // ignore gestures older than 10s on first load
 const POLL_INTERVAL = 500;
+const MIN_COLUMNS = 2;
+const MAX_COLUMNS = 6;
+const DEFAULT_COLUMNS = 4;
 
 export function useHandController(workerSettings, currentPage, goTo) {
   const [selectedIndex, setSelectedIndex] = useState(-1);
   const [lastGestureTime, setLastGestureTime] = useState(0);
   const [connected, setConnected] = useState(false);
+  const [photoColumns, setPhotoColumns] = useState(DEFAULT_COLUMNS);
+  const [photoScrollDir, setPhotoScrollDir] = useState(0); // -1 up, 0 none, 1 down
 
   const lastGestureIdRef = useRef(null);
   const initializedRef = useRef(false);
@@ -27,7 +32,40 @@ export function useHandController(workerSettings, currentPage, goTo) {
   const workerUrl = workerSettings?.url;
   const workerToken = workerSettings?.token;
 
+  // Clear scroll direction after it's been consumed
+  useEffect(() => {
+    if (photoScrollDir !== 0) {
+      const t = setTimeout(() => setPhotoScrollDir(0), 100);
+      return () => clearTimeout(t);
+    }
+  }, [photoScrollDir]);
+
   const processGesture = useCallback((gesture) => {
+    // Photo-specific gestures (only active on photos page)
+    if (currentPage === "photos") {
+      switch (gesture) {
+        case "twoHandPinchOut":
+          // Pull apart = zoom in = fewer columns = bigger photos
+          setPhotoColumns((prev) => Math.max(MIN_COLUMNS, prev - 1));
+          return;
+        case "twoHandPinchIn":
+          // Pinch together = zoom out = more columns = smaller photos
+          setPhotoColumns((prev) => Math.min(MAX_COLUMNS, prev + 1));
+          return;
+        case "pinchDragUp":
+        case "waveUp":
+          setPhotoScrollDir(-1);
+          return;
+        case "pinchDragDown":
+        case "waveDown":
+          setPhotoScrollDir(1);
+          return;
+        default:
+          break;
+      }
+    }
+
+    // Global gestures
     switch (gesture) {
       case "waveRight":
         setSelectedIndex((prev) =>
@@ -126,5 +164,5 @@ export function useHandController(workerSettings, currentPage, goTo) {
     ? PANEL_ORDER[selectedIndex].id
     : null;
 
-  return { connected, selectedPanelId };
+  return { connected, selectedPanelId, photoColumns, photoScrollDir };
 }

@@ -1,13 +1,15 @@
+import { useEffect, useRef } from "react";
 import { useTime } from "../hooks/useTime";
 import { ArrowLeft } from "lucide-react";
 
 const F = "'Geist','Inter',system-ui,sans-serif";
 const M = "'JetBrains Mono',ui-monospace,monospace";
 const SHORT_MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const SCROLL_STEP = 400; // px per scroll gesture
 
 // ─── Top Bar ─────────────────────────────────────────────────────────
 
-function TopBar({ onBack, photoCount, now }) {
+function TopBar({ onBack, photoCount, columns, now }) {
   const dayNames = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
   const dateStr = `${dayNames[now.getDay()]}, ${SHORT_MONTHS[now.getMonth()]} ${now.getDate()}`;
   const h = now.getHours() % 12 || 12;
@@ -25,9 +27,16 @@ function TopBar({ onBack, photoCount, now }) {
         <span style={{ fontFamily: F, fontSize: 33, fontWeight: 700, color: "#FFF" }}>Photos</span>
       </div>
 
-      <span style={{ fontFamily: F, fontSize: 22, color: "#FFFFFF88" }}>
-        {photoCount} {photoCount === 1 ? "Photo" : "Photos"}
-      </span>
+      <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+        <span style={{ fontFamily: F, fontSize: 22, color: "#FFFFFF88" }}>
+          {photoCount} {photoCount === 1 ? "Photo" : "Photos"}
+        </span>
+        {columns !== 4 && (
+          <span style={{ fontFamily: M, fontSize: 16, color: "#FFFFFF44" }}>
+            {columns} col
+          </span>
+        )}
+      </div>
 
       <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
         <span style={{ fontFamily: F, fontSize: 22, color: "#FFFFFF88" }}>{dateStr}</span>
@@ -41,9 +50,16 @@ function TopBar({ onBack, photoCount, now }) {
 
 // ─── Main Page ───────────────────────────────────────────────────────
 
-export function FullPhotosPage({ photos, loading, error, onBack }) {
+export function FullPhotosPage({ photos, loading, error, onBack, columns = 4, scrollDir = 0 }) {
   const now = useTime();
   const items = photos || [];
+  const scrollRef = useRef(null);
+
+  // Handle scroll gestures from hand controller
+  useEffect(() => {
+    if (scrollDir === 0 || !scrollRef.current) return;
+    scrollRef.current.scrollBy({ top: scrollDir * SCROLL_STEP, behavior: "smooth" });
+  }, [scrollDir]);
 
   return (
     <div style={{
@@ -51,8 +67,8 @@ export function FullPhotosPage({ photos, loading, error, onBack }) {
       flexDirection: "column", overflow: "hidden",
       fontFamily: F, color: "#FFF",
     }}>
-      <TopBar onBack={onBack} photoCount={items.length} now={now} />
-      <div style={{ flex: 1, padding: 16, minHeight: 0, overflow: "auto" }}>
+      <TopBar onBack={onBack} photoCount={items.length} columns={columns} now={now} />
+      <div ref={scrollRef} style={{ flex: 1, padding: 16, minHeight: 0, overflow: "auto" }}>
         {loading && (
           <div style={{
             height: "100%", display: "flex", alignItems: "center", justifyContent: "center",
@@ -72,15 +88,17 @@ export function FullPhotosPage({ photos, loading, error, onBack }) {
         {items.length > 0 && !loading && (
           <div style={{
             display: "grid",
-            gridTemplateColumns: "repeat(4, 1fr)",
+            gridTemplateColumns: `repeat(${columns}, 1fr)`,
             gap: 12,
             alignContent: "start",
+            transition: "all 300ms ease",
           }}>
             {items.map((p, i) => (
               <div key={i} style={{
                 aspectRatio: "3 / 2",
                 borderRadius: 10, overflow: "hidden",
                 border: "1px solid #FFFFFF30", background: "#FFFFFF10",
+                transition: "all 300ms ease",
               }}>
                 {p.url && (
                   <img

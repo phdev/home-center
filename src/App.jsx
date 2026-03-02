@@ -82,6 +82,8 @@ export default function App() {
           loading={photos.loading}
           error={photos.error}
           onBack={() => goTo("dashboard")}
+          columns={hc.photoColumns}
+          scrollDir={hc.photoScrollDir}
         />
         <AlarmOverlay expiredTimers={expiredTimers} onDismissAll={dismissAll} />
       </>

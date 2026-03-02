@@ -804,10 +804,15 @@ async function handleNotificationPost(request, env) {
 
   // If this is a gesture from HandController, also update the fast-poll gesture key
   if (notification.type === "gesture" && notification.from === "HandController") {
-    const m = notification.title?.match(/(L|R) Hand: (\w+)/);
+    const m = notification.title?.match(/(L|R|Both) (?:Hands?): (.+)/);
     if (m) {
+      // Normalize gesture name to camelCase (e.g. "Wave Left" -> "waveLeft")
+      const raw = m[2].trim();
+      const gesture = raw.includes(" ") || raw.includes("-")
+        ? raw.replace(/[-\s]+(.)/g, (_, c) => c.toUpperCase()).replace(/^./, c => c.toLowerCase())
+        : raw;
       await env.NOTIFICATIONS.put("gesture_latest", JSON.stringify({
-        gesture: m[2],
+        gesture,
         hand: m[1],
         timestamp: notification.timestamp || Date.now(),
         id: notification.id,
