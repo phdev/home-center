@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useTime } from "./hooks/useTime";
 import { useTimers } from "./hooks/useTimers";
 import { usePreviewMode } from "./hooks/usePreviewMode";
@@ -28,10 +28,13 @@ import { FullPhotosPage } from "./components/FullPhotosPage";
 import { FullLLMResponsePage } from "./components/FullLLMResponsePage";
 import { FullHistoryPage } from "./components/FullHistoryPage";
 import { TranscriptionOverlay } from "./components/TranscriptionOverlay";
+import { SideNav } from "./components/SideNav";
+import { FamilyMemberPage } from "./components/FamilyMemberPage";
 
 export default function App() {
   const now = useTime();
   const { isMobile } = usePreviewMode();
+  const [activeMember, setActiveMember] = useState("home");
   const { settings } = useSettings();
   const { timers, expiredTimers, dismissTimer, dismissAll } = useTimers(settings.worker);
   const { page, calendarView, goTo } = useNavigation(settings.worker);
@@ -175,47 +178,54 @@ export default function App() {
             <FactPanel />
           </div>
         ) : (
-          <div style={{ display: "flex", gap: 16, flex: 1, marginTop: 16, minHeight: 0 }}>
-            {/* Left column: Calendar */}
-            <div style={{ width: 400, flexShrink: 0, minHeight: 0 }}>
-              <CalendarPanel events={calendar.events} loading={calendar.loading} error={calendar.error} selected={hc.selectedPanelId === "calendar"} />
-            </div>
-
-            {/* Middle column */}
-            <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 16, minHeight: 0 }}>
-              <div style={{ display: "flex", gap: 16, height: 270, flexShrink: 0 }}>
-                <div style={{ width: 340, flexShrink: 0, minHeight: 0 }}>
-                  <BirthdaysPanel birthdays={bdays.birthdays} loading={bdays.loading} error={bdays.error} selected={hc.selectedPanelId === "birthdays"} />
+          <div style={{ display: "flex", flex: 1, marginTop: 16, minHeight: 0 }}>
+            <SideNav activeMember={activeMember} onSelect={setActiveMember} />
+            {activeMember !== "home" ? (
+              <FamilyMemberPage member={activeMember} />
+            ) : (
+              <div style={{ display: "flex", gap: 16, flex: 1, minHeight: 0, marginLeft: 16 }}>
+                {/* Left column: Calendar */}
+                <div style={{ width: 400, flexShrink: 0, minHeight: 0 }}>
+                  <CalendarPanel events={calendar.events} loading={calendar.loading} error={calendar.error} selected={hc.selectedPanelId === "calendar"} />
                 </div>
-                <div style={{ flex: 1, display: "flex", gap: 16, minHeight: 0 }}>
-                  <div style={{ flex: 1, minHeight: 0 }}>
-                    <WeatherPanel weatherData={weather.data} loading={weather.loading} error={weather.error} selected={hc.selectedPanelId === "weather"} />
+
+                {/* Middle column */}
+                <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 16, minHeight: 0 }}>
+                  <div style={{ display: "flex", gap: 16, height: 270, flexShrink: 0 }}>
+                    <div style={{ width: 340, flexShrink: 0, minHeight: 0 }}>
+                      <BirthdaysPanel birthdays={bdays.birthdays} loading={bdays.loading} error={bdays.error} selected={hc.selectedPanelId === "birthdays"} />
+                    </div>
+                    <div style={{ flex: 1, display: "flex", gap: 16, minHeight: 0 }}>
+                      <div style={{ flex: 1, minHeight: 0 }}>
+                        <WeatherPanel weatherData={weather.data} loading={weather.loading} error={weather.error} selected={hc.selectedPanelId === "weather"} />
+                      </div>
+                      <div style={{ flex: 1, minHeight: 0 }}>
+                        <WorldClockPanel selected={hc.selectedPanelId === "worldclock"} />
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", gap: 16, flex: 1, minHeight: 0 }}>
+                    <div style={{ flex: 1, minHeight: 0 }}>
+                      <PhotoPanel photos={photos.photos} photosLoading={photos.loading} photosError={photos.error} selected={hc.selectedPanelId === "photo"} />
+                    </div>
+                    <div style={{ width: 340, flexShrink: 0, minHeight: 0 }}>
+                      <EventsPanel updates={school.updates} loading={school.loading} error={school.error} selected={hc.selectedPanelId === "events"} />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Right column */}
+                <div style={{ width: 400, flexShrink: 0, display: "flex", flexDirection: "column", gap: 16, minHeight: 0 }}>
+                  <div style={{ height: 270, flexShrink: 0 }}>
+                    <TimersPanel timers={timers} dismissTimer={dismissTimer} selected={hc.selectedPanelId === "timers"} />
                   </div>
                   <div style={{ flex: 1, minHeight: 0 }}>
-                    <WorldClockPanel selected={hc.selectedPanelId === "worldclock"} />
+                    <AgentTasksPanel selected={hc.selectedPanelId === "agenttasks"} />
                   </div>
+                  <FactPanel selected={hc.selectedPanelId === "fact"} />
                 </div>
               </div>
-              <div style={{ display: "flex", gap: 16, flex: 1, minHeight: 0 }}>
-                <div style={{ flex: 1, minHeight: 0 }}>
-                  <PhotoPanel photos={photos.photos} photosLoading={photos.loading} photosError={photos.error} selected={hc.selectedPanelId === "photo"} />
-                </div>
-                <div style={{ width: 340, flexShrink: 0, minHeight: 0 }}>
-                  <EventsPanel updates={school.updates} loading={school.loading} error={school.error} selected={hc.selectedPanelId === "events"} />
-                </div>
-              </div>
-            </div>
-
-            {/* Right column */}
-            <div style={{ width: 400, flexShrink: 0, display: "flex", flexDirection: "column", gap: 16, minHeight: 0 }}>
-              <div style={{ height: 270, flexShrink: 0 }}>
-                <TimersPanel timers={timers} dismissTimer={dismissTimer} selected={hc.selectedPanelId === "timers"} />
-              </div>
-              <div style={{ flex: 1, minHeight: 0 }}>
-                <AgentTasksPanel selected={hc.selectedPanelId === "agenttasks"} />
-              </div>
-              <FactPanel selected={hc.selectedPanelId === "fact"} />
-            </div>
+            )}
           </div>
         )}
       </div>
