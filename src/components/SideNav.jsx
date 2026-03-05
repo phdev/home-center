@@ -1,11 +1,11 @@
 import { Home } from "lucide-react";
 
 const MEMBERS = [
-  { id: "home", label: "Home", color: "#4ade80", icon: true },
-  { id: "peter", label: "Peter", color: "#60A5FA", initial: "P" },
-  { id: "ali", label: "Ali", color: "#F472B6", initial: "A" },
-  { id: "lucy", label: "Lucy", color: "#A78BFA", initial: "L" },
-  { id: "livy", label: "Livy", color: "#34D399", initial: "L" },
+  { id: "home", label: "Home", icon: true },
+  { id: "peter", label: "Peter", initial: "P" },
+  { id: "ali", label: "Ali", initial: "A" },
+  { id: "lucy", label: "Lucy", initial: "L" },
+  { id: "livy", label: "Livy", initial: "L" },
 ];
 
 export function SideNav({ activeMember, onSelect }) {
@@ -44,20 +44,20 @@ export function SideNav({ activeMember, onSelect }) {
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                background: active ? m.color : "transparent",
-                border: active ? "none" : `2px solid ${m.color}`,
+                background: active ? "#FFFFFF" : "transparent",
+                border: active ? "none" : "2px solid #FFFFFF66",
                 transition: "background 0.2s, border 0.2s",
               }}
             >
               {m.icon ? (
-                <Home size={20} color={active ? "#000" : m.color} />
+                <Home size={20} color={active ? "#000" : "#FFFFFF88"} />
               ) : (
                 <span
                   style={{
                     fontFamily: "'Geist','Inter',system-ui,sans-serif",
                     fontSize: 16,
                     fontWeight: 600,
-                    color: active ? "#000" : m.color,
+                    color: active ? "#000" : "#FFFFFF88",
                     lineHeight: 1,
                   }}
                 >
