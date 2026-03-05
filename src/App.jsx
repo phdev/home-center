@@ -70,6 +70,7 @@ export default function App() {
           onViewChange={(v) => goTo(null, v)}
           onBack={() => goTo("dashboard")}
           handControllerConnected={hc.connected}
+          lastGesture={hc.lastGesture}
         />
         <TranscriptionOverlay query={llm.latestResponse?.query} visible={!!llm.latestResponse && forcePage !== "llm-response"} />
         <AlarmOverlay expiredTimers={expiredTimers} onDismissAll={dismissAll} />
@@ -87,6 +88,7 @@ export default function App() {
           locationName={weather.locationName}
           onBack={() => goTo("dashboard")}
           handControllerConnected={hc.connected}
+          lastGesture={hc.lastGesture}
         />
         <TranscriptionOverlay query={llm.latestResponse?.query} visible={!!llm.latestResponse && forcePage !== "llm-response"} />
         <AlarmOverlay expiredTimers={expiredTimers} onDismissAll={dismissAll} />
@@ -105,6 +107,7 @@ export default function App() {
           columns={hc.photoColumns}
           scrollDir={hc.photoScrollDir}
           handControllerConnected={hc.connected}
+          lastGesture={hc.lastGesture}
         />
         <TranscriptionOverlay query={llm.latestResponse?.query} visible={!!llm.latestResponse && forcePage !== "llm-response"} />
         <AlarmOverlay expiredTimers={expiredTimers} onDismissAll={dismissAll} />
@@ -119,6 +122,7 @@ export default function App() {
           response={llm.latestResponse}
           onBack={() => { llm.dismissResponse(); goTo("dashboard"); }}
           handControllerConnected={hc.connected}
+          lastGesture={hc.lastGesture}
         />
         <AlarmOverlay expiredTimers={expiredTimers} onDismissAll={dismissAll} />
       </>
@@ -138,6 +142,7 @@ export default function App() {
             goTo("dashboard");
           }}
           handControllerConnected={hc.connected}
+          lastGesture={hc.lastGesture}
         />
         <AlarmOverlay expiredTimers={expiredTimers} onDismissAll={dismissAll} />
       </>
@@ -166,7 +171,7 @@ export default function App() {
           color: "#FFFFFF",
         }}
       >
-        <Header now={now} isMobile={isMobile} onHistory={() => { llm.fetchHistory(); goTo("history"); }} handControllerConnected={hc.connected} />
+        <Header now={now} isMobile={isMobile} onHistory={() => { llm.fetchHistory(); goTo("history"); }} handControllerConnected={hc.connected} lastGesture={hc.lastGesture} />
 
         {isMobile ? (
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>

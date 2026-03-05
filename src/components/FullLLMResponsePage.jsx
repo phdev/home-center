@@ -1,6 +1,7 @@
 import { useTime } from "../hooks/useTime";
 import { ArrowLeft, MapPin, User, Bug, Flower2, Calendar, Lightbulb } from "lucide-react";
 import { GlassesIndicator } from "./GlassesIndicator";
+import { GestureDebug } from "./GestureDebug";
 
 const F = "'Geist','Inter',system-ui,sans-serif";
 const M = "'JetBrains Mono',ui-monospace,monospace";
@@ -26,7 +27,7 @@ const TYPE_COLORS = {
 
 // ─── Top Bar ─────────────────────────────────────────────────────────
 
-function TopBar({ onBack, response, now, handControllerConnected }) {
+function TopBar({ onBack, response, now, handControllerConnected, lastGesture }) {
   const dayNames = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
   const dateStr = `${dayNames[now.getDay()]}, ${SHORT_MONTHS[now.getMonth()]} ${now.getDate()}`;
   const h = now.getHours() % 12 || 12;
@@ -55,6 +56,7 @@ function TopBar({ onBack, response, now, handControllerConnected }) {
       </span>
 
       <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+        <GestureDebug lastGesture={lastGesture} />
         <GlassesIndicator connected={handControllerConnected} />
         <span style={{ fontFamily: F, fontSize: 22, color: "#FFFFFF88" }}>{dateStr}</span>
         <span style={{ fontFamily: M, fontSize: 42, fontWeight: 600, color: "#FFF" }}>
@@ -128,7 +130,7 @@ function InfographicCard({ infographic, typeColor }) {
 
 // ─── Main Page ───────────────────────────────────────────────────────
 
-export function FullLLMResponsePage({ response, onBack, handControllerConnected }) {
+export function FullLLMResponsePage({ response, onBack, handControllerConnected, lastGesture }) {
   const now = useTime();
 
   if (!response) return null;
@@ -141,7 +143,7 @@ export function FullLLMResponsePage({ response, onBack, handControllerConnected 
       flexDirection: "column", overflow: "hidden",
       fontFamily: F, color: "#FFF",
     }}>
-      <TopBar onBack={onBack} response={response} now={now} handControllerConnected={handControllerConnected} />
+      <TopBar onBack={onBack} response={response} now={now} handControllerConnected={handControllerConnected} lastGesture={lastGesture} />
 
       <div style={{
         flex: 1, display: "flex", gap: 20, padding: 20, minHeight: 0,

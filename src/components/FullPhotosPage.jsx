@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { useTime } from "../hooks/useTime";
 import { ArrowLeft } from "lucide-react";
 import { GlassesIndicator } from "./GlassesIndicator";
+import { GestureDebug } from "./GestureDebug";
 
 const F = "'Geist','Inter',system-ui,sans-serif";
 const M = "'JetBrains Mono',ui-monospace,monospace";
@@ -10,7 +11,7 @@ const SCROLL_STEP = 400; // px per scroll gesture
 
 // ─── Top Bar ─────────────────────────────────────────────────────────
 
-function TopBar({ onBack, photoCount, columns, now, handControllerConnected }) {
+function TopBar({ onBack, photoCount, columns, now, handControllerConnected, lastGesture }) {
   const dayNames = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
   const dateStr = `${dayNames[now.getDay()]}, ${SHORT_MONTHS[now.getMonth()]} ${now.getDate()}`;
   const h = now.getHours() % 12 || 12;
@@ -40,6 +41,7 @@ function TopBar({ onBack, photoCount, columns, now, handControllerConnected }) {
       </div>
 
       <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+        <GestureDebug lastGesture={lastGesture} />
         <GlassesIndicator connected={handControllerConnected} />
         <span style={{ fontFamily: F, fontSize: 22, color: "#FFFFFF88" }}>{dateStr}</span>
         <span style={{ fontFamily: M, fontSize: 42, fontWeight: 600, color: "#FFF" }}>
@@ -52,7 +54,7 @@ function TopBar({ onBack, photoCount, columns, now, handControllerConnected }) {
 
 // ─── Main Page ───────────────────────────────────────────────────────
 
-export function FullPhotosPage({ photos, loading, error, onBack, columns = 4, scrollDir = 0, handControllerConnected }) {
+export function FullPhotosPage({ photos, loading, error, onBack, columns = 4, scrollDir = 0, handControllerConnected, lastGesture }) {
   const now = useTime();
   const items = photos || [];
   const scrollRef = useRef(null);
@@ -69,7 +71,7 @@ export function FullPhotosPage({ photos, loading, error, onBack, columns = 4, sc
       flexDirection: "column", overflow: "hidden",
       fontFamily: F, color: "#FFF",
     }}>
-      <TopBar onBack={onBack} photoCount={items.length} columns={columns} now={now} handControllerConnected={handControllerConnected} />
+      <TopBar onBack={onBack} photoCount={items.length} columns={columns} now={now} handControllerConnected={handControllerConnected} lastGesture={lastGesture} />
       <div ref={scrollRef} style={{ flex: 1, padding: 16, minHeight: 0, overflow: "auto" }}>
         {loading && (
           <div style={{

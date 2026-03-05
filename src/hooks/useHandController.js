@@ -33,6 +33,7 @@ export function useHandController(workerSettings, currentPage, goTo) {
   const [connected, setConnected] = useState(false);
   const [photoColumns, setPhotoColumns] = useState(DEFAULT_COLUMNS);
   const [photoScrollDir, setPhotoScrollDir] = useState(0);
+  const [lastGesture, setLastGesture] = useState(null); // { name, hand, timestamp }
 
   const lastGestureIdRef = useRef(null);
   const initializedRef = useRef(false);
@@ -80,15 +81,19 @@ export function useHandController(workerSettings, currentPage, goTo) {
 
       switch (gesture) {
         case "waveRight":
+        case "thumbSwipeRight":
           navigate("right");
           return;
         case "waveLeft":
+        case "thumbSwipeLeft":
           navigate("left");
           return;
         case "waveUp":
+        case "thumbSwipeUp":
           navigate("up");
           return;
         case "waveDown":
+        case "thumbSwipeDown":
           navigate("down");
           return;
         case "indexThumbPinch":
@@ -139,6 +144,7 @@ export function useHandController(workerSettings, currentPage, goTo) {
 
         lastGestureIdRef.current = g.id;
         setLastGestureTime(g.timestamp);
+        setLastGesture({ name: g.gesture, hand: g.hand, timestamp: g.timestamp });
         processGesture(g.gesture);
       } catch {
         // silent
@@ -169,5 +175,5 @@ export function useHandController(workerSettings, currentPage, goTo) {
     return () => clearTimeout(timer);
   }, [lastGestureTime]);
 
-  return { connected, selectedPanelId, photoColumns, photoScrollDir };
+  return { connected, selectedPanelId, photoColumns, photoScrollDir, lastGesture };
 }
