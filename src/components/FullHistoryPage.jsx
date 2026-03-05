@@ -1,5 +1,6 @@
 import { useTime } from "../hooks/useTime";
 import { ArrowLeft, MapPin, User, Bug, Flower2, Calendar, Lightbulb, Clock } from "lucide-react";
+import { GlassesIndicator } from "./GlassesIndicator";
 
 const F = "'Geist','Inter',system-ui,sans-serif";
 const M = "'JetBrains Mono',ui-monospace,monospace";
@@ -36,7 +37,7 @@ function relativeTime(timestamp) {
 
 // ─── Top Bar ─────────────────────────────────────────────────────────
 
-function TopBar({ onBack, count, now }) {
+function TopBar({ onBack, count, now, handControllerConnected }) {
   const dayNames = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
   const dateStr = `${dayNames[now.getDay()]}, ${SHORT_MONTHS[now.getMonth()]} ${now.getDate()}`;
   const h = now.getHours() % 12 || 12;
@@ -60,6 +61,7 @@ function TopBar({ onBack, count, now }) {
       </span>
 
       <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+        <GlassesIndicator connected={handControllerConnected} />
         <span style={{ fontFamily: F, fontSize: 22, color: "#FFFFFF88" }}>{dateStr}</span>
         <span style={{ fontFamily: M, fontSize: 42, fontWeight: 600, color: "#FFF" }}>
           {h}:{m} {ampm}
@@ -128,7 +130,7 @@ function QueryCard({ item, onSelect }) {
 
 // ─── Main Page ───────────────────────────────────────────────────────
 
-export function FullHistoryPage({ history, loading, onBack, onSelect }) {
+export function FullHistoryPage({ history, loading, onBack, onSelect, handControllerConnected }) {
   const now = useTime();
   const items = history || [];
 
@@ -138,7 +140,7 @@ export function FullHistoryPage({ history, loading, onBack, onSelect }) {
       flexDirection: "column", overflow: "hidden",
       fontFamily: F, color: "#FFF",
     }}>
-      <TopBar onBack={onBack} count={items.length} now={now} />
+      <TopBar onBack={onBack} count={items.length} now={now} handControllerConnected={handControllerConnected} />
 
       <div style={{ flex: 1, padding: 20, minHeight: 0, overflowY: "auto" }}>
         {loading && (

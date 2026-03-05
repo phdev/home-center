@@ -69,6 +69,7 @@ export default function App() {
           view={forceView}
           onViewChange={(v) => goTo(null, v)}
           onBack={() => goTo("dashboard")}
+          handControllerConnected={hc.connected}
         />
         <TranscriptionOverlay query={llm.latestResponse?.query} visible={!!llm.latestResponse && forcePage !== "llm-response"} />
         <AlarmOverlay expiredTimers={expiredTimers} onDismissAll={dismissAll} />
@@ -85,6 +86,7 @@ export default function App() {
           error={weather.error}
           locationName={weather.locationName}
           onBack={() => goTo("dashboard")}
+          handControllerConnected={hc.connected}
         />
         <TranscriptionOverlay query={llm.latestResponse?.query} visible={!!llm.latestResponse && forcePage !== "llm-response"} />
         <AlarmOverlay expiredTimers={expiredTimers} onDismissAll={dismissAll} />
@@ -102,6 +104,7 @@ export default function App() {
           onBack={() => goTo("dashboard")}
           columns={hc.photoColumns}
           scrollDir={hc.photoScrollDir}
+          handControllerConnected={hc.connected}
         />
         <TranscriptionOverlay query={llm.latestResponse?.query} visible={!!llm.latestResponse && forcePage !== "llm-response"} />
         <AlarmOverlay expiredTimers={expiredTimers} onDismissAll={dismissAll} />
@@ -115,6 +118,7 @@ export default function App() {
         <FullLLMResponsePage
           response={llm.latestResponse}
           onBack={() => { llm.dismissResponse(); goTo("dashboard"); }}
+          handControllerConnected={hc.connected}
         />
         <AlarmOverlay expiredTimers={expiredTimers} onDismissAll={dismissAll} />
       </>
@@ -133,6 +137,7 @@ export default function App() {
             // For now, just show the summary since we don't store full sections in history
             goTo("dashboard");
           }}
+          handControllerConnected={hc.connected}
         />
         <AlarmOverlay expiredTimers={expiredTimers} onDismissAll={dismissAll} />
       </>
@@ -161,7 +166,7 @@ export default function App() {
           color: "#FFFFFF",
         }}
       >
-        <Header now={now} isMobile={isMobile} onHistory={() => { llm.fetchHistory(); goTo("history"); }} />
+        <Header now={now} isMobile={isMobile} onHistory={() => { llm.fetchHistory(); goTo("history"); }} handControllerConnected={hc.connected} />
 
         {isMobile ? (
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -229,20 +234,6 @@ export default function App() {
           </div>
         )}
       </div>
-      {hc.connected && (
-        <div style={{
-          position: "fixed", bottom: 12, right: 16,
-          display: "flex", alignItems: "center", gap: 6,
-          padding: "4px 10px", borderRadius: 12,
-          background: "#FFFFFF10", border: "1px solid #FFFFFF30",
-          zIndex: 50,
-        }}>
-          <div style={{ width: 6, height: 6, borderRadius: 3, background: "#4ADE80" }} />
-          <span style={{ fontFamily: "'Geist',sans-serif", fontSize: 11, color: "#FFFFFF66" }}>
-            Hand Control
-          </span>
-        </div>
-      )}
       <TranscriptionOverlay query={llm.latestResponse?.query} visible={!!llm.latestResponse && forcePage !== "llm-response"} />
       <AlarmOverlay expiredTimers={expiredTimers} onDismissAll={dismissAll} />
     </>

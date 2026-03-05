@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { useTime } from "../hooks/useTime";
 import { ArrowLeft, CalendarCheck } from "lucide-react";
+import { GlassesIndicator } from "./GlassesIndicator";
 
 const F = "'Geist','Inter',system-ui,sans-serif";
 const M = "'JetBrains Mono',ui-monospace,monospace";
@@ -71,7 +72,7 @@ const HOURS = Array.from({ length: 16 }, (_, i) => i + 6); // 6 AM to 9 PM
 
 // ─── Top Bar ─────────────────────────────────────────────────────────
 
-function TopBar({ view, onViewChange, onBack, now }) {
+function TopBar({ view, onViewChange, onBack, now, handControllerConnected }) {
   const dayNames = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
   const dateStr = `${dayNames[now.getDay()]}, ${SHORT_MONTHS[now.getMonth()]} ${now.getDate()}`;
   const h = now.getHours() % 12 || 12;
@@ -115,8 +116,9 @@ function TopBar({ view, onViewChange, onBack, now }) {
         })}
       </div>
 
-      {/* Right: date + clock */}
+      {/* Right: glasses + date + clock */}
       <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+        <GlassesIndicator connected={handControllerConnected} />
         <span style={{ fontFamily: F, fontSize: 22, color: "#FFFFFF88" }}>{dateStr}</span>
         <span style={{ fontFamily: M, fontSize: 42, fontWeight: 600, color: "#FFF" }}>
           {h}:{m} {ampm}
@@ -525,7 +527,7 @@ function DailyGrid({ today, events }) {
 
 // ─── Main Page ───────────────────────────────────────────────────────
 
-export function FullCalendarPage({ events, loading, view, onViewChange, onBack }) {
+export function FullCalendarPage({ events, loading, view, onViewChange, onBack, handControllerConnected }) {
   const now = useTime();
   const today = new Date(now);
 
@@ -542,7 +544,7 @@ export function FullCalendarPage({ events, loading, view, onViewChange, onBack }
       flexDirection: "column", overflow: "hidden",
       fontFamily: F, color: "#FFF",
     }}>
-      <TopBar view={view} onViewChange={onViewChange} onBack={onBack} now={now} />
+      <TopBar view={view} onViewChange={onViewChange} onBack={onBack} now={now} handControllerConnected={handControllerConnected} />
       <div style={{
         flex: 1, display: "flex", gap: 16, padding: 16, minHeight: 0,
       }}>

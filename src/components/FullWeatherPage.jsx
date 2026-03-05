@@ -1,5 +1,6 @@
 import { useTime } from "../hooks/useTime";
 import { ArrowLeft, Wind, Droplets, Thermometer, CloudSun } from "lucide-react";
+import { GlassesIndicator } from "./GlassesIndicator";
 
 const F = "'Geist','Inter',system-ui,sans-serif";
 const M = "'JetBrains Mono',ui-monospace,monospace";
@@ -7,7 +8,7 @@ const SHORT_MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct
 
 // ─── Top Bar ─────────────────────────────────────────────────────────
 
-function TopBar({ onBack, locationName, now }) {
+function TopBar({ onBack, locationName, now, handControllerConnected }) {
   const dayNames = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
   const dateStr = `${dayNames[now.getDay()]}, ${SHORT_MONTHS[now.getMonth()]} ${now.getDate()}`;
   const h = now.getHours() % 12 || 12;
@@ -28,6 +29,7 @@ function TopBar({ onBack, locationName, now }) {
         {locationName || ""}
       </span>
       <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+        <GlassesIndicator connected={handControllerConnected} />
         <span style={{ fontFamily: F, fontSize: 22, color: "#FFFFFF88" }}>{dateStr}</span>
         <span style={{ fontFamily: M, fontSize: 42, fontWeight: 600, color: "#FFF" }}>
           {h}:{m} {ampm}
@@ -226,7 +228,7 @@ function DailyForecast({ daily }) {
 
 // ─── Main Page ───────────────────────────────────────────────────────
 
-export function FullWeatherPage({ weatherData, loading, error, locationName, onBack }) {
+export function FullWeatherPage({ weatherData, loading, error, locationName, onBack, handControllerConnected }) {
   const now = useTime();
 
   return (
@@ -235,7 +237,7 @@ export function FullWeatherPage({ weatherData, loading, error, locationName, onB
       flexDirection: "column", overflow: "hidden",
       fontFamily: F, color: "#FFF",
     }}>
-      <TopBar onBack={onBack} locationName={locationName} now={now} />
+      <TopBar onBack={onBack} locationName={locationName} now={now} handControllerConnected={handControllerConnected} />
       <div style={{
         flex: 1, display: "flex", flexDirection: "column", gap: 16, padding: 16, minHeight: 0,
       }}>
