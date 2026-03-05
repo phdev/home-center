@@ -157,21 +157,6 @@ async function getLocationFromIP() {
 }
 
 export async function getLocationCoords() {
-  // Try browser geolocation first, fall back to IP-based
-  try {
-    const coords = await new Promise((resolve, reject) => {
-      if (!navigator.geolocation) {
-        reject(new Error("Geolocation not supported"));
-        return;
-      }
-      navigator.geolocation.getCurrentPosition(
-        (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude, locationName: null }),
-        (err) => reject(err),
-        { timeout: 5000 },
-      );
-    });
-    return coords;
-  } catch {
-    return getLocationFromIP();
-  }
+  // Use IP-based geolocation to avoid browser permission prompts (kiosk mode)
+  return getLocationFromIP();
 }
