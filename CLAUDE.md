@@ -76,6 +76,40 @@ Bypass pull requests entirely using two sequential pushes:
 | `src/components/` | 17 panel/widget components |
 | `index.html` | Viewport config, font imports, dark background |
 
+### HandController (Meta Glasses Gesture Control)
+
+**iOS app** (`phdev/HandController`) streams video from Meta Ray-Ban glasses, detects hand gestures via Apple Vision, and POSTs to the Cloudflare Worker.
+
+**Connection flow:**
+1. HandController iOS app → POST `/api/notifications` (with `type: "gesture"`, `from: "HandController"`)
+2. Worker extracts gesture from title (e.g. `"R Hand: Wave Right"` → `waveRight`), stores in KV as `gesture_latest`
+3. Dashboard polls `GET /api/gesture` every 500ms → processes gesture → green glasses icon appears in top nav
+
+**Worker URL:** `https://home-center-api.phhowell.workers.dev` (no AUTH_TOKEN currently configured)
+
+**Spatial navigation** (dashboard only):
+```
+Row 0:  Calendar → Birthdays → Weather → WorldClock → Timers
+Row 1:  Calendar → Photos    → Events  →             → AgentTasks
+Row 2:  Calendar →           →         →             → Fact
+```
+- Wave right/left/up/down navigates spatially between panels
+- Calendar is selected by default on load
+- Index-thumb pinch opens fullscreen page (Calendar, Weather, Photos)
+- Middle-thumb pinch returns to dashboard from any fullscreen page
+- Selected panel: **5px blue (#3B82F6) border**
+
+**Photo page gestures:** Two-hand pinch in/out zooms, pinchDrag up/down scrolls
+
+**Key files:**
+
+| File | Purpose |
+|---|---|
+| `src/hooks/useHandController.js` | Gesture polling, spatial nav, connection state |
+| `src/components/GlassesIndicator.jsx` | Green glasses icon for top nav (all pages) |
+| `src/components/Panel.jsx` | Panel wrapper with selected border style |
+| `worker/src/index.js` | Worker: `/api/notifications` → `/api/gesture` relay |
+
 ## Pencil Designs & TV Preview
 
 ### Workflow (ALWAYS follow when creating/updating pencil designs)

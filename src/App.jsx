@@ -211,7 +211,7 @@ export default function App() {
                   </div>
                   <div style={{ display: "flex", gap: 16, flex: 1, minHeight: 0 }}>
                     <div style={{ flex: 1, minHeight: 0 }}>
-                      <PhotoPanel photos={photos.photos} photosLoading={photos.loading} photosError={photos.error} selected={hc.selectedPanelId === "photo"} />
+                      <PhotoPanel photos={photos.photos} photosLoading={photos.loading} photosError={photos.error} selected={hc.selectedPanelId === "photos"} />
                     </div>
                     <div style={{ width: 340, flexShrink: 0, minHeight: 0 }}>
                       <EventsPanel updates={school.updates} loading={school.loading} error={school.error} selected={hc.selectedPanelId === "events"} />

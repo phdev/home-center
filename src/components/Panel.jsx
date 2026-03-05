@@ -3,8 +3,8 @@ export function Panel({ children, style = {}, selected = false }) {
     <div
       style={{
         borderRadius: 8,
-        border: selected ? "4px solid #FFFFFF" : "1px solid #FFFFFF",
-        margin: selected ? -3 : 0,
+        border: selected ? "5px solid #3B82F6" : "1px solid #FFFFFF",
+        margin: selected ? -4 : 0,
         padding: 16,
         background: "transparent",
         display: "flex",

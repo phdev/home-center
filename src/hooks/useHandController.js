@@ -1,31 +1,38 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 
-export const PANEL_ORDER = [
-  { id: "calendar",   fullscreenPage: "calendar" },
-  { id: "birthdays",  fullscreenPage: null },
-  { id: "weather",    fullscreenPage: "weather" },
-  { id: "worldclock", fullscreenPage: null },
-  { id: "photo",      fullscreenPage: "photos" },
-  { id: "events",     fullscreenPage: null },
-  { id: "timers",     fullscreenPage: null },
-  { id: "agenttasks", fullscreenPage: null },
-  { id: "fact",       fullscreenPage: null },
-  { id: "history",    fullscreenPage: "history" },
-];
+// Spatial navigation map — each panel knows its directional neighbors
+const NAV_MAP = {
+  calendar:    { right: "birthdays",   down: "photos",      left: null,         up: null },
+  birthdays:   { right: "weather",     down: "photos",      left: "calendar",   up: null },
+  weather:     { right: "worldclock",  down: "events",      left: "birthdays",  up: null },
+  worldclock:  { right: "timers",      down: "events",      left: "weather",    up: null },
+  timers:      { right: null,          down: "agenttasks",  left: "worldclock", up: null },
+  photos:      { right: "events",      down: null,          left: "calendar",   up: "birthdays" },
+  events:      { right: "agenttasks",  down: null,          left: "photos",     up: "weather" },
+  agenttasks:  { right: null,          down: "fact",        left: "events",     up: "timers" },
+  fact:        { right: null,          down: null,          left: "agenttasks", up: "agenttasks" },
+};
 
-const CONNECTED_TIMEOUT = 30_000; // 30s without gesture = disconnected
-const STALE_THRESHOLD = 10_000;   // ignore gestures older than 10s on first load
+// Panels that open a fullscreen page on pinch
+const FULLSCREEN_MAP = {
+  calendar: "calendar",
+  weather: "weather",
+  photos: "photos",
+};
+
+const CONNECTED_TIMEOUT = 30_000;
+const STALE_THRESHOLD = 10_000;
 const POLL_INTERVAL = 500;
 const MIN_COLUMNS = 2;
 const MAX_COLUMNS = 6;
 const DEFAULT_COLUMNS = 4;
 
 export function useHandController(workerSettings, currentPage, goTo) {
-  const [selectedIndex, setSelectedIndex] = useState(-1);
+  const [selectedPanelId, setSelectedPanelId] = useState("calendar");
   const [lastGestureTime, setLastGestureTime] = useState(0);
   const [connected, setConnected] = useState(false);
   const [photoColumns, setPhotoColumns] = useState(DEFAULT_COLUMNS);
-  const [photoScrollDir, setPhotoScrollDir] = useState(0); // -1 up, 0 none, 1 down
+  const [photoScrollDir, setPhotoScrollDir] = useState(0);
 
   const lastGestureIdRef = useRef(null);
   const initializedRef = useRef(false);
@@ -46,19 +53,15 @@ export function useHandController(workerSettings, currentPage, goTo) {
     if (currentPage === "photos") {
       switch (gesture) {
         case "twoHandPinchOut":
-          // Pull apart = zoom in = fewer columns = bigger photos
           setPhotoColumns((prev) => Math.max(MIN_COLUMNS, prev - 1));
           return;
         case "twoHandPinchIn":
-          // Pinch together = zoom out = more columns = smaller photos
           setPhotoColumns((prev) => Math.min(MAX_COLUMNS, prev + 1));
           return;
         case "pinchDragUp":
-        case "waveUp":
           setPhotoScrollDir(-1);
           return;
         case "pinchDragDown":
-        case "waveDown":
           setPhotoScrollDir(1);
           return;
         default:
@@ -66,38 +69,45 @@ export function useHandController(workerSettings, currentPage, goTo) {
       }
     }
 
-    // Global gestures
-    switch (gesture) {
-      case "waveRight":
-        setSelectedIndex((prev) =>
-          prev < 0 ? 0 : (prev + 1) % PANEL_ORDER.length
-        );
-        break;
-      case "waveLeft":
-        setSelectedIndex((prev) =>
-          prev < 0
-            ? PANEL_ORDER.length - 1
-            : (prev - 1 + PANEL_ORDER.length) % PANEL_ORDER.length
-        );
-        break;
-      case "indexThumbPinch":
-        setSelectedIndex((prev) => {
-          if (prev >= 0) {
-            const panel = PANEL_ORDER[prev];
-            if (panel.fullscreenPage) {
-              goTo(panel.fullscreenPage);
-            }
-          }
-          return prev;
+    // Spatial navigation on dashboard
+    if (!currentPage || currentPage === "dashboard") {
+      const navigate = (dir) => {
+        setSelectedPanelId((prev) => {
+          const neighbors = NAV_MAP[prev];
+          return (neighbors && neighbors[dir]) || prev;
         });
-        break;
-      case "middleThumbPinch":
-        if (currentPage && currentPage !== "dashboard") {
-          goTo("dashboard");
-        }
-        break;
-      default:
-        break;
+      };
+
+      switch (gesture) {
+        case "waveRight":
+          navigate("right");
+          return;
+        case "waveLeft":
+          navigate("left");
+          return;
+        case "waveUp":
+          navigate("up");
+          return;
+        case "waveDown":
+          navigate("down");
+          return;
+        case "indexThumbPinch":
+          setSelectedPanelId((prev) => {
+            const page = FULLSCREEN_MAP[prev];
+            if (page) goTo(page);
+            return prev;
+          });
+          return;
+        default:
+          break;
+      }
+    }
+
+    // Global: middle-thumb pinch to go back to dashboard
+    if (gesture === "middleThumbPinch") {
+      if (currentPage && currentPage !== "dashboard") {
+        goTo("dashboard");
+      }
     }
   }, [currentPage, goTo]);
 
@@ -116,10 +126,8 @@ export function useHandController(workerSettings, currentPage, goTo) {
 
         const g = data.gesture;
 
-        // Skip if already processed
         if (g.id === lastGestureIdRef.current) return;
 
-        // On first load, skip stale gestures (just record the ID)
         const age = Date.now() - g.timestamp;
         if (!initializedRef.current) {
           initializedRef.current = true;
@@ -160,10 +168,6 @@ export function useHandController(workerSettings, currentPage, goTo) {
     const timer = setTimeout(() => setConnected(false), remaining);
     return () => clearTimeout(timer);
   }, [lastGestureTime]);
-
-  const selectedPanelId = connected && selectedIndex >= 0
-    ? PANEL_ORDER[selectedIndex].id
-    : null;
 
   return { connected, selectedPanelId, photoColumns, photoScrollDir };
 }
