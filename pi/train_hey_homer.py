@@ -65,30 +65,62 @@ VOICES = [
     "en-AU-WilliamNeural",
 ]
 
-# Positive phrase variations
+# Positive phrase variations — include natural ways people say it
 POSITIVE_PHRASES = [
     "hey homer",
     "Hey Homer",
     "hey homer.",
     "Hey Homer!",
+    "hey, homer",
+    "Hey, Homer",
+    "hey homer?",
+    "hey Homer",
 ]
 
 # Negative phrases — things that should NOT trigger
-NEGATIVE_PHRASES = [
-    "hey", "homer", "hello", "hey there", "hey siri", "hey google",
-    "hey alexa", "okay google", "hi homer", "hey john", "hey home",
-    "hay bale", "hey honey", "hey mother", "hey brother", "homer simpson",
-    "home run", "homework", "hey holmer", "hey hummer", "hey humor",
-    "good morning", "what's the weather", "turn on the lights",
-    "play some music", "set a timer", "how are you", "tell me a joke",
-    "hey computer", "hey jarvis", "hey cortana", "open the door",
-    "the quick brown fox", "testing one two three",
+# Organized by category for maintainability
+_PHONETIC_NEAR_MISSES = [
+    # H-onset words that sound similar
     "hey hooper", "hey cooper", "hey mover", "hey rover",
+    "hey holmer", "hey hummer", "hey humor", "hey home",
+    "homework", "home run", "homer simpson", "hey honey",
+    "hey mother", "hey brother", "hey hammer", "hey harbor",
+    "hey horror", "hey hover", "hey hunger", "hey hunter",
+    # Partial matches — just one word
+    "hey", "homer", "hey there", "hi homer",
+    "hay bale", "hey john", "hey howdy",
+    # Rhymes and near-rhymes
+    "hey roamer", "hey gopher", "hey bloomer", "hey boomer",
+    "hey groomer", "hey looper", "hey trooper",
+]
+_OTHER_WAKE_WORDS = [
+    "hey siri", "hey google", "hey alexa", "okay google",
+    "hey computer", "hey jarvis", "hey cortana",
+]
+_COMMON_SPEECH = [
+    "hello", "good morning", "what's the weather", "turn on the lights",
+    "play some music", "set a timer", "how are you", "tell me a joke",
+    "open the door", "the quick brown fox", "testing one two three",
+    "what time is it", "turn off the TV", "can you hear me",
+    "I'm going to bed", "thanks a lot", "see you later",
+    "that's interesting", "let me check", "one more thing",
+]
+_TV_COMMON_PHRASES = [
+    # Phrases commonly heard from TV audio that might false-trigger
+    "coming up next", "stay tuned", "breaking news", "we'll be right back",
+    "and now", "here we go", "let's take a look", "tonight on",
+    "welcome back", "thanks for watching", "subscribe now",
+    "hey everyone", "hey guys", "hey folks",
 ]
 
+NEGATIVE_PHRASES = (
+    _PHONETIC_NEAR_MISSES + _OTHER_WAKE_WORDS +
+    _COMMON_SPEECH + _TV_COMMON_PHRASES
+)
+
 # Speech rate/pitch variations for data augmentation
-RATE_VARIATIONS = ["-10%", "-5%", "+0%", "+5%", "+10%", "+15%", "-15%"]
-PITCH_VARIATIONS = ["-5Hz", "+0Hz", "+5Hz", "-10Hz", "+10Hz"]
+RATE_VARIATIONS = ["-20%", "-15%", "-10%", "-5%", "+0%", "+5%", "+10%", "+15%", "+20%"]
+PITCH_VARIATIONS = ["-10Hz", "-5Hz", "+0Hz", "+5Hz", "+10Hz", "+15Hz", "-15Hz"]
 
 
 async def generate_tts_clip(text: str, voice: str, rate: str = "+0%",
@@ -157,6 +189,8 @@ async def generate_samples(phrases: list[str], n_samples: int,
 def add_noise(audio: np.ndarray, snr_db: float = 20.0) -> np.ndarray:
     """Add Gaussian noise at the specified SNR."""
     signal_power = np.mean(audio.astype(np.float64) ** 2)
+    if signal_power < 1e-10:
+        return audio
     noise_power = signal_power / (10 ** (snr_db / 10))
     noise = np.random.normal(0, np.sqrt(noise_power), len(audio))
     return np.clip(audio + noise, -32768, 32767).astype(np.int16)
@@ -169,33 +203,146 @@ def random_gain(audio: np.ndarray, min_db: float = -6, max_db: float = 6) -> np.
     return np.clip(audio * gain, -32768, 32767).astype(np.int16)
 
 
+def speed_perturbation(audio: np.ndarray, factor: float) -> np.ndarray:
+    """Change speed without changing pitch (simple resampling).
+
+    factor > 1.0 = faster speech, factor < 1.0 = slower speech.
+    """
+    indices = np.arange(0, len(audio), factor)
+    indices = indices[indices < len(audio)].astype(int)
+    return audio[indices]
+
+
+def simple_reverb(audio: np.ndarray, decay: float = 0.3, delay_ms: float = 30) -> np.ndarray:
+    """Add simple synthetic reverb (comb filter approximation).
+
+    Simulates room reflections — critical for training robustness since
+    the Pi mic picks up reflections off walls and the TV screen.
+    """
+    delay_samples = int(16000 * delay_ms / 1000)
+    output = audio.astype(np.float64).copy()
+    for tap in range(1, 4):
+        d = delay_samples * tap
+        gain = decay ** tap
+        if d < len(output):
+            output[d:] += audio[:len(output) - d] * gain
+    return np.clip(output, -32768, 32767).astype(np.int16)
+
+
+def apply_pre_emphasis(audio: np.ndarray, coeff: float = 0.97) -> np.ndarray:
+    """Pre-emphasis filter to boost high frequencies.
+
+    Helps the model learn the breathy "H" onset in "Hey Homer" which has
+    most energy in higher frequency bands.
+    """
+    emphasized = np.append(audio[0], audio[1:] - coeff * audio[:-1])
+    return np.clip(emphasized, -32768, 32767).astype(np.int16)
+
+
 def pad_or_trim(audio: np.ndarray, target_len: int) -> np.ndarray:
     """Pad with silence or trim to target length."""
     if len(audio) >= target_len:
-        # Random offset for trimming
         max_start = len(audio) - target_len
         start = random.randint(0, max_start)
         return audio[start:start + target_len]
     else:
-        # Pad with silence, random position
         pad_total = target_len - len(audio)
         pad_before = random.randint(0, pad_total)
         pad_after = pad_total - pad_before
         return np.pad(audio, (pad_before, pad_after), mode="constant")
 
 
-def augment_clip(audio: np.ndarray, target_len: int) -> np.ndarray:
-    """Apply random augmentation pipeline."""
+# Cache of loaded background noise clips for mixing
+_background_clips: list[np.ndarray] = []
+
+
+def load_background_clips(samples_dir: Path) -> list[np.ndarray]:
+    """Load background noise recordings from pi/samples/background/."""
+    global _background_clips
+    if _background_clips:
+        return _background_clips
+    bg_dir = samples_dir / "background"
+    if not bg_dir.exists():
+        return []
+    for wav_path in sorted(bg_dir.glob("*.wav")):
+        try:
+            with wave.open(str(wav_path), "r") as wf:
+                frames = wf.readframes(wf.getnframes())
+                audio = np.frombuffer(frames, dtype=np.int16)
+                if wf.getnchannels() > 1:
+                    audio = audio.reshape(-1, wf.getnchannels()).mean(axis=1).astype(np.int16)
+                _background_clips.append(audio)
+        except Exception:
+            pass
+    if _background_clips:
+        log.info("Loaded %d background noise clips for augmentation", len(_background_clips))
+    return _background_clips
+
+
+def mix_background(audio: np.ndarray, bg_clips: list[np.ndarray],
+                   snr_db: float = 15.0) -> np.ndarray:
+    """Mix in real background noise at the specified SNR."""
+    if not bg_clips:
+        return audio
+    bg = random.choice(bg_clips)
+    # Random offset into the background clip
+    if len(bg) > len(audio):
+        start = random.randint(0, len(bg) - len(audio))
+        bg_segment = bg[start:start + len(audio)]
+    else:
+        bg_segment = np.tile(bg, (len(audio) // len(bg)) + 1)[:len(audio)]
+
+    signal_power = np.mean(audio.astype(np.float64) ** 2)
+    bg_power = np.mean(bg_segment.astype(np.float64) ** 2)
+    if bg_power < 1e-10:
+        return audio
+    scale = np.sqrt(signal_power / (bg_power * 10 ** (snr_db / 10)))
+    mixed = audio.astype(np.float64) + bg_segment.astype(np.float64) * scale
+    return np.clip(mixed, -32768, 32767).astype(np.int16)
+
+
+def augment_clip(audio: np.ndarray, target_len: int,
+                 bg_clips: list[np.ndarray] | None = None) -> np.ndarray:
+    """Apply random augmentation pipeline.
+
+    Augmentations simulate real-world conditions:
+    - Gain variation: different speaking volumes and distances
+    - Speed perturbation: natural speech rate variation
+    - Reverb: room acoustics and TV screen reflections
+    - Gaussian noise: mic self-noise and electrical interference
+    - Background mixing: real ambient noise from the Pi's environment
+    - Pre-emphasis: occasionally emphasize high frequencies
+    """
     audio = audio.copy()
 
-    # Random gain
+    # Random gain (volume/distance variation)
     if random.random() < 0.7:
-        audio = random_gain(audio, -6, 6)
+        audio = random_gain(audio, -9, 9)
 
-    # Add noise
+    # Speed perturbation (natural speech rate variation)
+    if random.random() < 0.4:
+        factor = random.uniform(0.85, 1.15)
+        audio = speed_perturbation(audio, factor)
+
+    # Simple reverb (room acoustics)
+    if random.random() < 0.3:
+        decay = random.uniform(0.15, 0.45)
+        delay = random.uniform(15, 50)
+        audio = simple_reverb(audio, decay, delay)
+
+    # Add Gaussian noise
     if random.random() < 0.5:
-        snr = random.uniform(10, 30)
+        snr = random.uniform(8, 30)
         audio = add_noise(audio, snr)
+
+    # Mix in real background noise if available
+    if bg_clips and random.random() < 0.4:
+        snr = random.uniform(5, 20)
+        audio = mix_background(audio, bg_clips, snr)
+
+    # Pre-emphasis (occasionally)
+    if random.random() < 0.2:
+        audio = apply_pre_emphasis(audio, random.uniform(0.9, 0.97))
 
     # Pad or trim
     audio = pad_or_trim(audio, target_len)
@@ -209,7 +356,8 @@ def augment_clip(audio: np.ndarray, target_len: int) -> np.ndarray:
 
 
 def compute_features_streaming(clips: list[np.ndarray], clip_duration_samples: int,
-                               n_augments: int = 3) -> np.ndarray:
+                               n_augments: int = 3,
+                               bg_clips: list[np.ndarray] | None = None) -> np.ndarray:
     """
     Compute features by running clips through the same AudioFeatures pipeline
     that the wake word model uses at inference time.
@@ -221,7 +369,7 @@ def compute_features_streaming(clips: list[np.ndarray], clip_duration_samples: i
 
     for clip in tqdm(clips, desc="Computing features"):
         for _ in range(n_augments):
-            augmented = augment_clip(clip, clip_duration_samples)
+            augmented = augment_clip(clip, clip_duration_samples, bg_clips=bg_clips)
 
             # Create fresh AudioFeatures instance for each clip
             af = AudioFeatures(inference_framework="onnx")
@@ -499,6 +647,10 @@ def main():
                         help="Clip duration in seconds")
     parser.add_argument("--output-dir", type=str, default="models",
                         help="Output directory for model")
+    parser.add_argument("--use-real-samples", action="store_true",
+                        help="Include real voice samples from pi/samples/ (recorded with record_samples.py)")
+    parser.add_argument("--real-weight", type=int, default=3,
+                        help="How many times to duplicate real samples vs TTS (default: 3x)")
     parser.add_argument("--export-only", action="store_true",
                         help="Skip training, just export from saved .pt checkpoint")
     args = parser.parse_args()
@@ -540,17 +692,65 @@ def main():
     log.info("Negative phrases: %s", neg_phrases)
 
     clip_duration_samples = int(args.clip_duration * 16000)
+    samples_dir = Path(__file__).parent / "samples"
 
-    # Step 1: Generate positive samples
-    log.info("=== Generating %d positive samples ===", args.positive_samples)
+    # Load background noise clips for augmentation (if available)
+    bg_clips = load_background_clips(samples_dir)
+
+    # Step 1: Generate positive samples (TTS)
+    log.info("=== Generating %d positive TTS samples ===", args.positive_samples)
     pos_clips = asyncio.run(generate_samples(pos_phrases, args.positive_samples,
                                              desc="Positive clips"))
-    log.info("Generated %d positive clips", len(pos_clips))
+    log.info("Generated %d positive TTS clips", len(pos_clips))
 
-    # Step 2: Generate negative samples
-    log.info("=== Generating %d negative samples ===", args.negative_samples)
+    # Step 1b: Load real voice samples if available
+    if args.use_real_samples:
+        real_pos_dir = samples_dir / "positive"
+        real_neg_dir = samples_dir / "negative"
+        real_pos_count = 0
+        real_neg_count = 0
+
+        if real_pos_dir.exists():
+            for wav_path in sorted(real_pos_dir.glob("*.wav")):
+                try:
+                    with wave.open(str(wav_path), "r") as wf:
+                        frames = wf.readframes(wf.getnframes())
+                        audio = np.frombuffer(frames, dtype=np.int16)
+                        if wf.getnchannels() > 1:
+                            audio = audio.reshape(-1, wf.getnchannels()).mean(axis=1).astype(np.int16)
+                        # Weight real samples more heavily than TTS
+                        for _ in range(args.real_weight):
+                            pos_clips.append(audio)
+                        real_pos_count += 1
+                except Exception as e:
+                    log.warning("Failed to load %s: %s", wav_path, e)
+            log.info("Loaded %d real positive samples (x%d weight = %d clips)",
+                     real_pos_count, args.real_weight, real_pos_count * args.real_weight)
+        else:
+            log.info("No real positive samples found at %s (use record_samples.py to create)", real_pos_dir)
+
+    # Step 2: Generate negative samples (TTS)
+    log.info("=== Generating %d negative TTS samples ===", args.negative_samples)
     neg_clips = asyncio.run(generate_samples(neg_phrases, args.negative_samples,
                                              desc="Negative clips"))
+
+    # Step 2b: Load real negative samples
+    if args.use_real_samples and (samples_dir / "negative").exists():
+        real_neg_dir = samples_dir / "negative"
+        real_neg_count = 0
+        for wav_path in sorted(real_neg_dir.glob("*.wav")):
+            try:
+                with wave.open(str(wav_path), "r") as wf:
+                    frames = wf.readframes(wf.getnframes())
+                    audio = np.frombuffer(frames, dtype=np.int16)
+                    if wf.getnchannels() > 1:
+                        audio = audio.reshape(-1, wf.getnchannels()).mean(axis=1).astype(np.int16)
+                    for _ in range(args.real_weight):
+                        neg_clips.append(audio)
+                    real_neg_count += 1
+            except Exception as e:
+                log.warning("Failed to load %s: %s", wav_path, e)
+        log.info("Loaded %d real negative samples (x%d weight)", real_neg_count, args.real_weight)
 
     # Also add pure noise clips as negatives
     log.info("Adding noise-only negative clips...")
@@ -568,10 +768,10 @@ def main():
     log.info("=== Computing features ===")
     log.info("Computing positive features...")
     pos_features = compute_features_streaming(pos_clips, clip_duration_samples,
-                                              n_augments=args.augments)
+                                              n_augments=args.augments, bg_clips=bg_clips)
     log.info("Computing negative features...")
     neg_features = compute_features_streaming(neg_clips, clip_duration_samples,
-                                              n_augments=args.augments)
+                                              n_augments=args.augments, bg_clips=bg_clips)
 
     log.info("Positive features: %s, Negative features: %s",
              pos_features.shape, neg_features.shape)

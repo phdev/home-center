@@ -94,18 +94,27 @@ RECORD_SECONDS = _DEFAULT_CONFIG["record_seconds"]
 VERIFY_BUFFER_SECONDS = _DEFAULT_CONFIG["verify_buffer_seconds"]
 
 # Whisper verification: accept these patterns as confirming "hey homer"
-# Whisper tiny often mis-transcribes "hey homer" as phonetic near-matches
+# Whisper tiny often mis-transcribes "hey homer" as phonetic near-matches.
+# Organized by likelihood — most common mis-transcriptions first.
 VERIFY_PATTERNS = [
     r"homer",
+    r"hom+er",
+    r"h[eo]m[eo]r",
     r"homework",
     r"home\b",
-    r"hom+er",
+    r"hey\s*home",
     r"hummer",
     r"humor",
-    r"hey\s*home",
-    r"h[eo]m[eo]r",
     r"hey\s*h",
     r"omer",
+    # Additional patterns observed in practice
+    r"hey\s*oma",       # "hey oma" — common Whisper tiny output
+    r"ho+mer",          # "hoomer"
+    r"hey\s*o",         # "hey o..." — breathy H dropped entirely
+    r"h[aeiou]m",       # "ham", "hem", "him" — very short utterances
+    r"hey\s*hom",       # partial match
+    r"hey\s*gomer",     # Whisper sometimes adds a G
+    r"hey\s*comer",     # Whisper sometimes hears C
 ]
 
 # Alarm polling
@@ -277,6 +286,83 @@ def play_acknowledgement() -> None:
 
 
 # ---------------------------------------------------------------------------
+# Audio processing helpers
+# ---------------------------------------------------------------------------
+
+class AdaptiveNoiseFloor:
+    """Tracks ambient noise level and provides an adaptive RMS threshold.
+
+    Instead of a fixed MIN_RMS_ENERGY, this continuously estimates the noise
+    floor from quiet periods and sets the threshold above it. This handles
+    varying ambient conditions (TV on/off, HVAC, time of day).
+    """
+
+    def __init__(self, window_seconds: float = 30.0, headroom_db: float = 10.0):
+        self._chunk_rate = SAMPLE_RATE / CHUNK_SIZE  # chunks per second
+        self._max_samples = int(window_seconds * self._chunk_rate)
+        self._rms_history: collections.deque = collections.deque(maxlen=self._max_samples)
+        self._headroom_factor = 10 ** (headroom_db / 20)  # linear multiplier
+        self._calibrated = False
+
+    def update(self, rms: float) -> None:
+        self._rms_history.append(rms)
+        if len(self._rms_history) >= 50 and not self._calibrated:
+            self._calibrated = True
+            log.info("Adaptive noise floor calibrated (floor=%.0f, threshold=%.0f)",
+                     self.noise_floor, self.threshold)
+
+    @property
+    def noise_floor(self) -> float:
+        if len(self._rms_history) < 10:
+            return 0.0
+        # Use 10th percentile as noise floor estimate
+        sorted_rms = sorted(self._rms_history)
+        idx = max(0, int(len(sorted_rms) * 0.1))
+        return sorted_rms[idx]
+
+    @property
+    def threshold(self) -> float:
+        floor = self.noise_floor
+        if floor < 1.0:
+            return 0.0  # Not calibrated yet
+        return floor * self._headroom_factor
+
+    @property
+    def is_calibrated(self) -> bool:
+        return self._calibrated
+
+
+def apply_pre_emphasis(audio: np.ndarray, coeff: float = 0.97) -> np.ndarray:
+    """Pre-emphasis filter to boost high-frequency energy.
+
+    "Hey Homer" has two breathy H onsets that are low-energy and spread
+    across higher frequencies. Pre-emphasis makes these more prominent
+    in the signal before it hits the DNN, improving detection of the
+    characteristic spectral shape.
+    """
+    return np.append(audio[0], audio[1:] - coeff * audio[:-1]).astype(np.int16)
+
+
+def speech_band_energy_ratio(audio: np.ndarray, sample_rate: int = 16000) -> float:
+    """Compute the ratio of energy in speech frequencies (300-3000Hz) vs total.
+
+    Returns a value between 0 and 1. Human speech concentrates energy in
+    300-3000Hz. Values below ~0.2 indicate non-speech noise (fan, HVAC,
+    electrical hum). This avoids wasting DNN cycles on non-speech audio.
+    """
+    if len(audio) < 256:
+        return 0.0
+    spectrum = np.abs(np.fft.rfft(audio.astype(np.float64)))
+    freqs = np.fft.rfftfreq(len(audio), 1.0 / sample_rate)
+    total_energy = np.sum(spectrum ** 2)
+    if total_energy < 1e-10:
+        return 0.0
+    speech_mask = (freqs >= 300) & (freqs <= 3000)
+    speech_energy = np.sum(spectrum[speech_mask] ** 2)
+    return float(speech_energy / total_energy)
+
+
+# ---------------------------------------------------------------------------
 # Microphone helpers (ALSA)
 # ---------------------------------------------------------------------------
 
@@ -345,15 +431,28 @@ def get_whisper_model():
     return _whisper_model
 
 
-def transcribe(audio: np.ndarray) -> str:
-    """Transcribe int16 mono audio array to text."""
+def transcribe(audio: np.ndarray, initial_prompt: str | None = None) -> str:
+    """Transcribe int16 mono audio array to text.
+
+    Args:
+        audio: Int16 mono audio samples at 16kHz.
+        initial_prompt: Optional prompt to bias Whisper toward expected vocabulary.
+            For wake word verification, use "Hey Homer" to help Whisper recognize
+            the phrase even when spoken quietly or from a distance.
+    """
     model = get_whisper_model()
     # faster-whisper expects float32 normalized to [-1, 1]
     audio_f32 = audio.astype(np.float32) / 32768.0
-    segments, _ = model.transcribe(
-        audio_f32, beam_size=1, language="en",
-        no_speech_threshold=0.95,  # Don't skip segments unless very confident it's silence
-    )
+
+    kwargs = {
+        "beam_size": 1,
+        "language": "en",
+        "no_speech_threshold": 0.95,
+    }
+    if initial_prompt:
+        kwargs["initial_prompt"] = initial_prompt
+
+    segments, _ = model.transcribe(audio_f32, **kwargs)
     text = " ".join(seg.text.strip() for seg in segments).strip()
     return text
 
@@ -768,6 +867,9 @@ def main() -> None:
     last_action_time = 0.0
     consecutive_hits = {ww: 0 for ww in wake_words}
 
+    # Adaptive noise floor: auto-calibrates from ambient noise
+    noise_floor = AdaptiveNoiseFloor(window_seconds=30.0, headroom_db=10.0)
+
     # Rolling buffer: stores last ~VERIFY_BUFFER_SECONDS of mono audio chunks
     # for Whisper verification before acting on a detection
     # Each chunk after mono downmix = CHUNK_SIZE samples (80ms at 16kHz)
@@ -794,17 +896,37 @@ def main() -> None:
                 model.predict(audio_array)
                 continue
 
-            # RMS energy gate (live config)
+            # RMS energy gate — use adaptive threshold if calibrated, else config value
             rms = np.sqrt(np.mean(audio_array.astype(np.float64) ** 2))
-            if rms < cfg("min_rms_energy"):
+            noise_floor.update(rms)
+
+            effective_threshold = cfg("min_rms_energy")
+            if noise_floor.is_calibrated and noise_floor.threshold > 0:
+                # Use the higher of adaptive vs configured threshold
+                effective_threshold = max(effective_threshold, noise_floor.threshold)
+
+            if rms < effective_threshold:
                 model.predict(audio_array)
                 if args.debug:
-                    log.debug("RMS %.0f below threshold %d, skipping", rms, cfg("min_rms_energy"))
+                    log.debug("RMS %.0f below threshold %.0f (floor=%.0f), skipping",
+                              rms, effective_threshold, noise_floor.noise_floor)
                 for ww in consecutive_hits:
                     consecutive_hits[ww] = 0
                 continue
 
-            model.predict(audio_array)
+            # Speech-band energy check: skip if audio is mostly non-speech noise
+            speech_ratio = speech_band_energy_ratio(audio_array)
+            if speech_ratio < 0.15:
+                model.predict(audio_array)
+                if args.debug and rms > effective_threshold * 1.5:
+                    log.debug("Speech band ratio %.2f too low (rms=%.0f), likely non-speech noise", speech_ratio, rms)
+                for ww in consecutive_hits:
+                    consecutive_hits[ww] = 0
+                continue
+
+            # Apply pre-emphasis to boost breathy H onsets before DNN
+            emphasized = apply_pre_emphasis(audio_array)
+            model.predict(emphasized)
 
             for ww_name in wake_words:
                 buf = model.prediction_buffer[ww_name]
@@ -820,7 +942,14 @@ def main() -> None:
                               ww_name, score, float(list(buf)[-1]), rms,
                               consecutive_hits.get(ww_name, 0))
                 if score > 0.3:
-                    debug_post("dnn_score", {"score": round(score, 3), "rms": round(rms), "consecutive": consecutive_hits.get(ww_name, 0)})
+                    debug_post("dnn_score", {
+                        "score": round(score, 3),
+                        "rms": round(rms),
+                        "consecutive": consecutive_hits.get(ww_name, 0),
+                        "speech_ratio": round(speech_ratio, 2),
+                        "noise_floor": round(noise_floor.noise_floor),
+                        "effective_threshold": round(effective_threshold),
+                    })
 
                 if score >= cfg("detection_threshold"):
                     consecutive_hits[ww_name] = consecutive_hits.get(ww_name, 0) + 1
@@ -851,7 +980,8 @@ def main() -> None:
                         log.info("Borderline detection (%.3f) — verifying with Whisper...", score)
                         buf_audio = np.concatenate(list(verify_buffer)) if verify_buffer else np.array([], dtype=np.int16)
                         if len(buf_audio) > 0:
-                            verify_text = transcribe(buf_audio).lower()
+                            # Use initial_prompt to bias Whisper toward "Hey Homer"
+                            verify_text = transcribe(buf_audio, initial_prompt="Hey Homer").lower()
                             log.info("Verification transcription: '%s'", verify_text)
                             if not any(re.search(pat, verify_text) for pat in VERIFY_PATTERNS):
                                 log.info("Verification FAILED — no homer-like pattern in transcript '%s', ignoring.", verify_text)

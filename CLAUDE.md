@@ -172,10 +172,12 @@ A Python service (`pi/wake_word_service.py`) runs on a Raspberry Pi, continuousl
 |---|---|
 | `pi/wake_word_service.py` | Main service — audio capture, wake word detection, CEC control, chime playback |
 | `pi/train_hey_homer.py` | Training script for openWakeWord custom models |
+| `pi/record_samples.py` | Interactive tool to record real voice samples from Pi mic for training |
+| `pi/samples/` | Real voice recordings: `positive/`, `negative/`, `background/` |
 | `pi/models/` | ONNX/PT model files for openWakeWord |
 | `pi/sounds/acknowledge.wav` | Two-tone chime (C5+E5) played on detection |
 
-### Current Status (as of 2026-03-01)
+### Current Status (as of 2026-03-08)
 
 Uses openWakeWord with custom ONNX models trained via `pi/train_hey_homer.py`. After wake word detection, uses faster-whisper (tiny model, int8, local) for speech-to-text to parse voice commands.
 
@@ -188,25 +190,40 @@ Uses openWakeWord with custom ONNX models trained via `pi/train_hey_homer.py`. A
 **Two-stage detection (DNN → Whisper verification):**
 1. openWakeWord DNN detects wake word candidate
 2. Rolling 2.5s audio buffer is fed to Whisper to verify "homer" was actually spoken
-3. Only if Whisper confirms → chime plays and command recording begins
-4. This eliminates false positives from ambient noise/TV audio
+3. Whisper uses `initial_prompt="Hey Homer"` to bias transcription toward the wake phrase
+4. Only if Whisper confirms → chime plays and command recording begins
+5. This eliminates false positives from ambient noise/TV audio
 
 **Robustness mitigations against false positives:**
+- **Adaptive noise floor** — auto-calibrates from 30s of ambient audio, sets RMS threshold 10dB above floor
+- **Speech-band energy check** — rejects audio where <15% of energy is in 300-3000Hz (non-speech noise)
+- **Pre-emphasis filter** — boosts high frequencies before DNN to help detect breathy "H" onsets
 - **Whisper verification gate** — two-stage: DNN triggers → Whisper confirms "homer" in rolling buffer before acting
+- **Whisper initial_prompt** — biases Whisper toward "Hey Homer" for better recognition of breathy/quiet utterances
 - **Phonetic pattern matching** — Whisper tiny often mis-transcribes "hey homer" as "homework", "home", etc. Verification accepts these phonetic near-matches
 - **No-speech threshold raised to 0.95** — prevents Whisper from discarding short/quiet utterances as silence
-- RMS energy gate (MIN_RMS_ENERGY=300) — ignores low-energy audio chunks
-- Consecutive frame requirement — needs 5+ consecutive high-scoring frames (raised from 3)
+- RMS energy gate (MIN_RMS_ENERGY=200) — ignores low-energy audio chunks (adaptive floor overrides when calibrated)
+- Consecutive frame requirement — needs 3+ consecutive high-scoring frames
 - Score smoothing — averages last 3 prediction scores
-- Post-action mute — 15s silence after trigger to prevent TV audio feedback loops (raised from 3s)
+- Post-action mute — 8s silence after trigger to prevent TV audio feedback loops
 - Model reset after each detection to clear prediction buffer
-- Cooldown window (10s) between triggers
+- Cooldown window (5s) between triggers
 - Empty transcription returns "none" action (no longer defaults to turn_on)
 
 **Training (for retraining the DNN):**
-- `python pi/train_hey_homer.py --negative-samples 2000 --positive-samples 500 --augments 6`
-- Training script includes noise, silence, music, and phonetically-similar negatives
-- Use `--clip-duration 2.0` for "hey homer"
+
+1. Record real voice samples on the Pi (highest-leverage improvement):
+   ```bash
+   python pi/record_samples.py --type positive --count 50   # say "Hey Homer" 50 times
+   python pi/record_samples.py --type negative --count 30   # say confusable phrases
+   python pi/record_samples.py --type background --duration 120  # 2min ambient noise
+   ```
+2. Train with real samples + TTS:
+   ```bash
+   python pi/train_hey_homer.py --use-real-samples --positive-samples 500 --negative-samples 2000 --augments 6
+   ```
+3. Training augmentations include: gain variation, speed perturbation, synthetic reverb, Gaussian noise, real background noise mixing, pre-emphasis
+4. Negative set includes: phonetic near-misses, other wake words, common TV phrases, general speech
 
 The systemd service runs with `--debug` for diagnostics. Worker URL is configured via `--worker-url`.
 
