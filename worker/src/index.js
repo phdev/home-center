@@ -77,6 +77,13 @@ export default {
       if (path === "/api/gesture" && request.method === "GET") {
         return corsResponse(env, await handleGestureGet(env));
       }
+      // ── Wake Word Debug ──
+      if (path === "/api/wake-debug" && request.method === "POST") {
+        return corsResponse(env, await handleWakeDebugPost(request, env));
+      }
+      if (path === "/api/wake-debug" && request.method === "GET") {
+        return corsResponse(env, await handleWakeDebugGet(env, url));
+      }
       // ── Timers ──
       if (path === "/api/timers" && request.method === "POST") {
         return corsResponse(env, await handleTimerPost(request, env));
@@ -1004,6 +1011,39 @@ async function handleGestureGet(env) {
   const raw = await env.NOTIFICATIONS.get("gesture_latest");
   if (!raw) return json({ gesture: null });
   return json({ gesture: JSON.parse(raw) });
+}
+
+// ── Wake Word Debug ──
+
+const WAKE_DEBUG_KEY = "wake_debug_events";
+const MAX_WAKE_DEBUG_EVENTS = 50;
+
+async function handleWakeDebugPost(request, env) {
+  if (!env.NOTIFICATIONS) {
+    return json({ error: "KV not configured" }, 500);
+  }
+  const event = await request.json();
+  if (!event.type) {
+    return json({ error: "Event requires type" }, 400);
+  }
+  event.id = event.id || `wd_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+  event.timestamp = event.timestamp || Date.now();
+
+  const existing = await env.NOTIFICATIONS.get(WAKE_DEBUG_KEY, { type: "json" }) || [];
+  existing.push(event);
+  const capped = existing.slice(-MAX_WAKE_DEBUG_EVENTS);
+  await env.NOTIFICATIONS.put(WAKE_DEBUG_KEY, JSON.stringify(capped));
+  return json({ ok: true });
+}
+
+async function handleWakeDebugGet(env, url) {
+  if (!env.NOTIFICATIONS) {
+    return json({ events: [] });
+  }
+  const events = await env.NOTIFICATIONS.get(WAKE_DEBUG_KEY, { type: "json" }) || [];
+  const since = parseInt(url.searchParams.get("since") || "0", 10);
+  const filtered = since ? events.filter((e) => e.timestamp > since) : events;
+  return json({ events: filtered });
 }
 
 async function handleNotificationGet(env) {

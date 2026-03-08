@@ -11,6 +11,7 @@ import { useSchoolUpdates } from "./hooks/useSchoolUpdates";
 import { useNavigation } from "./hooks/useNavigation";
 import { useHandController } from "./hooks/useHandController";
 import { useLLMQuery } from "./hooks/useLLMQuery";
+import { useWakeWordDebug } from "./hooks/useWakeWordDebug";
 import { Header } from "./components/Header";
 import { CalendarPanel } from "./components/CalendarPanel";
 import { WeatherPanel } from "./components/WeatherPanel";
@@ -30,6 +31,7 @@ import { FullHistoryPage } from "./components/FullHistoryPage";
 import { TranscriptionOverlay } from "./components/TranscriptionOverlay";
 import { SideNav } from "./components/SideNav";
 import { FamilyMemberPage } from "./components/FamilyMemberPage";
+import { WakeWordDebug } from "./components/WakeWordDebug";
 
 export default function App() {
   const now = useTime();
@@ -52,6 +54,7 @@ export default function App() {
   const bdays = useBirthdays(settings.worker);
   const school = useSchoolUpdates(settings.worker);
   const llm = useLLMQuery(settings.worker);
+  const wakeDebug = useWakeWordDebug(settings.worker);
 
   // Auto-navigate to LLM response page when a new response arrives
   useEffect(() => {
@@ -74,6 +77,7 @@ export default function App() {
         />
         <TranscriptionOverlay query={llm.latestResponse?.query} visible={!!llm.latestResponse && forcePage !== "llm-response"} />
         <AlarmOverlay expiredTimers={expiredTimers} onDismissAll={dismissAll} />
+        <WakeWordDebug events={wakeDebug.events} connected={wakeDebug.connected} onClear={wakeDebug.clearEvents} />
       </>
     );
   }
@@ -92,6 +96,7 @@ export default function App() {
         />
         <TranscriptionOverlay query={llm.latestResponse?.query} visible={!!llm.latestResponse && forcePage !== "llm-response"} />
         <AlarmOverlay expiredTimers={expiredTimers} onDismissAll={dismissAll} />
+        <WakeWordDebug events={wakeDebug.events} connected={wakeDebug.connected} onClear={wakeDebug.clearEvents} />
       </>
     );
   }
@@ -111,6 +116,7 @@ export default function App() {
         />
         <TranscriptionOverlay query={llm.latestResponse?.query} visible={!!llm.latestResponse && forcePage !== "llm-response"} />
         <AlarmOverlay expiredTimers={expiredTimers} onDismissAll={dismissAll} />
+        <WakeWordDebug events={wakeDebug.events} connected={wakeDebug.connected} onClear={wakeDebug.clearEvents} />
       </>
     );
   }
@@ -125,6 +131,7 @@ export default function App() {
           lastGesture={hc.lastGesture}
         />
         <AlarmOverlay expiredTimers={expiredTimers} onDismissAll={dismissAll} />
+        <WakeWordDebug events={wakeDebug.events} connected={wakeDebug.connected} onClear={wakeDebug.clearEvents} />
       </>
     );
   }
@@ -145,6 +152,7 @@ export default function App() {
           lastGesture={hc.lastGesture}
         />
         <AlarmOverlay expiredTimers={expiredTimers} onDismissAll={dismissAll} />
+        <WakeWordDebug events={wakeDebug.events} connected={wakeDebug.connected} onClear={wakeDebug.clearEvents} />
       </>
     );
   }
@@ -241,6 +249,7 @@ export default function App() {
       </div>
       <TranscriptionOverlay query={llm.latestResponse?.query} visible={!!llm.latestResponse && forcePage !== "llm-response"} />
       <AlarmOverlay expiredTimers={expiredTimers} onDismissAll={dismissAll} />
+      <WakeWordDebug events={wakeDebug.events} connected={wakeDebug.connected} onClear={wakeDebug.clearEvents} />
     </>
   );
 }

@@ -57,14 +57,15 @@ WAKE_WORD = "hey_homer"
 SAMPLE_RATE = 16000
 CHUNK_SIZE = 1280  # 80ms at 16kHz — required by openWakeWord
 CHANNELS = 2  # ReSpeaker 2-Mic HAT is stereo; we downmix to mono
-DETECTION_THRESHOLD = 0.5
-COOLDOWN_SECONDS = 10  # Prevent repeated triggers
+DETECTION_THRESHOLD = 0.4
+COOLDOWN_SECONDS = 5  # Prevent repeated triggers
 
 # Robustness against false positives
-MIN_RMS_ENERGY = 300
-MIN_CONSECUTIVE = 5
+MIN_RMS_ENERGY = 200
+MIN_CONSECUTIVE = 3
 SCORE_SMOOTH_WINDOW = 3
-POST_ACTION_MUTE = 15.0
+POST_ACTION_MUTE = 8.0
+HIGH_CONFIDENCE_BYPASS = 0.8  # Skip Whisper verification when DNN score is this high
 
 # STT recording
 RECORD_SECONDS = 3.5  # How long to record after wake word for command
@@ -79,6 +80,10 @@ VERIFY_PATTERNS = [
     r"hom+er",
     r"hummer",
     r"humor",
+    r"hey\s*home",
+    r"h[eo]m[eo]r",
+    r"hey\s*h",
+    r"omer",
 ]
 
 # Alarm polling
@@ -341,7 +346,7 @@ def parse_command(text: str) -> dict:
     log.info("Transcribed: '%s'", text)
 
     if not text:
-        return {"action": "none"}
+        return {"action": "turn_on"}
 
     # Stop / dismiss / cancel
     if re.search(r'\b(stop|dismiss|cancel|quiet|shut up|silence)\b', text):
@@ -442,6 +447,44 @@ def worker_get(url: str, token: str | None, path: str) -> dict | None:
     except Exception as e:
         log.debug("Worker GET %s error: %s", path, e)
     return None
+
+
+# ---------------------------------------------------------------------------
+# Debug event emission
+# ---------------------------------------------------------------------------
+
+_debug_worker_url = None
+_debug_worker_token = None
+
+
+def debug_init(worker_url: str | None, worker_token: str | None) -> None:
+    global _debug_worker_url, _debug_worker_token
+    _debug_worker_url = worker_url
+    _debug_worker_token = worker_token
+
+
+def debug_post(event_type: str, data: dict | None = None) -> None:
+    """Fire-and-forget debug event to worker API."""
+    if not _debug_worker_url:
+        return
+    event = {"type": event_type, "timestamp": int(time.time() * 1000)}
+    if data:
+        event["data"] = data
+
+    def _send():
+        try:
+            import requests
+            headers = {"Content-Type": "application/json"}
+            if _debug_worker_token:
+                headers["Authorization"] = f"Bearer {_debug_worker_token}"
+            requests.post(
+                f"{_debug_worker_url}/api/wake-debug",
+                headers=headers, json=event, timeout=5,
+            )
+        except Exception:
+            pass
+
+    threading.Thread(target=_send, daemon=True).start()
 
 
 # ---------------------------------------------------------------------------
@@ -606,6 +649,9 @@ def main() -> None:
     if args.debug:
         logging.getLogger().setLevel(logging.DEBUG)
 
+    # Init debug emission
+    debug_init(args.worker_url, args.worker_token)
+
     # Pre-generate sounds
     if not CHIME_PATH.exists():
         generate_chime(CHIME_PATH)
@@ -705,6 +751,8 @@ def main() -> None:
                     log.debug("%s score: %.3f (raw=%.3f, rms=%.0f, consec=%d)",
                               ww_name, score, float(list(buf)[-1]), rms,
                               consecutive_hits.get(ww_name, 0))
+                if score > 0.3:
+                    debug_post("dnn_score", {"score": round(score, 3), "rms": round(rms), "consecutive": consecutive_hits.get(ww_name, 0)})
 
                 if score >= args.threshold:
                     consecutive_hits[ww_name] = consecutive_hits.get(ww_name, 0) + 1
@@ -717,36 +765,43 @@ def main() -> None:
                         continue
 
                     # ── Wake word candidate detected! ──
-                    log.info("Wake word candidate '%s' (score=%.3f, consec=%d) — verifying with Whisper...",
+                    log.info("Wake word candidate '%s' (score=%.3f, consec=%d)",
                              ww_name, score, consecutive_hits[ww_name])
+                    debug_post("wake_candidate", {"score": round(score, 3), "consecutive": consecutive_hits[ww_name]})
 
                     # Reset model state early to stop accumulating
                     model.reset()
                     for ww in consecutive_hits:
                         consecutive_hits[ww] = 0
 
-                    # ── Stage 2: Whisper verification ──
-                    # Run the rolling buffer through Whisper to confirm
-                    # "homer" was actually spoken (not ambient noise)
-                    buf_audio = np.concatenate(list(verify_buffer)) if verify_buffer else np.array([], dtype=np.int16)
-                    if len(buf_audio) > 0:
-                        verify_text = transcribe(buf_audio).lower()
-                        log.info("Verification transcription: '%s'", verify_text)
-                        if not any(re.search(pat, verify_text) for pat in VERIFY_PATTERNS):
-                            log.info("Verification FAILED — no homer-like pattern in transcript '%s', ignoring.", verify_text)
-                            last_trigger = now
-                            last_action_time = time.time()
-                            break
+                    # ── Stage 2: Whisper verification (skipped for high-confidence DNN) ──
+                    if score >= HIGH_CONFIDENCE_BYPASS:
+                        log.info("High-confidence DNN detection (%.3f >= %.2f) — skipping Whisper verification.",
+                                 score, HIGH_CONFIDENCE_BYPASS)
+                        debug_post("whisper_verify", {"transcript": "(skipped)", "passed": True, "method": "high_confidence"})
                     else:
-                        log.info("Verification FAILED — empty audio buffer, ignoring.")
-                        last_trigger = now
-                        break
+                        log.info("Borderline detection (%.3f) — verifying with Whisper...", score)
+                        buf_audio = np.concatenate(list(verify_buffer)) if verify_buffer else np.array([], dtype=np.int16)
+                        if len(buf_audio) > 0:
+                            verify_text = transcribe(buf_audio).lower()
+                            log.info("Verification transcription: '%s'", verify_text)
+                            if not any(re.search(pat, verify_text) for pat in VERIFY_PATTERNS):
+                                log.info("Verification FAILED — no homer-like pattern in transcript '%s', ignoring.", verify_text)
+                                debug_post("whisper_verify", {"transcript": verify_text, "passed": False})
+                                last_trigger = now
+                                last_action_time = time.time()
+                                break
+                        else:
+                            log.info("Verification FAILED — empty audio buffer, ignoring.")
+                            last_trigger = now
+                            break
+                        log.info("Verification PASSED.")
+                        debug_post("whisper_verify", {"transcript": verify_text, "passed": True})
 
-                    # ── Verified! Proceed. ──
+                    # ── Confirmed! Proceed. ──
                     last_trigger = now
-                    log.info("Verification PASSED — wake word confirmed!")
+                    log.info("Wake word confirmed!")
 
-                    # Play chime
                     if not args.dry_run:
                         play_acknowledgement()
 
@@ -760,11 +815,14 @@ def main() -> None:
                         command = {"action": "turn_on"}
 
                     log.info("Command: %s", command)
+                    debug_post("command", {"action": command.get("action"), "details": command})
 
                     # Dispatch
                     action = command["action"]
                     if action == "none":
-                        log.info("No command recognized, doing nothing.")
+                        log.info("No command recognized, defaulting to turn on TV.")
+                        if not args.dry_run:
+                            turn_on_tv()
                         last_action_time = time.time()
                         break
 
