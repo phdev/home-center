@@ -84,6 +84,13 @@ export default {
       if (path === "/api/wake-debug" && request.method === "GET") {
         return corsResponse(env, await handleWakeDebugGet(env, url));
       }
+      // ── Wake Word Config ──
+      if (path === "/api/wake-config" && request.method === "GET") {
+        return corsResponse(env, await handleWakeConfigGet(env));
+      }
+      if (path === "/api/wake-config" && request.method === "PUT") {
+        return corsResponse(env, await handleWakeConfigPut(request, env));
+      }
       // ── Timers ──
       if (path === "/api/timers" && request.method === "POST") {
         return corsResponse(env, await handleTimerPost(request, env));
@@ -1044,6 +1051,45 @@ async function handleWakeDebugGet(env, url) {
   const since = parseInt(url.searchParams.get("since") || "0", 10);
   const filtered = since ? events.filter((e) => e.timestamp > since) : events;
   return json({ events: filtered });
+}
+
+const WAKE_CONFIG_KEY = "wake_config";
+const WAKE_CONFIG_DEFAULTS = {
+  detection_threshold: 0.4,
+  min_consecutive: 3,
+  min_rms_energy: 200,
+  score_smooth_window: 3,
+  post_action_mute: 8.0,
+  high_confidence_bypass: 0.8,
+  cooldown_seconds: 5,
+  record_seconds: 3.5,
+  verify_buffer_seconds: 2.5,
+};
+
+async function handleWakeConfigGet(env) {
+  if (!env.NOTIFICATIONS) {
+    return json(WAKE_CONFIG_DEFAULTS);
+  }
+  const stored = await env.NOTIFICATIONS.get(WAKE_CONFIG_KEY, { type: "json" });
+  return json({ ...WAKE_CONFIG_DEFAULTS, ...stored });
+}
+
+async function handleWakeConfigPut(request, env) {
+  if (!env.NOTIFICATIONS) {
+    return json({ error: "KV not configured" }, 500);
+  }
+  const body = await request.json();
+  // Only accept known keys with numeric values
+  const update = {};
+  for (const [key, val] of Object.entries(body)) {
+    if (key in WAKE_CONFIG_DEFAULTS && typeof val === "number" && isFinite(val)) {
+      update[key] = val;
+    }
+  }
+  const existing = await env.NOTIFICATIONS.get(WAKE_CONFIG_KEY, { type: "json" }) || {};
+  const merged = { ...existing, ...update };
+  await env.NOTIFICATIONS.put(WAKE_CONFIG_KEY, JSON.stringify(merged));
+  return json({ ...WAKE_CONFIG_DEFAULTS, ...merged });
 }
 
 async function handleNotificationGet(env) {

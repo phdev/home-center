@@ -57,19 +57,41 @@ WAKE_WORD = "hey_homer"
 SAMPLE_RATE = 16000
 CHUNK_SIZE = 1280  # 80ms at 16kHz — required by openWakeWord
 CHANNELS = 2  # ReSpeaker 2-Mic HAT is stereo; we downmix to mono
-DETECTION_THRESHOLD = 0.4
-COOLDOWN_SECONDS = 5  # Prevent repeated triggers
 
-# Robustness against false positives
-MIN_RMS_ENERGY = 200
-MIN_CONSECUTIVE = 3
-SCORE_SMOOTH_WINDOW = 3
-POST_ACTION_MUTE = 8.0
-HIGH_CONFIDENCE_BYPASS = 0.8  # Skip Whisper verification when DNN score is this high
+# Default tunable parameters (can be overridden via /api/wake-config)
+_DEFAULT_CONFIG = {
+    "detection_threshold": 0.4,
+    "cooldown_seconds": 5,
+    "min_rms_energy": 200,
+    "min_consecutive": 3,
+    "score_smooth_window": 3,
+    "post_action_mute": 8.0,
+    "high_confidence_bypass": 0.8,
+    "record_seconds": 3.5,
+    "verify_buffer_seconds": 2.5,
+}
 
-# STT recording
-RECORD_SECONDS = 3.5  # How long to record after wake word for command
-VERIFY_BUFFER_SECONDS = 2.5  # Rolling buffer for Whisper verification
+# Mutable runtime config — updated by ConfigPoller thread
+_live_config = dict(_DEFAULT_CONFIG)
+_config_lock = threading.Lock()
+
+
+def cfg(key: str):
+    """Read a live config value (thread-safe)."""
+    with _config_lock:
+        return _live_config.get(key, _DEFAULT_CONFIG.get(key))
+
+
+# Legacy constants for code that doesn't use cfg() yet
+DETECTION_THRESHOLD = _DEFAULT_CONFIG["detection_threshold"]
+COOLDOWN_SECONDS = _DEFAULT_CONFIG["cooldown_seconds"]
+MIN_RMS_ENERGY = _DEFAULT_CONFIG["min_rms_energy"]
+MIN_CONSECUTIVE = _DEFAULT_CONFIG["min_consecutive"]
+SCORE_SMOOTH_WINDOW = _DEFAULT_CONFIG["score_smooth_window"]
+POST_ACTION_MUTE = _DEFAULT_CONFIG["post_action_mute"]
+HIGH_CONFIDENCE_BYPASS = _DEFAULT_CONFIG["high_confidence_bypass"]
+RECORD_SECONDS = _DEFAULT_CONFIG["record_seconds"]
+VERIFY_BUFFER_SECONDS = _DEFAULT_CONFIG["verify_buffer_seconds"]
 
 # Whisper verification: accept these patterns as confirming "hey homer"
 # Whisper tiny often mis-transcribes "hey homer" as phonetic near-matches
@@ -488,6 +510,48 @@ def debug_post(event_type: str, data: dict | None = None) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Config poller thread
+# ---------------------------------------------------------------------------
+
+CONFIG_POLL_INTERVAL = 10  # Poll for config changes every 10 seconds
+
+
+class ConfigPoller(threading.Thread):
+    """Background thread that polls /api/wake-config and updates _live_config."""
+
+    def __init__(self, worker_url: str, worker_token: str | None):
+        super().__init__(daemon=True)
+        self.worker_url = worker_url
+        self.worker_token = worker_token
+        self._stop_event = threading.Event()
+
+    def stop(self):
+        self._stop_event.set()
+
+    def run(self):
+        import requests as req
+        while not self._stop_event.is_set():
+            try:
+                headers = {"Content-Type": "application/json"}
+                if self.worker_token:
+                    headers["Authorization"] = f"Bearer {self.worker_token}"
+                resp = req.get(
+                    f"{self.worker_url}/api/wake-config",
+                    headers=headers, timeout=5,
+                )
+                if resp.ok:
+                    data = resp.json()
+                    with _config_lock:
+                        for key in _DEFAULT_CONFIG:
+                            if key in data and isinstance(data[key], (int, float)):
+                                _live_config[key] = data[key]
+                    log.debug("Config updated: %s", _live_config)
+            except Exception:
+                pass
+            self._stop_event.wait(CONFIG_POLL_INTERVAL)
+
+
+# ---------------------------------------------------------------------------
 # Alarm thread
 # ---------------------------------------------------------------------------
 
@@ -687,12 +751,16 @@ def main() -> None:
     # Start alarm polling thread if worker configured
     alarm_thread = None
     gesture_thread = None
+    config_poller = None
     if args.worker_url:
         alarm_thread = AlarmThread(args.worker_url, args.worker_token, args.dry_run)
         alarm_thread.start()
         log.info("Alarm polling thread started (every %ds)", ALARM_POLL_INTERVAL)
         gesture_thread = GestureThread(args.worker_url, args.worker_token, args.dry_run)
         gesture_thread.start()
+        config_poller = ConfigPoller(args.worker_url, args.worker_token)
+        config_poller.start()
+        log.info("Config polling thread started (every %ds)", CONFIG_POLL_INTERVAL)
         log.info("Gesture polling thread started (every 2s)")
 
     log.info("Microphone stream open. Listening...")
@@ -721,17 +789,17 @@ def main() -> None:
 
             now = time.time()
 
-            # Post-action mute
-            if now - last_action_time < POST_ACTION_MUTE:
+            # Post-action mute (live config)
+            if now - last_action_time < cfg("post_action_mute"):
                 model.predict(audio_array)
                 continue
 
-            # RMS energy gate
+            # RMS energy gate (live config)
             rms = np.sqrt(np.mean(audio_array.astype(np.float64) ** 2))
-            if rms < MIN_RMS_ENERGY:
+            if rms < cfg("min_rms_energy"):
                 model.predict(audio_array)
                 if args.debug:
-                    log.debug("RMS %.0f below threshold %d, skipping", rms, MIN_RMS_ENERGY)
+                    log.debug("RMS %.0f below threshold %d, skipping", rms, cfg("min_rms_energy"))
                 for ww in consecutive_hits:
                     consecutive_hits[ww] = 0
                 continue
@@ -743,7 +811,7 @@ def main() -> None:
                 if len(buf) == 0:
                     continue
 
-                n = min(SCORE_SMOOTH_WINDOW, len(buf))
+                n = min(int(cfg("score_smooth_window")), len(buf))
                 scores = list(buf)[-n:]
                 score = float(np.mean(scores))
 
@@ -754,13 +822,13 @@ def main() -> None:
                 if score > 0.3:
                     debug_post("dnn_score", {"score": round(score, 3), "rms": round(rms), "consecutive": consecutive_hits.get(ww_name, 0)})
 
-                if score >= args.threshold:
+                if score >= cfg("detection_threshold"):
                     consecutive_hits[ww_name] = consecutive_hits.get(ww_name, 0) + 1
 
-                    if consecutive_hits[ww_name] < MIN_CONSECUTIVE:
+                    if consecutive_hits[ww_name] < cfg("min_consecutive"):
                         continue
 
-                    if now - last_trigger < args.cooldown:
+                    if now - last_trigger < cfg("cooldown_seconds"):
                         log.debug("Cooldown active, ignoring detection")
                         continue
 
@@ -775,7 +843,7 @@ def main() -> None:
                         consecutive_hits[ww] = 0
 
                     # ── Stage 2: Whisper verification (skipped for high-confidence DNN) ──
-                    if score >= HIGH_CONFIDENCE_BYPASS:
+                    if score >= cfg("high_confidence_bypass"):
                         log.info("High-confidence DNN detection (%.3f >= %.2f) — skipping Whisper verification.",
                                  score, HIGH_CONFIDENCE_BYPASS)
                         debug_post("whisper_verify", {"transcript": "(skipped)", "passed": True, "method": "high_confidence"})
