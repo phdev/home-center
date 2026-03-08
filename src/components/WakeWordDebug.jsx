@@ -66,7 +66,7 @@ function EventRow({ event }) {
 }
 
 export function WakeWordDebug({ events, connected, onClear }) {
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(true);
   const [minimized, setMinimized] = useState(false);
 
   if (minimized) {
