@@ -7,10 +7,46 @@ const pulseKeyframes = `
 }
 `;
 
-export function RecordingIndicator({ active, type, count }) {
-  if (!active) return null;
+const GOAL = 50;
 
+export function RecordingIndicator({ active, type, count, totalPositive, totalNegative }) {
+  const hasAny = (totalPositive || 0) > 0 || (totalNegative || 0) > 0;
+
+  // When not recording, show persistent totals (if any samples exist)
+  if (!active) {
+    if (!hasAny) return null;
+    return (
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 6,
+          padding: "6px 10px",
+          borderRadius: 12,
+          background: "#FFFFFF10",
+          border: "1px solid #FFFFFF30",
+        }}
+      >
+        <Mic size={16} color="#FFFFFF88" />
+        <span
+          style={{
+            fontFamily: "'Geist','Inter',system-ui,sans-serif",
+            fontSize: 13,
+            color: "#FFFFFF88",
+            whiteSpace: "nowrap",
+          }}
+        >
+          {totalPositive || 0}+ {totalNegative || 0}−
+        </span>
+      </div>
+    );
+  }
+
+  // Active recording
   const isPositive = type === "positive";
+  const sessionTotal = isPositive
+    ? (totalPositive || 0) + (count || 0)
+    : (totalNegative || 0) + (count || 0);
 
   return (
     <>
@@ -46,7 +82,17 @@ export function RecordingIndicator({ active, type, count }) {
             whiteSpace: "nowrap",
           }}
         >
-          REC {isPositive ? "+" : "−"} {count}
+          {isPositive ? "+" : "−"}{count}
+        </span>
+        <span
+          style={{
+            fontFamily: "'Geist','Inter',system-ui,sans-serif",
+            fontSize: 12,
+            color: "#FFFFFF66",
+            whiteSpace: "nowrap",
+          }}
+        >
+          ({sessionTotal}/{GOAL})
         </span>
       </div>
     </>

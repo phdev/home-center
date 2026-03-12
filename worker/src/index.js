@@ -1105,10 +1105,10 @@ const WAKE_RECORD_KEY = "wake_record";
 
 async function handleWakeRecordGet(env) {
   if (!env.NOTIFICATIONS) {
-    return json({ active: false, type: "positive", count: 0 });
+    return json({ active: false, type: "positive", count: 0, totalPositive: 0, totalNegative: 0 });
   }
   const data = await env.NOTIFICATIONS.get(WAKE_RECORD_KEY, { type: "json" });
-  return json(data || { active: false, type: "positive", count: 0 });
+  return json(data || { active: false, type: "positive", count: 0, totalPositive: 0, totalNegative: 0 });
 }
 
 async function handleWakeRecordPost(request, env) {
@@ -1117,7 +1117,11 @@ async function handleWakeRecordPost(request, env) {
   }
   const body = await request.json();
   const current = await env.NOTIFICATIONS.get(WAKE_RECORD_KEY, { type: "json" }) ||
-    { active: false, type: "positive", count: 0 };
+    { active: false, type: "positive", count: 0, totalPositive: 0, totalNegative: 0 };
+
+  // Ensure totals exist (migration for existing state)
+  if (current.totalPositive == null) current.totalPositive = 0;
+  if (current.totalNegative == null) current.totalNegative = 0;
 
   const action = body.action || "toggle";
 
@@ -1127,18 +1131,38 @@ async function handleWakeRecordPost(request, env) {
     current.count = 0;
     current.startedAt = Date.now();
   } else if (action === "stop") {
+    // Add session count to totals
+    if (current.active) {
+      if (current.type === "positive") {
+        current.totalPositive += current.count || 0;
+      } else {
+        current.totalNegative += current.count || 0;
+      }
+    }
     current.active = false;
   } else if (action === "toggle") {
-    current.active = !current.active;
-    if (current.active) {
+    if (!current.active) {
+      // Starting — reset session count
+      current.active = true;
       current.type = body.type || current.type || "positive";
       current.count = 0;
       current.startedAt = Date.now();
+    } else {
+      // Stopping — add session count to totals
+      if (current.type === "positive") {
+        current.totalPositive += current.count || 0;
+      } else {
+        current.totalNegative += current.count || 0;
+      }
+      current.active = false;
     }
   } else if (action === "increment") {
     current.count = (current.count || 0) + 1;
   } else if (action === "set_type") {
     current.type = body.type || "positive";
+  } else if (action === "reset_totals") {
+    current.totalPositive = 0;
+    current.totalNegative = 0;
   }
 
   await env.NOTIFICATIONS.put(WAKE_RECORD_KEY, JSON.stringify(current));

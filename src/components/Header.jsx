@@ -123,7 +123,7 @@ export function Header({ now, isMobile, onHistory, handControllerConnected, last
 
       {/* Right: Debug + Glasses + Date + Clock */}
       <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-        <RecordingIndicator active={wakeRecord?.active} type={wakeRecord?.type} count={wakeRecord?.count} />
+        <RecordingIndicator active={wakeRecord?.active} type={wakeRecord?.type} count={wakeRecord?.count} totalPositive={wakeRecord?.totalPositive} totalNegative={wakeRecord?.totalNegative} />
         <GestureDebug lastGesture={lastGesture} />
         <GlassesIndicator connected={handControllerConnected} />
         <span
