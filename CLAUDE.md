@@ -222,12 +222,22 @@ Uses openWakeWord with custom ONNX models trained via `pi/train_hey_homer.py`. A
 - Real samples get 20× augmentation by default (`--real-augments 20`)
 
 **Voice sample recording mode (via HandController app):**
-- Worker endpoint: `POST /api/wake-record` with `{action: "toggle"|"start"|"stop", type: "positive"|"negative"}`
-- Status: `GET /api/wake-record` → `{active, type, count}`
+- Worker endpoint: `POST /api/wake-record` with `{action: "toggle"|"start"|"stop"|"set_type"|"reset_totals", type: "positive"|"negative"}`
+- Status: `GET /api/wake-record` → `{active, type, count, totalPositive, totalNegative}`
 - When active, the wake word service auto-records speech clips above the noise floor
 - Clips saved to `pi/models/recorded_samples/`, merged to `.npz` on stop
 - Audio feedback: ascending chime (start), beep (each clip saved), descending tone (stop)
 - Wake word detection is paused during recording mode
+- Worker tracks cumulative `totalPositive`/`totalNegative` across sessions (goal: 50 each)
+- Dashboard shows red pulsing `RecordingIndicator` in header when active (session count + progress toward 50)
+- When idle, shows persistent totals if any samples exist (e.g. "12+ 5−")
+
+**Key UI files for recording mode:**
+
+| File | Purpose |
+|---|---|
+| `src/components/RecordingIndicator.jsx` | Red pulsing mic + counter in header |
+| `src/hooks/useWakeRecord.js` | Polls `/api/wake-record` every 2s |
 
 The systemd service runs with `--debug` for diagnostics. Worker URL is configured via `--worker-url`.
 
