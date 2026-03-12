@@ -12,6 +12,7 @@ import { useNavigation } from "./hooks/useNavigation";
 import { useHandController } from "./hooks/useHandController";
 import { useLLMQuery } from "./hooks/useLLMQuery";
 import { useWakeWordDebug } from "./hooks/useWakeWordDebug";
+import { useWakeRecord } from "./hooks/useWakeRecord";
 import { Header } from "./components/Header";
 import { CalendarPanel } from "./components/CalendarPanel";
 import { WeatherPanel } from "./components/WeatherPanel";
@@ -55,6 +56,7 @@ export default function App() {
   const school = useSchoolUpdates(settings.worker);
   const llm = useLLMQuery(settings.worker);
   const wakeDebug = useWakeWordDebug(settings.worker);
+  const wakeRecord = useWakeRecord(settings.worker);
 
   // Auto-navigate to LLM response page when a new response arrives
   useEffect(() => {
@@ -179,7 +181,7 @@ export default function App() {
           color: "#FFFFFF",
         }}
       >
-        <Header now={now} isMobile={isMobile} onHistory={() => { llm.fetchHistory(); goTo("history"); }} handControllerConnected={hc.connected} lastGesture={hc.lastGesture} />
+        <Header now={now} isMobile={isMobile} onHistory={() => { llm.fetchHistory(); goTo("history"); }} handControllerConnected={hc.connected} lastGesture={hc.lastGesture} wakeRecord={wakeRecord} />
 
         {isMobile ? (
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>

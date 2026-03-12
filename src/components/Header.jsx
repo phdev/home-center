@@ -1,8 +1,9 @@
 import { LayoutDashboard, Mic, Clock } from "lucide-react";
 import { GlassesIndicator } from "./GlassesIndicator";
 import { GestureDebug } from "./GestureDebug";
+import { RecordingIndicator } from "./RecordingIndicator";
 
-export function Header({ now, isMobile, onHistory, handControllerConnected, lastGesture }) {
+export function Header({ now, isMobile, onHistory, handControllerConnected, lastGesture, wakeRecord }) {
   const time = now.toLocaleTimeString("en-US", {
     hour: "numeric",
     minute: "2-digit",
@@ -122,6 +123,7 @@ export function Header({ now, isMobile, onHistory, handControllerConnected, last
 
       {/* Right: Debug + Glasses + Date + Clock */}
       <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+        <RecordingIndicator active={wakeRecord?.active} type={wakeRecord?.type} count={wakeRecord?.count} />
         <GestureDebug lastGesture={lastGesture} />
         <GlassesIndicator connected={handControllerConnected} />
         <span
