@@ -91,6 +91,13 @@ export default {
       if (path === "/api/wake-config" && request.method === "PUT") {
         return corsResponse(env, await handleWakeConfigPut(request, env));
       }
+      // ── Wake Record (voice sample recording for training) ──
+      if (path === "/api/wake-record" && request.method === "GET") {
+        return corsResponse(env, await handleWakeRecordGet(env));
+      }
+      if (path === "/api/wake-record" && request.method === "POST") {
+        return corsResponse(env, await handleWakeRecordPost(request, env));
+      }
       // ── Timers ──
       if (path === "/api/timers" && request.method === "POST") {
         return corsResponse(env, await handleTimerPost(request, env));
@@ -1090,6 +1097,52 @@ async function handleWakeConfigPut(request, env) {
   const merged = { ...existing, ...update };
   await env.NOTIFICATIONS.put(WAKE_CONFIG_KEY, JSON.stringify(merged));
   return json({ ...WAKE_CONFIG_DEFAULTS, ...merged });
+}
+
+// ── Wake Record (voice sample recording control) ───────────────────
+
+const WAKE_RECORD_KEY = "wake_record";
+
+async function handleWakeRecordGet(env) {
+  if (!env.NOTIFICATIONS) {
+    return json({ active: false, type: "positive", count: 0 });
+  }
+  const data = await env.NOTIFICATIONS.get(WAKE_RECORD_KEY, { type: "json" });
+  return json(data || { active: false, type: "positive", count: 0 });
+}
+
+async function handleWakeRecordPost(request, env) {
+  if (!env.NOTIFICATIONS) {
+    return json({ error: "KV not configured" }, 500);
+  }
+  const body = await request.json();
+  const current = await env.NOTIFICATIONS.get(WAKE_RECORD_KEY, { type: "json" }) ||
+    { active: false, type: "positive", count: 0 };
+
+  const action = body.action || "toggle";
+
+  if (action === "start") {
+    current.active = true;
+    current.type = body.type || "positive";
+    current.count = 0;
+    current.startedAt = Date.now();
+  } else if (action === "stop") {
+    current.active = false;
+  } else if (action === "toggle") {
+    current.active = !current.active;
+    if (current.active) {
+      current.type = body.type || current.type || "positive";
+      current.count = 0;
+      current.startedAt = Date.now();
+    }
+  } else if (action === "increment") {
+    current.count = (current.count || 0) + 1;
+  } else if (action === "set_type") {
+    current.type = body.type || "positive";
+  }
+
+  await env.NOTIFICATIONS.put(WAKE_RECORD_KEY, JSON.stringify(current));
+  return json(current);
 }
 
 async function handleNotificationGet(env) {

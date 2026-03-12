@@ -269,6 +269,64 @@ def play_sound(path: Path) -> subprocess.Popen | None:
         return None
 
 
+RECORD_BEEP_PATH = SOUNDS_DIR / "record_beep.wav"
+RECORD_START_PATH = SOUNDS_DIR / "record_start.wav"
+RECORD_STOP_PATH = SOUNDS_DIR / "record_stop.wav"
+
+
+def generate_record_beep(path: Path) -> None:
+    """Short high beep to confirm a sample was saved."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    sr = 22050
+    t = np.linspace(0, 0.08, int(sr * 0.08), endpoint=False)
+    env = np.minimum(t / 0.005, 1.0) * np.maximum(1.0 - t / 0.08, 0.0)
+    signal = env * np.sin(2 * np.pi * 880 * t)
+    signal = (signal / np.max(np.abs(signal)) * 24000).astype(np.int16)
+    with wave.open(str(path), "w") as wf:
+        wf.setnchannels(1)
+        wf.setsampwidth(2)
+        wf.setframerate(sr)
+        wf.writeframes(signal.tobytes())
+
+
+def generate_record_start(path: Path) -> None:
+    """Ascending three-tone to indicate recording mode started."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    sr = 22050
+    tones = []
+    for freq in [440, 554, 659]:
+        t = np.linspace(0, 0.1, int(sr * 0.1), endpoint=False)
+        env = np.minimum(t / 0.005, 1.0) * np.maximum(1.0 - t / 0.12, 0.0)
+        tones.append(env * np.sin(2 * np.pi * freq * t))
+        tones.append(np.zeros(int(sr * 0.02)))
+    signal = np.concatenate(tones)
+    signal = (signal / np.max(np.abs(signal)) * 28000).astype(np.int16)
+    with wave.open(str(path), "w") as wf:
+        wf.setnchannels(1)
+        wf.setsampwidth(2)
+        wf.setframerate(sr)
+        wf.writeframes(signal.tobytes())
+
+
+def generate_record_stop(path: Path) -> None:
+    """Descending two-tone to indicate recording mode stopped."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    sr = 22050
+    tones = []
+    for freq in [659, 440]:
+        t = np.linspace(0, 0.12, int(sr * 0.12), endpoint=False)
+        env = np.minimum(t / 0.005, 1.0) * np.maximum(1.0 - t / 0.14, 0.0)
+        tones.append(env * np.sin(2 * np.pi * freq * t))
+        tones.append(np.zeros(int(sr * 0.02)))
+    signal = np.concatenate(tones)
+    signal = (signal / np.max(np.abs(signal)) * 28000).astype(np.int16)
+    with wave.open(str(path), "w") as wf:
+        wf.setnchannels(1)
+        wf.setsampwidth(2)
+        wf.setframerate(sr)
+        wf.writeframes(signal.tobytes())
+
+
 def play_acknowledgement() -> None:
     if not CHIME_PATH.exists():
         generate_chime(CHIME_PATH)
@@ -616,7 +674,9 @@ class AlarmThread(threading.Thread):
 # ---------------------------------------------------------------------------
 
 class GestureThread(threading.Thread):
-    """Background thread that polls for hand gestures and triggers CEC TV on."""
+    """Background thread that polls for hand gestures and triggers CEC TV on.
+
+    """
 
     def __init__(self, worker_url: str, worker_token: str | None, dry_run: bool = False):
         super().__init__(daemon=True)
@@ -643,16 +703,234 @@ class GestureThread(threading.Thread):
                     age_ms = time.time() * 1000 - timestamp
                     if gesture_id != self._last_gesture_id:
                         self._last_gesture_id = gesture_id
+
                         if gesture_type == "middleThumbPinch" and age_ms < 10000:
                             log.info("Gesture middleThumbPinch — turning TV on via CEC")
                             if not self.dry_run:
                                 turn_on_tv()
                             else:
                                 log.info("[DRY RUN] Would turn on TV via CEC (gesture)")
+
+
             except Exception as e:
                 log.debug("Gesture thread error: %s", e)
 
             self._stop_event.wait(2)  # Poll every 2 seconds
+
+
+# ---------------------------------------------------------------------------
+# Recording mode (for training data collection via HandController)
+# ---------------------------------------------------------------------------
+
+class RecordingManager:
+    """Manages voice sample recording mode, controlled via /api/wake-record.
+
+    When active, the main loop delegates audio to this manager instead of
+    doing wake word detection.  Each time speech above the energy threshold
+    is detected, a clip is saved locally as a .npz file.  The HandController
+    iOS app toggles recording on/off via the worker API.
+    """
+
+    CLIP_DURATION = 2.5  # seconds per recorded sample
+    SPEECH_THRESHOLD_MULT = 2.5  # RMS must be this × min_rms_energy
+    MIN_SPEECH_CHUNKS = 4  # consecutive chunks above threshold to trigger
+    POST_SAVE_SILENCE = 1.0  # seconds to skip after saving a clip
+
+    def __init__(self, worker_url: str | None, worker_token: str | None):
+        self.worker_url = worker_url
+        self.worker_token = worker_token
+        self.active = False
+        self.record_type = "positive"  # "positive" or "negative"
+        self.count = 0
+        self._last_poll = 0.0
+        self._poll_interval = 2.0  # check every 2s
+        self._last_save_time = 0.0
+        self._speech_chunks = 0
+        self._recording_buffer: list[np.ndarray] = []
+        self._clip_samples = int(SAMPLE_RATE * self.CLIP_DURATION)
+        self._was_active = False
+        self._save_dir = Path(__file__).parent / "models" / "recorded_samples"
+
+    def poll_state(self) -> None:
+        """Check worker for recording mode changes."""
+        if not self.worker_url:
+            return
+        now = time.time()
+        if now - self._last_poll < self._poll_interval:
+            return
+        self._last_poll = now
+
+        data = worker_get(self.worker_url, self.worker_token, "/api/wake-record")
+        if data is None:
+            return
+
+        new_active = bool(data.get("active", False))
+        new_type = data.get("type", "positive")
+
+        # Detect transitions
+        if new_active and not self._was_active:
+            self.active = True
+            self.record_type = new_type
+            self.count = 0
+            self._recording_buffer = []
+            self._speech_chunks = 0
+            self._save_dir.mkdir(parents=True, exist_ok=True)
+            log.info("🎙️  RECORDING MODE ON — type=%s, save_dir=%s", self.record_type, self._save_dir)
+            # Play start sound
+            if not RECORD_START_PATH.exists():
+                generate_record_start(RECORD_START_PATH)
+            play_sound(RECORD_START_PATH)
+
+        elif not new_active and self._was_active:
+            self.active = False
+            log.info("🎙️  RECORDING MODE OFF — saved %d clips", self.count)
+            # Merge all clips into a single .npz for training
+            self._merge_clips()
+            # Play stop sound
+            if not RECORD_STOP_PATH.exists():
+                generate_record_stop(RECORD_STOP_PATH)
+            play_sound(RECORD_STOP_PATH)
+
+        self._was_active = new_active
+
+    def process_audio(self, audio_chunk: np.ndarray) -> bool:
+        """Process an audio chunk while in recording mode.
+
+        Returns True if recording mode is active (caller should skip wake detection).
+        """
+        if not self.active:
+            return False
+
+        now = time.time()
+        if now - self._last_save_time < self.POST_SAVE_SILENCE:
+            return True  # Skip during post-save silence
+
+        rms = np.sqrt(np.mean(audio_chunk.astype(np.float64) ** 2))
+        min_rms = cfg("min_rms_energy") * self.SPEECH_THRESHOLD_MULT
+
+        if rms >= min_rms:
+            self._speech_chunks += 1
+            self._recording_buffer.append(audio_chunk.copy())
+        else:
+            # If we had enough speech and now it stopped, save the clip
+            if self._speech_chunks >= self.MIN_SPEECH_CHUNKS and self._recording_buffer:
+                self._save_clip()
+            self._speech_chunks = 0
+            self._recording_buffer = []
+
+        # Also save if buffer is full (long utterance)
+        buf_samples = sum(len(c) for c in self._recording_buffer)
+        if buf_samples >= self._clip_samples:
+            self._save_clip()
+
+        return True
+
+    def _save_clip(self) -> None:
+        """Save the current recording buffer as a clip."""
+        if not self._recording_buffer:
+            return
+
+        audio = np.concatenate(self._recording_buffer)
+        # Trim or pad to target duration
+        if len(audio) > self._clip_samples:
+            audio = audio[:self._clip_samples]
+
+        self.count += 1
+        clip_path = self._save_dir / f"{self.record_type}_{self.count:04d}.npy"
+        np.save(str(clip_path), audio)
+        log.info("🎙️  Saved clip %d: %s (%.1fs, RMS=%.0f)",
+                 self.count, clip_path.name, len(audio) / SAMPLE_RATE,
+                 np.sqrt(np.mean(audio.astype(np.float64) ** 2)))
+
+        # Play beep
+        if not RECORD_BEEP_PATH.exists():
+            generate_record_beep(RECORD_BEEP_PATH)
+        play_sound(RECORD_BEEP_PATH)
+
+        # Report to worker
+        if self.worker_url:
+            worker_post(self.worker_url, self.worker_token,
+                        "/api/wake-record", {"action": "increment"})
+
+        self._recording_buffer = []
+        self._speech_chunks = 0
+        self._last_save_time = time.time()
+
+    def _merge_clips(self) -> None:
+        """Merge individual .npy clips into a single .npz for training."""
+        if self.count == 0:
+            return
+        clips = []
+        for i in range(1, self.count + 1):
+            clip_path = self._save_dir / f"{self.record_type}_{i:04d}.npy"
+            if clip_path.exists():
+                clips.append(np.load(str(clip_path)))
+
+        if clips:
+            ts = int(time.time())
+            npz_path = self._save_dir.parent / f"real_samples_{self.record_type}_{ts}.npz"
+            np.savez(npz_path, *clips)
+            log.info("🎙️  Merged %d clips → %s", len(clips), npz_path)
+            # Clean up individual .npy files
+            for i in range(1, self.count + 1):
+                clip_path = self._save_dir / f"{self.record_type}_{i:04d}.npy"
+                clip_path.unlink(missing_ok=True)
+
+
+# ---------------------------------------------------------------------------
+# Audio preprocessing
+# ---------------------------------------------------------------------------
+
+class AudioPreprocessor:
+    """Simple audio preprocessing: high-pass filter + adaptive noise gate.
+
+    Runs before DNN inference to clean up the audio signal:
+    - High-pass filter removes low-freq rumble (TV bass, HVAC, fans)
+    - Adaptive noise gate tracks ambient noise floor and suppresses
+      audio that's only slightly above it (reduces TV dialogue triggers)
+    """
+
+    def __init__(self, cutoff_hz: float = 85, sr: int = 16000,
+                 noise_adapt_rate: float = 0.02):
+        # High-pass filter state (first-order IIR)
+        rc = 1.0 / (2.0 * np.pi * cutoff_hz)
+        dt = 1.0 / sr
+        self.hp_alpha = rc / (rc + dt)
+        self.hp_prev_raw = 0.0
+        self.hp_prev_out = 0.0
+
+        # Adaptive noise floor
+        self.noise_floor_rms = 300.0  # Initial estimate
+        self.noise_adapt_rate = noise_adapt_rate  # How fast floor adapts
+
+    def process(self, audio: np.ndarray) -> np.ndarray:
+        """Process a chunk of int16 mono audio."""
+        # High-pass filter (vectorized for speed)
+        audio_f = audio.astype(np.float64)
+        output = np.zeros_like(audio_f)
+        prev_raw = self.hp_prev_raw
+        prev_out = self.hp_prev_out
+        alpha = self.hp_alpha
+        for i in range(len(audio_f)):
+            output[i] = alpha * (prev_out + audio_f[i] - prev_raw)
+            prev_raw = audio_f[i]
+            prev_out = output[i]
+        self.hp_prev_raw = prev_raw
+        self.hp_prev_out = prev_out
+
+        # Update adaptive noise floor (slow tracking of quiet periods)
+        chunk_rms = np.sqrt(np.mean(output ** 2))
+        if chunk_rms < self.noise_floor_rms * 1.5:
+            # Likely noise/ambient — adapt floor toward it
+            self.noise_floor_rms += self.noise_adapt_rate * (chunk_rms - self.noise_floor_rms)
+
+        return np.clip(output, -32768, 32767).astype(np.int16)
+
+    def is_speech_likely(self, audio: np.ndarray) -> bool:
+        """Check if audio is likely speech (well above noise floor)."""
+        rms = np.sqrt(np.mean(audio.astype(np.float64) ** 2))
+        # Speech should be at least 3x the noise floor
+        return rms > self.noise_floor_rms * 3.0
 
 
 # ---------------------------------------------------------------------------
@@ -721,6 +999,12 @@ def main() -> None:
         generate_chime(CHIME_PATH)
     if not ALARM_PATH.exists():
         generate_alarm(ALARM_PATH)
+    if not RECORD_BEEP_PATH.exists():
+        generate_record_beep(RECORD_BEEP_PATH)
+    if not RECORD_START_PATH.exists():
+        generate_record_start(RECORD_START_PATH)
+    if not RECORD_STOP_PATH.exists():
+        generate_record_stop(RECORD_STOP_PATH)
 
     # Pre-load whisper model so first command is fast
     if args.worker_url:
@@ -763,6 +1047,12 @@ def main() -> None:
         log.info("Config polling thread started (every %ds)", CONFIG_POLL_INTERVAL)
         log.info("Gesture polling thread started (every 2s)")
 
+    # Audio preprocessor — high-pass filter + adaptive noise gate
+    preprocessor = AudioPreprocessor(cutoff_hz=85)
+
+    # Recording manager — handles voice sample collection mode
+    rec_mgr = RecordingManager(args.worker_url, args.worker_token)
+
     log.info("Microphone stream open. Listening...")
     last_trigger = 0.0
     last_action_time = 0.0
@@ -784,17 +1074,27 @@ def main() -> None:
             if CHANNELS > 1:
                 audio_array = audio_array.reshape(-1, CHANNELS).mean(axis=1).astype(np.int16)
 
-            # Append to rolling verification buffer
+            # Append raw audio to rolling verification buffer (before preprocessing)
             verify_buffer.append(audio_array.copy())
 
+            # Apply audio preprocessing (high-pass filter, noise tracking)
+            audio_array = preprocessor.process(audio_array)
+
             now = time.time()
+
+            # Check recording mode state (polls worker every 2s)
+            rec_mgr.poll_state()
+            if rec_mgr.process_audio(audio_array):
+                # Recording mode active — skip wake word detection
+                model.predict(audio_array)  # Keep model state current
+                continue
 
             # Post-action mute (live config)
             if now - last_action_time < cfg("post_action_mute"):
                 model.predict(audio_array)
                 continue
 
-            # RMS energy gate (live config)
+            # RMS energy gate (live config) — use preprocessed audio
             rms = np.sqrt(np.mean(audio_array.astype(np.float64) ** 2))
             if rms < cfg("min_rms_energy"):
                 model.predict(audio_array)
@@ -822,7 +1122,16 @@ def main() -> None:
                 if score > 0.3:
                     debug_post("dnn_score", {"score": round(score, 3), "rms": round(rms), "consecutive": consecutive_hits.get(ww_name, 0)})
 
-                if score >= cfg("detection_threshold"):
+                # Adaptive threshold: lower when speech energy is strong
+                # (user speaking directly) vs background noise
+                base_threshold = cfg("detection_threshold")
+                if rms > cfg("min_rms_energy") * 4:
+                    # Strong speech — allow slightly lower threshold
+                    effective_threshold = base_threshold * 0.85
+                else:
+                    effective_threshold = base_threshold
+
+                if score >= effective_threshold:
                     consecutive_hits[ww_name] = consecutive_hits.get(ww_name, 0) + 1
 
                     if consecutive_hits[ww_name] < cfg("min_consecutive"):

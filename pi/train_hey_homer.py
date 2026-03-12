@@ -71,24 +71,141 @@ POSITIVE_PHRASES = [
     "Hey Homer",
     "hey homer.",
     "Hey Homer!",
+    # Casual/mumbled variations TTS can approximate
+    "hey, homer",
+    "Hey Homer?",
+    "hey homer!",
+    "hey Homer",
+    # With slight lead-in (more realistic utterance context)
+    "um hey homer",
+    "okay hey homer",
+    "uh hey homer",
 ]
 
 # Negative phrases — things that should NOT trigger
 NEGATIVE_PHRASES = [
-    "hey", "homer", "hello", "hey there", "hey siri", "hey google",
-    "hey alexa", "okay google", "hi homer", "hey john", "hey home",
-    "hay bale", "hey honey", "hey mother", "hey brother", "homer simpson",
-    "home run", "homework", "hey holmer", "hey hummer", "hey humor",
-    "good morning", "what's the weather", "turn on the lights",
-    "play some music", "set a timer", "how are you", "tell me a joke",
-    "hey computer", "hey jarvis", "hey cortana", "open the door",
+    # Phonetically similar — most important for reducing false positives
+    "hey", "homer", "hi homer", "hey home", "hey holmer", "hey hummer",
+    "hey humor", "hey hooper", "hey cooper", "hey mover", "hey rover",
+    "hey honey", "hey mother", "hey brother", "hay bale", "home run",
+    "homework", "homer simpson", "hey roamer", "hey comer", "hey gopher",
+    "hey over", "hey omer", "heyommer", "hey ohmer", "hey hamer",
+    "hey hammer", "hey hamper", "hey harbor", "hey holler", "hey honor",
+    # Other wake words / assistant triggers
+    "hey siri", "hey google", "hey alexa", "okay google", "hey cortana",
+    "hey jarvis", "hey computer",
+    # Common household speech (TV/conversation false positive sources)
+    "hello", "hey there", "hey john", "good morning", "good night",
+    "what's the weather", "turn on the lights", "play some music",
+    "set a timer", "how are you", "tell me a joke", "open the door",
     "the quick brown fox", "testing one two three",
-    "hey hooper", "hey cooper", "hey mover", "hey rover",
+    "what time is it", "can you hear me", "are you there",
+    "come here", "over here", "go home", "I'm home", "welcome home",
+    "let's go", "dinner's ready", "time for bed", "hurry up",
+    "what's for dinner", "pass the remote", "change the channel",
+    "turn it up", "turn it down", "pause it", "stop that",
+    # TV/movie dialogue that could cause false positives
+    "hey man", "hey buddy", "hey dude", "hey boss", "hey partner",
+    "hey kid", "hey chief", "hey doc", "hey coach",
+    "oh my god", "what happened", "look at that", "did you see",
+    "I don't know", "let me think", "wait a minute", "hold on",
 ]
 
 # Speech rate/pitch variations for data augmentation
 RATE_VARIATIONS = ["-10%", "-5%", "+0%", "+5%", "+10%", "+15%", "-15%"]
 PITCH_VARIATIONS = ["-5Hz", "+0Hz", "+5Hz", "-10Hz", "+10Hz"]
+
+
+# ---------------------------------------------------------------------------
+# Real voice recording
+# ---------------------------------------------------------------------------
+
+def record_real_samples(n_samples: int, label: str, duration: float = 2.5,
+                        device: str | None = None) -> list[np.ndarray]:
+    """Record real voice samples from the microphone interactively.
+
+    Prompts the user to speak the phrase, records each sample, and returns
+    a list of int16 mono 16kHz numpy arrays.
+    """
+    import alsaaudio
+
+    if device is None:
+        # Try to find ReSpeaker
+        import subprocess
+        result = subprocess.run(["arecord", "-l"], capture_output=True, text=True, timeout=5)
+        for line in result.stdout.splitlines():
+            lower = line.lower()
+            if lower.startswith("card") and any(
+                kw in lower for kw in ("respeaker", "seeed", "wm8960", "2mic")
+            ):
+                card_num = lower.split(":")[0].replace("card", "").strip()
+                device = f"hw:{card_num},0"
+                break
+        if device is None:
+            device = "default"
+
+    channels = 2  # ReSpeaker is stereo
+    sample_rate = 16000
+    chunk_size = 1280
+
+    log.info("Recording %d samples of '%s' (%.1fs each) from %s", n_samples, label, duration, device)
+    log.info("Press Enter to start each recording, or 'q' to stop early.\n")
+
+    clips = []
+    for i in range(n_samples):
+        user_input = input(f"  [{i+1}/{n_samples}] Say \"{label}\" — press Enter to record (q to quit): ")
+        if user_input.strip().lower() == "q":
+            break
+
+        pcm = alsaaudio.PCM(
+            type=alsaaudio.PCM_CAPTURE, mode=alsaaudio.PCM_NORMAL,
+            device=device, channels=channels, rate=sample_rate,
+            format=alsaaudio.PCM_FORMAT_S16_LE, periodsize=chunk_size,
+        )
+
+        print(f"    Recording {duration:.1f}s...", end="", flush=True)
+        chunks = []
+        total_samples = int(sample_rate * duration)
+        collected = 0
+        while collected < total_samples:
+            length, data = pcm.read()
+            if length <= 0:
+                continue
+            audio = np.frombuffer(data, dtype=np.int16)
+            if channels > 1:
+                audio = audio.reshape(-1, channels).mean(axis=1).astype(np.int16)
+            chunks.append(audio)
+            collected += len(audio)
+
+        pcm.close()
+        clip = np.concatenate(chunks)[:total_samples]
+        rms = np.sqrt(np.mean(clip.astype(np.float64) ** 2))
+        print(f" done (RMS={rms:.0f})")
+
+        if rms < 50:
+            print("    ⚠ Very quiet — try speaking louder or closer to the mic")
+        clips.append(clip)
+
+    log.info("Recorded %d real samples", len(clips))
+    return clips
+
+
+def save_real_samples(clips: list[np.ndarray], output_dir: Path, label: str) -> Path:
+    """Save recorded clips as a .npz file for reuse in future training runs."""
+    output_dir.mkdir(exist_ok=True)
+    safe_label = label.replace(" ", "_").lower()
+    path = output_dir / f"real_samples_{safe_label}.npz"
+    np.savez(path, *clips)
+    log.info("Saved %d real samples to %s", len(clips), path)
+    return path
+
+
+def load_real_samples(path: Path) -> list[np.ndarray]:
+    """Load previously recorded real samples from .npz file."""
+    data = np.load(path)
+    clips = [data[k] for k in data.files]
+    log.info("Loaded %d real samples from %s", len(clips), path)
+    return clips
 
 
 async def generate_tts_clip(text: str, voice: str, rate: str = "+0%",
@@ -184,17 +301,64 @@ def pad_or_trim(audio: np.ndarray, target_len: int) -> np.ndarray:
         return np.pad(audio, (pad_before, pad_after), mode="constant")
 
 
+def time_stretch(audio: np.ndarray, rate: float) -> np.ndarray:
+    """Simple time-stretch via linear interpolation (no pitch shift)."""
+    indices = np.arange(0, len(audio), rate)
+    indices = indices[indices < len(audio) - 1].astype(np.float64)
+    idx_floor = indices.astype(int)
+    frac = indices - idx_floor
+    stretched = audio[idx_floor] * (1 - frac) + audio[np.minimum(idx_floor + 1, len(audio) - 1)] * frac
+    return stretched.astype(np.int16)
+
+
+def simulate_reverb(audio: np.ndarray, decay: float = 0.3, delay_ms: float = 20) -> np.ndarray:
+    """Add simple early reflections to simulate room acoustics."""
+    sr = 16000
+    delay_samples = int(sr * delay_ms / 1000)
+    output = audio.astype(np.float64).copy()
+    # 2-3 early reflections at different delays
+    for i, (mult, d) in enumerate([(decay, delay_samples),
+                                    (decay * 0.5, delay_samples * 2),
+                                    (decay * 0.25, delay_samples * 3)]):
+        if d < len(output):
+            output[d:] += audio[:len(output) - d].astype(np.float64) * mult
+    return np.clip(output, -32768, 32767).astype(np.int16)
+
+
+def highpass_filter(audio: np.ndarray, cutoff_hz: float = 80, sr: int = 16000) -> np.ndarray:
+    """Simple first-order high-pass filter to remove low-frequency rumble."""
+    rc = 1.0 / (2.0 * np.pi * cutoff_hz)
+    dt = 1.0 / sr
+    alpha = rc / (rc + dt)
+    output = np.zeros_like(audio, dtype=np.float64)
+    output[0] = audio[0]
+    for i in range(1, len(audio)):
+        output[i] = alpha * (output[i - 1] + audio[i] - audio[i - 1])
+    return np.clip(output, -32768, 32767).astype(np.int16)
+
+
 def augment_clip(audio: np.ndarray, target_len: int) -> np.ndarray:
     """Apply random augmentation pipeline."""
     audio = audio.copy()
 
     # Random gain
     if random.random() < 0.7:
-        audio = random_gain(audio, -6, 6)
+        audio = random_gain(audio, -8, 8)
+
+    # Time stretch (slight speed variation)
+    if random.random() < 0.4:
+        rate = random.uniform(0.85, 1.15)
+        audio = time_stretch(audio, rate)
+
+    # Simulate room reverb
+    if random.random() < 0.3:
+        decay = random.uniform(0.1, 0.4)
+        delay = random.uniform(10, 40)
+        audio = simulate_reverb(audio, decay, delay)
 
     # Add noise
     if random.random() < 0.5:
-        snr = random.uniform(10, 30)
+        snr = random.uniform(5, 30)  # Lower SNR floor for harder examples
         audio = add_noise(audio, snr)
 
     # Pad or trim
@@ -489,7 +653,7 @@ def main():
                         help="Comma-separated negative phrases (overrides built-in defaults)")
     parser.add_argument("--positive-samples", type=int, default=500,
                         help="Number of positive TTS clips to generate")
-    parser.add_argument("--negative-samples", type=int, default=750,
+    parser.add_argument("--negative-samples", type=int, default=2000,
                         help="Number of negative TTS clips to generate")
     parser.add_argument("--augments", type=int, default=4,
                         help="Augmented versions per clip")
@@ -501,6 +665,18 @@ def main():
                         help="Output directory for model")
     parser.add_argument("--export-only", action="store_true",
                         help="Skip training, just export from saved .pt checkpoint")
+    parser.add_argument("--record", type=int, default=0,
+                        help="Record N real voice samples from the mic before training")
+    parser.add_argument("--record-negative", type=int, default=0,
+                        help="Record N negative (non-wake-word) samples from the mic")
+    parser.add_argument("--real-samples", type=str, default=None,
+                        help="Path to .npz file with previously recorded real samples to include")
+    parser.add_argument("--real-negative-samples", type=str, default=None,
+                        help="Path to .npz file with previously recorded negative real samples")
+    parser.add_argument("--record-device", type=str, default=None,
+                        help="ALSA device for recording (auto-detected if not set)")
+    parser.add_argument("--real-augments", type=int, default=20,
+                        help="Augmented copies per real voice sample (default: 20, since real data is scarce)")
     args = parser.parse_args()
 
     output_dir = Path(__file__).parent / args.output_dir
@@ -541,27 +717,82 @@ def main():
 
     clip_duration_samples = int(args.clip_duration * 16000)
 
+    # Step 0: Record real voice samples (if requested)
+    real_pos_clips = []
+    real_neg_clips = []
+
+    if args.record > 0:
+        log.info("=== Recording %d real positive samples ===", args.record)
+        real_pos_clips = record_real_samples(args.record, "Hey Homer",
+                                             duration=args.clip_duration + 0.5,
+                                             device=args.record_device)
+        if real_pos_clips:
+            saved = save_real_samples(real_pos_clips, output_dir, "hey_homer_positive")
+            log.info("Saved for reuse: %s", saved)
+
+    if args.record_negative > 0:
+        log.info("=== Recording %d real negative samples ===", args.record_negative)
+        log.info("Say anything EXCEPT 'Hey Homer' — random speech, similar words, etc.")
+        real_neg_clips = record_real_samples(args.record_negative, "(NOT hey homer)",
+                                             duration=args.clip_duration + 0.5,
+                                             device=args.record_device)
+        if real_neg_clips:
+            saved = save_real_samples(real_neg_clips, output_dir, "hey_homer_negative")
+            log.info("Saved for reuse: %s", saved)
+
+    if args.real_samples:
+        loaded = load_real_samples(Path(args.real_samples))
+        real_pos_clips.extend(loaded)
+
+    if args.real_negative_samples:
+        loaded = load_real_samples(Path(args.real_negative_samples))
+        real_neg_clips.extend(loaded)
+
+    if real_pos_clips:
+        log.info("Will include %d real positive samples (×%d augments = %d features)",
+                 len(real_pos_clips), args.real_augments, len(real_pos_clips) * args.real_augments)
+    if real_neg_clips:
+        log.info("Will include %d real negative samples (×%d augments = %d features)",
+                 len(real_neg_clips), args.real_augments, len(real_neg_clips) * args.real_augments)
+
     # Step 1: Generate positive samples
-    log.info("=== Generating %d positive samples ===", args.positive_samples)
+    log.info("=== Generating %d positive TTS samples ===", args.positive_samples)
     pos_clips = asyncio.run(generate_samples(pos_phrases, args.positive_samples,
                                              desc="Positive clips"))
-    log.info("Generated %d positive clips", len(pos_clips))
+    log.info("Generated %d positive TTS clips", len(pos_clips))
 
     # Step 2: Generate negative samples
-    log.info("=== Generating %d negative samples ===", args.negative_samples)
+    log.info("=== Generating %d negative TTS samples ===", args.negative_samples)
     neg_clips = asyncio.run(generate_samples(neg_phrases, args.negative_samples,
                                              desc="Negative clips"))
 
-    # Also add pure noise clips as negatives
-    log.info("Adding noise-only negative clips...")
-    for _ in range(200):
-        noise = np.random.normal(0, 500, clip_duration_samples).astype(np.int16)
+    # Also add non-speech negative clips (noise, silence, tones)
+    log.info("Adding non-speech negative clips...")
+    # Pure Gaussian noise at various levels
+    for _ in range(300):
+        amplitude = random.uniform(100, 3000)
+        noise = np.random.normal(0, amplitude, clip_duration_samples).astype(np.int16)
         neg_clips.append(noise)
-    # Add silence clips
-    for _ in range(100):
+    # Silence with low-level noise (ambient room)
+    for _ in range(200):
         silence = np.zeros(clip_duration_samples, dtype=np.int16)
-        silence = add_noise(silence, snr_db=random.uniform(15, 30))
+        silence = add_noise(silence, snr_db=random.uniform(10, 40))
         neg_clips.append(silence)
+    # Pink-ish noise (more realistic ambient than white noise)
+    for _ in range(100):
+        white = np.random.normal(0, 1, clip_duration_samples)
+        # Simple 1/f approximation via cumulative filtering
+        pink = np.cumsum(white)
+        pink = pink - np.mean(pink)
+        pink = pink / (np.max(np.abs(pink)) + 1e-8) * random.uniform(500, 3000)
+        neg_clips.append(pink.astype(np.int16))
+    # Sine wave hum (TV/appliance hum at 50/60 Hz harmonics)
+    for _ in range(100):
+        freq = random.choice([50, 60, 100, 120, 180, 240])
+        t = np.linspace(0, clip_duration_samples / 16000, clip_duration_samples)
+        hum = np.sin(2 * np.pi * freq * t) * random.uniform(500, 2000)
+        hum = add_noise(hum.astype(np.int16), snr_db=random.uniform(10, 25))
+        neg_clips.append(hum)
     log.info("Total negative clips: %d", len(neg_clips))
 
     # Step 3: Compute features
@@ -572,6 +803,21 @@ def main():
     log.info("Computing negative features...")
     neg_features = compute_features_streaming(neg_clips, clip_duration_samples,
                                               n_augments=args.augments)
+
+    # Compute real sample features with higher augmentation factor
+    if real_pos_clips:
+        log.info("Computing real positive features (×%d augments)...", args.real_augments)
+        real_pos_features = compute_features_streaming(
+            real_pos_clips, clip_duration_samples, n_augments=args.real_augments)
+        pos_features = np.concatenate([pos_features, real_pos_features])
+        log.info("Added %d real positive features (total: %d)", len(real_pos_features), len(pos_features))
+
+    if real_neg_clips:
+        log.info("Computing real negative features (×%d augments)...", args.real_augments)
+        real_neg_features = compute_features_streaming(
+            real_neg_clips, clip_duration_samples, n_augments=args.real_augments)
+        neg_features = np.concatenate([neg_features, real_neg_features])
+        log.info("Added %d real negative features (total: %d)", len(real_neg_features), len(neg_features))
 
     log.info("Positive features: %s, Negative features: %s",
              pos_features.shape, neg_features.shape)

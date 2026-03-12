@@ -175,7 +175,7 @@ A Python service (`pi/wake_word_service.py`) runs on a Raspberry Pi, continuousl
 | `pi/models/` | ONNX/PT model files for openWakeWord |
 | `pi/sounds/acknowledge.wav` | Two-tone chime (C5+E5) played on detection |
 
-### Current Status (as of 2026-03-01)
+### Current Status (as of 2026-03-12)
 
 Uses openWakeWord with custom ONNX models trained via `pi/train_hey_homer.py`. After wake word detection, uses faster-whisper (tiny model, int8, local) for speech-to-text to parse voice commands.
 
@@ -183,7 +183,10 @@ Uses openWakeWord with custom ONNX models trained via `pi/train_hey_homer.py`. A
 - "Hey Homer, set a timer for X minutes for Y" → creates timer via worker API
 - "Hey Homer, stop" → dismisses all expired timers
 - "Hey Homer, turn off" → TV standby via HDMI-CEC
-- "Hey Homer" (no command) → does nothing (previously defaulted to turn_on)
+- "Hey Homer, show calendar/weather/photos" → navigates to page
+- "Hey Homer, go back" → returns to dashboard
+- "Hey Homer, [question]" → sends to LLM via worker `/api/ask-query`
+- "Hey Homer" (no command) → turns on TV
 
 **Two-stage detection (DNN → Whisper verification):**
 1. openWakeWord DNN detects wake word candidate
@@ -191,22 +194,40 @@ Uses openWakeWord with custom ONNX models trained via `pi/train_hey_homer.py`. A
 3. Only if Whisper confirms → chime plays and command recording begins
 4. This eliminates false positives from ambient noise/TV audio
 
+**Audio preprocessing pipeline:**
+- **High-pass filter** (85 Hz cutoff) — removes TV bass, HVAC rumble, fan noise before DNN inference
+- **Adaptive noise floor tracking** — continuously estimates ambient noise level
+- **Energy-adaptive threshold** — lowers DNN threshold to 85% when strong speech detected (4× RMS minimum)
+
 **Robustness mitigations against false positives:**
 - **Whisper verification gate** — two-stage: DNN triggers → Whisper confirms "homer" in rolling buffer before acting
 - **Phonetic pattern matching** — Whisper tiny often mis-transcribes "hey homer" as "homework", "home", etc. Verification accepts these phonetic near-matches
 - **No-speech threshold raised to 0.95** — prevents Whisper from discarding short/quiet utterances as silence
-- RMS energy gate (MIN_RMS_ENERGY=300) — ignores low-energy audio chunks
-- Consecutive frame requirement — needs 5+ consecutive high-scoring frames (raised from 3)
-- Score smoothing — averages last 3 prediction scores
-- Post-action mute — 15s silence after trigger to prevent TV audio feedback loops (raised from 3s)
+- RMS energy gate (configurable via `/api/wake-config`, default 200)
+- Consecutive frame requirement (default 3 consecutive high-scoring frames)
+- Score smoothing — averages last N prediction scores (default 3)
+- Post-action mute (default 8s) to prevent TV audio feedback loops
 - Model reset after each detection to clear prediction buffer
-- Cooldown window (10s) between triggers
-- Empty transcription returns "none" action (no longer defaults to turn_on)
+- Cooldown window (default 5s) between triggers
+- High-confidence DNN bypass (≥0.8) skips Whisper verification for speed
 
 **Training (for retraining the DNN):**
 - `python pi/train_hey_homer.py --negative-samples 2000 --positive-samples 500 --augments 6`
 - Training script includes noise, silence, music, and phonetically-similar negatives
 - Use `--clip-duration 2.0` for "hey homer"
+- **Real voice recording:** `--record 50` records samples from the ReSpeaker mic interactively
+- **Reuse recorded samples:** `--real-samples models/real_samples_positive_*.npz`
+- **Record negatives:** `--record-negative 30` for non-wake-word samples
+- **Augmentation:** time-stretching, room reverb simulation, variable SNR noise (down to 5 dB)
+- Real samples get 20× augmentation by default (`--real-augments 20`)
+
+**Voice sample recording mode (via HandController app):**
+- Worker endpoint: `POST /api/wake-record` with `{action: "toggle"|"start"|"stop", type: "positive"|"negative"}`
+- Status: `GET /api/wake-record` → `{active, type, count}`
+- When active, the wake word service auto-records speech clips above the noise floor
+- Clips saved to `pi/models/recorded_samples/`, merged to `.npz` on stop
+- Audio feedback: ascending chime (start), beep (each clip saved), descending tone (stop)
+- Wake word detection is paused during recording mode
 
 The systemd service runs with `--debug` for diagnostics. Worker URL is configured via `--worker-url`.
 
@@ -222,3 +243,132 @@ ssh pi@homecenter.local "sudo systemctl restart wake-word"
 # Install a Python package in the Pi's venv
 ssh pi@homecenter.local "/home/pi/home-center/pi/.venv/bin/pip install <package>"
 ```
+
+## OpenClaw (Family WhatsApp Assistant)
+
+### Architecture
+
+A Node.js service (`openclaw/index.js`) running on the Pi provides a WhatsApp bridge using `whatsapp-web.js`. It exposes a local HTTP API for sending messages and forwards incoming messages to the worker's `/api/ask` LLM endpoint for bot replies.
+
+**OpenClaw is the family-facing assistant.** Family members scan the QR code on the TV dashboard, text questions ("when's Emma's science fair?"), and get LLM-powered answers. It also delivers email triage notifications and school updates to a family group chat.
+
+**Homer CI** (see below) is the separate dev-facing orchestrator that uses this same bridge as transport for build/PR notifications to Peter's personal chat.
+
+### API Endpoints (localhost:3100)
+
+- `GET /status` — connection health, QR pending state
+- `GET /qr` — QR code data for pairing
+- `GET /chats` — list recent chats (for finding chat IDs)
+- `POST /send` — send message: `{ chatId, message }`
+
+### Pi Access
+
+- **Service:** `sudo systemctl {start|stop|restart|status} openclaw`
+- **Logs:** `sudo journalctl -u openclaw -f`
+- **Service unit:** `/etc/systemd/system/openclaw.service`
+- **Working dir:** `/home/pi/home-center/openclaw/`
+- **Auth data:** `/home/pi/home-center/openclaw/.wwebjs_auth/` (persists WhatsApp session)
+- **Browser:** Uses system Chromium (`/usr/bin/chromium`) via `PUPPETEER_EXECUTABLE_PATH` env var
+
+### Key Files
+
+| File | Purpose |
+|---|---|
+| `openclaw/index.js` | Main service — Express API + whatsapp-web.js client |
+| `openclaw/package.json` | Dependencies (whatsapp-web.js, express, qrcode-terminal) |
+| `openclaw/openclaw.service` | Systemd unit file |
+
+### Integration with Other Services
+
+- **Email triage** (`email-triage/email_triage/notifier.py`) — posts to `http://localhost:3100/send` when `whatsapp.enabled` is true in config
+- **Dashboard QR code** (`src/components/FactPanel.jsx`) — "Chat with OpenClaw" QR links to WhatsApp
+- **Dashboard panel** (`src/components/AgentTasksPanel.jsx`) — header labeled "OpenClaw"
+- **Incoming messages** — forwarded to worker `/api/ask` for LLM-powered replies (when `--llm-url` is set)
+- **Homer CI** — dev orchestrator sends build/PR notifications via `POST /send` to Peter's personal chat
+
+### Setup
+
+1. Start the service: `sudo systemctl start openclaw`
+2. Watch logs for QR code: `sudo journalctl -u openclaw -f`
+3. Scan QR with WhatsApp on your phone
+4. Check connection: `curl http://localhost:3100/status`
+5. Find chat IDs: `curl http://localhost:3100/chats`
+6. Set `chat_id` in `email-triage/config.yaml` and enable WhatsApp
+
+### Deploying Changes
+
+```bash
+# Copy updated files to Pi
+scp openclaw/index.js pi@homecenter.local:/home/pi/home-center/openclaw/
+
+# Restart service
+ssh pi@homecenter.local "sudo systemctl restart openclaw"
+
+# Install new npm deps (if package.json changed)
+ssh pi@homecenter.local "cd /home/pi/home-center/openclaw && npm install"
+```
+
+## Homer CI (Dev Agent Orchestrator)
+
+### Architecture
+
+Homer CI is the dev-facing agent orchestrator that spawns coding agents, monitors their progress via cron, and sends WhatsApp notifications when PRs are ready. It runs on the Mac (not the Pi).
+
+**Homer CI is NOT OpenClaw.** OpenClaw is the family assistant. Homer CI uses the OpenClaw WhatsApp bridge as transport but targets Peter's personal chat, not the family group.
+
+### How It Works
+
+1. Write a task prompt file describing the feature to build
+2. `spawn-agent.sh` creates a branch, launches Claude Code or Codex in tmux
+3. Agent commits, pushes, opens PR
+4. GitHub Actions (`openclaw-checks.yml`) runs build, code review, security scan
+5. `check-agents.sh` (cron, every 15 min) reads CI results, sends WhatsApp notification
+
+### Key Files
+
+| File | Purpose |
+|---|---|
+| `.openclaw/orchestrator-prompt.md` | Homer CI system prompt with architecture + rules |
+| `.openclaw/active-tasks.json` | Task registry (status, gates, PR numbers) |
+| `.openclaw/audit.log` | All agent actions logged here |
+| `.openclaw/scripts/spawn-agent.sh` | Launch agent in tmux with branch isolation |
+| `.openclaw/scripts/check-agents.sh` | Cron monitor — reads CI, sends notifications |
+| `.openclaw/scripts/notify-whatsapp.sh` | Send dev notifications via OpenClaw bridge |
+| `.openclaw/scripts/review-pr.sh` | Manual fallback for local PR review |
+| `.openclaw/scripts/build-context.sh` | Generate module map from codebase |
+| `.openclaw/scripts/detect-tasks.sh` | Proactive task suggestions from family context |
+| `.openclaw/templates/frontend-agent.md` | Prompt template for UI tasks (Claude Code) |
+| `.openclaw/templates/backend-agent.md` | Prompt template for worker/Pi tasks (Codex) |
+| `.openclaw/context/module-map.md` | Auto-generated codebase map |
+| `.github/workflows/openclaw-checks.yml` | CI: build + code review + security scan |
+
+### Environment Variables
+
+```bash
+HOMER_CI_CHAT_ID="<your-personal-whatsapp-id>@c.us"
+HOMER_CI_OPENCLAW_URL="http://homecenter.local:3100"
+```
+
+### Spawning an Agent
+
+```bash
+# Write a task prompt
+cat > /tmp/task.md << 'EOF'
+# Add sunrise/sunset to WeatherPanel
+...
+EOF
+
+# Spawn
+bash .openclaw/scripts/spawn-agent.sh task-001 weather-sunrise frontend /tmp/task.md
+
+# Watch
+tmux attach -t agent-task-001
+```
+
+### Security
+
+- Agents get ZERO access to family data
+- Agents never SSH to Pi or deploy
+- All quality gates run in GitHub Actions (not locally)
+- External data wrapped in `<UNTRUSTED_EXTERNAL_CONTEXT>` tags
+- Everything logged to `.openclaw/audit.log`
