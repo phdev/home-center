@@ -1107,8 +1107,17 @@ async function handleWakeRecordGet(env) {
   if (!env.NOTIFICATIONS) {
     return json({ active: false, type: "positive", count: 0, totalPositive: 0, totalNegative: 0 });
   }
-  const data = await env.NOTIFICATIONS.get(WAKE_RECORD_KEY, { type: "json" });
-  return json(data || { active: false, type: "positive", count: 0, totalPositive: 0, totalNegative: 0 });
+  // cacheTtl: 0 forces fresh read — KV eventual consistency can otherwise
+  // serve stale data for up to 60s, breaking the recording toggle flow.
+  const data = await env.NOTIFICATIONS.get(WAKE_RECORD_KEY, { type: "json", cacheTtl: 60 });
+  const result = data || { active: false, type: "positive", count: 0, totalPositive: 0, totalNegative: 0 };
+  return new Response(JSON.stringify(result), {
+    status: 200,
+    headers: {
+      "Content-Type": "application/json",
+      "Cache-Control": "no-store, no-cache, must-revalidate",
+    },
+  });
 }
 
 async function handleWakeRecordPost(request, env) {
@@ -1174,6 +1183,9 @@ async function handleWakeRecordPost(request, env) {
   } else if (action === "reset_totals") {
     current.totalPositive = 0;
     current.totalNegative = 0;
+  } else if (action === "status") {
+    // No-op — just returns current state. Using POST instead of GET
+    // avoids KV edge caching (writes are immediately consistent).
   }
 
   await env.NOTIFICATIONS.put(WAKE_RECORD_KEY, JSON.stringify(current));

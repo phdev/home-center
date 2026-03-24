@@ -760,12 +760,17 @@ class RecordingManager:
             return
         self._last_poll = now
 
-        data = worker_get(self.worker_url, self.worker_token, "/api/wake-record")
+        # Use POST with action=status instead of GET to bypass KV edge caching.
+        # KV reads can be stale for ~60s across edges; POST writes force consistency.
+        data = worker_post(self.worker_url, self.worker_token,
+                           "/api/wake-record", {"action": "status"})
         if data is None:
             return
 
         new_active = bool(data.get("active", False))
         new_type = data.get("type", "positive")
+        log.debug("🎙️  Poll: active=%s, type=%s, count=%d",
+                  new_active, new_type, data.get("count", 0))
 
         # Detect transitions
         if new_active and not self._was_active:
