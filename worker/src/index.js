@@ -1126,6 +1126,14 @@ async function handleWakeRecordPost(request, env) {
   const action = body.action || "toggle";
 
   if (action === "start") {
+    // If already active, accumulate previous session's count first
+    if (current.active && (current.count || 0) > 0) {
+      if (current.type === "positive") {
+        current.totalPositive += current.count;
+      } else {
+        current.totalNegative += current.count;
+      }
+    }
     current.active = true;
     current.type = body.type || "positive";
     current.count = 0;

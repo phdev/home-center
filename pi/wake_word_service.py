@@ -732,9 +732,9 @@ class RecordingManager:
     """
 
     CLIP_DURATION = 2.5  # seconds per recorded sample
-    SPEECH_THRESHOLD_MULT = 2.5  # RMS must be this × min_rms_energy
-    MIN_SPEECH_CHUNKS = 4  # consecutive chunks above threshold to trigger
-    POST_SAVE_SILENCE = 1.0  # seconds to skip after saving a clip
+    SPEECH_RMS_THRESHOLD = 150  # absolute RMS threshold (not relative to min_rms_energy)
+    MIN_SPEECH_CHUNKS = 3  # consecutive chunks above threshold to trigger
+    POST_SAVE_SILENCE = 1.5  # seconds to skip after saving a clip
 
     def __init__(self, worker_url: str | None, worker_token: str | None):
         self.worker_url = worker_url
@@ -806,15 +806,18 @@ class RecordingManager:
             return True  # Skip during post-save silence
 
         rms = np.sqrt(np.mean(audio_chunk.astype(np.float64) ** 2))
-        min_rms = cfg("min_rms_energy") * self.SPEECH_THRESHOLD_MULT
 
-        if rms >= min_rms:
+        if rms >= self.SPEECH_RMS_THRESHOLD:
             self._speech_chunks += 1
             self._recording_buffer.append(audio_chunk.copy())
+            if self._speech_chunks % 5 == 1:
+                log.debug("🎙️  Recording: speech detected (RMS=%.0f, chunks=%d)", rms, self._speech_chunks)
         else:
             # If we had enough speech and now it stopped, save the clip
             if self._speech_chunks >= self.MIN_SPEECH_CHUNKS and self._recording_buffer:
                 self._save_clip()
+            if self._speech_chunks > 0:
+                log.debug("🎙️  Recording: speech ended (had %d chunks, need %d)", self._speech_chunks, self.MIN_SPEECH_CHUNKS)
             self._speech_chunks = 0
             self._recording_buffer = []
 
@@ -1075,7 +1078,8 @@ def main() -> None:
                 audio_array = audio_array.reshape(-1, CHANNELS).mean(axis=1).astype(np.int16)
 
             # Append raw audio to rolling verification buffer (before preprocessing)
-            verify_buffer.append(audio_array.copy())
+            raw_audio = audio_array.copy()
+            verify_buffer.append(raw_audio)
 
             # Apply audio preprocessing (high-pass filter, noise tracking)
             audio_array = preprocessor.process(audio_array)
@@ -1084,7 +1088,7 @@ def main() -> None:
 
             # Check recording mode state (polls worker every 2s)
             rec_mgr.poll_state()
-            if rec_mgr.process_audio(audio_array):
+            if rec_mgr.process_audio(raw_audio):  # Use raw audio for training clips
                 # Recording mode active — skip wake word detection
                 model.predict(audio_array)  # Keep model state current
                 continue
