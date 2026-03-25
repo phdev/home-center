@@ -1182,6 +1182,17 @@ async function handleWakeRecordPost(request, env) {
   } else if (action === "reset_totals") {
     current.totalPositive = 0;
     current.totalNegative = 0;
+  } else if (action === "clear_recordings") {
+    // Full reset — zero everything and mark inactive.
+    // Pi polls for this flag and deletes saved audio files.
+    current.active = false;
+    current.count = 0;
+    current.totalPositive = 0;
+    current.totalNegative = 0;
+    current.clearRequested = true;
+  } else if (action === "clear_ack") {
+    // Pi acknowledges it deleted files — remove the flag.
+    delete current.clearRequested;
   } else if (action === "status") {
     // Read-only — return current state without writing.
     // Using POST instead of GET to avoid KV edge caching.

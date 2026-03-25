@@ -759,6 +759,13 @@ class RecordingManager:
         if data is None:
             return
 
+        # Handle clear_recordings request — delete all saved audio files
+        if data.get("clearRequested"):
+            self._clear_saved_files()
+            # Acknowledge by clearing the flag
+            worker_post(self.worker_url, self.worker_token,
+                        "/api/wake-record", {"action": "clear_ack"})
+
         new_active = bool(data.get("active", False))
         new_type = data.get("type", "positive")
         log.debug("🎙️  Poll: active=%s, type=%s, count=%d",
@@ -830,6 +837,21 @@ class RecordingManager:
         if self.worker_url:
             worker_post(self.worker_url, self.worker_token,
                         "/api/wake-record", {"action": "increment"})
+
+    def _clear_saved_files(self) -> None:
+        """Delete all saved .npy clips and .npz training files."""
+        models_dir = self._save_dir.parent  # pi/models/
+        count = 0
+        # Delete individual clips
+        if self._save_dir.exists():
+            for f in self._save_dir.glob("*.npy"):
+                f.unlink()
+                count += 1
+        # Delete merged training files
+        for f in models_dir.glob("real_samples_*.npz"):
+            f.unlink()
+            count += 1
+        log.info("🎙️  Cleared %d saved recording files", count)
 
 
 # ---------------------------------------------------------------------------
