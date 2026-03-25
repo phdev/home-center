@@ -1,53 +1,17 @@
-import { Mic } from "lucide-react";
+import { Mic, MicOff } from "lucide-react";
 
 const pulseKeyframes = `
 @keyframes recording-pulse {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.6; transform: scale(1.08); }
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
 }
 `;
 
-const GOAL = 50;
+export function RecordingIndicator({ active, type, totalPositive, totalNegative }) {
+  const pos = totalPositive || 0;
+  const neg = totalNegative || 0;
 
-export function RecordingIndicator({ active, type, count, totalPositive, totalNegative }) {
-  const hasAny = (totalPositive || 0) > 0 || (totalNegative || 0) > 0;
-
-  // When not recording, show persistent totals (if any samples exist)
-  if (!active) {
-    if (!hasAny) return null;
-    return (
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 6,
-          padding: "6px 10px",
-          borderRadius: 12,
-          background: "#FFFFFF10",
-          border: "1px solid #FFFFFF30",
-        }}
-      >
-        <Mic size={16} color="#FFFFFF88" />
-        <span
-          style={{
-            fontFamily: "'Geist','Inter',system-ui,sans-serif",
-            fontSize: 13,
-            color: "#FFFFFF88",
-            whiteSpace: "nowrap",
-          }}
-        >
-          {totalPositive || 0}+ {totalNegative || 0}−
-        </span>
-      </div>
-    );
-  }
-
-  // Active recording
-  const isPositive = type === "positive";
-  const sessionTotal = isPositive
-    ? (totalPositive || 0) + (count || 0)
-    : (totalNegative || 0) + (count || 0);
-
+  // Always show — gives visibility into wake word training progress
   return (
     <>
       <style>{pulseKeyframes}</style>
@@ -58,41 +22,75 @@ export function RecordingIndicator({ active, type, count, totalPositive, totalNe
           gap: 8,
           padding: "6px 12px",
           borderRadius: 12,
-          background: "#EF444420",
-          border: "1px solid #EF4444",
-          animation: "recording-pulse 1.5s ease-in-out infinite",
+          background: active ? "#EF444420" : "#FFFFFF10",
+          border: `1px solid ${active ? "#EF4444" : "#FFFFFF30"}`,
         }}
       >
-        <div
-          style={{
-            width: 10,
-            height: 10,
-            borderRadius: "50%",
-            background: "#EF4444",
-            boxShadow: "0 0 8px #EF444480",
-          }}
-        />
-        <Mic size={18} color="#EF4444" />
+        {/* Listening indicator */}
+        {active ? (
+          <>
+            <div
+              style={{
+                width: 10,
+                height: 10,
+                borderRadius: "50%",
+                background: "#EF4444",
+                boxShadow: "0 0 8px #EF444480",
+                animation: "recording-pulse 1s ease-in-out infinite",
+              }}
+            />
+            <Mic size={16} color="#EF4444" />
+            <span
+              style={{
+                fontFamily: "'Geist','Inter',system-ui,sans-serif",
+                fontSize: 13,
+                fontWeight: 600,
+                color: "#EF4444",
+                whiteSpace: "nowrap",
+              }}
+            >
+              {type === "positive" ? "+" : "−"} Listening
+            </span>
+          </>
+        ) : (
+          <>
+            <MicOff size={16} color="#FFFFFF55" />
+            <span
+              style={{
+                fontFamily: "'Geist','Inter',system-ui,sans-serif",
+                fontSize: 13,
+                color: "#FFFFFF55",
+                whiteSpace: "nowrap",
+              }}
+            >
+              Idle
+            </span>
+          </>
+        )}
+
+        {/* Divider */}
+        <div style={{ width: 1, height: 16, background: "#FFFFFF30" }} />
+
+        {/* Positive / Negative counts */}
         <span
           style={{
-            fontFamily: "'Geist','Inter',system-ui,sans-serif",
-            fontSize: 14,
-            fontWeight: 600,
-            color: "#EF4444",
+            fontFamily: "'JetBrains Mono',ui-monospace,monospace",
+            fontSize: 13,
+            color: pos >= 50 ? "#22C55E" : "#FFFFFF99",
             whiteSpace: "nowrap",
           }}
         >
-          {isPositive ? "+" : "−"}{count}
+          +{pos}/50
         </span>
         <span
           style={{
-            fontFamily: "'Geist','Inter',system-ui,sans-serif",
-            fontSize: 12,
-            color: "#FFFFFF66",
+            fontFamily: "'JetBrains Mono',ui-monospace,monospace",
+            fontSize: 13,
+            color: neg >= 50 ? "#22C55E" : "#FFFFFF99",
             whiteSpace: "nowrap",
           }}
         >
-          ({sessionTotal}/{GOAL})
+          −{neg}/50
         </span>
       </div>
     </>
