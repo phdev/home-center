@@ -732,7 +732,7 @@ class RecordingManager:
     """
 
     CLIP_DURATION = 2.5  # seconds per recorded sample
-    SPEECH_RMS_THRESHOLD = 150  # absolute RMS threshold (not relative to min_rms_energy)
+    SPEECH_RMS_THRESHOLD = 40  # absolute RMS threshold — Pi mic runs very quiet (~20-35 ambient)
     MIN_SPEECH_CHUNKS = 3  # consecutive chunks above threshold to trigger
     POST_SAVE_SILENCE = 1.5  # seconds to skip after saving a clip
 
