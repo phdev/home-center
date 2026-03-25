@@ -1184,8 +1184,9 @@ async function handleWakeRecordPost(request, env) {
     current.totalPositive = 0;
     current.totalNegative = 0;
   } else if (action === "status") {
-    // No-op — just returns current state. Using POST instead of GET
-    // avoids KV edge caching (writes are immediately consistent).
+    // Read-only — return current state without writing.
+    // Using POST instead of GET to avoid KV edge caching.
+    return json(current);
   }
 
   await env.NOTIFICATIONS.put(WAKE_RECORD_KEY, JSON.stringify(current));

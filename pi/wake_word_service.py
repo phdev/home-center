@@ -781,12 +781,16 @@ class RecordingManager:
             self._speech_chunks = 0
             self._save_dir.mkdir(parents=True, exist_ok=True)
             log.info("🎙️  RECORDING MODE ON — type=%s, save_dir=%s", self.record_type, self._save_dir)
-            # Play start sound
+            # Play start sound and mute briefly so mic doesn't pick up the chime
             if not RECORD_START_PATH.exists():
                 generate_record_start(RECORD_START_PATH)
             play_sound(RECORD_START_PATH)
+            self._last_save_time = time.time()  # Triggers POST_SAVE_SILENCE mute
 
         elif not new_active and self._was_active:
+            # Save any partial buffer before stopping
+            if self._speech_chunks >= 1 and self._recording_buffer:
+                self._save_clip()
             self.active = False
             log.info("🎙️  RECORDING MODE OFF — saved %d clips", self.count)
             # Merge all clips into a single .npz for training
