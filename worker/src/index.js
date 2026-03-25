@@ -1109,7 +1109,7 @@ async function handleWakeRecordGet(env) {
   }
   // cacheTtl: 0 forces fresh read — KV eventual consistency can otherwise
   // serve stale data for up to 60s, breaking the recording toggle flow.
-  const data = await env.NOTIFICATIONS.get(WAKE_RECORD_KEY, { type: "json", cacheTtl: 0 });
+  const data = await env.NOTIFICATIONS.get(WAKE_RECORD_KEY, { type: "json", cacheTtl: 30 });
   const result = data || { active: false, type: "positive", count: 0, totalPositive: 0, totalNegative: 0 };
   return new Response(JSON.stringify(result), {
     status: 200,
@@ -1125,8 +1125,7 @@ async function handleWakeRecordPost(request, env) {
     return json({ error: "KV not configured" }, 500);
   }
   const body = await request.json();
-  // cacheTtl: 0 forces a fresh read — KV edge cache can serve stale data for ~60s
-  const current = await env.NOTIFICATIONS.get(WAKE_RECORD_KEY, { type: "json", cacheTtl: 0 }) ||
+  const current = await env.NOTIFICATIONS.get(WAKE_RECORD_KEY, { type: "json", cacheTtl: 30 }) ||
     { active: false, type: "positive", count: 0, totalPositive: 0, totalNegative: 0 };
 
   // Ensure totals exist (migration for existing state)
