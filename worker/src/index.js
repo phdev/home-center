@@ -1174,9 +1174,8 @@ async function handleWakeRecordPost(request, env) {
       current.active = false;
     }
   } else if (action === "increment") {
-    // Only increment count — force active=true since Pi only sends this while recording.
-    // This guards against KV eventual consistency returning stale active=false.
-    current.active = true;
+    // Only increment if currently active — don't force active=true
+    if (!current.active) return json(current);
     current.count = (current.count || 0) + 1;
   } else if (action === "set_type") {
     current.type = body.type || "positive";
