@@ -725,16 +725,11 @@ class GestureThread(threading.Thread):
 class RecordingManager:
     """Manages voice sample recording mode, controlled via /api/wake-record.
 
-    When active, the main loop delegates audio to this manager instead of
-    doing wake word detection.  Each time speech above the energy threshold
-    is detected, a clip is saved locally as a .npz file.  The HandController
-    iOS app toggles recording on/off via the worker API.
+    Simple start/stop model: one press of Start → buffer all audio → one press
+    of Stop → save the entire buffer as one clip → increment count → done.
+    No auto-speech-detection, no looping.  The HandController iOS app toggles
+    recording on/off via the worker API.
     """
-
-    CLIP_DURATION = 2.5  # seconds per recorded sample
-    SPEECH_RMS_THRESHOLD = 40  # absolute RMS threshold — Pi mic runs very quiet (~20-35 ambient)
-    MIN_SPEECH_CHUNKS = 3  # consecutive chunks above threshold to trigger
-    POST_SAVE_SILENCE = 1.5  # seconds to skip after saving a clip
 
     def __init__(self, worker_url: str | None, worker_token: str | None):
         self.worker_url = worker_url
@@ -744,11 +739,9 @@ class RecordingManager:
         self.count = 0
         self._last_poll = 0.0
         self._poll_interval = 2.0  # check every 2s
-        self._last_save_time = 0.0
-        self._speech_chunks = 0
         self._recording_buffer: list[np.ndarray] = []
-        self._clip_samples = int(SAMPLE_RATE * self.CLIP_DURATION)
         self._was_active = False
+        self._chime_mute_until = 0.0  # skip audio until this time (chime bleed)
         self._save_dir = Path(__file__).parent / "models" / "recorded_samples"
 
     def poll_state(self) -> None:
@@ -761,7 +754,6 @@ class RecordingManager:
         self._last_poll = now
 
         # Use POST with action=status instead of GET to bypass KV edge caching.
-        # KV reads can be stale for ~60s across edges; POST writes force consistency.
         data = worker_post(self.worker_url, self.worker_token,
                            "/api/wake-record", {"action": "status"})
         if data is None:
@@ -772,30 +764,27 @@ class RecordingManager:
         log.debug("🎙️  Poll: active=%s, type=%s, count=%d",
                   new_active, new_type, data.get("count", 0))
 
-        # Detect transitions
+        # --- Transition: OFF → ON ---
         if new_active and not self._was_active:
             self.active = True
             self.record_type = new_type
             self.count = 0
             self._recording_buffer = []
-            self._speech_chunks = 0
             self._save_dir.mkdir(parents=True, exist_ok=True)
-            log.info("🎙️  RECORDING MODE ON — type=%s, save_dir=%s", self.record_type, self._save_dir)
-            # Play start sound and mute briefly so mic doesn't pick up the chime
+            log.info("🎙️  RECORDING START — type=%s", self.record_type)
             if not RECORD_START_PATH.exists():
                 generate_record_start(RECORD_START_PATH)
             play_sound(RECORD_START_PATH)
-            self._last_save_time = time.time()  # Triggers POST_SAVE_SILENCE mute
+            # Mute 1.5s so mic doesn't capture the start chime
+            self._chime_mute_until = time.time() + 1.5
 
+        # --- Transition: ON → OFF ---
         elif not new_active and self._was_active:
-            # Save any partial buffer before stopping
-            if self._speech_chunks >= 1 and self._recording_buffer:
-                self._save_clip()
             self.active = False
-            log.info("🎙️  RECORDING MODE OFF — saved %d clips", self.count)
-            # Merge all clips into a single .npz for training
-            self._merge_clips()
-            # Play stop sound
+            if self._recording_buffer:
+                self._save_clip()
+            else:
+                log.info("🎙️  RECORDING STOP — no audio buffered")
             if not RECORD_STOP_PATH.exists():
                 generate_record_stop(RECORD_STOP_PATH)
             play_sound(RECORD_STOP_PATH)
@@ -803,90 +792,44 @@ class RecordingManager:
         self._was_active = new_active
 
     def process_audio(self, audio_chunk: np.ndarray) -> bool:
-        """Process an audio chunk while in recording mode.
+        """Buffer audio while recording is active.
 
         Returns True if recording mode is active (caller should skip wake detection).
         """
         if not self.active:
             return False
 
-        now = time.time()
-        if now - self._last_save_time < self.POST_SAVE_SILENCE:
-            return True  # Skip during post-save silence
+        # Skip audio during chime mute window
+        if time.time() < self._chime_mute_until:
+            return True
 
-        rms = np.sqrt(np.mean(audio_chunk.astype(np.float64) ** 2))
-
-        if rms >= self.SPEECH_RMS_THRESHOLD:
-            self._speech_chunks += 1
-            self._recording_buffer.append(audio_chunk.copy())
-            if self._speech_chunks % 5 == 1:
-                log.debug("🎙️  Recording: speech detected (RMS=%.0f, chunks=%d)", rms, self._speech_chunks)
-        else:
-            # If we had enough speech and now it stopped, save the clip
-            if self._speech_chunks >= self.MIN_SPEECH_CHUNKS and self._recording_buffer:
-                self._save_clip()
-            if self._speech_chunks > 0:
-                log.debug("🎙️  Recording: speech ended (had %d chunks, need %d)", self._speech_chunks, self.MIN_SPEECH_CHUNKS)
-            self._speech_chunks = 0
-            self._recording_buffer = []
-
-        # Also save if buffer is full (long utterance)
-        buf_samples = sum(len(c) for c in self._recording_buffer)
-        if buf_samples >= self._clip_samples:
-            self._save_clip()
-
+        self._recording_buffer.append(audio_chunk.copy())
         return True
 
     def _save_clip(self) -> None:
-        """Save the current recording buffer as a clip."""
-        if not self._recording_buffer:
-            return
-
+        """Save the entire recording buffer as one clip and increment count."""
         audio = np.concatenate(self._recording_buffer)
-        # Trim or pad to target duration
-        if len(audio) > self._clip_samples:
-            audio = audio[:self._clip_samples]
-
+        self._recording_buffer = []
         self.count += 1
+
+        # Save individual .npy
+        self._save_dir.mkdir(parents=True, exist_ok=True)
         clip_path = self._save_dir / f"{self.record_type}_{self.count:04d}.npy"
         np.save(str(clip_path), audio)
-        log.info("🎙️  Saved clip %d: %s (%.1fs, RMS=%.0f)",
-                 self.count, clip_path.name, len(audio) / SAMPLE_RATE,
-                 np.sqrt(np.mean(audio.astype(np.float64) ** 2)))
+        duration = len(audio) / SAMPLE_RATE
+        rms = np.sqrt(np.mean(audio.astype(np.float64) ** 2))
+        log.info("🎙️  Saved clip: %s (%.1fs, RMS=%.0f)", clip_path.name, duration, rms)
 
-        # Play beep
-        if not RECORD_BEEP_PATH.exists():
-            generate_record_beep(RECORD_BEEP_PATH)
-        play_sound(RECORD_BEEP_PATH)
+        # Also append to cumulative .npz for training
+        ts = int(time.time())
+        npz_path = self._save_dir.parent / f"real_samples_{self.record_type}_{ts}.npz"
+        np.savez(npz_path, audio)
+        log.info("🎙️  Saved training file → %s", npz_path)
 
-        # Report to worker
+        # Report to worker (increments cumulative totals)
         if self.worker_url:
             worker_post(self.worker_url, self.worker_token,
                         "/api/wake-record", {"action": "increment"})
-
-        self._recording_buffer = []
-        self._speech_chunks = 0
-        self._last_save_time = time.time()
-
-    def _merge_clips(self) -> None:
-        """Merge individual .npy clips into a single .npz for training."""
-        if self.count == 0:
-            return
-        clips = []
-        for i in range(1, self.count + 1):
-            clip_path = self._save_dir / f"{self.record_type}_{i:04d}.npy"
-            if clip_path.exists():
-                clips.append(np.load(str(clip_path)))
-
-        if clips:
-            ts = int(time.time())
-            npz_path = self._save_dir.parent / f"real_samples_{self.record_type}_{ts}.npz"
-            np.savez(npz_path, *clips)
-            log.info("🎙️  Merged %d clips → %s", len(clips), npz_path)
-            # Clean up individual .npy files
-            for i in range(1, self.count + 1):
-                clip_path = self._save_dir / f"{self.record_type}_{i:04d}.npy"
-                clip_path.unlink(missing_ok=True)
 
 
 # ---------------------------------------------------------------------------
