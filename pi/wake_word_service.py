@@ -763,17 +763,7 @@ class RecordingManager:
             "totalNegative": self._count_files("negative"),
         }
 
-    def _sync_to_worker(self) -> None:
-        """Fire-and-forget push of current state to worker KV for dashboard display."""
-        if not self.worker_url:
-            return
-        status = self._get_status()
-        status["action"] = "sync"
-        threading.Thread(
-            target=worker_post,
-            args=(self.worker_url, self.worker_token, "/api/wake-record", status),
-            daemon=True,
-        ).start()
+
 
     def _start_http_server(self) -> None:
         """Run a tiny HTTP server in a daemon thread."""
@@ -846,7 +836,7 @@ class RecordingManager:
                         if not s.exists(): g(s)
                         play_sound(s)
                         mgr._chime_mute_until = time.time() + 1.5
-                        mgr._sync_to_worker()
+    
                     threading.Thread(target=_after, daemon=True).start()
 
                 elif self.path == "/reset":
@@ -854,7 +844,7 @@ class RecordingManager:
                         mgr._session_count = 0
                         log.info("🎙️  Session count reset")
                         self._respond_json(mgr._get_status())
-                    mgr._sync_to_worker()
+
 
                 elif self.path == "/clear":
                     with mgr._lock:
@@ -863,7 +853,7 @@ class RecordingManager:
                         mgr._recording_buffer = []
                         mgr._clear_saved_files()
                         self._respond_json(mgr._get_status())
-                    mgr._sync_to_worker()
+
 
                 elif self.path == "/status":
                     with mgr._lock:
