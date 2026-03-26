@@ -723,131 +723,191 @@ class GestureThread(threading.Thread):
 # ---------------------------------------------------------------------------
 
 class RecordingManager:
-    """Manages voice sample recording mode, controlled via /api/wake-record.
+    """Manages voice sample recording, controlled via local HTTP server on port 8765.
 
-    Simple start/stop model: one press of Start → buffer all audio → one press
-    of Stop → save the entire buffer as one clip → increment count → done.
-    No auto-speech-detection, no looping.  The HandController iOS app toggles
-    recording on/off via the worker API.
+    No Cloudflare KV — state lives in-memory on the Pi.  HandController and
+    the dashboard talk directly to http://homecenter.local:8765/.
+
+    Endpoints:
+        GET  /status  → {active, type, count, totalPositive, totalNegative}
+        POST /toggle  {type:"positive"|"negative"} → toggles recording, returns status
+        POST /reset   → zeroes counts, returns status
+        POST /clear   → zeroes counts + deletes saved audio files, returns status
     """
 
-    def __init__(self, worker_url: str | None, worker_token: str | None):
-        self.worker_url = worker_url
-        self.worker_token = worker_token
+    HTTP_PORT = 8765
+
+    def __init__(self):
         self.active = False
-        self.record_type = "positive"  # "positive" or "negative"
-        self.count = 0
-        self._last_poll = 0.0
-        self._poll_interval = 2.0  # check every 2s
+        self.record_type = "positive"
+        self.total_positive = 0
+        self.total_negative = 0
+        self._session_count = 0
         self._recording_buffer: list[np.ndarray] = []
-        self._was_active = False
-        self._chime_mute_until = 0.0  # skip audio until this time (chime bleed)
+        self._chime_mute_until = 0.0
         self._save_dir = Path(__file__).parent / "models" / "recorded_samples"
+        self._lock = threading.Lock()
+        self._start_http_server()
 
-    def poll_state(self) -> None:
-        """Check worker for recording mode changes."""
-        if not self.worker_url:
-            return
-        now = time.time()
-        if now - self._last_poll < self._poll_interval:
-            return
-        self._last_poll = now
+    def _get_status(self) -> dict:
+        return {
+            "active": self.active,
+            "type": self.record_type,
+            "count": self._session_count,
+            "totalPositive": self.total_positive,
+            "totalNegative": self.total_negative,
+        }
 
-        # Use POST with action=status instead of GET to bypass KV edge caching.
-        data = worker_post(self.worker_url, self.worker_token,
-                           "/api/wake-record", {"action": "status"})
-        if data is None:
-            return
+    def _start_http_server(self) -> None:
+        """Run a tiny HTTP server in a daemon thread."""
+        from http.server import HTTPServer, BaseHTTPRequestHandler
+        import json as _json
 
-        # Handle clear_recordings request — delete all saved audio files
-        if data.get("clearRequested"):
-            self._clear_saved_files()
-            # Acknowledge by clearing the flag
-            worker_post(self.worker_url, self.worker_token,
-                        "/api/wake-record", {"action": "clear_ack"})
+        mgr = self  # closure reference
 
-        new_active = bool(data.get("active", False))
-        new_type = data.get("type", "positive")
-        log.debug("🎙️  Poll: active=%s, type=%s, count=%d",
-                  new_active, new_type, data.get("count", 0))
+        class Handler(BaseHTTPRequestHandler):
+            def log_message(self, fmt, *a):
+                log.debug("🎙️  HTTP: " + fmt % a)
 
-        # --- Transition: OFF → ON ---
-        if new_active and not self._was_active:
-            self.active = True
-            self.record_type = new_type
-            self.count = 0
-            self._recording_buffer = []
-            self._save_dir.mkdir(parents=True, exist_ok=True)
-            log.info("🎙️  RECORDING START — type=%s", self.record_type)
-            if not RECORD_START_PATH.exists():
-                generate_record_start(RECORD_START_PATH)
-            play_sound(RECORD_START_PATH)
-            # Mute 1.5s so mic doesn't capture the start chime
-            self._chime_mute_until = time.time() + 1.5
+            def _cors_headers(self):
+                self.send_header("Access-Control-Allow-Origin", "*")
+                self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+                self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization")
 
-        # --- Transition: ON → OFF ---
-        elif not new_active and self._was_active:
-            self.active = False
-            if self._recording_buffer:
-                self._save_clip()
-            else:
-                log.info("🎙️  RECORDING STOP — no audio buffered")
-            if not RECORD_STOP_PATH.exists():
-                generate_record_stop(RECORD_STOP_PATH)
-            play_sound(RECORD_STOP_PATH)
+            def _respond_json(self, data, code=200):
+                body = _json.dumps(data).encode()
+                self.send_response(code)
+                self.send_header("Content-Type", "application/json")
+                self._cors_headers()
+                self.end_headers()
+                self.wfile.write(body)
 
-        self._was_active = new_active
+            def do_OPTIONS(self):
+                self.send_response(204)
+                self._cors_headers()
+                self.end_headers()
+
+            def do_GET(self):
+                if self.path == "/status":
+                    with mgr._lock:
+                        self._respond_json(mgr._get_status())
+                else:
+                    self._respond_json({"error": "not found"}, 404)
+
+            def do_POST(self):
+                length = int(self.headers.get("Content-Length", 0))
+                body = {}
+                if length > 0:
+                    try:
+                        body = _json.loads(self.rfile.read(length))
+                    except Exception:
+                        pass
+
+                if self.path == "/toggle":
+                    with mgr._lock:
+                        if not mgr.active:
+                            # Start recording
+                            mgr.active = True
+                            mgr.record_type = body.get("type", "positive")
+                            mgr._session_count = 0
+                            mgr._recording_buffer = []
+                            mgr._save_dir.mkdir(parents=True, exist_ok=True)
+                            log.info("🎙️  RECORDING START — type=%s", mgr.record_type)
+                            if not RECORD_START_PATH.exists():
+                                generate_record_start(RECORD_START_PATH)
+                            play_sound(RECORD_START_PATH)
+                            mgr._chime_mute_until = time.time() + 1.5
+                        else:
+                            # Stop recording — save clip
+                            mgr.active = False
+                            if mgr._recording_buffer:
+                                mgr._save_clip()
+                            else:
+                                log.info("🎙️  RECORDING STOP — no audio buffered")
+                            if not RECORD_STOP_PATH.exists():
+                                generate_record_stop(RECORD_STOP_PATH)
+                            play_sound(RECORD_STOP_PATH)
+                        self._respond_json(mgr._get_status())
+
+                elif self.path == "/reset":
+                    with mgr._lock:
+                        mgr.total_positive = 0
+                        mgr.total_negative = 0
+                        mgr._session_count = 0
+                        log.info("🎙️  Totals reset")
+                        self._respond_json(mgr._get_status())
+
+                elif self.path == "/clear":
+                    with mgr._lock:
+                        mgr.active = False
+                        mgr.total_positive = 0
+                        mgr.total_negative = 0
+                        mgr._session_count = 0
+                        mgr._recording_buffer = []
+                        mgr._clear_saved_files()
+                        self._respond_json(mgr._get_status())
+
+                elif self.path == "/status":
+                    with mgr._lock:
+                        self._respond_json(mgr._get_status())
+
+                else:
+                    self._respond_json({"error": "not found"}, 404)
+
+        server = HTTPServer(("0.0.0.0", self.HTTP_PORT), Handler)
+        t = threading.Thread(target=server.serve_forever, daemon=True)
+        t.start()
+        log.info("🎙️  Recording HTTP server listening on port %d", self.HTTP_PORT)
 
     def process_audio(self, audio_chunk: np.ndarray) -> bool:
         """Buffer audio while recording is active.
 
         Returns True if recording mode is active (caller should skip wake detection).
         """
-        if not self.active:
-            return False
-
-        # Skip audio during chime mute window
-        if time.time() < self._chime_mute_until:
+        with self._lock:
+            if not self.active:
+                return False
+            if time.time() < self._chime_mute_until:
+                return True
+            self._recording_buffer.append(audio_chunk.copy())
             return True
 
-        self._recording_buffer.append(audio_chunk.copy())
-        return True
-
     def _save_clip(self) -> None:
-        """Save the entire recording buffer as one clip and increment count."""
+        """Save the entire recording buffer as one clip. Must hold self._lock."""
+        if not self._recording_buffer:
+            return
         audio = np.concatenate(self._recording_buffer)
         self._recording_buffer = []
-        self.count += 1
+        self._session_count += 1
 
-        # Save individual .npy
+        # Update cumulative totals
+        if self.record_type == "positive":
+            self.total_positive += 1
+        else:
+            self.total_negative += 1
+
+        # Save .npy clip
         self._save_dir.mkdir(parents=True, exist_ok=True)
-        clip_path = self._save_dir / f"{self.record_type}_{self.count:04d}.npy"
+        clip_path = self._save_dir / f"{self.record_type}_{self.total_positive if self.record_type == 'positive' else self.total_negative:04d}.npy"
         np.save(str(clip_path), audio)
         duration = len(audio) / SAMPLE_RATE
         rms = np.sqrt(np.mean(audio.astype(np.float64) ** 2))
         log.info("🎙️  Saved clip: %s (%.1fs, RMS=%.0f)", clip_path.name, duration, rms)
 
-        # Also append to cumulative .npz for training
+        # Also save as .npz for training
         ts = int(time.time())
         npz_path = self._save_dir.parent / f"real_samples_{self.record_type}_{ts}.npz"
         np.savez(npz_path, audio)
         log.info("🎙️  Saved training file → %s", npz_path)
 
-        # Report to worker (increments cumulative totals)
-        if self.worker_url:
-            worker_post(self.worker_url, self.worker_token,
-                        "/api/wake-record", {"action": "increment"})
-
     def _clear_saved_files(self) -> None:
-        """Delete all saved .npy clips and .npz training files."""
-        models_dir = self._save_dir.parent  # pi/models/
+        """Delete all saved .npy clips and .npz training files. Must hold self._lock."""
+        models_dir = self._save_dir.parent
         count = 0
-        # Delete individual clips
         if self._save_dir.exists():
             for f in self._save_dir.glob("*.npy"):
                 f.unlink()
                 count += 1
-        # Delete merged training files
         for f in models_dir.glob("real_samples_*.npz"):
             f.unlink()
             count += 1
@@ -1028,7 +1088,7 @@ def main() -> None:
     preprocessor = AudioPreprocessor(cutoff_hz=85)
 
     # Recording manager — handles voice sample collection mode
-    rec_mgr = RecordingManager(args.worker_url, args.worker_token)
+    rec_mgr = RecordingManager()
 
     log.info("Microphone stream open. Listening...")
     last_trigger = 0.0
@@ -1060,9 +1120,8 @@ def main() -> None:
 
             now = time.time()
 
-            # Check recording mode state (polls worker every 2s)
-            rec_mgr.poll_state()
-            if rec_mgr.process_audio(raw_audio):  # Use raw audio for training clips
+            # Recording mode — controlled via local HTTP server on :8765
+            if rec_mgr.process_audio(raw_audio):
                 # Recording mode active — skip wake word detection
                 model.predict(audio_array)  # Keep model state current
                 continue
