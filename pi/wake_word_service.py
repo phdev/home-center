@@ -281,7 +281,7 @@ def generate_record_beep(path: Path) -> None:
     t = np.linspace(0, 0.08, int(sr * 0.08), endpoint=False)
     env = np.minimum(t / 0.005, 1.0) * np.maximum(1.0 - t / 0.08, 0.0)
     signal = env * np.sin(2 * np.pi * 880 * t)
-    signal = (signal / np.max(np.abs(signal)) * 24000).astype(np.int16)
+    signal = (signal / np.max(np.abs(signal)) * 32700).astype(np.int16)
     with wave.open(str(path), "w") as wf:
         wf.setnchannels(1)
         wf.setsampwidth(2)
@@ -300,7 +300,7 @@ def generate_record_start(path: Path) -> None:
         tones.append(env * np.sin(2 * np.pi * freq * t))
         tones.append(np.zeros(int(sr * 0.02)))
     signal = np.concatenate(tones)
-    signal = (signal / np.max(np.abs(signal)) * 28000).astype(np.int16)
+    signal = (signal / np.max(np.abs(signal)) * 32700).astype(np.int16)
     with wave.open(str(path), "w") as wf:
         wf.setnchannels(1)
         wf.setsampwidth(2)
@@ -319,7 +319,7 @@ def generate_record_stop(path: Path) -> None:
         tones.append(env * np.sin(2 * np.pi * freq * t))
         tones.append(np.zeros(int(sr * 0.02)))
     signal = np.concatenate(tones)
-    signal = (signal / np.max(np.abs(signal)) * 28000).astype(np.int16)
+    signal = (signal / np.max(np.abs(signal)) * 32700).astype(np.int16)
     with wave.open(str(path), "w") as wf:
         wf.setnchannels(1)
         wf.setsampwidth(2)
@@ -829,21 +829,25 @@ class RecordingManager:
                             mgr._recording_buffer = []
                             mgr._save_dir.mkdir(parents=True, exist_ok=True)
                             log.info("🎙️  RECORDING START — type=%s", mgr.record_type)
-                            if not RECORD_START_PATH.exists():
-                                generate_record_start(RECORD_START_PATH)
-                            play_sound(RECORD_START_PATH)
-                            mgr._chime_mute_until = time.time() + 1.5
+                            sound = RECORD_START_PATH
+                            gen = generate_record_start
                         else:
                             mgr.active = False
                             if mgr._recording_buffer:
                                 mgr._save_clip()
                             else:
                                 log.info("🎙️  RECORDING STOP — no audio buffered")
-                            if not RECORD_STOP_PATH.exists():
-                                generate_record_stop(RECORD_STOP_PATH)
-                            play_sound(RECORD_STOP_PATH)
+                            sound = RECORD_STOP_PATH
+                            gen = generate_record_stop
+                        # Respond immediately — don't block on sound
                         self._respond_json(mgr._get_status())
-                    mgr._sync_to_worker()
+                    # Play sound and sync in background
+                    def _after(s=sound, g=gen):
+                        if not s.exists(): g(s)
+                        play_sound(s)
+                        mgr._chime_mute_until = time.time() + 1.5
+                        mgr._sync_to_worker()
+                    threading.Thread(target=_after, daemon=True).start()
 
                 elif self.path == "/reset":
                     with mgr._lock:
