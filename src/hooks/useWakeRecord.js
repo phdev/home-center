@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 
-const PI_URL = "http://homecenter.local:8765";
+const PI_URL = "http://localhost:8765";
 
 /**
  * Polls the Pi's local HTTP server for recording status.
