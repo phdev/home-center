@@ -56,7 +56,7 @@ export default function App() {
   const school = useSchoolUpdates(settings.worker);
   const llm = useLLMQuery(settings.worker);
   const wakeDebug = useWakeWordDebug(settings.worker);
-  const wakeRecord = useWakeRecord();
+  const wakeRecord = useWakeRecord(settings.worker);
 
   // Auto-navigate to LLM response page when a new response arrives
   useEffect(() => {

@@ -1190,8 +1190,14 @@ async function handleWakeRecordPost(request, env) {
     current.totalPositive = 0;
     current.totalNegative = 0;
     current.clearRequested = true;
+  } else if (action === "sync") {
+    // Pi pushes its authoritative state — overwrite KV directly.
+    current.active = !!body.active;
+    current.type = body.type || "positive";
+    current.count = body.count || 0;
+    current.totalPositive = body.totalPositive || 0;
+    current.totalNegative = body.totalNegative || 0;
   } else if (action === "clear_ack") {
-    // Pi acknowledges it deleted files — remove the flag.
     delete current.clearRequested;
   } else if (action === "status") {
     // Read-only — return current state without writing.

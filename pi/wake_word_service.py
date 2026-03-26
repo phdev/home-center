@@ -737,7 +737,9 @@ class RecordingManager:
 
     HTTP_PORT = 8765
 
-    def __init__(self):
+    def __init__(self, worker_url: str | None = None, worker_token: str | None = None):
+        self.worker_url = worker_url
+        self.worker_token = worker_token
         self.active = False
         self.record_type = "positive"
         self.total_positive = 0
@@ -757,6 +759,18 @@ class RecordingManager:
             "totalPositive": self.total_positive,
             "totalNegative": self.total_negative,
         }
+
+    def _sync_to_worker(self) -> None:
+        """Fire-and-forget push of current state to worker KV for dashboard display."""
+        if not self.worker_url:
+            return
+        status = self._get_status()
+        status["action"] = "sync"
+        threading.Thread(
+            target=worker_post,
+            args=(self.worker_url, self.worker_token, "/api/wake-record", status),
+            daemon=True,
+        ).start()
 
     def _start_http_server(self) -> None:
         """Run a tiny HTTP server in a daemon thread."""
@@ -806,7 +820,6 @@ class RecordingManager:
                 if self.path == "/toggle":
                     with mgr._lock:
                         if not mgr.active:
-                            # Start recording
                             mgr.active = True
                             mgr.record_type = body.get("type", "positive")
                             mgr._session_count = 0
@@ -818,7 +831,6 @@ class RecordingManager:
                             play_sound(RECORD_START_PATH)
                             mgr._chime_mute_until = time.time() + 1.5
                         else:
-                            # Stop recording — save clip
                             mgr.active = False
                             if mgr._recording_buffer:
                                 mgr._save_clip()
@@ -828,6 +840,7 @@ class RecordingManager:
                                 generate_record_stop(RECORD_STOP_PATH)
                             play_sound(RECORD_STOP_PATH)
                         self._respond_json(mgr._get_status())
+                    mgr._sync_to_worker()
 
                 elif self.path == "/reset":
                     with mgr._lock:
@@ -836,6 +849,7 @@ class RecordingManager:
                         mgr._session_count = 0
                         log.info("🎙️  Totals reset")
                         self._respond_json(mgr._get_status())
+                    mgr._sync_to_worker()
 
                 elif self.path == "/clear":
                     with mgr._lock:
@@ -846,6 +860,7 @@ class RecordingManager:
                         mgr._recording_buffer = []
                         mgr._clear_saved_files()
                         self._respond_json(mgr._get_status())
+                    mgr._sync_to_worker()
 
                 elif self.path == "/status":
                     with mgr._lock:
@@ -1088,7 +1103,7 @@ def main() -> None:
     preprocessor = AudioPreprocessor(cutoff_hz=85)
 
     # Recording manager — handles voice sample collection mode
-    rec_mgr = RecordingManager()
+    rec_mgr = RecordingManager(args.worker_url, args.worker_token)
 
     log.info("Microphone stream open. Listening...")
     last_trigger = 0.0
