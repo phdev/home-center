@@ -742,8 +742,6 @@ class RecordingManager:
         self.worker_token = worker_token
         self.active = False
         self.record_type = "positive"
-        self.total_positive = 0
-        self.total_negative = 0
         self._session_count = 0
         self._recording_buffer: list[np.ndarray] = []
         self._chime_mute_until = 0.0
@@ -751,13 +749,18 @@ class RecordingManager:
         self._lock = threading.Lock()
         self._start_http_server()
 
+    def _count_files(self, prefix: str) -> int:
+        """Count .npz training files on disk — always accurate."""
+        models_dir = self._save_dir.parent
+        return len(list(models_dir.glob(f"real_samples_{prefix}_*.npz")))
+
     def _get_status(self) -> dict:
         return {
             "active": self.active,
             "type": self.record_type,
             "count": self._session_count,
-            "totalPositive": self.total_positive,
-            "totalNegative": self.total_negative,
+            "totalPositive": self._count_files("positive"),
+            "totalNegative": self._count_files("negative"),
         }
 
     def _sync_to_worker(self) -> None:
@@ -844,18 +847,14 @@ class RecordingManager:
 
                 elif self.path == "/reset":
                     with mgr._lock:
-                        mgr.total_positive = 0
-                        mgr.total_negative = 0
                         mgr._session_count = 0
-                        log.info("🎙️  Totals reset")
+                        log.info("🎙️  Session count reset")
                         self._respond_json(mgr._get_status())
                     mgr._sync_to_worker()
 
                 elif self.path == "/clear":
                     with mgr._lock:
                         mgr.active = False
-                        mgr.total_positive = 0
-                        mgr.total_negative = 0
                         mgr._session_count = 0
                         mgr._recording_buffer = []
                         mgr._clear_saved_files()
@@ -895,22 +894,18 @@ class RecordingManager:
         self._recording_buffer = []
         self._session_count += 1
 
-        # Update cumulative totals
-        if self.record_type == "positive":
-            self.total_positive += 1
-        else:
-            self.total_negative += 1
+        # Use timestamp for unique filenames — no counter drift
+        ts = int(time.time())
 
         # Save .npy clip
         self._save_dir.mkdir(parents=True, exist_ok=True)
-        clip_path = self._save_dir / f"{self.record_type}_{self.total_positive if self.record_type == 'positive' else self.total_negative:04d}.npy"
+        clip_path = self._save_dir / f"{self.record_type}_{ts}.npy"
         np.save(str(clip_path), audio)
         duration = len(audio) / SAMPLE_RATE
         rms = np.sqrt(np.mean(audio.astype(np.float64) ** 2))
         log.info("🎙️  Saved clip: %s (%.1fs, RMS=%.0f)", clip_path.name, duration, rms)
 
         # Also save as .npz for training
-        ts = int(time.time())
         npz_path = self._save_dir.parent / f"real_samples_{self.record_type}_{ts}.npz"
         np.savez(npz_path, audio)
         log.info("🎙️  Saved training file → %s", npz_path)
