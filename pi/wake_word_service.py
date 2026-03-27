@@ -220,17 +220,27 @@ def generate_alarm(path: Path) -> None:
 
 
 def find_speaker_device() -> str | None:
+    """Find audio output device. Prefers HDMI (TV), falls back to ReSpeaker HAT."""
     try:
         result = subprocess.run(
             ["aplay", "-l"], capture_output=True, text=True, timeout=5,
         )
+        hdmi_card = None
+        respeaker_card = None
         for line in result.stdout.splitlines():
             lower = line.lower()
-            if lower.startswith("card") and any(
-                kw in lower for kw in ("respeaker", "seeed", "wm8960")
-            ):
-                card_num = lower.split(":")[0].replace("card", "").strip()
-                return f"plughw:{card_num},0"
+            if not lower.startswith("card"):
+                continue
+            card_num = lower.split(":")[0].replace("card", "").strip()
+            if "hdmi-0" in lower or "vc4hdmi0" in lower:
+                hdmi_card = card_num
+            elif any(kw in lower for kw in ("respeaker", "seeed", "wm8960")):
+                respeaker_card = card_num
+        # Prefer HDMI — louder via TV speakers
+        if hdmi_card:
+            return f"plughw:{hdmi_card},0"
+        if respeaker_card:
+            return f"plughw:{respeaker_card},0"
     except Exception:
         pass
     return None
@@ -242,7 +252,7 @@ def set_speaker_volume() -> None:
         return
     card = device.split(":")[0].replace("plughw", "").replace("hw", "")
     for control in ["Speaker", "Playback", "HP Playback",
-                    "Line Playback", "PCM Playback"]:
+                    "Line Playback", "PCM Playback", "PCM"]:
         try:
             subprocess.run(
                 ["amixer", "-c", card, "-q", "sset", control, "100%"],
