@@ -17,6 +17,7 @@ Hardware: ReSpeaker 2-Mics Pi HAT (or any ALSA-compatible microphone)
 """
 
 import argparse
+import collections
 import io
 import json
 import logging
@@ -75,7 +76,9 @@ _config_lock = threading.Lock()
 
 
 def cfg(key: str):
-    """Read a live config value (thread-safe)."""
+    """Read a live config value — from local server if available."""
+    if _local_server:
+        return _local_server.get_config(key)
     with _config_lock:
         return _live_config.get(key, _DEFAULT_CONFIG.get(key))
 
@@ -436,6 +439,11 @@ def parse_command(text: str) -> dict:
     text = text.lower().strip()
     log.info("Transcribed: '%s'", text)
 
+    # Strip wake word prefix — user says "Hey Jarvis open calendar" as one phrase
+    # Whisper mangles "hey jarvis" in many ways
+    text = re.sub(r'^(hey|hi|hay|in|a|the|and)?\s*(jarvis|jervis|service|travis|jarvis,)\s*[,.]?\s*', '', text).strip()
+    log.info("After wake word strip: '%s'", text)
+
     if not text:
         return {"action": "turn_on"}
 
@@ -487,6 +495,13 @@ def parse_command(text: str) -> dict:
     # Go back / go home (return to dashboard)
     if re.search(r'\b(go\s+(back|home)|back\s+to\s+(dashboard|home)|close\s+(calendar|weather|photos?))\b', text):
         return {"action": "navigate", "page": "dashboard"}
+
+    # Show/hide debug overlay (Whisper mis-transcribes "debug" many ways)
+    debug_pat = r"(debug|debud|d-bug|d bug|the\s*bug|de-?bug)"
+    if re.search(r'\b(show|open|display)\s+(the\s+)?' + debug_pat, text):
+        return {"action": "debug_show"}
+    if re.search(r"(hi|hide|high|close|dismiss|remove|i'm)\s+(the\s+)?" + debug_pat, text):
+        return {"action": "debug_hide"}
 
     # Turn on (explicit)
     if re.search(r'\bturn\s*(it\s+)?on\b', text):
@@ -554,8 +569,15 @@ def debug_init(worker_url: str | None, worker_token: str | None) -> None:
     _debug_worker_token = worker_token
 
 
+_local_server = None  # Set to RecordingManager instance in main()
+
+
 def debug_post(event_type: str, data: dict | None = None) -> None:
-    """Fire-and-forget debug event to worker API."""
+    """Post debug event to local server (in-process, no HTTP)."""
+    if _local_server:
+        _local_server.add_debug_event(event_type, data)
+        return
+    # Fallback to worker if local server not ready
     if not _debug_worker_url:
         return
     event = {"type": event_type, "timestamp": int(time.time() * 1000)}
@@ -582,42 +604,8 @@ def debug_post(event_type: str, data: dict | None = None) -> None:
 # Config poller thread
 # ---------------------------------------------------------------------------
 
-CONFIG_POLL_INTERVAL = 10  # Poll for config changes every 10 seconds
 
-
-class ConfigPoller(threading.Thread):
-    """Background thread that polls /api/wake-config and updates _live_config."""
-
-    def __init__(self, worker_url: str, worker_token: str | None):
-        super().__init__(daemon=True)
-        self.worker_url = worker_url
-        self.worker_token = worker_token
-        self._stop_event = threading.Event()
-
-    def stop(self):
-        self._stop_event.set()
-
-    def run(self):
-        import requests as req
-        while not self._stop_event.is_set():
-            try:
-                headers = {"Content-Type": "application/json"}
-                if self.worker_token:
-                    headers["Authorization"] = f"Bearer {self.worker_token}"
-                resp = req.get(
-                    f"{self.worker_url}/api/wake-config",
-                    headers=headers, timeout=5,
-                )
-                if resp.ok:
-                    data = resp.json()
-                    with _config_lock:
-                        for key in _DEFAULT_CONFIG:
-                            if key in data and isinstance(data[key], (int, float)):
-                                _live_config[key] = data[key]
-                    log.debug("Config updated: %s", _live_config)
-            except Exception:
-                pass
-            self._stop_event.wait(CONFIG_POLL_INTERVAL)
+# ConfigPoller removed — config is now local (RecordingManager._wake_config)
 
 
 # ---------------------------------------------------------------------------
@@ -625,12 +613,11 @@ class ConfigPoller(threading.Thread):
 # ---------------------------------------------------------------------------
 
 class AlarmThread(threading.Thread):
-    """Background thread that polls for expired timers and plays alarm."""
+    """Background thread that checks local timers for expiry and plays alarm."""
 
-    def __init__(self, worker_url: str, worker_token: str | None, dry_run: bool = False):
+    def __init__(self, rec_mgr: "RecordingManager", dry_run: bool = False):
         super().__init__(daemon=True)
-        self.worker_url = worker_url
-        self.worker_token = worker_token
+        self.rec_mgr = rec_mgr
         self.dry_run = dry_run
         self._stop_event = threading.Event()
         self._alarm_proc = None
@@ -651,29 +638,27 @@ class AlarmThread(threading.Thread):
         alarming = False
         while not self._stop_event.is_set():
             try:
-                data = worker_get(self.worker_url, self.worker_token, "/api/timers")
-                if data:
-                    timers = data.get("timers", [])
-                    now_ms = time.time() * 1000
-                    expired_undismissed = [
-                        t for t in timers
-                        if t.get("expiresAt", 0) <= now_ms and not t.get("dismissed", False)
-                    ]
+                timers = self.rec_mgr.get_active_timers()
+                now_ms = time.time() * 1000
+                expired_undismissed = [
+                    t for t in timers
+                    if t.get("expiresAt", 0) <= now_ms and not t.get("dismissed", False)
+                ]
 
-                    if expired_undismissed and not alarming:
-                        log.info("Expired timer(s) detected, starting alarm on Pi speaker")
-                        alarming = True
-                    elif not expired_undismissed and alarming:
-                        log.info("All timers dismissed, stopping alarm")
-                        alarming = False
-                        self._kill_alarm()
+                if expired_undismissed and not alarming:
+                    log.info("Expired timer(s) detected, starting alarm on Pi speaker")
+                    alarming = True
+                elif not expired_undismissed and alarming:
+                    log.info("All timers dismissed, stopping alarm")
+                    alarming = False
+                    self._kill_alarm()
 
-                    # Play alarm sound in a loop while active
-                    if alarming and (self._alarm_proc is None or self._alarm_proc.poll() is not None):
-                        if not self.dry_run:
-                            self._alarm_proc = play_sound(ALARM_PATH)
-                        else:
-                            log.info("[DRY RUN] Would play alarm sound")
+                # Play alarm sound in a loop while active
+                if alarming and (self._alarm_proc is None or self._alarm_proc.poll() is not None):
+                    if not self.dry_run:
+                        self._alarm_proc = play_sound(ALARM_PATH)
+                    else:
+                        log.info("[DRY RUN] Would play alarm sound")
             except Exception as e:
                 log.debug("Alarm thread error: %s", e)
 
@@ -734,32 +719,144 @@ class GestureThread(threading.Thread):
 # ---------------------------------------------------------------------------
 
 class RecordingManager:
-    """Manages voice sample recording, controlled via local HTTP server on port 8765.
+    """Local API server on port 8765 — replaces Cloudflare Worker for Pi-local endpoints.
 
-    No Cloudflare KV — state lives in-memory on the Pi.  HandController and
-    the dashboard talk directly to http://homecenter.local:8765/.
+    All state lives in-memory on the Pi (config persists to JSON file).
+    Dashboard and HandController talk directly to http://localhost:8765/.
 
     Endpoints:
-        GET  /status  → {active, type, count, totalPositive, totalNegative}
-        POST /toggle  {type:"positive"|"negative"} → toggles recording, returns status
-        POST /reset   → zeroes counts, returns status
-        POST /clear   → zeroes counts + deletes saved audio files, returns status
+        Recording:
+            GET/POST /status  → {active, type, count, totalPositive, totalNegative}
+            POST /toggle  → toggles recording
+            POST /reset   → zeroes counts
+            POST /clear   → zeroes counts + deletes saved audio files
+
+        Wake config:
+            GET  /api/wake-config  → config dict
+            PUT/POST /api/wake-config  → update config, persist to disk
+
+        Wake debug:
+            GET  /api/wake-debug?since=N  → {events: [...]}
+            POST /api/wake-debug  → append event
+
+        Navigation:
+            GET  /api/navigate  → {navigation: {page, view, timestamp}}
+            POST /api/navigate  → update page/view
+
+        Timers:
+            GET  /api/timers  → {timers: [...], serverTime: ms}
+            POST /api/timers  → create timer
+            POST /api/timers/dismiss-all  → dismiss all expired
+            POST /api/timers/<id>/dismiss  → dismiss specific timer
+
+        Gestures:
+            GET  /gesture  → {gesture: ...}
+            POST /gesture  → accept gesture from HandController
     """
 
     HTTP_PORT = 8765
+    MAX_DEBUG_EVENTS = 100
 
     def __init__(self, worker_url: str | None = None, worker_token: str | None = None):
         self.worker_url = worker_url
         self.worker_token = worker_token
+        # Recording state
         self.active = False
         self.record_type = "positive"
         self._session_count = 0
         self._recording_buffer: list[np.ndarray] = []
         self._chime_mute_until = 0.0
         self._save_dir = Path(__file__).parent / "models" / "recorded_samples"
+        # Gesture state
         self._gesture_latest = None  # {gesture, hand, timestamp, id}
+        # Wake config (persisted to JSON)
+        self._config_path = Path(__file__).parent / "wake_config.json"
+        self._wake_config = dict(_DEFAULT_CONFIG)
+        if self._config_path.exists():
+            try:
+                self._wake_config.update(json.loads(self._config_path.read_text()))
+                log.info("Loaded wake config from %s", self._config_path)
+            except Exception:
+                pass
+        # Wake debug events (circular buffer)
+        self._debug_events: list[dict] = []
+        # Navigation state
+        self._navigation = {"page": "dashboard", "view": None, "timestamp": 0}
+        # Timers
+        self._timers: list[dict] = []
+        self._timer_counter = 0
+        # Thread lock
         self._lock = threading.Lock()
         self._start_http_server()
+
+    # ── Public methods for in-process callers (no HTTP round-trip) ──
+
+    def add_debug_event(self, event_type: str, data: dict | None = None):
+        """Add a debug event (called from detection loop)."""
+        event = {
+            "type": event_type,
+            "timestamp": int(time.time() * 1000),
+            **(data or {}),
+        }
+        with self._lock:
+            self._debug_events.append(event)
+            if len(self._debug_events) > self.MAX_DEBUG_EVENTS:
+                self._debug_events = self._debug_events[-self.MAX_DEBUG_EVENTS:]
+
+    def navigate(self, page: str | None = None, view: str | None = None):
+        """Update navigation state (called from detection loop)."""
+        with self._lock:
+            if page:
+                self._navigation["page"] = page
+            if view:
+                self._navigation["view"] = view
+            self._navigation["timestamp"] = int(time.time() * 1000)
+
+    def add_timer(self, name: str, total_seconds: int, source: str = "voice") -> dict:
+        """Create a timer (called from detection loop)."""
+        with self._lock:
+            self._timer_counter += 1
+            timer = {
+                "id": f"timer_{int(time.time() * 1000)}_{self._timer_counter}",
+                "name": name,
+                "totalSeconds": total_seconds,
+                "expiresAt": int(time.time() * 1000) + total_seconds * 1000,
+                "dismissed": False,
+                "source": source,
+                "createdAt": int(time.time() * 1000),
+            }
+            self._timers.append(timer)
+            log.info("Timer created: %s (%ds)", name, total_seconds)
+            return timer
+
+    def dismiss_all_timers(self):
+        """Dismiss all expired timers."""
+        now = int(time.time() * 1000)
+        with self._lock:
+            for t in self._timers:
+                if t["expiresAt"] <= now:
+                    t["dismissed"] = True
+
+    def dismiss_timer(self, timer_id: str):
+        """Dismiss a specific timer."""
+        with self._lock:
+            for t in self._timers:
+                if t["id"] == timer_id:
+                    t["dismissed"] = True
+
+    def get_config(self, key: str):
+        """Get a config value (thread-safe)."""
+        with self._lock:
+            return self._wake_config.get(key, _DEFAULT_CONFIG.get(key))
+
+    def get_active_timers(self) -> list[dict]:
+        """Get non-stale timers (cleanup old dismissed ones)."""
+        now = int(time.time() * 1000)
+        with self._lock:
+            # Remove timers dismissed more than 1 hour ago
+            self._timers = [t for t in self._timers
+                           if not (t["dismissed"] and now - t["expiresAt"] > 3600000)]
+            return list(self._timers)
 
     def _count_files(self, prefix: str) -> int:
         """Count .npz training files on disk — always accurate."""
@@ -790,7 +887,7 @@ class RecordingManager:
 
             def _cors_headers(self):
                 self.send_header("Access-Control-Allow-Origin", "*")
-                self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+                self.send_header("Access-Control-Allow-Methods", "GET, POST, PUT, OPTIONS")
                 self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization")
 
             def _respond_json(self, data, code=200):
@@ -806,13 +903,53 @@ class RecordingManager:
                 self._cors_headers()
                 self.end_headers()
 
+            def do_PUT(self):
+                # Route PUT to POST handler (for wake-config)
+                self.do_POST()
+
+            def _handle_gesture(self, body):
+                title = body.get("title", "")
+                m = re.match(r"(Left|Right|L|R|Both) (?:Hands?): (.+)", title)
+                if m:
+                    raw = m.group(2).strip()
+                    parts = re.split(r"[-\s]+", raw)
+                    gesture = parts[0].lower() + "".join(w.capitalize() for w in parts[1:])
+                    with mgr._lock:
+                        mgr._gesture_latest = {
+                            "gesture": gesture,
+                            "hand": m.group(1),
+                            "timestamp": body.get("timestamp", int(time.time() * 1000)),
+                            "id": body.get("id", ""),
+                        }
+                    self._respond_json({"ok": True})
+                else:
+                    self._respond_json({"error": "invalid title format"}, 400)
+
             def do_GET(self):
-                if self.path == "/status":
+                path = self.path.split("?")[0]  # strip query string
+                qs = self.path.split("?")[1] if "?" in self.path else ""
+                params = dict(p.split("=", 1) for p in qs.split("&") if "=" in p) if qs else {}
+
+                if path == "/status":
                     with mgr._lock:
                         self._respond_json(mgr._get_status())
-                elif self.path == "/gesture":
+                elif path == "/gesture":
                     with mgr._lock:
                         self._respond_json({"gesture": mgr._gesture_latest})
+                elif path == "/api/wake-config":
+                    with mgr._lock:
+                        self._respond_json(dict(mgr._wake_config))
+                elif path == "/api/wake-debug":
+                    since = int(params.get("since", "0"))
+                    with mgr._lock:
+                        events = [e for e in mgr._debug_events if e["timestamp"] > since]
+                    self._respond_json({"events": events})
+                elif path == "/api/navigate":
+                    with mgr._lock:
+                        self._respond_json({"navigation": dict(mgr._navigation)})
+                elif path == "/api/timers":
+                    timers = mgr.get_active_timers()
+                    self._respond_json({"timers": timers, "serverTime": int(time.time() * 1000)})
                 else:
                     self._respond_json({"error": "not found"}, 404)
 
@@ -855,24 +992,7 @@ class RecordingManager:
                     threading.Thread(target=_after, daemon=True).start()
 
                 elif self.path == "/gesture":
-                    # Accept gesture from HandController, normalize title to camelCase
-                    title = body.get("title", "")
-                    m = re.match(r"(Left|Right|L|R|Both) (?:Hands?): (.+)", title)
-                    if m:
-                        raw = m.group(2).strip()
-                        # camelCase: "Index-Thumb Pinch" -> "indexThumbPinch"
-                        parts = re.split(r"[-\s]+", raw)
-                        gesture = parts[0].lower() + "".join(w.capitalize() for w in parts[1:])
-                        with mgr._lock:
-                            mgr._gesture_latest = {
-                                "gesture": gesture,
-                                "hand": m.group(1),
-                                "timestamp": body.get("timestamp", int(time.time() * 1000)),
-                                "id": body.get("id", ""),
-                            }
-                        self._respond_json({"ok": True})
-                    else:
-                        self._respond_json({"error": "invalid title format"}, 400)
+                    self._handle_gesture(body)
 
                 elif self.path == "/reset":
                     with mgr._lock:
@@ -893,6 +1013,56 @@ class RecordingManager:
                 elif self.path == "/status":
                     with mgr._lock:
                         self._respond_json(mgr._get_status())
+
+                elif self.path == "/api/wake-config":
+                    # PUT or POST to update config
+                    with mgr._lock:
+                        for k, v in body.items():
+                            if k in mgr._wake_config:
+                                mgr._wake_config[k] = type(mgr._wake_config[k])(v)
+                        # Also update live config
+                        _live_config.update(mgr._wake_config)
+                        # Persist to disk
+                        try:
+                            mgr._config_path.write_text(json.dumps(mgr._wake_config, indent=2))
+                        except Exception:
+                            pass
+                        self._respond_json(dict(mgr._wake_config))
+
+                elif self.path == "/api/wake-debug":
+                    mgr.add_debug_event(
+                        body.get("type", "unknown"),
+                        {k: v for k, v in body.items() if k not in ("type",)},
+                    )
+                    self._respond_json({"ok": True})
+
+                elif self.path == "/api/navigate":
+                    mgr.navigate(body.get("page"), body.get("view"))
+                    with mgr._lock:
+                        self._respond_json({"ok": True, "navigation": dict(mgr._navigation)})
+
+                elif self.path == "/api/timers":
+                    name = body.get("name", "timer")
+                    seconds = body.get("totalSeconds", 60)
+                    source = body.get("source", "voice")
+                    timer = mgr.add_timer(name, int(seconds), source)
+                    self._respond_json({"ok": True, "timer": timer})
+
+                elif self.path == "/api/timers/dismiss-all":
+                    mgr.dismiss_all_timers()
+                    self._respond_json({"ok": True})
+
+                elif self.path.startswith("/api/timers/") and self.path.endswith("/dismiss"):
+                    # /api/timers/<id>/dismiss
+                    parts = self.path.split("/")
+                    if len(parts) >= 4:
+                        timer_id = parts[3]
+                        mgr.dismiss_timer(timer_id)
+                    self._respond_json({"ok": True})
+
+                elif self.path == "/api/gesture":
+                    # Accept gesture via /api/ path too
+                    self._handle_gesture(body)
 
                 else:
                     self._respond_json({"error": "not found"}, 404)
@@ -1024,7 +1194,7 @@ def get_or_train_model() -> "Model":
     return Model(
         wakeword_models=["hey_jarvis"],
         inference_framework=framework,
-        vad_threshold=0.5,
+        vad_threshold=0.3,
     )
 
 
@@ -1097,32 +1267,41 @@ def main() -> None:
         log.error("Failed to open ALSA device %s: %s", device, e)
         sys.exit(1)
 
-    # Start alarm polling thread if worker configured
-    alarm_thread = None
     gesture_thread = None
-    config_poller = None
-    if args.worker_url:
-        alarm_thread = AlarmThread(args.worker_url, args.worker_token, args.dry_run)
-        alarm_thread.start()
-        log.info("Alarm polling thread started (every %ds)", ALARM_POLL_INTERVAL)
-        gesture_thread = GestureThread(args.worker_url, args.worker_token, args.dry_run)
-        gesture_thread.start()
-        config_poller = ConfigPoller(args.worker_url, args.worker_token)
-        config_poller.start()
-        log.info("Config polling thread started (every %ds)", CONFIG_POLL_INTERVAL)
-        log.info("Gesture polling thread started (every 2s)")
 
     # Audio preprocessor — high-pass filter + adaptive noise gate
     preprocessor = AudioPreprocessor(cutoff_hz=85)
 
-    # Recording manager — handles voice sample collection mode
+    # Recording manager — local API server on :8765
     rec_mgr = RecordingManager(args.worker_url, args.worker_token)
+
+    # Wire up global reference for in-process callers (debug_post, cfg)
+    global _local_server
+    _local_server = rec_mgr
+
+    # Start alarm thread (uses local timers via rec_mgr)
+    alarm_thread = AlarmThread(rec_mgr, args.dry_run)
+    alarm_thread.start()
+    log.info("Alarm thread started (local timers, every %ds)", ALARM_POLL_INTERVAL)
+
+    # Gesture thread — only if worker configured (HandController still posts to worker)
+    if args.worker_url:
+        gesture_thread = GestureThread(args.worker_url, args.worker_token, args.dry_run)
+        gesture_thread.start()
+        log.info("Gesture thread started (polling worker every 2s)")
 
     log.info("=== openWakeWord DNN mode (no Whisper verification) ===")
     log.info("Microphone stream open. Listening...")
     last_trigger = 0.0
     last_action_time = 0.0
     consecutive_hits = {ww: 0 for ww in wake_words}
+
+    # Rolling buffer: ~4 seconds of raw mono audio for "Hey Jarvis, open calendar" style commands
+    # Each chunk = CHUNK_SIZE samples (80ms at 16kHz), so 4s ≈ 50 chunks
+    PREBUFFER_SECONDS = 4.0
+    prebuf_max = int(PREBUFFER_SECONDS * SAMPLE_RATE / CHUNK_SIZE)
+    prebuffer = collections.deque(maxlen=prebuf_max)
+    TAIL_SECONDS = 2.0  # Extra recording after detection to catch trailing words
 
     try:
         while True:
@@ -1134,8 +1313,10 @@ def main() -> None:
             if CHANNELS > 1:
                 audio_array = audio_array.reshape(-1, CHANNELS).mean(axis=1).astype(np.int16)
 
-            # Apply audio preprocessing (high-pass filter, noise tracking)
             raw_audio = audio_array.copy()
+            prebuffer.append(raw_audio)
+
+            # Apply audio preprocessing (high-pass filter, noise tracking)
             audio_array = preprocessor.process(audio_array)
 
             now = time.time()
@@ -1206,40 +1387,41 @@ def main() -> None:
                         consecutive_hits[ww] = 0
                     last_trigger = now
 
-                    if not args.dry_run:
-                        play_acknowledgement()
-
-                    # Record and transcribe command if worker is configured
+                    # Grab pre-trigger audio buffer + record short tail
+                    # This captures "Hey Jarvis open calendar" as one phrase
                     if args.worker_url:
-                        log.info("Recording %.1fs for command...", cfg("record_seconds"))
-                        audio_clip = record_audio(pcm, cfg("record_seconds"))
-                        command = parse_command(transcribe(audio_clip))
+                        log.info("Capturing pre-buffer + %.1fs tail...", TAIL_SECONDS)
+                        tail_clip = record_audio(pcm, TAIL_SECONDS)
+                        pre_audio = np.concatenate(list(prebuffer)) if prebuffer else np.array([], dtype=np.int16)
+                        full_audio = np.concatenate([pre_audio, tail_clip])
+                        log.info("Total audio: %.1fs (%.1fs pre + %.1fs tail)",
+                                 len(full_audio) / SAMPLE_RATE,
+                                 len(pre_audio) / SAMPLE_RATE, TAIL_SECONDS)
+                        command = parse_command(transcribe(full_audio))
                     else:
                         command = {"action": "turn_on"}
+
+                    if not args.dry_run:
+                        play_acknowledgement()
 
                     log.info("Command: %s", command)
                     debug_post("command", {"action": command.get("action"), "details": command})
 
-                    # Dispatch
+                    # Dispatch — all local now (no worker round-trip)
                     action = command["action"]
-                    if action == "set_timer" and args.worker_url:
+                    if action == "set_timer":
                         label = command.get("label", "timer")
                         duration = command.get("duration", 60)
                         if args.dry_run:
                             log.info("[DRY RUN] Would create timer: %s (%ds)", label, duration)
                         else:
-                            result = worker_post(
-                                args.worker_url, args.worker_token,
-                                "/api/timers",
-                                {"name": label, "totalSeconds": duration, "source": "voice"},
-                            )
-                            log.info("Timer %s: %s for %ds", "created" if result else "FAILED", label, duration)
+                            rec_mgr.add_timer(label, duration, "voice")
 
                     elif action == "stop":
                         if args.dry_run:
                             log.info("[DRY RUN] Would dismiss all timers")
-                        elif args.worker_url:
-                            worker_post(args.worker_url, args.worker_token, "/api/timers/dismiss-all")
+                        else:
+                            rec_mgr.dismiss_all_timers()
                             log.info("Dismissed all timers")
 
                     elif action == "ask" and args.worker_url:
@@ -1250,13 +1432,18 @@ def main() -> None:
                             result = worker_post(args.worker_url, args.worker_token, "/api/ask-query", {"query": query_text})
                             log.info("LLM query %s: %s", "sent" if result else "FAILED", query_text)
 
-                    elif action == "navigate" and args.worker_url:
-                        nav_data = {k: command[k] for k in ("page", "view") if command.get(k)}
+                    elif action == "navigate":
+                        page = command.get("page")
+                        view = command.get("view")
                         if args.dry_run:
-                            log.info("[DRY RUN] Would navigate: %s", nav_data)
+                            log.info("[DRY RUN] Would navigate: page=%s view=%s", page, view)
                         else:
-                            worker_post(args.worker_url, args.worker_token, "/api/navigate", nav_data)
-                            log.info("Navigation: %s", nav_data)
+                            rec_mgr.navigate(page, view)
+                            log.info("Navigation: page=%s view=%s", page, view)
+
+                    elif action in ("debug_hide", "debug_show"):
+                        debug_post(action, {"message": action.replace("_", " ")})
+                        log.info("Debug overlay: %s", action)
 
                     elif action == "turn_off":
                         if args.dry_run:

@@ -79,7 +79,7 @@ export default function App() {
         />
         <TranscriptionOverlay query={llm.latestResponse?.query} visible={!!llm.latestResponse && forcePage !== "llm-response"} />
         <AlarmOverlay expiredTimers={expiredTimers} onDismissAll={dismissAll} />
-        <WakeWordDebug events={wakeDebug.events} connected={wakeDebug.connected} onClear={wakeDebug.clearEvents} workerUrl={settings.worker?.url} workerToken={settings.worker?.token} />
+        {wakeDebug.visible && <WakeWordDebug events={wakeDebug.events} connected={wakeDebug.connected} onClear={wakeDebug.clearEvents} workerUrl={settings.worker?.url} workerToken={settings.worker?.token} />}
       </>
     );
   }
@@ -98,7 +98,7 @@ export default function App() {
         />
         <TranscriptionOverlay query={llm.latestResponse?.query} visible={!!llm.latestResponse && forcePage !== "llm-response"} />
         <AlarmOverlay expiredTimers={expiredTimers} onDismissAll={dismissAll} />
-        <WakeWordDebug events={wakeDebug.events} connected={wakeDebug.connected} onClear={wakeDebug.clearEvents} workerUrl={settings.worker?.url} workerToken={settings.worker?.token} />
+        {wakeDebug.visible && <WakeWordDebug events={wakeDebug.events} connected={wakeDebug.connected} onClear={wakeDebug.clearEvents} workerUrl={settings.worker?.url} workerToken={settings.worker?.token} />}
       </>
     );
   }
@@ -118,7 +118,7 @@ export default function App() {
         />
         <TranscriptionOverlay query={llm.latestResponse?.query} visible={!!llm.latestResponse && forcePage !== "llm-response"} />
         <AlarmOverlay expiredTimers={expiredTimers} onDismissAll={dismissAll} />
-        <WakeWordDebug events={wakeDebug.events} connected={wakeDebug.connected} onClear={wakeDebug.clearEvents} workerUrl={settings.worker?.url} workerToken={settings.worker?.token} />
+        {wakeDebug.visible && <WakeWordDebug events={wakeDebug.events} connected={wakeDebug.connected} onClear={wakeDebug.clearEvents} workerUrl={settings.worker?.url} workerToken={settings.worker?.token} />}
       </>
     );
   }
@@ -133,7 +133,7 @@ export default function App() {
           lastGesture={hc.lastGesture}
         />
         <AlarmOverlay expiredTimers={expiredTimers} onDismissAll={dismissAll} />
-        <WakeWordDebug events={wakeDebug.events} connected={wakeDebug.connected} onClear={wakeDebug.clearEvents} workerUrl={settings.worker?.url} workerToken={settings.worker?.token} />
+        {wakeDebug.visible && <WakeWordDebug events={wakeDebug.events} connected={wakeDebug.connected} onClear={wakeDebug.clearEvents} workerUrl={settings.worker?.url} workerToken={settings.worker?.token} />}
       </>
     );
   }
@@ -154,7 +154,7 @@ export default function App() {
           lastGesture={hc.lastGesture}
         />
         <AlarmOverlay expiredTimers={expiredTimers} onDismissAll={dismissAll} />
-        <WakeWordDebug events={wakeDebug.events} connected={wakeDebug.connected} onClear={wakeDebug.clearEvents} workerUrl={settings.worker?.url} workerToken={settings.worker?.token} />
+        {wakeDebug.visible && <WakeWordDebug events={wakeDebug.events} connected={wakeDebug.connected} onClear={wakeDebug.clearEvents} workerUrl={settings.worker?.url} workerToken={settings.worker?.token} />}
       </>
     );
   }

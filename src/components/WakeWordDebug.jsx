@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { Mic, MicOff, X, ChevronUp, ChevronDown, Trash2, Sliders } from "lucide-react";
+import { apiUrl, apiHeaders } from "../services/piLocal";
 
 const M = "'JetBrains Mono',ui-monospace,monospace";
 const F = "'Geist','Inter',system-ui,sans-serif";
@@ -115,10 +116,10 @@ export function WakeWordDebug({ events, connected, onClear, workerUrl, workerTok
 
   // Fetch config when config panel is shown
   useEffect(() => {
-    if (!showConfig || !workerUrl) return;
-    const headers = {};
-    if (workerToken) headers.Authorization = `Bearer ${workerToken}`;
-    fetch(`${workerUrl}/api/wake-config`, { headers })
+    if (!showConfig) return;
+    const url = apiUrl(workerUrl, "/api/wake-config");
+    if (!url) return;
+    fetch(url, { headers: apiHeaders(workerToken) })
       .then((r) => r.json())
       .then(setConfig)
       .catch(() => {});
@@ -129,14 +130,13 @@ export function WakeWordDebug({ events, connected, onClear, workerUrl, workerTok
   }, []);
 
   const saveConfig = useCallback(async () => {
-    if (!workerUrl || !config) return;
+    const url = apiUrl(workerUrl, "/api/wake-config");
+    if (!url || !config) return;
     setSaving(true);
     try {
-      const headers = { "Content-Type": "application/json" };
-      if (workerToken) headers.Authorization = `Bearer ${workerToken}`;
-      const res = await fetch(`${workerUrl}/api/wake-config`, {
+      const res = await fetch(url, {
         method: "PUT",
-        headers,
+        headers: apiHeaders(workerToken),
         body: JSON.stringify(config),
       });
       if (res.ok) {
@@ -154,7 +154,7 @@ export function WakeWordDebug({ events, connected, onClear, workerUrl, workerTok
       <div
         onClick={() => setMinimized(false)}
         style={{
-          position: "fixed", bottom: 16, right: 16, zIndex: 9999,
+          position: "fixed", bottom: 16, left: 16, zIndex: 9999,
           display: "flex", alignItems: "center", gap: 8,
           padding: "8px 14px", borderRadius: 12, cursor: "pointer",
           background: "#111", border: `1px solid ${connected ? "#4ADE8044" : "#FFFFFF22"}`,
@@ -171,9 +171,9 @@ export function WakeWordDebug({ events, connected, onClear, workerUrl, workerTok
 
   return (
     <div style={{
-      position: "fixed", bottom: 16, right: 16, zIndex: 9999,
+      position: "fixed", bottom: 16, left: 16, zIndex: 9999,
       width: expanded ? 500 : 360,
-      maxHeight: expanded ? "70vh" : 240,
+      maxHeight: expanded ? "35vh" : 120,
       background: "#0A0A0A", border: "1px solid #FFFFFF20",
       borderRadius: 12, overflow: "hidden",
       display: "flex", flexDirection: "column",

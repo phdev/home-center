@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback } from "react";
+import { apiUrl, apiHeaders } from "../services/piLocal";
 
 /**
- * Polls the worker for navigation commands (from voice/Pi).
- * Returns current page/view state and a goTo function for local navigation.
+ * Polls for navigation commands (from voice/Pi).
+ * On Pi, talks to localhost:8765. Off Pi, talks to Cloudflare Worker.
  */
 export function useNavigation(workerSettings) {
   const [page, setPage] = useState("dashboard"); // "dashboard" | "calendar"
@@ -14,14 +15,13 @@ export function useNavigation(workerSettings) {
 
   // Poll for navigation commands every 2s
   useEffect(() => {
-    if (!workerUrl) return;
+    const url = apiUrl(workerUrl, "/api/navigate");
+    if (!url) return;
     let active = true;
 
     const poll = async () => {
       try {
-        const headers = {};
-        if (workerToken) headers.Authorization = `Bearer ${workerToken}`;
-        const res = await fetch(`${workerUrl}/api/navigate`, { headers });
+        const res = await fetch(url, { headers: apiHeaders(workerToken) });
         if (!res.ok) return;
         const data = await res.json();
         const nav = data.navigation;

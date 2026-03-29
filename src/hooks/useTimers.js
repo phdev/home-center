@@ -1,28 +1,24 @@
 import { useState, useEffect, useCallback } from "react";
+import { apiUrl, apiHeaders } from "../services/piLocal";
 
 export function useTimers(workerSettings) {
   const [timers, setTimers] = useState([]);
   const workerUrl = workerSettings?.url;
   const workerToken = workerSettings?.token;
 
-  const headers = useCallback(() => {
-    const h = { "Content-Type": "application/json" };
-    if (workerToken) h.Authorization = `Bearer ${workerToken}`;
-    return h;
-  }, [workerToken]);
-
   // Poll server every 5s
   const poll = useCallback(async () => {
-    if (!workerUrl) return;
+    const url = apiUrl(workerUrl, "/api/timers");
+    if (!url) return;
     try {
-      const res = await fetch(`${workerUrl}/api/timers`, { headers: headers() });
+      const res = await fetch(url, { headers: apiHeaders(workerToken) });
       if (!res.ok) return;
       const data = await res.json();
       setTimers(data.timers || []);
     } catch {
       // silent
     }
-  }, [workerUrl, headers]);
+  }, [workerUrl, workerToken]);
 
   useEffect(() => {
     poll();
@@ -47,11 +43,12 @@ export function useTimers(workerSettings) {
 
   const addTimer = useCallback(
     async (name, seconds) => {
-      if (!workerUrl) return;
+      const url = apiUrl(workerUrl, "/api/timers");
+      if (!url) return;
       try {
-        await fetch(`${workerUrl}/api/timers`, {
+        await fetch(url, {
           method: "POST",
-          headers: headers(),
+          headers: apiHeaders(workerToken),
           body: JSON.stringify({ name, totalSeconds: seconds, source: "dashboard" }),
         });
         poll();
@@ -59,37 +56,39 @@ export function useTimers(workerSettings) {
         // silent
       }
     },
-    [workerUrl, headers, poll],
+    [workerUrl, workerToken, poll],
   );
 
   const dismissTimer = useCallback(
     async (id) => {
-      if (!workerUrl) return;
+      const url = apiUrl(workerUrl, `/api/timers/${encodeURIComponent(id)}/dismiss`);
+      if (!url) return;
       try {
-        await fetch(`${workerUrl}/api/timers/${encodeURIComponent(id)}/dismiss`, {
+        await fetch(url, {
           method: "POST",
-          headers: headers(),
+          headers: apiHeaders(workerToken),
         });
         poll();
       } catch {
         // silent
       }
     },
-    [workerUrl, headers, poll],
+    [workerUrl, workerToken, poll],
   );
 
   const dismissAll = useCallback(async () => {
-    if (!workerUrl) return;
+    const url = apiUrl(workerUrl, "/api/timers/dismiss-all");
+    if (!url) return;
     try {
-      await fetch(`${workerUrl}/api/timers/dismiss-all`, {
+      await fetch(url, {
         method: "POST",
-        headers: headers(),
+        headers: apiHeaders(workerToken),
       });
       poll();
     } catch {
       // silent
     }
-  }, [workerUrl, headers, poll]);
+  }, [workerUrl, workerToken, poll]);
 
   return { timers: computed, expiredTimers, addTimer, dismissTimer, dismissAll };
 }

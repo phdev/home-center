@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { apiUrl, apiHeaders } from "../services/piLocal";
 
 const POLL_INTERVAL = 2000;
 const MAX_EVENTS = 50;
@@ -6,6 +7,7 @@ const MAX_EVENTS = 50;
 export function useWakeWordDebug(workerSettings) {
   const [events, setEvents] = useState([]);
   const [connected, setConnected] = useState(false);
+  const [visible, setVisible] = useState(true);
   const sinceRef = useRef(Date.now());
   const lastPollRef = useRef(0);
 
@@ -13,15 +15,14 @@ export function useWakeWordDebug(workerSettings) {
   const workerToken = workerSettings?.token;
 
   useEffect(() => {
-    if (!workerUrl) return;
+    const baseUrl = apiUrl(workerUrl, "/api/wake-debug");
+    if (!baseUrl) return;
 
     const poll = async () => {
       try {
-        const headers = {};
-        if (workerToken) headers.Authorization = `Bearer ${workerToken}`;
         const res = await fetch(
-          `${workerUrl}/api/wake-debug?since=${sinceRef.current}`,
-          { headers }
+          `${baseUrl}?since=${sinceRef.current}`,
+          { headers: apiHeaders(workerToken) }
         );
         if (!res.ok) {
           setConnected(false);
@@ -32,8 +33,13 @@ export function useWakeWordDebug(workerSettings) {
         lastPollRef.current = Date.now();
 
         if (data.events && data.events.length > 0) {
+          // Check for show/hide debug commands
+          for (const e of data.events) {
+            if (e.type === "debug_hide") setVisible(false);
+            if (e.type === "debug_show") setVisible(true);
+          }
           setEvents((prev) => {
-            const merged = [...prev, ...data.events];
+            const merged = [...prev, ...data.events.filter((e) => e.type !== "debug_hide" && e.type !== "debug_show")];
             // Deduplicate by timestamp+type
             const seen = new Set();
             const unique = merged.filter((e) => {
@@ -64,5 +70,5 @@ export function useWakeWordDebug(workerSettings) {
     sinceRef.current = Date.now();
   };
 
-  return { events, connected, clearEvents };
+  return { events, connected, visible, clearEvents };
 }
