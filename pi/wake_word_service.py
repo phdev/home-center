@@ -2,7 +2,7 @@
 """
 Wake Word Detection Service for Home Center
 
-Listens for "Hey Homer" via openWakeWord, then records a short audio clip
+Listens for "Hey Comni" via openWakeWord, then records a short audio clip
 and transcribes it with faster-whisper to parse voice commands:
 
   - "set a timer for X minutes for Y" → creates a timer via worker API
@@ -17,7 +17,6 @@ Hardware: ReSpeaker 2-Mics Pi HAT (or any ALSA-compatible microphone)
 """
 
 import argparse
-import collections
 import io
 import json
 import logging
@@ -53,7 +52,7 @@ def _inference_framework() -> str:
 # ---------------------------------------------------------------------------
 # Configuration
 # ---------------------------------------------------------------------------
-WAKE_WORD = "hey_homer"
+WAKE_WORD = "hey_jarvis"
 SAMPLE_RATE = 16000
 CHUNK_SIZE = 1280  # 80ms at 16kHz — required by openWakeWord
 CHANNELS = 2  # ReSpeaker 2-Mic HAT is stereo; we downmix to mono
@@ -65,10 +64,9 @@ _DEFAULT_CONFIG = {
     "min_rms_energy": 200,
     "min_consecutive": 3,
     "score_smooth_window": 3,
-    "post_action_mute": 8.0,
+    "post_action_mute": 3.0,
     "high_confidence_bypass": 0.8,
     "record_seconds": 3.5,
-    "verify_buffer_seconds": 2.5,
 }
 
 # Mutable runtime config — updated by ConfigPoller thread
@@ -91,22 +89,6 @@ SCORE_SMOOTH_WINDOW = _DEFAULT_CONFIG["score_smooth_window"]
 POST_ACTION_MUTE = _DEFAULT_CONFIG["post_action_mute"]
 HIGH_CONFIDENCE_BYPASS = _DEFAULT_CONFIG["high_confidence_bypass"]
 RECORD_SECONDS = _DEFAULT_CONFIG["record_seconds"]
-VERIFY_BUFFER_SECONDS = _DEFAULT_CONFIG["verify_buffer_seconds"]
-
-# Whisper verification: accept these patterns as confirming "hey homer"
-# Whisper tiny often mis-transcribes "hey homer" as phonetic near-matches
-VERIFY_PATTERNS = [
-    r"homer",
-    r"homework",
-    r"home\b",
-    r"hom+er",
-    r"hummer",
-    r"humor",
-    r"hey\s*home",
-    r"h[eo]m[eo]r",
-    r"hey\s*h",
-    r"omer",
-]
 
 # Alarm polling
 ALARM_POLL_INTERVAL = 5  # Seconds between timer checks
@@ -167,25 +149,29 @@ def turn_off_tv() -> None:
 # ---------------------------------------------------------------------------
 
 def generate_chime(path: Path) -> None:
-    """Generate a two-tone acknowledgement chime WAV file."""
+    """Generate a bright three-tone rising arpeggio chime (ding-ding-DING)."""
     path.parent.mkdir(parents=True, exist_ok=True)
-    sr = 22050
+    sr = 44100  # Higher sample rate for clarity on TV speakers
 
-    def tone(freq: float, duration: float) -> np.ndarray:
+    def tone(freq: float, duration: float, amp: float = 1.0) -> np.ndarray:
         t = np.linspace(0, duration, int(sr * duration), endpoint=False)
-        attack = np.minimum(t / 0.01, 1.0)
-        decay = np.maximum(1.0 - t / (duration * 1.2), 0.0)
-        env = attack * decay
+        attack = np.minimum(t / 0.008, 1.0)
+        decay = np.exp(-t / (duration * 0.8))
+        env = attack * decay * amp
+        # Rich harmonics for TV speaker presence
         signal = env * (np.sin(2 * np.pi * freq * t)
-                        + 0.3 * np.sin(4 * np.pi * freq * t))
+                        + 0.4 * np.sin(4 * np.pi * freq * t)
+                        + 0.15 * np.sin(6 * np.pi * freq * t))
         return signal
 
     chime = np.concatenate([
-        tone(523.25, 0.15),
-        np.zeros(int(sr * 0.03)),
-        tone(659.25, 0.22),
+        tone(659.25, 0.12, 0.7),    # E5 — soft lead-in
+        np.zeros(int(sr * 0.04)),
+        tone(783.99, 0.12, 0.85),   # G5 — middle
+        np.zeros(int(sr * 0.04)),
+        tone(1046.50, 0.25, 1.0),   # C6 — bright resolve
     ])
-    chime = (chime / np.max(np.abs(chime)) * 32000).astype(np.int16)
+    chime = (chime / np.max(np.abs(chime)) * 32700).astype(np.int16)
 
     with wave.open(str(path), "w") as wf:
         wf.setnchannels(1)
@@ -244,6 +230,18 @@ def find_speaker_device() -> str | None:
     except Exception:
         pass
     return None
+
+
+def set_mic_gain(card: str = "2", gain: int = 60) -> None:
+    """Set ReSpeaker PGA capture gain (0-119, ~0.5dB steps). Default 32 is too low."""
+    try:
+        subprocess.run(
+            ["amixer", "-c", card, "-q", "cset", "numid=34", f"{gain},{gain}"],
+            capture_output=True, timeout=5,
+        )
+        log.info("Mic PGA capture gain set to %d/119 on card %s", gain, card)
+    except Exception as e:
+        log.warning("Failed to set mic gain: %s", e)
 
 
 def set_speaker_volume() -> None:
@@ -408,7 +406,7 @@ def get_whisper_model():
     if _whisper_model is None:
         from faster_whisper import WhisperModel
         log.info("Loading faster-whisper tiny model (int8)...")
-        _whisper_model = WhisperModel("tiny", compute_type="int8", device="cpu")
+        _whisper_model = WhisperModel("base", compute_type="int8", device="cpu")
         log.info("Whisper model loaded.")
     return _whisper_model
 
@@ -416,11 +414,14 @@ def get_whisper_model():
 def transcribe(audio: np.ndarray) -> str:
     """Transcribe int16 mono audio array to text."""
     model = get_whisper_model()
-    # faster-whisper expects float32 normalized to [-1, 1]
-    audio_f32 = audio.astype(np.float32) / 32768.0
+    # Remove DC offset, then standard int16 normalization
+    audio_f32 = audio.astype(np.float32)
+    audio_f32 = audio_f32 - np.mean(audio_f32)
+    audio_f32 = audio_f32 / 32768.0
     segments, _ = model.transcribe(
-        audio_f32, beam_size=1, language="en",
+        audio_f32, beam_size=3, language="en",
         no_speech_threshold=0.95,  # Don't skip segments unless very confident it's silence
+        initial_prompt="Hey Jarvis",  # Bias toward hearing the wake word
     )
     text = " ".join(seg.text.strip() for seg in segments).strip()
     return text
@@ -756,6 +757,7 @@ class RecordingManager:
         self._recording_buffer: list[np.ndarray] = []
         self._chime_mute_until = 0.0
         self._save_dir = Path(__file__).parent / "models" / "recorded_samples"
+        self._gesture_latest = None  # {gesture, hand, timestamp, id}
         self._lock = threading.Lock()
         self._start_http_server()
 
@@ -808,6 +810,9 @@ class RecordingManager:
                 if self.path == "/status":
                     with mgr._lock:
                         self._respond_json(mgr._get_status())
+                elif self.path == "/gesture":
+                    with mgr._lock:
+                        self._respond_json({"gesture": mgr._gesture_latest})
                 else:
                     self._respond_json({"error": "not found"}, 404)
 
@@ -848,6 +853,26 @@ class RecordingManager:
                         mgr._chime_mute_until = time.time() + 1.5
     
                     threading.Thread(target=_after, daemon=True).start()
+
+                elif self.path == "/gesture":
+                    # Accept gesture from HandController, normalize title to camelCase
+                    title = body.get("title", "")
+                    m = re.match(r"(Left|Right|L|R|Both) (?:Hands?): (.+)", title)
+                    if m:
+                        raw = m.group(2).strip()
+                        # camelCase: "Index-Thumb Pinch" -> "indexThumbPinch"
+                        parts = re.split(r"[-\s]+", raw)
+                        gesture = parts[0].lower() + "".join(w.capitalize() for w in parts[1:])
+                        with mgr._lock:
+                            mgr._gesture_latest = {
+                                "gesture": gesture,
+                                "hand": m.group(1),
+                                "timestamp": body.get("timestamp", int(time.time() * 1000)),
+                                "id": body.get("id", ""),
+                            }
+                        self._respond_json({"ok": True})
+                    else:
+                        self._respond_json({"error": "invalid title format"}, 400)
 
                 elif self.path == "/reset":
                     with mgr._lock:
@@ -988,34 +1013,19 @@ class AudioPreprocessor:
 # Wake word model setup
 # ---------------------------------------------------------------------------
 
-def get_or_train_model() -> Model:
-    custom_model_dir = Path(__file__).parent / "models"
-    custom_model_dir.mkdir(exist_ok=True)
-
+def get_or_train_model() -> "Model":
     framework = _inference_framework()
     log.info("Using inference framework: %s", framework)
 
-    # Only load hey_homer model (STT handles all disambiguation)
-    wakeword_models = []
-    for ext in (".onnx", ".tflite"):
-        path = custom_model_dir / f"hey_homer{ext}"
-        if path.exists():
-            log.info("Found custom model: %s", path)
-            wakeword_models.append(str(path))
-            break
-
-    if wakeword_models:
-        fw = "onnx" if wakeword_models[0].endswith(".onnx") else "tflite"
-        log.info("Loading custom wake word model")
-        return Model(wakeword_models=wakeword_models, inference_framework=fw)
-
-    log.warning("No custom 'hey_homer' model found in %s", custom_model_dir)
-    log.info("Train one with: python pi/train_hey_homer.py")
-    log.info("Falling back to built-in models as stand-in.")
-
+    # Use built-in "hey_jarvis" model — well-trained, no custom model needed
     import openwakeword
     openwakeword.utils.download_models()
-    return Model(inference_framework=framework)
+    log.info("Loading built-in 'hey_jarvis' model with Silero VAD")
+    return Model(
+        wakeword_models=["hey_jarvis"],
+        inference_framework=framework,
+        vad_threshold=0.5,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -1075,6 +1085,10 @@ def main() -> None:
         log.error("No ReSpeaker found! Check your HAT connection or specify --device")
         sys.exit(1)
 
+    # Boost mic gain — default 32/119 is too quiet for across-room detection
+    mic_card = device.replace("hw:", "").split(",")[0] if device else "2"
+    set_mic_gain(mic_card, gain=80)
+
     # Open ALSA capture
     log.info("Opening ALSA capture on %s (%d ch, %d Hz)", device, CHANNELS, SAMPLE_RATE)
     try:
@@ -1104,16 +1118,11 @@ def main() -> None:
     # Recording manager — handles voice sample collection mode
     rec_mgr = RecordingManager(args.worker_url, args.worker_token)
 
+    log.info("=== openWakeWord DNN mode (no Whisper verification) ===")
     log.info("Microphone stream open. Listening...")
     last_trigger = 0.0
     last_action_time = 0.0
     consecutive_hits = {ww: 0 for ww in wake_words}
-
-    # Rolling buffer: stores last ~VERIFY_BUFFER_SECONDS of mono audio chunks
-    # for Whisper verification before acting on a detection
-    # Each chunk after mono downmix = CHUNK_SIZE samples (80ms at 16kHz)
-    verify_buf_max = int(VERIFY_BUFFER_SECONDS * SAMPLE_RATE / CHUNK_SIZE)
-    verify_buffer = collections.deque(maxlen=verify_buf_max)
 
     try:
         while True:
@@ -1125,18 +1134,14 @@ def main() -> None:
             if CHANNELS > 1:
                 audio_array = audio_array.reshape(-1, CHANNELS).mean(axis=1).astype(np.int16)
 
-            # Append raw audio to rolling verification buffer (before preprocessing)
-            raw_audio = audio_array.copy()
-            verify_buffer.append(raw_audio)
-
             # Apply audio preprocessing (high-pass filter, noise tracking)
+            raw_audio = audio_array.copy()
             audio_array = preprocessor.process(audio_array)
 
             now = time.time()
 
-            # Recording mode — controlled via local HTTP server on :8765
+            # Recording mode — skip wake word detection
             if rec_mgr.process_audio(raw_audio):
-                # Recording mode active — skip wake word detection
                 model.predict(audio_array)  # Keep model state current
                 continue
 
@@ -1174,10 +1179,8 @@ def main() -> None:
                     debug_post("dnn_score", {"score": round(score, 3), "rms": round(rms), "consecutive": consecutive_hits.get(ww_name, 0)})
 
                 # Adaptive threshold: lower when speech energy is strong
-                # (user speaking directly) vs background noise
                 base_threshold = cfg("detection_threshold")
                 if rms > cfg("min_rms_energy") * 4:
-                    # Strong speech — allow slightly lower threshold
                     effective_threshold = base_threshold * 0.85
                 else:
                     effective_threshold = base_threshold
@@ -1192,54 +1195,26 @@ def main() -> None:
                         log.debug("Cooldown active, ignoring detection")
                         continue
 
-                    # ── Wake word candidate detected! ──
-                    log.info("Wake word candidate '%s' (score=%.3f, consec=%d)",
-                             ww_name, score, consecutive_hits[ww_name])
-                    debug_post("wake_candidate", {"score": round(score, 3), "consecutive": consecutive_hits[ww_name]})
+                    # ── Wake word detected! No Whisper verification — act immediately ──
+                    log.info("Wake word '%s' DETECTED (score=%.3f, consec=%d, rms=%.0f)",
+                             ww_name, score, consecutive_hits[ww_name], rms)
+                    debug_post("wake_confirmed", {"score": round(score, 3), "consecutive": consecutive_hits[ww_name]})
 
-                    # Reset model state early to stop accumulating
+                    # Reset model state
                     model.reset()
                     for ww in consecutive_hits:
                         consecutive_hits[ww] = 0
-
-                    # ── Stage 2: Whisper verification (skipped for high-confidence DNN) ──
-                    if score >= cfg("high_confidence_bypass"):
-                        log.info("High-confidence DNN detection (%.3f >= %.2f) — skipping Whisper verification.",
-                                 score, HIGH_CONFIDENCE_BYPASS)
-                        debug_post("whisper_verify", {"transcript": "(skipped)", "passed": True, "method": "high_confidence"})
-                    else:
-                        log.info("Borderline detection (%.3f) — verifying with Whisper...", score)
-                        buf_audio = np.concatenate(list(verify_buffer)) if verify_buffer else np.array([], dtype=np.int16)
-                        if len(buf_audio) > 0:
-                            verify_text = transcribe(buf_audio).lower()
-                            log.info("Verification transcription: '%s'", verify_text)
-                            if not any(re.search(pat, verify_text) for pat in VERIFY_PATTERNS):
-                                log.info("Verification FAILED — no homer-like pattern in transcript '%s', ignoring.", verify_text)
-                                debug_post("whisper_verify", {"transcript": verify_text, "passed": False})
-                                last_trigger = now
-                                last_action_time = time.time()
-                                break
-                        else:
-                            log.info("Verification FAILED — empty audio buffer, ignoring.")
-                            last_trigger = now
-                            break
-                        log.info("Verification PASSED.")
-                        debug_post("whisper_verify", {"transcript": verify_text, "passed": True})
-
-                    # ── Confirmed! Proceed. ──
                     last_trigger = now
-                    log.info("Wake word confirmed!")
 
                     if not args.dry_run:
                         play_acknowledgement()
 
                     # Record and transcribe command if worker is configured
                     if args.worker_url:
-                        log.info("Recording %.1fs for command...", RECORD_SECONDS)
-                        audio_clip = record_audio(pcm, RECORD_SECONDS)
+                        log.info("Recording %.1fs for command...", cfg("record_seconds"))
+                        audio_clip = record_audio(pcm, cfg("record_seconds"))
                         command = parse_command(transcribe(audio_clip))
                     else:
-                        # No worker → default to turn_on (legacy behavior)
                         command = {"action": "turn_on"}
 
                     log.info("Command: %s", command)
@@ -1247,13 +1222,6 @@ def main() -> None:
 
                     # Dispatch
                     action = command["action"]
-                    if action == "none":
-                        log.info("No command recognized, defaulting to turn on TV.")
-                        if not args.dry_run:
-                            turn_on_tv()
-                        last_action_time = time.time()
-                        break
-
                     if action == "set_timer" and args.worker_url:
                         label = command.get("label", "timer")
                         duration = command.get("duration", 60)
@@ -1265,64 +1233,40 @@ def main() -> None:
                                 "/api/timers",
                                 {"name": label, "totalSeconds": duration, "source": "voice"},
                             )
-                            if result:
-                                log.info("Timer created: %s for %ds", label, duration)
-                            else:
-                                log.error("Failed to create timer")
+                            log.info("Timer %s: %s for %ds", "created" if result else "FAILED", label, duration)
 
                     elif action == "stop":
-                        if args.worker_url:
-                            if args.dry_run:
-                                log.info("[DRY RUN] Would dismiss all timers")
-                            else:
-                                worker_post(
-                                    args.worker_url, args.worker_token,
-                                    "/api/timers/dismiss-all",
-                                )
-                                log.info("Dismissed all timers")
+                        if args.dry_run:
+                            log.info("[DRY RUN] Would dismiss all timers")
+                        elif args.worker_url:
+                            worker_post(args.worker_url, args.worker_token, "/api/timers/dismiss-all")
+                            log.info("Dismissed all timers")
 
                     elif action == "ask" and args.worker_url:
                         query_text = command.get("query", "")
                         if args.dry_run:
                             log.info("[DRY RUN] Would ask: %s", query_text)
                         else:
-                            result = worker_post(
-                                args.worker_url, args.worker_token,
-                                "/api/ask-query",
-                                {"query": query_text},
-                            )
-                            if result:
-                                log.info("LLM query sent: %s", query_text)
-                            else:
-                                log.error("Failed to send LLM query")
+                            result = worker_post(args.worker_url, args.worker_token, "/api/ask-query", {"query": query_text})
+                            log.info("LLM query %s: %s", "sent" if result else "FAILED", query_text)
 
                     elif action == "navigate" and args.worker_url:
-                        nav_data = {}
-                        if command.get("page"):
-                            nav_data["page"] = command["page"]
-                        if command.get("view"):
-                            nav_data["view"] = command["view"]
+                        nav_data = {k: command[k] for k in ("page", "view") if command.get(k)}
                         if args.dry_run:
                             log.info("[DRY RUN] Would navigate: %s", nav_data)
                         else:
-                            result = worker_post(
-                                args.worker_url, args.worker_token,
-                                "/api/navigate", nav_data,
-                            )
-                            if result:
-                                log.info("Navigation sent: %s", nav_data)
-                            else:
-                                log.error("Failed to send navigation")
+                            worker_post(args.worker_url, args.worker_token, "/api/navigate", nav_data)
+                            log.info("Navigation: %s", nav_data)
 
                     elif action == "turn_off":
                         if args.dry_run:
-                            log.info("[DRY RUN] Would turn off TV via CEC")
+                            log.info("[DRY RUN] Would turn off TV")
                         else:
                             turn_off_tv()
 
-                    else:  # turn_on
+                    else:  # turn_on or unrecognized
                         if args.dry_run:
-                            log.info("[DRY RUN] Would turn on TV via CEC")
+                            log.info("[DRY RUN] Would turn on TV")
                         else:
                             turn_on_tv()
 

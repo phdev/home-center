@@ -20,6 +20,7 @@ const FULLSCREEN_MAP = {
   photos: "photos",
 };
 
+const PI_GESTURE_URL = "http://localhost:8765/gesture";
 const CONNECTED_TIMEOUT = 30_000;
 const STALE_THRESHOLD = 10_000;
 const POLL_INTERVAL = 500;
@@ -37,9 +38,6 @@ export function useHandController(workerSettings, currentPage, goTo) {
 
   const lastGestureIdRef = useRef(null);
   const initializedRef = useRef(false);
-
-  const workerUrl = workerSettings?.url;
-  const workerToken = workerSettings?.token;
 
   // Clear scroll direction after it's been consumed
   useEffect(() => {
@@ -116,15 +114,11 @@ export function useHandController(workerSettings, currentPage, goTo) {
     }
   }, [currentPage, goTo]);
 
-  // Poll for gestures
+  // Poll for gestures from Pi's local HTTP server
   useEffect(() => {
-    if (!workerUrl) return;
-
     const poll = async () => {
       try {
-        const headers = {};
-        if (workerToken) headers.Authorization = `Bearer ${workerToken}`;
-        const res = await fetch(`${workerUrl}/api/gesture`, { headers });
+        const res = await fetch(PI_GESTURE_URL);
         if (!res.ok) return;
         const data = await res.json();
         if (!data.gesture) return;
@@ -154,7 +148,7 @@ export function useHandController(workerSettings, currentPage, goTo) {
     poll();
     const id = setInterval(poll, POLL_INTERVAL);
     return () => clearInterval(id);
-  }, [workerUrl, workerToken, processGesture]);
+  }, [processGesture]);
 
   // Update connected state based on gesture recency
   useEffect(() => {

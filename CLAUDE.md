@@ -78,14 +78,14 @@ Bypass pull requests entirely using two sequential pushes:
 
 ### HandController (Meta Glasses Gesture Control)
 
-**iOS app** (`phdev/HandController`) streams video from Meta Ray-Ban glasses, detects hand gestures via Apple Vision, and POSTs to the Cloudflare Worker.
+**iOS app** (`phdev/HandController`) streams video from Meta Ray-Ban glasses, detects hand gestures via Apple Vision, and POSTs directly to the Pi over local WiFi.
 
-**Connection flow:**
-1. HandController iOS app → POST `/api/notifications` (with `type: "gesture"`, `from: "HandController"`)
-2. Worker extracts gesture from title (e.g. `"R Hand: Wave Right"` → `waveRight`), stores in KV as `gesture_latest`
-3. Dashboard polls `GET /api/gesture` every 500ms → processes gesture → green glasses icon appears in top nav
+**Connection flow (local WiFi, no worker):**
+1. HandController iOS app → POST `http://<pi-ip>:8765/gesture` (same payload as before: `type: "gesture"`, `title: "Right Hand: Wave Right"`, etc.)
+2. Pi's wake word service HTTP server extracts gesture from title, normalizes to camelCase, stores in memory
+3. Dashboard (Chromium on Pi) polls `GET http://localhost:8765/gesture` every 500ms → processes gesture → green glasses icon appears in top nav
 
-**Worker URL:** `https://home-center-api.phhowell.workers.dev` (no AUTH_TOKEN currently configured)
+**Pi gesture endpoint:** `http://192.168.1.162:8765/gesture` (same HTTP server as wake word recording)
 
 **Spatial navigation** (dashboard only):
 ```
@@ -105,10 +105,10 @@ Row 2:  Calendar →           →         →             → Fact
 
 | File | Purpose |
 |---|---|
-| `src/hooks/useHandController.js` | Gesture polling, spatial nav, connection state |
+| `src/hooks/useHandController.js` | Gesture polling (Pi localhost:8765), spatial nav, connection state |
 | `src/components/GlassesIndicator.jsx` | Green glasses icon for top nav (all pages) |
 | `src/components/Panel.jsx` | Panel wrapper with selected border style |
-| `worker/src/index.js` | Worker: `/api/notifications` → `/api/gesture` relay |
+| `pi/wake_word_service.py` | Pi HTTP server: `POST /gesture` (receive) + `GET /gesture` (poll) |
 
 ## Pencil Designs & TV Preview
 
@@ -254,95 +254,133 @@ ssh pi@homecenter.local "sudo systemctl restart wake-word"
 ssh pi@homecenter.local "/home/pi/home-center/pi/.venv/bin/pip install <package>"
 ```
 
+## Hardware Architecture
+
+### Three Machines
+
+| Machine | Hostname | Role |
+|---|---|---|
+| **Raspberry Pi** | `homecenter.local` | Display-only: Chromium kiosk dashboard + wake word + HDMI-CEC |
+| **Mac Mini** | `macmini.local` (TBD) | Compute: OpenClaw bridge, Homer CI, email-triage, school-updates, agent spawning |
+| **Laptop** | — | Development only (optional) |
+
+### What runs where
+
+| Service | Machine | Manager | Port |
+|---|---|---|---|
+| Dashboard kiosk | Pi | systemd (`home-center-kiosk`) | — |
+| Wake word | Pi | systemd (`wake-word`) | — |
+| OpenClaw bridge | Mac Mini | launchd (`com.openclaw.bridge`) | 3100 |
+| Homer CI | Mac Mini | launchd (`com.homerci.daemon`) | — |
+| Email triage | Mac Mini | launchd (`com.homecenter.email-triage`) | — |
+| School updates | Mac Mini | launchd (`com.homecenter.school-updates`) | — |
+| Cloudflare Worker | Cloudflare | — | — |
+
+### Mac Mini Setup
+
+```bash
+git clone https://github.com/phdev/accel-driv.git home-center
+cd home-center
+bash .openclaw/mac-mini/setup.sh
+```
+
+After setup, migrate services off the Pi:
+```bash
+bash .openclaw/mac-mini/migrate-from-pi.sh
+```
+
 ## OpenClaw (Family WhatsApp Assistant)
 
 ### Architecture
 
-A Node.js service (`openclaw/index.js`) running on the Pi provides a WhatsApp bridge using `whatsapp-web.js`. It exposes a local HTTP API for sending messages and forwards incoming messages to the worker's `/api/ask` LLM endpoint for bot replies.
+A Node.js service (`openclaw/index.js`) running on the **Mac Mini** provides a WhatsApp bridge using `whatsapp-web.js`. It exposes a local HTTP API for sending messages and forwards incoming messages to the worker's `/api/ask` LLM endpoint for bot replies.
 
 **OpenClaw is the family-facing assistant.** Family members scan the QR code on the TV dashboard, text questions ("when's Emma's science fair?"), and get LLM-powered answers. It also delivers email triage notifications and school updates to a family group chat.
 
 **Homer CI** (see below) is the separate dev-facing orchestrator that uses this same bridge as transport for build/PR notifications to Peter's personal chat.
 
-### API Endpoints (localhost:3100)
+### API Endpoints (localhost:3100 on Mac Mini)
 
 - `GET /status` — connection health, QR pending state
 - `GET /qr` — QR code data for pairing
 - `GET /chats` — list recent chats (for finding chat IDs)
 - `POST /send` — send message: `{ chatId, message }`
+- `GET /messages` — unacknowledged incoming messages (Homer CI polls this)
+- `POST /messages/ack` — acknowledge processed messages: `{ ids: [...] }`
 
-### Pi Access
+### Mac Mini Access
 
-- **Service:** `sudo systemctl {start|stop|restart|status} openclaw`
-- **Logs:** `sudo journalctl -u openclaw -f`
-- **Service unit:** `/etc/systemd/system/openclaw.service`
-- **Working dir:** `/home/pi/home-center/openclaw/`
-- **Auth data:** `/home/pi/home-center/openclaw/.wwebjs_auth/` (persists WhatsApp session)
-- **Browser:** Uses system Chromium (`/usr/bin/chromium`) via `PUPPETEER_EXECUTABLE_PATH` env var
+- **Service:** `launchctl {load|unload} ~/Library/LaunchAgents/com.openclaw.bridge.plist`
+- **Logs:** `tail -f .openclaw/logs/openclaw-bridge-stdout.log`
+- **Plist template:** `.openclaw/mac-mini/plists/com.openclaw.bridge.plist`
+- **Auth data:** `openclaw/.wwebjs_auth/` (persists WhatsApp session)
+- **Browser:** Uses Puppeteer's bundled Chrome on Mac (no `PUPPETEER_EXECUTABLE_PATH` needed)
 
 ### Key Files
 
 | File | Purpose |
 |---|---|
-| `openclaw/index.js` | Main service — Express API + whatsapp-web.js client |
+| `openclaw/index.js` | Main service — Express API + whatsapp-web.js client + message queue |
 | `openclaw/package.json` | Dependencies (whatsapp-web.js, express, qrcode-terminal) |
-| `openclaw/openclaw.service` | Systemd unit file |
+| `openclaw/openclaw.service` | Legacy Pi systemd unit (kept for reference) |
+| `.openclaw/mac-mini/plists/com.openclaw.bridge.plist` | Mac Mini launchd plist |
 
 ### Integration with Other Services
 
-- **Email triage** (`email-triage/email_triage/notifier.py`) — posts to `http://localhost:3100/send` when `whatsapp.enabled` is true in config
+- **Email triage** (`email-triage/email_triage/notifier.py`) — posts to `http://localhost:3100/send` (same machine)
 - **Dashboard QR code** (`src/components/FactPanel.jsx`) — "Chat with OpenClaw" QR links to WhatsApp
 - **Dashboard panel** (`src/components/AgentTasksPanel.jsx`) — header labeled "OpenClaw"
-- **Incoming messages** — forwarded to worker `/api/ask` for LLM-powered replies (when `--llm-url` is set)
-- **Homer CI** — dev orchestrator sends build/PR notifications via `POST /send` to Peter's personal chat
+- **Incoming messages** — forwarded to worker `/api/ask` for LLM-powered replies
+- **Homer CI** — polls `GET /messages` for dev task requests, sends notifications via `POST /send`
 
 ### Setup
 
-1. Start the service: `sudo systemctl start openclaw`
-2. Watch logs for QR code: `sudo journalctl -u openclaw -f`
+1. Start the service: `launchctl load ~/Library/LaunchAgents/com.openclaw.bridge.plist`
+2. Watch logs for QR code: `tail -f .openclaw/logs/openclaw-bridge-stdout.log`
 3. Scan QR with WhatsApp on your phone
 4. Check connection: `curl http://localhost:3100/status`
 5. Find chat IDs: `curl http://localhost:3100/chats`
 6. Set `chat_id` in `email-triage/config.yaml` and enable WhatsApp
 
-### Deploying Changes
-
-```bash
-# Copy updated files to Pi
-scp openclaw/index.js pi@homecenter.local:/home/pi/home-center/openclaw/
-
-# Restart service
-ssh pi@homecenter.local "sudo systemctl restart openclaw"
-
-# Install new npm deps (if package.json changed)
-ssh pi@homecenter.local "cd /home/pi/home-center/openclaw && npm install"
-```
-
-## Homer CI (Dev Agent Orchestrator)
+## Homer CI (Autonomous Dev Orchestrator)
 
 ### Architecture
 
-Homer CI is the dev-facing agent orchestrator that spawns coding agents, monitors their progress via cron, and sends WhatsApp notifications when PRs are ready. It runs on the Mac (not the Pi).
+Homer CI is an autonomous dev orchestrator running on the **Mac Mini**. It listens for WhatsApp messages, plans tasks with Claude, spawns coding agents, monitors their progress via GitHub Actions CI, and notifies via WhatsApp when PRs are ready.
 
 **Homer CI is NOT OpenClaw.** OpenClaw is the family assistant. Homer CI uses the OpenClaw WhatsApp bridge as transport but targets Peter's personal chat, not the family group.
 
-### How It Works
+### How It Works (Autonomous Mode)
 
-1. Write a task prompt file describing the feature to build
-2. `spawn-agent.sh` creates a branch, launches Claude Code or Codex in tmux
-3. Agent commits, pushes, opens PR
-4. GitHub Actions (`openclaw-checks.yml`) runs build, code review, security scan
-5. `check-agents.sh` (cron, every 15 min) reads CI results, sends WhatsApp notification
+1. You text Homer CI on WhatsApp: "add sunrise times to the weather panel"
+2. Homer CI reads the codebase module map, asks Claude to plan the task
+3. Claude picks files, chooses Claude Code (frontend) or Codex (backend), writes the prompt
+4. Homer CI spawns the agent in tmux, texts you confirmation
+5. Agent works autonomously, commits, pushes, opens PR
+6. GitHub Actions runs build, code review, security scan
+7. Homer CI polls CI results every 15 min, texts you when PR passes all gates
+8. You review and merge over morning coffee
+
+### WhatsApp Commands
+
+- **Any text** → treated as a task request, planned and spawned automatically
+- **"status"** → returns active agents and recent PRs
+- **"stop"** → kills all running agents
+
+### Proactive Mode
+
+Every hour, Homer CI pulls family data (school updates, notifications) and if no agents are running, texts you task suggestions based on what it finds.
 
 ### Key Files
 
 | File | Purpose |
 |---|---|
+| `.openclaw/homer-ci.sh` | Main daemon — polls WhatsApp, plans tasks, spawns agents, monitors |
 | `.openclaw/orchestrator-prompt.md` | Homer CI system prompt with architecture + rules |
 | `.openclaw/active-tasks.json` | Task registry (status, gates, PR numbers) |
 | `.openclaw/audit.log` | All agent actions logged here |
 | `.openclaw/scripts/spawn-agent.sh` | Launch agent in tmux with branch isolation |
-| `.openclaw/scripts/check-agents.sh` | Cron monitor — reads CI, sends notifications |
+| `.openclaw/scripts/check-agents.sh` | Reads CI results, sends notifications |
 | `.openclaw/scripts/notify-whatsapp.sh` | Send dev notifications via OpenClaw bridge |
 | `.openclaw/scripts/review-pr.sh` | Manual fallback for local PR review |
 | `.openclaw/scripts/build-context.sh` | Generate module map from codebase |
@@ -351,29 +389,22 @@ Homer CI is the dev-facing agent orchestrator that spawns coding agents, monitor
 | `.openclaw/templates/backend-agent.md` | Prompt template for worker/Pi tasks (Codex) |
 | `.openclaw/context/module-map.md` | Auto-generated codebase map |
 | `.github/workflows/openclaw-checks.yml` | CI: build + code review + security scan |
+| `.openclaw/mac-mini/plists/com.homerci.daemon.plist` | Mac Mini launchd plist |
 
 ### Environment Variables
 
 ```bash
 HOMER_CI_CHAT_ID="<your-personal-whatsapp-id>@c.us"
-HOMER_CI_OPENCLAW_URL="http://homecenter.local:3100"
+HOMER_CI_OPENCLAW_URL="http://localhost:3100"  # Same machine on Mac Mini
 ```
 
-### Spawning an Agent
+### Mac Mini Setup Files
 
-```bash
-# Write a task prompt
-cat > /tmp/task.md << 'EOF'
-# Add sunrise/sunset to WeatherPanel
-...
-EOF
-
-# Spawn
-bash .openclaw/scripts/spawn-agent.sh task-001 weather-sunrise frontend /tmp/task.md
-
-# Watch
-tmux attach -t agent-task-001
-```
+| File | Purpose |
+|---|---|
+| `.openclaw/mac-mini/setup.sh` | One-time Mac Mini setup (deps, venvs, plists) |
+| `.openclaw/mac-mini/migrate-from-pi.sh` | Stop/disable migrated services on Pi |
+| `.openclaw/mac-mini/plists/` | All launchd plist templates |
 
 ### Security
 
