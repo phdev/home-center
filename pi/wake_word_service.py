@@ -60,7 +60,7 @@ CHANNELS = 2  # ReSpeaker 2-Mic HAT is stereo; we downmix to mono
 
 # Default tunable parameters (can be overridden via /api/wake-config)
 _DEFAULT_CONFIG = {
-    "detection_threshold": 0.4,
+    "detection_threshold": 0.25,
     "cooldown_seconds": 5,
     "min_rms_energy": 200,
     "min_consecutive": 3,
@@ -408,21 +408,76 @@ def get_whisper_model():
     global _whisper_model
     if _whisper_model is None:
         from faster_whisper import WhisperModel
-        log.info("Loading faster-whisper tiny model (int8)...")
+        log.info("Loading faster-whisper base model (int8)...")
         _whisper_model = WhisperModel("base", compute_type="int8", device="cpu")
         log.info("Whisper model loaded.")
     return _whisper_model
 
 
+_silero_vad = None
+
+
+def get_silero_vad():
+    """Load Silero VAD model for speech trimming."""
+    global _silero_vad
+    if _silero_vad is None:
+        import torch
+        model, utils = torch.hub.load(
+            repo_or_dir="snakers4/silero-vad", model="silero_vad",
+            trust_repo=True, verbose=False,
+        )
+        _silero_vad = (model, utils)
+        log.info("Silero VAD loaded for audio trimming.")
+    return _silero_vad
+
+
+def vad_trim(audio: np.ndarray, sr: int = 16000, pad_ms: int = 300) -> np.ndarray:
+    """Trim audio to speech regions using Silero VAD.
+
+    Returns the concatenated speech segments with padding, or the
+    original audio if no speech is detected.
+    """
+    import torch
+    try:
+        model, utils = get_silero_vad()
+        get_speech_timestamps = utils[0]
+
+        audio_f32 = torch.from_numpy(audio.astype(np.float32) / 32768.0)
+        timestamps = get_speech_timestamps(audio_f32, model, sampling_rate=sr,
+                                           threshold=0.3, min_speech_duration_ms=100)
+        if not timestamps:
+            log.debug("VAD: no speech found, using full audio")
+            return audio
+
+        # Merge speech regions with padding
+        pad_samples = int(sr * pad_ms / 1000)
+        start = max(0, timestamps[0]["start"] - pad_samples)
+        end = min(len(audio), timestamps[-1]["end"] + pad_samples)
+        trimmed = audio[start:end]
+
+        orig_dur = len(audio) / sr
+        trim_dur = len(trimmed) / sr
+        log.info("VAD trim: %.1fs → %.1fs (%.0f%% reduction)",
+                 orig_dur, trim_dur, (1 - trim_dur / orig_dur) * 100)
+        model.reset_states()
+        return trimmed
+    except Exception as e:
+        log.warning("VAD trim failed, using full audio: %s", e)
+        return audio
+
+
 def transcribe(audio: np.ndarray) -> str:
-    """Transcribe int16 mono audio array to text."""
+    """Transcribe int16 mono audio array to text. Trims silence with VAD first."""
+    # Trim to speech regions before transcribing
+    audio = vad_trim(audio)
+
     model = get_whisper_model()
     # Remove DC offset, then standard int16 normalization
     audio_f32 = audio.astype(np.float32)
     audio_f32 = audio_f32 - np.mean(audio_f32)
     audio_f32 = audio_f32 / 32768.0
     segments, _ = model.transcribe(
-        audio_f32, beam_size=3, language="en",
+        audio_f32, beam_size=1, language="en",
         no_speech_threshold=0.95,  # Don't skip segments unless very confident it's silence
         initial_prompt="Hey Jarvis",  # Bias toward hearing the wake word
     )
@@ -511,8 +566,9 @@ def parse_command(text: str) -> dict:
     if re.search(r'\b(what|who|where|when|why|how|tell\s+me|explain|describe)\b', text) or len(text.split()) > 4:
         return {"action": "ask", "query": text}
 
-    # Default: treat as turn on (just said "hey homer" with no clear command)
-    return {"action": "turn_on"}
+    # Default: ignore unrecognized speech (don't act on false positives)
+    log.info("No command matched, ignoring: '%s'", text)
+    return {"action": "none"}
 
 
 # ---------------------------------------------------------------------------
@@ -752,6 +808,10 @@ class RecordingManager:
         Gestures:
             GET  /gesture  → {gesture: ...}
             POST /gesture  → accept gesture from HandController
+
+        Presence:
+            GET  /api/presence  → {present, lastPing, secondsAgo}
+            POST /api/presence  → heartbeat ping, auto turns TV on if was away
     """
 
     HTTP_PORT = 8765
@@ -785,6 +845,11 @@ class RecordingManager:
         # Timers
         self._timers: list[dict] = []
         self._timer_counter = 0
+        # Presence detection (HandController heartbeat → CEC TV on)
+        self._presence_last_ping = 0.0  # epoch seconds
+        self._presence_tv_on_at = 0.0   # when we last turned TV on for presence
+        self._presence_cooldown = 60.0  # don't re-trigger CEC for 60s
+        self._presence_timeout = 120.0  # consider "away" after 2min without ping
         # Thread lock
         self._lock = threading.Lock()
         self._start_http_server()
@@ -857,6 +922,43 @@ class RecordingManager:
             self._timers = [t for t in self._timers
                            if not (t["dismissed"] and now - t["expiresAt"] > 3600000)]
             return list(self._timers)
+
+    def handle_presence(self, dry_run: bool = False) -> dict:
+        """Handle a presence ping from HandController. Turns TV on if needed."""
+        now = time.time()
+        with self._lock:
+            was_away = (now - self._presence_last_ping) > self._presence_timeout
+            self._presence_last_ping = now
+            since_tv_on = now - self._presence_tv_on_at
+
+            if was_away and since_tv_on > self._presence_cooldown:
+                self._presence_tv_on_at = now
+                action = "tv_on"
+            else:
+                action = "already_present"
+
+        if action == "tv_on":
+            log.info("Presence detected (was away) — turning TV on via CEC")
+            if not dry_run:
+                threading.Thread(target=turn_on_tv, daemon=True).start()
+
+        return {
+            "action": action,
+            "lastPing": now,
+            "away": was_away,
+        }
+
+    def get_presence(self) -> dict:
+        """Get current presence state."""
+        now = time.time()
+        with self._lock:
+            last = self._presence_last_ping
+            present = (now - last) < self._presence_timeout if last > 0 else False
+        return {
+            "present": present,
+            "lastPing": last,
+            "secondsAgo": round(now - last, 1) if last > 0 else None,
+        }
 
     def _count_files(self, prefix: str) -> int:
         """Count .npz training files on disk — always accurate."""
@@ -950,6 +1052,8 @@ class RecordingManager:
                 elif path == "/api/timers":
                     timers = mgr.get_active_timers()
                     self._respond_json({"timers": timers, "serverTime": int(time.time() * 1000)})
+                elif path == "/api/presence":
+                    self._respond_json(mgr.get_presence())
                 else:
                     self._respond_json({"error": "not found"}, 404)
 
@@ -1063,6 +1167,10 @@ class RecordingManager:
                 elif self.path == "/api/gesture":
                     # Accept gesture via /api/ path too
                     self._handle_gesture(body)
+
+                elif self.path == "/api/presence":
+                    result = mgr.handle_presence()
+                    self._respond_json(result)
 
                 else:
                     self._respond_json({"error": "not found"}, 404)
@@ -1237,12 +1345,15 @@ def main() -> None:
     if not RECORD_STOP_PATH.exists():
         generate_record_stop(RECORD_STOP_PATH)
 
-    # Pre-load whisper model so first command is fast
-    if args.worker_url:
-        try:
-            get_whisper_model()
-        except Exception as e:
-            log.warning("Could not pre-load whisper model: %s", e)
+    # Pre-load models so first command is fast
+    try:
+        get_whisper_model()
+    except Exception as e:
+        log.warning("Could not pre-load whisper model: %s", e)
+    try:
+        get_silero_vad()
+    except Exception as e:
+        log.warning("Could not pre-load Silero VAD: %s", e)
 
     # Load wake word model
     model = get_or_train_model()
@@ -1296,12 +1407,12 @@ def main() -> None:
     last_action_time = 0.0
     consecutive_hits = {ww: 0 for ww in wake_words}
 
-    # Rolling buffer: ~4 seconds of raw mono audio for "Hey Jarvis, open calendar" style commands
-    # Each chunk = CHUNK_SIZE samples (80ms at 16kHz), so 4s ≈ 50 chunks
-    PREBUFFER_SECONDS = 4.0
+    # Rolling buffer: ~2 seconds of raw mono audio for "Hey Jarvis, open calendar" style commands
+    # Each chunk = CHUNK_SIZE samples (80ms at 16kHz), so 2s ≈ 25 chunks
+    PREBUFFER_SECONDS = 2.0
     prebuf_max = int(PREBUFFER_SECONDS * SAMPLE_RATE / CHUNK_SIZE)
     prebuffer = collections.deque(maxlen=prebuf_max)
-    TAIL_SECONDS = 2.0  # Extra recording after detection to catch trailing words
+    TAIL_SECONDS = 1.5  # Extra recording after detection to catch trailing words
 
     try:
         while True:
@@ -1387,22 +1498,20 @@ def main() -> None:
                         consecutive_hits[ww] = 0
                     last_trigger = now
 
-                    # Grab pre-trigger audio buffer + record short tail
-                    # This captures "Hey Jarvis open calendar" as one phrase
-                    if args.worker_url:
-                        log.info("Capturing pre-buffer + %.1fs tail...", TAIL_SECONDS)
-                        tail_clip = record_audio(pcm, TAIL_SECONDS)
-                        pre_audio = np.concatenate(list(prebuffer)) if prebuffer else np.array([], dtype=np.int16)
-                        full_audio = np.concatenate([pre_audio, tail_clip])
-                        log.info("Total audio: %.1fs (%.1fs pre + %.1fs tail)",
-                                 len(full_audio) / SAMPLE_RATE,
-                                 len(pre_audio) / SAMPLE_RATE, TAIL_SECONDS)
-                        command = parse_command(transcribe(full_audio))
-                    else:
-                        command = {"action": "turn_on"}
-
+                    # Chime immediately — user gets instant feedback
                     if not args.dry_run:
                         play_acknowledgement()
+
+                    # Grab pre-trigger audio buffer + record short tail
+                    # This captures "Hey Jarvis open calendar" as one phrase
+                    log.info("Capturing pre-buffer + %.1fs tail...", TAIL_SECONDS)
+                    tail_clip = record_audio(pcm, TAIL_SECONDS)
+                    pre_audio = np.concatenate(list(prebuffer)) if prebuffer else np.array([], dtype=np.int16)
+                    full_audio = np.concatenate([pre_audio, tail_clip])
+                    log.info("Total audio: %.1fs (%.1fs pre + %.1fs tail)",
+                             len(full_audio) / SAMPLE_RATE,
+                             len(pre_audio) / SAMPLE_RATE, TAIL_SECONDS)
+                    command = parse_command(transcribe(full_audio))
 
                     log.info("Command: %s", command)
                     debug_post("command", {"action": command.get("action"), "details": command})
