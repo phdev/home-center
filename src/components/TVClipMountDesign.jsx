@@ -23,7 +23,7 @@ const COLORS = {
   screw: "#999",
 };
 
-const VIEWS = ["overview", "front", "side", "top", "exploded", "specs"];
+const VIEWS = ["overview", "render", "front", "side", "top", "exploded", "specs"];
 
 function DimLine({ x1, y1, x2, y2, label, offset = 12, side = "top" }) {
   const isHoriz = Math.abs(y2 - y1) < 2;
@@ -316,6 +316,214 @@ function ExplodedView({ compact }) {
   );
 }
 
+// Render: Proportional 42" TV with mount attached
+function TVRenderView() {
+  // 42" TV: 930mm x 523mm. Mount is 70mm disc.
+  // Scale: 1 SVG unit = ~1.5mm → TV ~620 x 349 SVG units
+  const tvW = 620;
+  const tvH = 349;
+  const bezelW = 8; // ~12mm bezel
+  const screenW = tvW - bezelW * 2;
+  const screenH = tvH - bezelW * 2;
+  const mountR = 23; // 70mm / 3 ≈ 23 SVG units
+  const standW = 200;
+  const standH = 14;
+  const standBaseW = 260;
+  const standBaseH = 6;
+
+  // Center of viewport
+  const cx = 480;
+  const cy = 300;
+  const tvX = cx - tvW / 2;
+  const tvY = cy - tvH / 2 - 20;
+
+  return (
+    <svg width="100%" height="100%" viewBox="0 0 960 540" preserveAspectRatio="xMidYMid meet">
+      <defs>
+        {/* TV screen gradient (showing dashboard content) */}
+        <linearGradient id="screenGrad" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor="#0d1117" />
+          <stop offset="100%" stopColor="#161b22" />
+        </linearGradient>
+        {/* Subtle ambient glow from screen */}
+        <radialGradient id="screenGlow" cx="0.5" cy="0.5" r="0.6">
+          <stop offset="0%" stopColor="#3B82F6" stopOpacity="0.06" />
+          <stop offset="100%" stopColor="#3B82F6" stopOpacity="0" />
+        </radialGradient>
+        {/* Mount shadow */}
+        <filter id="mountShadow" x="-50%" y="-50%" width="200%" height="200%">
+          <feDropShadow dx="0" dy="2" stdDeviation="3" floodColor="#000" floodOpacity="0.5" />
+        </filter>
+        {/* LED glow */}
+        <filter id="ledGlow" x="-100%" y="-100%" width="300%" height="300%">
+          <feGaussianBlur stdDeviation="2" result="blur" />
+          <feMerge>
+            <feMergeNode in="blur" />
+            <feMergeNode in="SourceGraphic" />
+          </feMerge>
+        </filter>
+        {/* Wall texture */}
+        <linearGradient id="wallGrad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#1a1a1e" />
+          <stop offset="100%" stopColor="#111114" />
+        </linearGradient>
+        {/* Surface/shelf */}
+        <linearGradient id="surfaceGrad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#2a2520" />
+          <stop offset="100%" stopColor="#1e1a16" />
+        </linearGradient>
+      </defs>
+
+      {/* Background wall */}
+      <rect x="0" y="0" width="960" height="540" fill="url(#wallGrad)" />
+
+      {/* Surface/console under TV */}
+      <rect x={cx - 340} y={tvY + tvH + standH + standBaseH + 2} width={680} height={100}
+        fill="url(#surfaceGrad)" rx="2" />
+      <line x1={cx - 340} y1={tvY + tvH + standH + standBaseH + 2} x2={cx + 340} y2={tvY + tvH + standH + standBaseH + 2}
+        stroke="#3a3530" strokeWidth={0.5} />
+
+      {/* TV body */}
+      <rect x={tvX} y={tvY} width={tvW} height={tvH} rx={4}
+        fill="#0c0c0c" stroke="#1a1a1a" strokeWidth={1.5} />
+
+      {/* Screen */}
+      <rect x={tvX + bezelW} y={tvY + bezelW} width={screenW} height={screenH} rx={2}
+        fill="url(#screenGrad)" />
+      <rect x={tvX + bezelW} y={tvY + bezelW} width={screenW} height={screenH} rx={2}
+        fill="url(#screenGlow)" />
+
+      {/* Dashboard content on screen (simplified) */}
+      <g transform={`translate(${tvX + bezelW + 12}, ${tvY + bezelW + 8})`} opacity={0.4}>
+        {/* Header bar */}
+        <rect x={0} y={0} width={screenW - 24} height={16} rx={2} fill="#1e293b" />
+        <text x={8} y={11} fontSize={7} fill="#94a3b8" fontFamily="system-ui">Home Center</text>
+        <text x={screenW - 80} y={11} fontSize={7} fill="#64748b" fontFamily="monospace">10:42 AM</text>
+
+        {/* Panel grid */}
+        <rect x={0} y={22} width={(screenW - 36) * 0.3} height={120} rx={3} fill="#1e293b" opacity={0.6} />
+        <rect x={(screenW - 36) * 0.3 + 6} y={22} width={(screenW - 36) * 0.4} height={56} rx={3} fill="#1e293b" opacity={0.6} />
+        <rect x={(screenW - 36) * 0.7 + 12} y={22} width={(screenW - 36) * 0.3 - 0} height={56} rx={3} fill="#1e293b" opacity={0.6} />
+        <rect x={(screenW - 36) * 0.3 + 6} y={84} width={(screenW - 36) * 0.4} height={58} rx={3} fill="#1e293b" opacity={0.6} />
+        <rect x={(screenW - 36) * 0.7 + 12} y={84} width={(screenW - 36) * 0.3 - 0} height={58} rx={3} fill="#1e293b" opacity={0.6} />
+
+        {/* Calendar panel content */}
+        <text x={8} y={36} fontSize={5} fill="#64748b" fontFamily="monospace">CALENDAR</text>
+        {[0, 1, 2, 3, 4].map(i => (
+          <rect key={i} x={6} y={42 + i * 14} width={(screenW - 36) * 0.3 - 18} height={9} rx={1.5} fill="#0f172a" />
+        ))}
+
+        {/* Weather panel */}
+        <text x={(screenW - 36) * 0.3 + 14} y={36} fontSize={5} fill="#64748b" fontFamily="monospace">WEATHER</text>
+        <text x={(screenW - 36) * 0.3 + 14} y={52} fontSize={14} fill="#e2e8f0" fontFamily="system-ui">72°</text>
+
+        {/* Photos placeholder */}
+        <text x={(screenW - 36) * 0.3 + 14} y={98} fontSize={5} fill="#64748b" fontFamily="monospace">PHOTOS</text>
+      </g>
+
+      {/* TV stand */}
+      <rect x={cx - standW / 2} y={tvY + tvH} width={standW} height={standH}
+        fill="#111" stroke="#1a1a1a" strokeWidth={0.5} />
+      <rect x={cx - standBaseW / 2} y={tvY + tvH + standH} width={standBaseW} height={standBaseH}
+        fill="#0e0e0e" stroke="#1a1a1a" strokeWidth={0.5} rx={2} />
+
+      {/* === MOUNT ON TOP OF TV === */}
+      <g filter="url(#mountShadow)">
+        {/* Clip (mostly hidden behind TV top) */}
+        <rect x={cx - 14} y={tvY - 3} width={28} height={6}
+          fill={COLORS.mount} stroke={COLORS.mountStroke} strokeWidth={0.5} rx={1.5} />
+
+        {/* Cradle disc */}
+        <circle cx={cx} cy={tvY - mountR - 1} r={mountR + 2}
+          fill={COLORS.mount} stroke={COLORS.mountStroke} strokeWidth={0.8} />
+
+        {/* Board */}
+        <circle cx={cx} cy={tvY - mountR - 1} r={mountR}
+          fill={COLORS.board} stroke={COLORS.boardStroke} strokeWidth={0.6} />
+
+        {/* LED ring with glow */}
+        <g filter="url(#ledGlow)">
+          {Array.from({ length: 12 }).map((_, i) => {
+            const a = (i * 30 - 90) * Math.PI / 180;
+            const ledR = mountR * 0.78;
+            return (
+              <circle key={i}
+                cx={cx + Math.cos(a) * ledR}
+                cy={tvY - mountR - 1 + Math.sin(a) * ledR}
+                r={1.3} fill={COLORS.led} opacity={0.8} />
+            );
+          })}
+        </g>
+      </g>
+
+      {/* USB-C cable (thin, running down the back — visible at top) */}
+      <path d={`M ${cx} ${tvY + 1} L ${cx} ${tvY - 1}`}
+        stroke="#333" strokeWidth={1.5} />
+
+      {/* Callout line to mount */}
+      <line x1={cx + mountR + 8} y1={tvY - mountR - 10}
+        x2={cx + 120} y2={tvY - mountR - 40}
+        stroke={COLORS.dimLine} strokeWidth={0.5} strokeDasharray="3,2" />
+      <g transform={`translate(${cx + 124}, ${tvY - mountR - 48})`}>
+        <rect x={-4} y={-14} width={200} height={42} rx={4}
+          fill="#111" stroke={COLORS.border} strokeWidth={0.5} />
+        <text x={4} y={-1} fontSize={9} fill={COLORS.accent} fontFamily="system-ui, sans-serif" fontWeight="600">
+          ReSpeaker XVF3800 Mount
+        </text>
+        <text x={4} y={12} fontSize={7} fill={COLORS.muted} fontFamily="monospace">
+          70mm disc, 12mm above bezel
+        </text>
+        <text x={4} y={23} fontSize={7} fill={COLORS.muted} fontFamily="monospace">
+          4 mics + 12 LEDs + USB-C
+        </text>
+      </g>
+
+      {/* Scale reference */}
+      <g transform={`translate(${tvX + 20}, ${tvY + tvH + standH + standBaseH + 36})`}>
+        <text x={0} y={0} fontSize={8} fill={COLORS.muted} fontFamily="monospace">42" Samsung TV (930 x 523mm)</text>
+        <text x={0} y={14} fontSize={8} fill={COLORS.muted} fontFamily="monospace">Mount: 70mm dia — {(70 / 930 * 100).toFixed(1)}% of TV width</text>
+        <text x={0} y={28} fontSize={7} fill={COLORS.dimLine} fontFamily="monospace">Proportional rendering — all dimensions to scale</text>
+      </g>
+
+      {/* Title */}
+      <text x={cx} y={30} textAnchor="middle" fontSize={14} fill={COLORS.accent}
+        fontFamily="system-ui, sans-serif" fontWeight="600">
+        42" TV WITH CLIP MOUNT — FRONT VIEW
+      </text>
+
+      {/* Side profile inset (small) */}
+      <g transform={`translate(${tvX + tvW - 180}, ${tvY + tvH + standH + standBaseH + 20})`}>
+        <rect x={-6} y={-14} width={185} height={90} rx={4}
+          fill="#0d0d0d" stroke={COLORS.border} strokeWidth={0.5} />
+        <text x={2} y={-2} fontSize={7} fill={COLORS.muted} fontFamily="monospace" textTransform="uppercase">Side profile (not to scale)</text>
+
+        {/* Mini side view */}
+        <g transform="translate(90, 38) scale(1.8)">
+          {/* TV bezel */}
+          <rect x={-3} y={-18} width={6} height={36} fill="#0c0c0c" stroke="#222" strokeWidth={0.4} rx={0.5} />
+
+          {/* Clip */}
+          <path d="M -3,-8 L -5,-8 L -5,-10 L 6,-10 L 6,-8 L 3,-8" fill={COLORS.mount} stroke={COLORS.mountStroke} strokeWidth={0.3} />
+          <path d="M 3,-8 L 6,-8 L 6,4 L 3,4" fill={COLORS.mount} stroke={COLORS.mountStroke} strokeWidth={0.3} />
+
+          {/* Cradle arm */}
+          <path d="M -5,-10 L -30,-10 L -30,-7 L -5,-7" fill={COLORS.mount} stroke={COLORS.mountStroke} strokeWidth={0.3} />
+
+          {/* Board */}
+          <rect x={-28} y={-12} width={23} height={1.5} fill={COLORS.board} stroke={COLORS.boardStroke} strokeWidth={0.3} />
+
+          {/* Lip */}
+          <rect x={-30} y={-12} width={1} height={3.5} fill={COLORS.mount} stroke={COLORS.mountStroke} strokeWidth={0.2} />
+
+          {/* Cable */}
+          <path d="M 0,-7 L 0,18" stroke="#333" strokeWidth={0.6} strokeDasharray="1.5,1" />
+          <text x={3} y={16} fontSize={2.5} fill={COLORS.muted} fontFamily="monospace">USB-C</text>
+        </g>
+      </g>
+    </svg>
+  );
+}
+
 // Specs panel
 function SpecsPanel() {
   const specs = [
@@ -389,6 +597,7 @@ export default function TVClipMountDesign() {
 
   const viewLabels = {
     overview: "Overview (All Views)",
+    render: "42\" TV Rendering",
     front: "Front View",
     side: "Side Cross-Section",
     top: "Top View (Looking Down)",
@@ -441,6 +650,10 @@ export default function TVClipMountDesign() {
         {activeView === "specs" ? (
           <div style={{ flex: 1, overflow: "auto", padding: "0 60px" }}>
             <SpecsPanel />
+          </div>
+        ) : activeView === "render" ? (
+          <div style={{ flex: 1 }}>
+            <TVRenderView />
           </div>
         ) : activeView === "overview" ? (
           /* 2x2 grid of all views */
