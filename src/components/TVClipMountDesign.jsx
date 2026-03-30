@@ -613,18 +613,19 @@ export default function TVClipMountDesign() {
     }}>
       {/* Header */}
       <div style={{
-        height: 64, display: "flex", alignItems: "center", justifyContent: "space-between",
+        height: 64, display: "flex", alignItems: "center",
         padding: "0 32px", borderBottom: `1px solid ${COLORS.border}`, flexShrink: 0,
+        gap: 24,
       }}>
-        <div>
+        <div style={{ whiteSpace: "nowrap" }}>
           <span style={{ fontSize: 20, fontWeight: 700, color: COLORS.text }}>
-            ReSpeaker XVF3800 TV Clip Mount
+            XVF3800 Clip Mount
           </span>
-          <span style={{ fontSize: 13, color: COLORS.muted, marginLeft: 16 }}>
-            Technical Drawing — Comni
+          <span style={{ fontSize: 13, color: COLORS.muted, marginLeft: 12 }}>
+            Comni
           </span>
         </div>
-        <div style={{ display: "flex", gap: 4 }}>
+        <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
           {VIEWS.map((v) => (
             <button
               key={v}
@@ -637,9 +638,10 @@ export default function TVClipMountDesign() {
                 cursor: "pointer", fontFamily: "system-ui, sans-serif",
                 fontWeight: activeView === v ? 600 : 400,
                 transition: "all 0.15s",
+                whiteSpace: "nowrap",
               }}
             >
-              {v.charAt(0).toUpperCase() + v.slice(1)}
+              {v === "render" ? "42\" TV" : v.charAt(0).toUpperCase() + v.slice(1)}
             </button>
           ))}
         </div>
