@@ -605,27 +605,37 @@ export default function TVClipMountDesign() {
     specs: "Specifications",
   };
 
+  const buttonLabels = {
+    overview: "Overview",
+    render: "42\" TV",
+    front: "Front",
+    side: "Side",
+    top: "Top",
+    exploded: "Exploded",
+    specs: "Specs",
+  };
+
   return (
     <div style={{
-      width: 1920, height: 1080, background: COLORS.bg,
-      display: "flex", flexDirection: "column", overflow: "hidden",
+      width: "100%", minHeight: "100dvh", background: COLORS.bg,
+      display: "flex", flexDirection: "column", overflow: "auto",
       fontFamily: "system-ui, sans-serif",
     }}>
       {/* Header */}
       <div style={{
-        height: 64, display: "flex", alignItems: "center",
-        padding: "0 32px", borderBottom: `1px solid ${COLORS.border}`, flexShrink: 0,
-        gap: 24,
+        display: "flex", flexDirection: "column",
+        padding: "12px 16px", borderBottom: `1px solid ${COLORS.border}`, flexShrink: 0,
+        gap: 10,
       }}>
-        <div style={{ whiteSpace: "nowrap" }}>
-          <span style={{ fontSize: 20, fontWeight: 700, color: COLORS.text }}>
+        <div>
+          <span style={{ fontSize: 18, fontWeight: 700, color: COLORS.text }}>
             XVF3800 Clip Mount
           </span>
-          <span style={{ fontSize: 13, color: COLORS.muted, marginLeft: 12 }}>
+          <span style={{ fontSize: 12, color: COLORS.muted, marginLeft: 10 }}>
             Comni
           </span>
         </div>
-        <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
+        <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
           {VIEWS.map((v) => (
             <button
               key={v}
@@ -634,27 +644,27 @@ export default function TVClipMountDesign() {
                 background: activeView === v ? COLORS.accent : COLORS.panel,
                 color: activeView === v ? "#fff" : COLORS.muted,
                 border: `1px solid ${activeView === v ? COLORS.accent : COLORS.border}`,
-                borderRadius: 6, padding: "6px 14px", fontSize: 12,
+                borderRadius: 6, padding: "6px 12px", fontSize: 12,
                 cursor: "pointer", fontFamily: "system-ui, sans-serif",
                 fontWeight: activeView === v ? 600 : 400,
                 transition: "all 0.15s",
                 whiteSpace: "nowrap",
               }}
             >
-              {v === "render" ? "42\" TV" : v.charAt(0).toUpperCase() + v.slice(1)}
+              {buttonLabels[v]}
             </button>
           ))}
         </div>
       </div>
 
       {/* Content */}
-      <div style={{ flex: 1, display: "flex" }}>
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", minHeight: 0 }}>
         {activeView === "specs" ? (
-          <div style={{ flex: 1, overflow: "auto", padding: "0 60px" }}>
+          <div style={{ flex: 1, overflow: "auto", padding: "0 20px" }}>
             <SpecsPanel />
           </div>
         ) : activeView === "render" ? (
-          <div style={{ flex: 1 }}>
+          <div style={{ flex: 1, minHeight: 400 }}>
             <TVRenderView />
           </div>
         ) : activeView === "overview" ? (
@@ -662,6 +672,7 @@ export default function TVClipMountDesign() {
           <div style={{
             flex: 1, display: "grid", gridTemplateColumns: "1fr 1fr",
             gridTemplateRows: "1fr 1fr", gap: 1, background: COLORS.border,
+            minHeight: 400,
           }}>
             {[
               { key: "front", label: "Front", View: FrontView },
@@ -671,7 +682,7 @@ export default function TVClipMountDesign() {
             ].map(({ key, label, View }) => (
               <div key={key} style={{
                 background: COLORS.bg, position: "relative",
-                cursor: "pointer",
+                cursor: "pointer", minHeight: 180,
               }} onClick={() => setActiveView(key)}>
                 <div style={{
                   position: "absolute", top: 8, left: 12,
@@ -688,14 +699,14 @@ export default function TVClipMountDesign() {
           </div>
         ) : (
           /* Single view */
-          <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
+          <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: 400 }}>
             <div style={{
               fontSize: 12, color: COLORS.muted, marginBottom: 8,
               fontFamily: "monospace", letterSpacing: 1,
             }}>
               {viewLabels[activeView]}
             </div>
-            <svg width="80%" height="85%" viewBox="0 0 300 160" preserveAspectRatio="xMidYMid meet">
+            <svg width="95%" height="85%" viewBox="0 0 300 160" preserveAspectRatio="xMidYMid meet" style={{ maxHeight: "70vh" }}>
               {activeView === "front" && <FrontView />}
               {activeView === "side" && <SideView />}
               {activeView === "top" && <TopView />}
@@ -704,11 +715,11 @@ export default function TVClipMountDesign() {
           </div>
         )}
 
-        {/* Side info panel (not on specs or overview) */}
-        {activeView !== "specs" && activeView !== "overview" && (
+        {/* Notes panel — shown below on mobile, side on desktop */}
+        {!["specs", "overview", "render"].includes(activeView) && (
           <div style={{
-            width: 280, borderLeft: `1px solid ${COLORS.border}`,
-            padding: 20, fontSize: 12, color: COLORS.muted,
+            borderTop: `1px solid ${COLORS.border}`,
+            padding: 20, fontSize: 13, color: COLORS.muted,
             fontFamily: "monospace", lineHeight: 1.8, overflow: "auto",
           }}>
             <div style={{ color: COLORS.accent, fontSize: 14, fontWeight: 600, marginBottom: 12, fontFamily: "system-ui, sans-serif" }}>
