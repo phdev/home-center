@@ -1388,6 +1388,23 @@ class RecordingManager:
                     self._respond_json(mgr.get_presence())
                 elif path == "/api/enrollments":
                     self._respond_json({"enrollments": mgr.list_enrollments()})
+                elif path.startswith("/api/enrollments/"):
+                    # GET /api/enrollments/<name> — individual enrollment details
+                    ename = path.split("/")[3].lower() if len(path.split("/")) >= 4 else ""
+                    with mgr._lock:
+                        enrollment = mgr._enrollments.get(ename)
+                    if enrollment:
+                        self._respond_json({
+                            "name": enrollment.get("name", ename),
+                            "wake_phrase": enrollment.get("wake_phrase", ""),
+                            "action": enrollment.get("action", "navigate"),
+                            "target": enrollment.get("target", "dashboard"),
+                            "n_templates": enrollment.get("n_templates", 0),
+                            "sample_duration": enrollment.get("sample_duration", 0),
+                            "created_at": enrollment.get("created_at", 0),
+                        })
+                    else:
+                        self._respond_json({"error": "not found"}, 404)
                 elif path == "/api/enrollment-status":
                     self._respond_json(mgr.get_enrollment_status())
                 else:
