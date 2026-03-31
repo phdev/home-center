@@ -5,6 +5,7 @@ dist
 .pencil-queue.json
 
 # Pi wake word
+pi/__pycache__/
 pi/.venv/
 pi/.env
 pi/models/*.tflite
