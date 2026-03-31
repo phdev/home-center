@@ -25,6 +25,7 @@ const LIVE_VIEWS = [
   { slug: "weather", label: "Weather Page", params: "?page=weather" },
   { slug: "photos", label: "Photos Page", params: "?page=photos" },
   { slug: "history", label: "Query History", params: "?page=history" },
+  { slug: "tv-clip-mount", label: "TV Clip Mount Design", params: "../tv-clip-mount" },
 ];
 
 export default function TVPreview() {

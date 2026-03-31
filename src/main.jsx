@@ -2,6 +2,7 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
 import TVPreview from "./TVPreview";
+import TVClipMountDesign from "./components/TVClipMountDesign";
 
 const base = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -23,6 +24,9 @@ const route = getRoute();
 function Root() {
   if (route === "/tv-preview" || route === "/tv-preview/") {
     return <TVPreview />;
+  }
+  if (route === "/tv-clip-mount" || route === "/tv-clip-mount/") {
+    return <TVClipMountDesign />;
   }
   return <App />;
 }

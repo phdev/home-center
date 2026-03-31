@@ -93,6 +93,14 @@ POST_ACTION_MUTE = _DEFAULT_CONFIG["post_action_mute"]
 HIGH_CONFIDENCE_BYPASS = _DEFAULT_CONFIG["high_confidence_bypass"]
 RECORD_SECONDS = _DEFAULT_CONFIG["record_seconds"]
 
+# Enrollment constants (custom wake words via embedding similarity)
+ENROLLMENTS_DIR = Path(__file__).parent / "models" / "enrollments"
+ENROLL_SILENCE_TIMEOUT = 1.5   # seconds of silence after speech to auto-stop
+ENROLL_MAX_DURATION = 10.0     # max enrollment recording duration
+ENROLL_N_AUGMENTS = 20         # augmented variants per single sample
+ENROLL_SIMILARITY_THRESHOLD = 0.85  # cosine similarity threshold for matching
+ENROLL_MIN_CONSECUTIVE = 3     # consecutive 80ms windows needed to trigger
+
 # Alarm polling
 ALARM_POLL_INTERVAL = 5  # Seconds between timer checks
 
@@ -305,6 +313,8 @@ def play_sound(path: Path, prefer_hat: bool = False) -> subprocess.Popen | None:
 RECORD_BEEP_PATH = SOUNDS_DIR / "record_beep.wav"
 RECORD_START_PATH = SOUNDS_DIR / "record_start.wav"
 RECORD_STOP_PATH = SOUNDS_DIR / "record_stop.wav"
+ENROLL_START_PATH = SOUNDS_DIR / "enroll_start.wav"
+ENROLL_COMPLETE_PATH = SOUNDS_DIR / "enroll_complete.wav"
 
 
 def generate_record_beep(path: Path) -> None:
@@ -347,6 +357,44 @@ def generate_record_stop(path: Path) -> None:
     sr = 22050
     tones = []
     for freq in [659, 440]:
+        t = np.linspace(0, 0.12, int(sr * 0.12), endpoint=False)
+        env = np.minimum(t / 0.005, 1.0) * np.maximum(1.0 - t / 0.14, 0.0)
+        tones.append(env * np.sin(2 * np.pi * freq * t))
+        tones.append(np.zeros(int(sr * 0.02)))
+    signal = np.concatenate(tones)
+    signal = (signal / np.max(np.abs(signal)) * 32700).astype(np.int16)
+    with wave.open(str(path), "w") as wf:
+        wf.setnchannels(1)
+        wf.setsampwidth(2)
+        wf.setframerate(sr)
+        wf.writeframes(signal.tobytes())
+
+
+def generate_enroll_start(path: Path) -> None:
+    """Two rising tones signaling 'say your wake word now'."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    sr = 22050
+    tones = []
+    for freq in [523, 784]:  # C5 → G5
+        t = np.linspace(0, 0.15, int(sr * 0.15), endpoint=False)
+        env = np.minimum(t / 0.005, 1.0) * np.maximum(1.0 - t / 0.18, 0.0)
+        tones.append(env * np.sin(2 * np.pi * freq * t))
+        tones.append(np.zeros(int(sr * 0.05)))
+    signal = np.concatenate(tones)
+    signal = (signal / np.max(np.abs(signal)) * 32700).astype(np.int16)
+    with wave.open(str(path), "w") as wf:
+        wf.setnchannels(1)
+        wf.setsampwidth(2)
+        wf.setframerate(sr)
+        wf.writeframes(signal.tobytes())
+
+
+def generate_enroll_complete(path: Path) -> None:
+    """Success jingle — ascending C-E-G-C(octave)."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    sr = 22050
+    tones = []
+    for freq in [523, 659, 784, 1047]:  # C5-E5-G5-C6
         t = np.linspace(0, 0.12, int(sr * 0.12), endpoint=False)
         env = np.minimum(t / 0.005, 1.0) * np.maximum(1.0 - t / 0.14, 0.0)
         tones.append(env * np.sin(2 * np.pi * freq * t))
@@ -524,6 +572,21 @@ def parse_command(text: str) -> dict:
 
     if not text:
         return {"action": "turn_on"}
+
+    # Enroll — start enrollment flow (navigate to enrollment page)
+    if re.search(r'\benroll(ment)?\b', text):
+        return {"action": "enroll"}
+
+    # Record wake word — "record Olivia's wake word [for photos]"
+    record_match = re.search(
+        r"record\s+(\w+?)(?:'?s)?\s+wake\s*word"
+        r"(?:\s+(?:for|to)\s+(\w+))?",
+        text,
+    )
+    if record_match:
+        name = record_match.group(1).capitalize()
+        target = record_match.group(2) or "dashboard"
+        return {"action": "enroll_record", "name": name, "target": target}
 
     # Stop / dismiss / cancel
     if re.search(r'\b(stop|dismiss|cancel|quiet|shut up|silence)\b', text):
@@ -865,8 +928,20 @@ class RecordingManager:
         # Timers
         self._timers: list[dict] = []
         self._timer_counter = 0
+        # Enrollment state (custom wake word recording)
+        self._enroll_state = "idle"  # idle, waiting, recording, processing
+        self._enroll_name = None
+        self._enroll_action = "navigate"
+        self._enroll_target = "dashboard"
+        self._enroll_buffer: list[np.ndarray] = []
+        self._enroll_silence_start = 0.0
+        self._enroll_speech_start = 0.0
+        self._enroll_start_time = 0.0
+        # Loaded enrollments: {name_lower: {embeddings, action, target, wake_phrase, ...}}
+        self._enrollments: dict[str, dict] = {}
         # Thread lock
         self._lock = threading.Lock()
+        self._load_enrollments()
         self._start_http_server()
 
     # ── Public methods for in-process callers (no HTTP round-trip) ──
@@ -952,7 +1027,264 @@ class RecordingManager:
             "totalNegative": self._count_files("negative"),
         }
 
+    # ── Enrollment methods (custom wake words) ──────────────────────────
 
+    def _load_enrollments(self):
+        """Load all saved enrollments from disk."""
+        if not ENROLLMENTS_DIR.exists():
+            return
+        for json_path in ENROLLMENTS_DIR.glob("*.json"):
+            try:
+                meta = json.loads(json_path.read_text())
+                name = meta["name"]
+                npz_path = ENROLLMENTS_DIR / meta.get("embeddings_file", f"{name.lower()}_embeddings.npz")
+                if npz_path.exists():
+                    data = np.load(str(npz_path))
+                    meta["embeddings"] = data["embeddings"]
+                    self._enrollments[name.lower()] = meta
+                    log.info("Loaded enrollment: %s (%d templates, phrase='%s')",
+                             name, len(meta["embeddings"]), meta.get("wake_phrase", "?"))
+            except Exception as e:
+                log.warning("Failed to load enrollment %s: %s", json_path, e)
+
+    def has_enrollments(self) -> bool:
+        return bool(self._enrollments)
+
+    def is_enrolling(self) -> bool:
+        with self._lock:
+            return self._enroll_state != "idle"
+
+    def enroll_start(self, name: str, action: str = "navigate", target: str = "dashboard"):
+        """Start enrollment recording for a person's custom wake word."""
+        with self._lock:
+            self._enroll_state = "waiting"
+            self._enroll_name = name
+            self._enroll_action = action
+            self._enroll_target = target
+            self._enroll_buffer = []
+            self._enroll_speech_start = 0.0
+            self._enroll_silence_start = 0.0
+            self._enroll_start_time = time.time()
+            ENROLLMENTS_DIR.mkdir(parents=True, exist_ok=True)
+        log.info("Enrollment started for '%s' (action=%s, target=%s)", name, action, target)
+        # Play enrollment prompt sound
+        if not ENROLL_START_PATH.exists():
+            generate_enroll_start(ENROLL_START_PATH)
+        play_sound(ENROLL_START_PATH)
+
+    def enroll_process_audio(self, audio_chunk: np.ndarray,
+                             preprocessor: "AudioPreprocessor") -> str:
+        """Process audio during enrollment recording. Returns current state.
+
+        State machine: waiting → recording → done
+        - waiting: listening for speech to begin
+        - recording: capturing speech, watching for silence after speech
+        - done: silence detected after speech, ready to finalize
+        """
+        with self._lock:
+            if self._enroll_state == "idle":
+                return "idle"
+
+            now = time.time()
+
+            # Timeout — give up after ENROLL_MAX_DURATION
+            if now - self._enroll_start_time > ENROLL_MAX_DURATION:
+                log.info("Enrollment recording timed out (%.0fs)", ENROLL_MAX_DURATION)
+                self._enroll_state = "idle"
+                return "timeout"
+
+            is_speech = preprocessor.is_speech_likely(audio_chunk)
+
+            if self._enroll_state == "waiting":
+                if is_speech:
+                    self._enroll_state = "recording"
+                    self._enroll_speech_start = now
+                    self._enroll_buffer.append(audio_chunk.copy())
+                    log.info("Enrollment: speech detected, recording...")
+                return self._enroll_state
+
+            elif self._enroll_state == "recording":
+                self._enroll_buffer.append(audio_chunk.copy())
+
+                if is_speech:
+                    # Reset silence timer while speech continues
+                    self._enroll_silence_start = 0.0
+                else:
+                    if self._enroll_silence_start == 0.0:
+                        self._enroll_silence_start = now
+                    elif now - self._enroll_silence_start >= ENROLL_SILENCE_TIMEOUT:
+                        # Speech followed by sufficient silence — done
+                        speech_dur = now - self._enroll_speech_start
+                        log.info("Enrollment: auto-stopped after %.1fs speech + %.1fs silence",
+                                 speech_dur, ENROLL_SILENCE_TIMEOUT)
+                        self._enroll_state = "processing"
+                        return "done"
+
+                return "recording"
+
+            return self._enroll_state
+
+    def enroll_finalize(self):
+        """Extract embeddings from recorded audio, save enrollment. Runs in background thread."""
+        with self._lock:
+            if not self._enroll_buffer:
+                log.warning("Enrollment finalize: no audio buffered")
+                self._enroll_state = "idle"
+                return
+            audio = np.concatenate(self._enroll_buffer)
+            name = self._enroll_name
+            action = self._enroll_action
+            target = self._enroll_target
+            self._enroll_buffer = []
+
+        log.info("Processing enrollment for '%s': %.1fs audio", name, len(audio) / SAMPLE_RATE)
+
+        try:
+            # Transcribe to identify the wake phrase
+            wake_phrase = transcribe(audio).strip().lower()
+            log.info("Enrollment transcription: '%s'", wake_phrase)
+
+            # Create augmented variants from the single sample
+            variants = augment_single_clip(audio, n_augments=ENROLL_N_AUGMENTS)
+            log.info("Created %d augmented variants", len(variants))
+
+            # Extract embeddings via AudioFeatures pipeline
+            embeddings = extract_enrollment_embeddings(variants)
+            if len(embeddings) == 0:
+                log.error("Failed to extract embeddings for enrollment '%s'", name)
+                with self._lock:
+                    self._enroll_state = "idle"
+                return
+
+            log.info("Extracted %d embeddings, shape %s", len(embeddings), embeddings.shape)
+
+            # Save to disk
+            name_lower = name.lower()
+            ENROLLMENTS_DIR.mkdir(parents=True, exist_ok=True)
+
+            emb_file = f"{name_lower}_embeddings.npz"
+            np.savez(str(ENROLLMENTS_DIR / emb_file), embeddings=embeddings)
+
+            audio_file = f"{name_lower}_sample.npy"
+            np.save(str(ENROLLMENTS_DIR / audio_file), audio)
+
+            meta = {
+                "name": name,
+                "wake_phrase": wake_phrase,
+                "action": action,
+                "target": target,
+                "embeddings_file": emb_file,
+                "audio_file": audio_file,
+                "n_templates": int(len(embeddings)),
+                "sample_duration": round(len(audio) / SAMPLE_RATE, 2),
+                "created_at": int(time.time()),
+            }
+            (ENROLLMENTS_DIR / f"{name_lower}.json").write_text(json.dumps(meta, indent=2))
+
+            # Load into memory
+            meta["embeddings"] = embeddings
+            with self._lock:
+                self._enrollments[name_lower] = meta
+                self._enroll_state = "idle"
+
+            log.info("Enrollment complete: '%s' phrase='%s', %d templates",
+                     name, wake_phrase, len(embeddings))
+
+            # Play success jingle
+            if not ENROLL_COMPLETE_PATH.exists():
+                generate_enroll_complete(ENROLL_COMPLETE_PATH)
+            play_sound(ENROLL_COMPLETE_PATH)
+
+        except Exception as e:
+            log.error("Enrollment failed for '%s': %s", name, e)
+            with self._lock:
+                self._enroll_state = "idle"
+
+    def check_enrolled(self, feature_buffer: np.ndarray, rms: float) -> dict | None:
+        """Check if current audio matches any enrolled wake word via cosine similarity.
+
+        Args:
+            feature_buffer: openWakeWord preprocessor feature buffer (n_frames, 96)
+            rms: Current audio RMS energy
+
+        Returns:
+            Enrollment metadata dict if match found, None otherwise.
+        """
+        if not self._enrollments or feature_buffer is None:
+            return None
+        if len(feature_buffer) < 16:
+            return None
+
+        current_flat = feature_buffer[-16:].flatten().astype(np.float32)
+        current_norm = np.linalg.norm(current_flat)
+        if current_norm < 1e-10:
+            return None
+
+        best_match = None
+        best_score = 0.0
+
+        with self._lock:
+            for _name, enrollment in self._enrollments.items():
+                templates = enrollment.get("embeddings")
+                if templates is None:
+                    continue
+                for template in templates:
+                    t_flat = template.flatten()
+                    sim = float(np.dot(current_flat, t_flat) /
+                                (current_norm * np.linalg.norm(t_flat) + 1e-10))
+                    if sim > best_score:
+                        best_score = sim
+                        best_match = enrollment
+
+        if best_score >= ENROLL_SIMILARITY_THRESHOLD:
+            return best_match
+
+        return None
+
+    def get_enrollment_status(self) -> dict:
+        """Get current enrollment recording state."""
+        with self._lock:
+            return {
+                "state": self._enroll_state,
+                "name": self._enroll_name,
+                "elapsed": round(time.time() - self._enroll_start_time, 1)
+                           if self._enroll_start_time else 0,
+                "buffer_seconds": round(
+                    sum(len(c) for c in self._enroll_buffer) / SAMPLE_RATE, 1
+                ) if self._enroll_buffer else 0,
+            }
+
+    def list_enrollments(self) -> list[dict]:
+        """List all enrolled wake words (without embedding data)."""
+        with self._lock:
+            return [
+                {
+                    "name": d.get("name", n),
+                    "wake_phrase": d.get("wake_phrase", ""),
+                    "action": d.get("action", "navigate"),
+                    "target": d.get("target", "dashboard"),
+                    "n_templates": d.get("n_templates", 0),
+                    "sample_duration": d.get("sample_duration", 0),
+                    "created_at": d.get("created_at", 0),
+                }
+                for n, d in self._enrollments.items()
+            ]
+
+    def delete_enrollment(self, name: str) -> bool:
+        """Delete an enrollment by name."""
+        name_lower = name.lower()
+        with self._lock:
+            if name_lower not in self._enrollments:
+                return False
+            del self._enrollments[name_lower]
+        # Delete files from disk
+        for pattern in [f"{name_lower}.json", f"{name_lower}_embeddings.npz",
+                        f"{name_lower}_sample.npy"]:
+            p = ENROLLMENTS_DIR / pattern
+            if p.exists():
+                p.unlink()
+                log.info("Deleted enrollment file: %s", p)
+        return True
 
     def _start_http_server(self) -> None:
         """Run a tiny HTTP server in a daemon thread."""
@@ -1030,6 +1362,27 @@ class RecordingManager:
                 elif path == "/api/timers":
                     timers = mgr.get_active_timers()
                     self._respond_json({"timers": timers, "serverTime": int(time.time() * 1000)})
+                elif path == "/api/enrollments":
+                    self._respond_json({"enrollments": mgr.list_enrollments()})
+                elif path.startswith("/api/enrollments/"):
+                    # GET /api/enrollments/<name> — individual enrollment details
+                    ename = path.split("/")[3].lower() if len(path.split("/")) >= 4 else ""
+                    with mgr._lock:
+                        enrollment = mgr._enrollments.get(ename)
+                    if enrollment:
+                        self._respond_json({
+                            "name": enrollment.get("name", ename),
+                            "wake_phrase": enrollment.get("wake_phrase", ""),
+                            "action": enrollment.get("action", "navigate"),
+                            "target": enrollment.get("target", "dashboard"),
+                            "n_templates": enrollment.get("n_templates", 0),
+                            "sample_duration": enrollment.get("sample_duration", 0),
+                            "created_at": enrollment.get("created_at", 0),
+                        })
+                    else:
+                        self._respond_json({"error": "not found"}, 404)
+                elif path == "/api/enrollment-status":
+                    self._respond_json(mgr.get_enrollment_status())
                 else:
                     self._respond_json({"error": "not found"}, 404)
 
@@ -1143,6 +1496,36 @@ class RecordingManager:
                 elif self.path == "/api/gesture":
                     # Accept gesture via /api/ path too
                     self._handle_gesture(body)
+
+                elif self.path == "/api/enrollments":
+                    # Start enrollment recording
+                    name = body.get("name", "")
+                    action = body.get("action", "navigate")
+                    target = body.get("target", "dashboard")
+                    if not name:
+                        self._respond_json({"error": "name required"}, 400)
+                    else:
+                        mgr.enroll_start(name, action, target)
+                        self._respond_json({"ok": True, "status": mgr.get_enrollment_status()})
+
+                elif self.path.startswith("/api/enrollments/") and self.path.endswith("/delete"):
+                    # Delete enrollment: POST /api/enrollments/<name>/delete
+                    parts = self.path.split("/")
+                    if len(parts) >= 4:
+                        ename = parts[3]
+                        if mgr.delete_enrollment(ename):
+                            self._respond_json({"ok": True})
+                        else:
+                            self._respond_json({"error": "not found"}, 404)
+                    else:
+                        self._respond_json({"error": "invalid path"}, 400)
+
+                elif self.path == "/api/enrollment-stop":
+                    # Force stop enrollment recording
+                    with mgr._lock:
+                        mgr._enroll_state = "idle"
+                        mgr._enroll_buffer = []
+                    self._respond_json({"ok": True})
 
                 else:
                     self._respond_json({"error": "not found"}, 404)
@@ -1260,6 +1643,65 @@ class AudioPreprocessor:
 
 
 # ---------------------------------------------------------------------------
+# Enrollment helpers (single-sample wake word via embedding similarity)
+# ---------------------------------------------------------------------------
+
+def augment_single_clip(audio: np.ndarray, n_augments: int = 20) -> list[np.ndarray]:
+    """Create augmented variants of a single audio clip for enrollment.
+
+    Takes one real recording and produces n_augments variations with
+    random gain, speed shift, and noise injection. Returns list including
+    the original clip.
+    """
+    variants = [audio.copy()]
+    for _ in range(n_augments):
+        clip = audio.astype(np.float64)
+        # Random gain (-6dB to +6dB)
+        gain_db = np.random.uniform(-6, 6)
+        clip = clip * (10 ** (gain_db / 20))
+        # Random speed shift (resampling) — changes pitch slightly too
+        speed = np.random.uniform(0.88, 1.12)
+        indices = np.arange(0, len(clip), speed)
+        indices = indices[indices < len(clip)].astype(int)
+        clip = clip[indices]
+        # Add noise at random SNR
+        snr_db = np.random.uniform(15, 30)
+        noise = np.random.randn(len(clip))
+        signal_power = np.mean(clip ** 2) + 1e-10
+        noise_power = signal_power / (10 ** (snr_db / 10))
+        clip = clip + noise * np.sqrt(noise_power)
+        variants.append(np.clip(clip, -32768, 32767).astype(np.int16))
+    return variants
+
+
+def extract_enrollment_embeddings(audio_clips: list[np.ndarray],
+                                  target_len: int = 32000) -> np.ndarray:
+    """Extract (N, 16, 96) embeddings from audio clips using openWakeWord's AudioFeatures.
+
+    Each clip is padded/trimmed to target_len samples (2s at 16kHz),
+    then streamed through AudioFeatures in 80ms chunks.
+    Returns shape (N, 16, 96) where N = number of clips with valid features.
+    """
+    from openwakeword.utils import AudioFeatures
+    chunk_size = 1280
+    embeddings = []
+    for clip in audio_clips:
+        # Pad or trim to target length
+        if len(clip) < target_len:
+            clip = np.pad(clip, (0, target_len - len(clip)))
+        else:
+            clip = clip[:target_len]
+        af = AudioFeatures(inference_framework=_inference_framework())
+        for i in range(0, len(clip) - chunk_size + 1, chunk_size):
+            af(clip[i:i + chunk_size])
+        if len(af.feature_buffer) >= 16:
+            embeddings.append(af.feature_buffer[-16:])
+    if not embeddings:
+        return np.array([])
+    return np.array(embeddings, dtype=np.float32)
+
+
+# ---------------------------------------------------------------------------
 # Wake word model setup
 # ---------------------------------------------------------------------------
 
@@ -1316,6 +1758,10 @@ def main() -> None:
         generate_record_start(RECORD_START_PATH)
     if not RECORD_STOP_PATH.exists():
         generate_record_stop(RECORD_STOP_PATH)
+    if not ENROLL_START_PATH.exists():
+        generate_enroll_start(ENROLL_START_PATH)
+    if not ENROLL_COMPLETE_PATH.exists():
+        generate_enroll_complete(ENROLL_COMPLETE_PATH)
 
     # Pre-load models so first command is fast
     try:
@@ -1378,6 +1824,7 @@ def main() -> None:
     last_trigger = 0.0
     last_action_time = 0.0
     consecutive_hits = {ww: 0 for ww in wake_words}
+    enroll_consecutive: dict[str, int] = {}  # tracks consecutive enrollment matches
 
     # Rolling buffer: ~2 seconds of raw mono audio for "Hey Jarvis, open calendar" style commands
     # Each chunk = CHUNK_SIZE samples (80ms at 16kHz), so 2s ≈ 25 chunks
@@ -1409,6 +1856,16 @@ def main() -> None:
                 model.predict(audio_array)  # Keep model state current
                 continue
 
+            # Enrollment recording mode — auto-stops on speech→silence
+            if rec_mgr.is_enrolling():
+                enroll_result = rec_mgr.enroll_process_audio(raw_audio, preprocessor)
+                model.predict(audio_array)  # Keep model state current
+                if enroll_result == "done":
+                    threading.Thread(target=rec_mgr.enroll_finalize, daemon=True).start()
+                elif enroll_result == "timeout":
+                    log.info("Enrollment timed out")
+                continue
+
             # Post-action mute (live config)
             if now - last_action_time < cfg("post_action_mute"):
                 model.predict(audio_array)
@@ -1425,6 +1882,50 @@ def main() -> None:
                 continue
 
             model.predict(audio_array)
+
+            # ── Check enrolled custom wake words via embedding similarity ──
+            if rec_mgr.has_enrollments() and now - last_trigger >= cfg("cooldown_seconds"):
+                try:
+                    feat_buf = model.preprocessor.feature_buffer
+                    if feat_buf is not None and len(feat_buf) >= 16:
+                        match = rec_mgr.check_enrolled(feat_buf, rms)
+                        if match:
+                            match_name = match.get("name", "").lower()
+                            enroll_consecutive[match_name] = enroll_consecutive.get(match_name, 0) + 1
+
+                            if enroll_consecutive[match_name] >= ENROLL_MIN_CONSECUTIVE:
+                                log.info("Custom wake word '%s' triggered! (phrase='%s', action=%s, target=%s)",
+                                         match.get("name"), match.get("wake_phrase"),
+                                         match.get("action"), match.get("target"))
+                                debug_post("custom_wake", {
+                                    "name": match.get("name"),
+                                    "wake_phrase": match.get("wake_phrase"),
+                                    "action": match.get("action"),
+                                    "target": match.get("target"),
+                                })
+
+                                model.reset()
+                                for ww in consecutive_hits:
+                                    consecutive_hits[ww] = 0
+                                enroll_consecutive.clear()
+                                last_trigger = now
+
+                                if not args.dry_run:
+                                    play_acknowledgement()
+
+                                # Dispatch the enrolled action
+                                e_action = match.get("action", "navigate")
+                                e_target = match.get("target", "dashboard")
+                                if e_action == "navigate":
+                                    rec_mgr.navigate(e_target)
+                                    log.info("Custom wake → navigate to %s", e_target)
+
+                                last_action_time = time.time()
+                                continue  # Skip DNN wake word check this cycle
+                        else:
+                            enroll_consecutive.clear()
+                except AttributeError:
+                    pass  # model.preprocessor.feature_buffer may not exist
 
             for ww_name in wake_words:
                 buf = model.prediction_buffer[ww_name]
@@ -1525,6 +2026,22 @@ def main() -> None:
                     elif action in ("debug_hide", "debug_show"):
                         debug_post(action, {"message": action.replace("_", " ")})
                         log.info("Debug overlay: %s", action)
+
+                    elif action == "enroll":
+                        if args.dry_run:
+                            log.info("[DRY RUN] Would navigate to enrollment page")
+                        else:
+                            rec_mgr.navigate("enrollment")
+                            log.info("Navigating to enrollment page")
+
+                    elif action == "enroll_record":
+                        name = command.get("name", "unknown")
+                        target = command.get("target", "dashboard")
+                        if args.dry_run:
+                            log.info("[DRY RUN] Would start enrollment for %s (target=%s)", name, target)
+                        else:
+                            rec_mgr.enroll_start(name, "navigate", target)
+                            log.info("Started enrollment recording for %s → %s", name, target)
 
                     elif action == "turn_off":
                         if args.dry_run:
