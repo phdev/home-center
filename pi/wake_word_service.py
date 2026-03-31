@@ -147,6 +147,19 @@ def turn_off_tv() -> None:
     log.info("TV should now be off.")
 
 
+def is_tv_on() -> bool:
+    """Check if TV is powered on via CEC. Returns False if off/standby/unknown."""
+    try:
+        proc = subprocess.run(
+            ["cec-client", "-s", "-d", "1"],
+            input=f"pow {CEC_DEVICE}\n",
+            capture_output=True, text=True, timeout=5,
+        )
+        return "power status: on" in proc.stdout.lower()
+    except Exception:
+        return False
+
+
 # ---------------------------------------------------------------------------
 # Audio helpers
 # ---------------------------------------------------------------------------
@@ -208,8 +221,12 @@ def generate_alarm(path: Path) -> None:
     log.info("Generated alarm sound: %s", path)
 
 
-def find_speaker_device() -> str | None:
-    """Find audio output device. Prefers HDMI (TV), falls back to ReSpeaker HAT."""
+def find_speaker_device(prefer_hat: bool = False) -> str | None:
+    """Find audio output device.
+
+    prefer_hat=False (default): HDMI first, ReSpeaker fallback.
+    prefer_hat=True: ReSpeaker first, HDMI fallback.
+    """
     try:
         result = subprocess.run(
             ["aplay", "-l"], capture_output=True, text=True, timeout=5,
@@ -225,11 +242,16 @@ def find_speaker_device() -> str | None:
                 hdmi_card = card_num
             elif any(kw in lower for kw in ("respeaker", "seeed", "wm8960")):
                 respeaker_card = card_num
-        # Prefer HDMI — louder via TV speakers
-        if hdmi_card:
-            return f"plughw:{hdmi_card},0"
-        if respeaker_card:
-            return f"plughw:{respeaker_card},0"
+        if prefer_hat:
+            if respeaker_card:
+                return f"plughw:{respeaker_card},0"
+            if hdmi_card:
+                return f"plughw:{hdmi_card},0"
+        else:
+            if hdmi_card:
+                return f"plughw:{hdmi_card},0"
+            if respeaker_card:
+                return f"plughw:{respeaker_card},0"
     except Exception:
         pass
     return None
@@ -263,12 +285,12 @@ def set_speaker_volume() -> None:
             pass
 
 
-def play_sound(path: Path) -> subprocess.Popen | None:
-    """Play a WAV file through the ReSpeaker HAT speaker (non-blocking)."""
+def play_sound(path: Path, prefer_hat: bool = False) -> subprocess.Popen | None:
+    """Play a WAV file (non-blocking). prefer_hat=True routes to ReSpeaker HAT."""
     if not path.exists():
         return None
     set_speaker_volume()
-    device = find_speaker_device()
+    device = find_speaker_device(prefer_hat=prefer_hat)
     cmd = ["aplay", "-q"]
     if device:
         cmd.extend(["-D", device])
@@ -341,8 +363,9 @@ def generate_record_stop(path: Path) -> None:
 def play_acknowledgement() -> None:
     if not CHIME_PATH.exists():
         generate_chime(CHIME_PATH)
-    play_sound(CHIME_PATH)
-    log.info("Playing acknowledgement chime")
+    tv_on = is_tv_on()
+    play_sound(CHIME_PATH, prefer_hat=not tv_on)
+    log.info("Playing acknowledgement chime (%s)", "HDMI" if tv_on else "HAT")
 
 
 # ---------------------------------------------------------------------------
@@ -477,7 +500,7 @@ def transcribe(audio: np.ndarray) -> str:
     audio_f32 = audio_f32 - np.mean(audio_f32)
     audio_f32 = audio_f32 / 32768.0
     segments, _ = model.transcribe(
-        audio_f32, beam_size=1, language="en",
+        audio_f32, beam_size=3, language="en",
         no_speech_threshold=0.95,  # Don't skip segments unless very confident it's silence
         initial_prompt="Hey Jarvis",  # Bias toward hearing the wake word
     )
@@ -507,7 +530,7 @@ def parse_command(text: str) -> dict:
         return {"action": "stop"}
 
     # Turn off
-    if re.search(r'\bturn\s*(it\s+)?off\b', text):
+    if re.search(r'\bturn(ed|s)?\s*(it\s+)?off\b', text):
         return {"action": "turn_off"}
 
     # Set a timer
@@ -559,7 +582,7 @@ def parse_command(text: str) -> dict:
         return {"action": "debug_hide"}
 
     # Turn on (explicit)
-    if re.search(r'\bturn\s*(it\s+)?on\b', text):
+    if re.search(r'\bturn(ed|s)?\s*(it\s+)?on\b', text):
         return {"action": "turn_on"}
 
     # General knowledge query — question words or substantial speech
@@ -809,9 +832,6 @@ class RecordingManager:
             GET  /gesture  → {gesture: ...}
             POST /gesture  → accept gesture from HandController
 
-        Presence:
-            GET  /api/presence  → {present, lastPing, secondsAgo}
-            POST /api/presence  → heartbeat ping, auto turns TV on if was away
     """
 
     HTTP_PORT = 8765
@@ -845,11 +865,6 @@ class RecordingManager:
         # Timers
         self._timers: list[dict] = []
         self._timer_counter = 0
-        # Presence detection (HandController heartbeat → CEC TV on)
-        self._presence_last_ping = 0.0  # epoch seconds
-        self._presence_tv_on_at = 0.0   # when we last turned TV on for presence
-        self._presence_cooldown = 60.0  # don't re-trigger CEC for 60s
-        self._presence_timeout = 120.0  # consider "away" after 2min without ping
         # Thread lock
         self._lock = threading.Lock()
         self._start_http_server()
@@ -922,43 +937,6 @@ class RecordingManager:
             self._timers = [t for t in self._timers
                            if not (t["dismissed"] and now - t["expiresAt"] > 3600000)]
             return list(self._timers)
-
-    def handle_presence(self, dry_run: bool = False) -> dict:
-        """Handle a presence ping from HandController. Turns TV on if needed."""
-        now = time.time()
-        with self._lock:
-            was_away = (now - self._presence_last_ping) > self._presence_timeout
-            self._presence_last_ping = now
-            since_tv_on = now - self._presence_tv_on_at
-
-            if was_away and since_tv_on > self._presence_cooldown:
-                self._presence_tv_on_at = now
-                action = "tv_on"
-            else:
-                action = "already_present"
-
-        if action == "tv_on":
-            log.info("Presence detected (was away) — turning TV on via CEC")
-            if not dry_run:
-                threading.Thread(target=turn_on_tv, daemon=True).start()
-
-        return {
-            "action": action,
-            "lastPing": now,
-            "away": was_away,
-        }
-
-    def get_presence(self) -> dict:
-        """Get current presence state."""
-        now = time.time()
-        with self._lock:
-            last = self._presence_last_ping
-            present = (now - last) < self._presence_timeout if last > 0 else False
-        return {
-            "present": present,
-            "lastPing": last,
-            "secondsAgo": round(now - last, 1) if last > 0 else None,
-        }
 
     def _count_files(self, prefix: str) -> int:
         """Count .npz training files on disk — always accurate."""
@@ -1052,8 +1030,6 @@ class RecordingManager:
                 elif path == "/api/timers":
                     timers = mgr.get_active_timers()
                     self._respond_json({"timers": timers, "serverTime": int(time.time() * 1000)})
-                elif path == "/api/presence":
-                    self._respond_json(mgr.get_presence())
                 else:
                     self._respond_json({"error": "not found"}, 404)
 
@@ -1167,10 +1143,6 @@ class RecordingManager:
                 elif self.path == "/api/gesture":
                     # Accept gesture via /api/ path too
                     self._handle_gesture(body)
-
-                elif self.path == "/api/presence":
-                    result = mgr.handle_presence()
-                    self._respond_json(result)
 
                 else:
                     self._respond_json({"error": "not found"}, 404)
