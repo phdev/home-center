@@ -411,9 +411,16 @@ def generate_enroll_complete(path: Path) -> None:
 def play_acknowledgement() -> None:
     if not CHIME_PATH.exists():
         generate_chime(CHIME_PATH)
-    tv_on = is_tv_on()
-    play_sound(CHIME_PATH, prefer_hat=not tv_on)
-    log.info("Playing acknowledgement chime (%s)", "HDMI" if tv_on else "HAT")
+    # Use cached TV state (non-blocking) to decide routing:
+    # TV on → HDMI only (user hears it through TV speakers)
+    # TV off → HAT only (user hears it through ReSpeaker speaker)
+    tv_on = _local_server.is_tv_on_cached() if _local_server else False
+    if tv_on:
+        play_sound(CHIME_PATH, prefer_hat=False)
+        log.info("Playing acknowledgement chime (HDMI — TV is on)")
+    else:
+        play_sound(CHIME_PATH, prefer_hat=True)
+        log.info("Playing acknowledgement chime (HAT — TV is off)")
 
 
 # ---------------------------------------------------------------------------
@@ -592,8 +599,9 @@ def parse_command(text: str) -> dict:
     if re.search(r'\b(stop|dismiss|cancel|quiet|shut up|silence)\b', text):
         return {"action": "stop"}
 
-    # Turn off
-    if re.search(r'\bturn(ed|s)?\s*(it\s+)?off\b', text):
+    # Turn off — Whisper frequently mis-transcribes "turn off" as "turn up", "turn of", etc.
+    if re.search(r'\bturn(ed|s)?\s*(it\s+)?(off|of|up|down|f)\b', text):
+        # "turn up/down" could be legit but in our context always means "turn off"
         return {"action": "turn_off"}
 
     # Set a timer
@@ -939,10 +947,46 @@ class RecordingManager:
         self._enroll_start_time = 0.0
         # Loaded enrollments: {name_lower: {embeddings, action, target, wake_phrase, ...}}
         self._enrollments: dict[str, dict] = {}
+        # Listening state (for TV overlay)
+        self._listening_until = 0.0
+        # Cached TV power state (updated in background to avoid CEC blocking)
+        self._tv_on_cached = False
+        self._tv_on_last_check = 0.0
         # Thread lock
         self._lock = threading.Lock()
         self._load_enrollments()
+        self._start_tv_power_poller()
         self._start_http_server()
+
+    def _start_tv_power_poller(self):
+        """Background thread that checks TV power state every 30s via CEC."""
+        def _poll():
+            while True:
+                try:
+                    on = is_tv_on()
+                    with self._lock:
+                        self._tv_on_cached = on
+                        self._tv_on_last_check = time.time()
+                except Exception:
+                    pass
+                time.sleep(30)
+        t = threading.Thread(target=_poll, daemon=True)
+        t.start()
+
+    def is_tv_on_cached(self) -> bool:
+        """Return cached TV power state (non-blocking)."""
+        with self._lock:
+            return self._tv_on_cached
+
+    def set_listening(self, duration: float = 6.0):
+        """Mark as listening for the next `duration` seconds (for TV overlay)."""
+        with self._lock:
+            self._listening_until = time.time() + duration
+
+    @property
+    def is_listening(self) -> bool:
+        with self._lock:
+            return time.time() < self._listening_until
 
     # ── Public methods for in-process callers (no HTTP round-trip) ──
 
@@ -1347,7 +1391,10 @@ class RecordingManager:
                         self._respond_json(mgr._get_status())
                 elif path == "/gesture":
                     with mgr._lock:
-                        self._respond_json({"gesture": mgr._gesture_latest})
+                        self._respond_json({
+                            "gesture": mgr._gesture_latest,
+                            "listening": time.time() < mgr._listening_until,
+                        })
                 elif path == "/api/wake-config":
                     with mgr._lock:
                         self._respond_json(dict(mgr._wake_config))
@@ -1911,6 +1958,7 @@ def main() -> None:
                                 last_trigger = now
 
                                 if not args.dry_run:
+                                    rec_mgr.set_listening(6.0)
                                     play_acknowledgement()
 
                                 # Dispatch the enrolled action
@@ -1973,6 +2021,7 @@ def main() -> None:
 
                     # Chime immediately — user gets instant feedback
                     if not args.dry_run:
+                        rec_mgr.set_listening(6.0)
                         play_acknowledgement()
 
                     # Grab pre-trigger audio buffer + record short tail

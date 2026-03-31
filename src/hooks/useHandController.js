@@ -35,6 +35,7 @@ export function useHandController(workerSettings, currentPage, goTo) {
   const [photoColumns, setPhotoColumns] = useState(DEFAULT_COLUMNS);
   const [photoScrollDir, setPhotoScrollDir] = useState(0);
   const [lastGesture, setLastGesture] = useState(null); // { name, hand, timestamp }
+  const [listening, setListening] = useState(false);
 
   const lastGestureIdRef = useRef(null);
   const initializedRef = useRef(false);
@@ -121,9 +122,12 @@ export function useHandController(workerSettings, currentPage, goTo) {
         const res = await fetch(PI_GESTURE_URL);
         if (!res.ok) return;
         const data = await res.json();
-        if (!data.gesture) return;
+
+        // Update listening state from wake word service (always present)
+        setListening(!!data.listening);
 
         const g = data.gesture;
+        if (!g) return;
 
         if (g.id === lastGestureIdRef.current) return;
 
@@ -169,5 +173,5 @@ export function useHandController(workerSettings, currentPage, goTo) {
     return () => clearTimeout(timer);
   }, [lastGestureTime]);
 
-  return { connected, selectedPanelId, photoColumns, photoScrollDir, lastGesture };
+  return { connected, selectedPanelId, photoColumns, photoScrollDir, lastGesture, listening };
 }
