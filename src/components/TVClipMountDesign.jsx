@@ -1,657 +1,643 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 
-// ReSpeaker XVF3800 TV Clip Mount — Technical Drawing
-// All dimensions in mm, drawn to scale within each viewport
-
-const COLORS = {
-  bg: "#0a0a0a",
-  panel: "#111",
-  border: "#222",
-  mount: "#2a2a2a",
-  mountStroke: "#555",
-  board: "#1a472a",
-  boardStroke: "#3a7a4a",
-  accent: "#3B82F6",
-  dim: "#888",
-  dimLine: "#444",
-  text: "#ccc",
-  muted: "#666",
-  led: "#4ade80",
-  pad: "#c9a030",
-  usb: "#888",
-  mic: "#e44",
-  screw: "#999",
+const C = {
+  bg: "#0a0a0a", panel: "#111", border: "#222",
+  shell: "#1a1a1a", shellHi: "#2a2a2a", shellStroke: "#333",
+  board: "#1a472a", boardStroke: "#3a7a4a",
+  accent: "#3B82F6", dim: "#888", dimLine: "#444",
+  text: "#ccc", muted: "#666", led: "#4ade80",
+  mic: "#ef4444", screw: "#999", usb: "#888",
 };
 
-const VIEWS = ["overview", "render", "front", "side", "top", "exploded", "specs"];
-
-function DimLine({ x1, y1, x2, y2, label, offset = 12, side = "top" }) {
-  const isHoriz = Math.abs(y2 - y1) < 2;
-  const mx = (x1 + x2) / 2;
-  const my = (y1 + y2) / 2;
-
-  if (isHoriz) {
-    const oy = side === "top" ? -offset : offset;
-    return (
-      <g>
-        <line x1={x1} y1={y1 + oy} x2={x2} y2={y2 + oy} stroke={COLORS.dimLine} strokeWidth={0.5} />
-        <line x1={x1} y1={y1} x2={x1} y2={y1 + oy} stroke={COLORS.dimLine} strokeWidth={0.3} />
-        <line x1={x2} y1={y2} x2={x2} y2={y2 + oy} stroke={COLORS.dimLine} strokeWidth={0.3} />
-        <line x1={x1} y1={y1 + oy} x2={x1 + 3} y2={y1 + oy - 2} stroke={COLORS.dimLine} strokeWidth={0.5} />
-        <line x1={x2} y1={y2 + oy} x2={x2 - 3} y2={y2 + oy - 2} stroke={COLORS.dimLine} strokeWidth={0.5} />
-        <text x={mx} y={my + oy - 3} textAnchor="middle" fontSize={5} fill={COLORS.dim} fontFamily="monospace">
-          {label}
-        </text>
-      </g>
-    );
+// Generate icosphere: subdivision 1 of icosahedron = 80 faces, 42 vertices
+function makeIco() {
+  const t = (1 + Math.sqrt(5)) / 2;
+  const raw = [
+    [-1,t,0],[1,t,0],[-1,-t,0],[1,-t,0],
+    [0,-1,t],[0,1,t],[0,-1,-t],[0,1,-t],
+    [t,0,-1],[t,0,1],[-t,0,-1],[-t,0,1],
+  ];
+  const V = raw.map(v => {
+    const l = Math.hypot(...v);
+    return v.map(c => c / l);
+  });
+  const F = [
+    [0,11,5],[0,5,1],[0,1,7],[0,7,10],[0,10,11],
+    [1,5,9],[5,11,4],[11,10,2],[10,7,6],[7,1,8],
+    [3,9,4],[3,4,2],[3,2,6],[3,6,8],[3,8,9],
+    [4,9,5],[2,4,11],[6,2,10],[8,6,7],[9,8,1],
+  ];
+  // Subdivide once
+  const mc = {};
+  const nf = [];
+  function mid(i, j) {
+    const k = Math.min(i,j)+"_"+Math.max(i,j);
+    if (mc[k] !== undefined) return mc[k];
+    const m = [0,1,2].map(d => (V[i][d]+V[j][d])/2);
+    const l = Math.hypot(...m);
+    V.push(m.map(c => c/l));
+    mc[k] = V.length - 1;
+    return mc[k];
   }
-  const ox = side === "left" ? -offset : offset;
-  return (
-    <g>
-      <line x1={x1 + ox} y1={y1} x2={x2 + ox} y2={y2} stroke={COLORS.dimLine} strokeWidth={0.5} />
-      <line x1={x1} y1={y1} x2={x1 + ox} y2={y1} stroke={COLORS.dimLine} strokeWidth={0.3} />
-      <line x1={x2} y1={y2} x2={x2 + ox} y2={y2} stroke={COLORS.dimLine} strokeWidth={0.3} />
-      <text x={mx + ox + 3} y={my + 2} textAnchor="start" fontSize={5} fill={COLORS.dim} fontFamily="monospace">
-        {label}
-      </text>
-    </g>
-  );
+  for (const [a,b,c] of F) {
+    const ab=mid(a,b), bc=mid(b,c), ca=mid(c,a);
+    nf.push([a,ab,ca],[b,bc,ab],[c,ca,bc],[ab,bc,ca]);
+  }
+  return { V, F: nf };
 }
 
-// Front View: What you see looking at the TV from the viewer's perspective
-function FrontView({ compact }) {
-  const s = compact ? 1.8 : 2.5;
-  const ox = compact ? 110 : 150;
-  const oy = compact ? 55 : 70;
+const ICO = makeIco();
+const BASE_CUT_Y = -0.65;
 
-  return (
-    <g transform={`translate(${ox},${oy}) scale(${s})`}>
-      {/* Board - circular, face-on */}
-      <circle cx={0} cy={0} r={35} fill={COLORS.board} stroke={COLORS.boardStroke} strokeWidth={0.8} />
+// Classify special faces
+function classify() {
+  const { V, F } = ICO;
+  const micPorts = [];
+  const baseCut = [];
+  const ledTop = [];
+  const cands = [];
 
-      {/* 12 RGB LEDs ring */}
-      {Array.from({ length: 12 }).map((_, i) => {
-        const a = (i * 30 - 90) * Math.PI / 180;
-        return (
-          <circle key={i} cx={Math.cos(a) * 28} cy={Math.sin(a) * 28} r={1.8}
-            fill={COLORS.led} opacity={0.6} />
-        );
-      })}
+  F.forEach((f, i) => {
+    const cy = (V[f[0]][1]+V[f[1]][1]+V[f[2]][1])/3;
+    const cx = (V[f[0]][0]+V[f[1]][0]+V[f[2]][0])/3;
+    const cz = (V[f[0]][2]+V[f[1]][2]+V[f[2]][2])/3;
+    if (cy < BASE_CUT_Y) baseCut.push(i);
+    if (cy > 0.75) ledTop.push(i);
+    if (cy > 0.25 && cy < 0.6) {
+      cands.push({ i, az: Math.atan2(cz, cx) });
+    }
+  });
 
-      {/* 3x M2 mounting holes */}
-      {[0, 120, 240].map((deg, i) => {
-        const a = (deg - 90) * Math.PI / 180;
-        const r = 32;
-        return (
-          <circle key={i} cx={Math.cos(a) * r} cy={Math.sin(a) * r} r={1.2}
-            fill="none" stroke={COLORS.screw} strokeWidth={0.4} />
-        );
-      })}
-
-      {/* Center label */}
-      <text x={0} y={-2} textAnchor="middle" fontSize={4} fill={COLORS.text} fontFamily="monospace">
-        XVF3800
-      </text>
-      <text x={0} y={4} textAnchor="middle" fontSize={3} fill={COLORS.muted} fontFamily="monospace">
-        70mm dia
-      </text>
-
-      {/* Cradle ring visible behind board */}
-      <circle cx={0} cy={0} r={37} fill="none" stroke={COLORS.mountStroke} strokeWidth={1} strokeDasharray="2,2" />
-
-      {!compact && (
-        <>
-          <DimLine x1={-35} y1={38} x2={35} y2={38} label="70mm" side="bottom" offset={6} />
-          <text x={0} y={-42} textAnchor="middle" fontSize={5} fill={COLORS.accent} fontFamily="system-ui, sans-serif" fontWeight="600">
-            FRONT VIEW
-          </text>
-        </>
-      )}
-    </g>
-  );
+  for (const target of [0, Math.PI/2, Math.PI, -Math.PI/2]) {
+    let best = null, bd = Infinity;
+    for (const c of cands) {
+      let d = Math.abs(c.az - target);
+      if (d > Math.PI) d = 2*Math.PI - d;
+      if (d < bd && !micPorts.includes(c.i)) { bd = d; best = c.i; }
+    }
+    if (best !== null) micPorts.push(best);
+  }
+  return { baseCut: new Set(baseCut), micPorts: new Set(micPorts), ledTop: new Set(ledTop) };
 }
 
-// Side View (cross-section): Shows clip gripping TV bezel, cradle extending forward
-function SideView({ compact }) {
-  const s = compact ? 2.2 : 3;
-  const ox = compact ? 110 : 150;
-  const oy = compact ? 55 : 75;
+const CLS = classify();
 
-  return (
-    <g transform={`translate(${ox},${oy}) scale(${s})`}>
-      {/* TV bezel cross-section */}
-      <rect x={-5} y={-20} width={10} height={40} fill="#1a1a1a" stroke="#333" strokeWidth={0.6} rx={1} />
-      <text x={0} y={26} textAnchor="middle" fontSize={3} fill={COLORS.muted} fontFamily="monospace">TV bezel</text>
-
-      {/* Clip - back jaw (behind TV) */}
-      <path d="M 5,-12 L 12,-12 L 12,12 L 5,12" fill={COLORS.mount} stroke={COLORS.mountStroke} strokeWidth={0.5} />
-
-      {/* Clip - front jaw */}
-      <path d="M -5,-12 L -8,-12 L -8,-6" fill={COLORS.mount} stroke={COLORS.mountStroke} strokeWidth={0.5} />
-
-      {/* Clip - top bridge */}
-      <path d="M -8,-12 L -8,-14 L 12,-14 L 12,-12" fill={COLORS.mount} stroke={COLORS.mountStroke} strokeWidth={0.5} />
-
-      {/* Spring indicator */}
-      <path d="M -6,-8 L -7,-6.5 L -5,-5 L -7,-3.5 L -6,-2" fill="none" stroke={COLORS.accent} strokeWidth={0.4} />
-
-      {/* Rubber pads */}
-      <rect x={-5.5} y={-11} width={1} height={4} fill={COLORS.pad} rx={0.3} opacity={0.8} />
-      <rect x={4.5} y={-11} width={1} height={4} fill={COLORS.pad} rx={0.3} opacity={0.8} />
-
-      {/* Cradle arm extending forward */}
-      <path d="M -8,-14 L -45,-14 L -45,-10 L -8,-10" fill={COLORS.mount} stroke={COLORS.mountStroke} strokeWidth={0.5} />
-
-      {/* Board in cradle (side profile) */}
-      <rect x={-42} y={-16} width={34} height={2} fill={COLORS.board} stroke={COLORS.boardStroke} strokeWidth={0.4} rx={0.3} />
-
-      {/* Cradle lip */}
-      <rect x={-44} y={-16} width={1.5} height={4} fill={COLORS.mount} stroke={COLORS.mountStroke} strokeWidth={0.3} rx={0.3} />
-
-      {/* Mic holes (bottom-firing) */}
-      {[-35, -28, -21, -14].map((x, i) => (
-        <g key={i}>
-          <rect x={x - 1} y={-10} width={2} height={4} fill="none" stroke={COLORS.mic} strokeWidth={0.3} strokeDasharray="1,0.5" />
-          <text x={x} y={-7} textAnchor="middle" fontSize={1.5} fill={COLORS.mic}>MIC</text>
-        </g>
-      ))}
-
-      {/* USB-C cable routing */}
-      <path d="M -42,-14 L -42,-10 L -42,10 L 8,10 L 8,5" fill="none" stroke={COLORS.usb} strokeWidth={0.4} strokeDasharray="1.5,1" />
-      <text x={-30} y={13} textAnchor="middle" fontSize={2.5} fill={COLORS.usb} fontFamily="monospace">USB-C cable</text>
-
-      {!compact && (
-        <>
-          {/* Dimension lines */}
-          <DimLine x1={-45} y1={-20} x2={-8} y2={-20} label="~37mm cradle" side="top" offset={5} />
-          <DimLine x1={-5} y1={-22} x2={5} y2={-22} label="5-25mm" side="top" offset={8} />
-          <DimLine x1={15} y1={-16} x2={15} y2={-10} label="~6mm" side="right" offset={4} />
-          <text x={0} y={-32} textAnchor="middle" fontSize={5} fill={COLORS.accent} fontFamily="system-ui, sans-serif" fontWeight="600">
-            SIDE VIEW (CROSS-SECTION)
-          </text>
-        </>
-      )}
-    </g>
-  );
+// 3D rotation
+function rot(v, rx, ry) {
+  const cy = Math.cos(ry), sy = Math.sin(ry);
+  const cx = Math.cos(rx), sx = Math.sin(rx);
+  const x1 = v[0]*cy + v[2]*sy;
+  const z1 = -v[0]*sy + v[2]*cy;
+  const y1 = v[1]*cx - z1*sx;
+  const z2 = v[1]*sx + z1*cx;
+  return [x1, -y1, z2];
 }
 
-// Top View: Looking down at the mount on the TV
-function TopView({ compact }) {
-  const s = compact ? 1.6 : 2.2;
-  const ox = compact ? 110 : 150;
-  const oy = compact ? 55 : 70;
+// Render icosphere to SVG polygons
+function renderIco(opts = {}) {
+  const {
+    rx = -0.3, ry = 0.5, s = 120, ox = 0, oy = 0,
+    light = [0.3, 0.7, -0.6],
+    showMic = true, showLed = true, showBase = true,
+    showSplit = false, cutaway = false, opacity = 1,
+    micColor = C.mic, baseAlpha = 0.15,
+    filterUpper = false, filterLower = false,
+  } = opts;
+  const { V, F } = ICO;
+  const ll = Math.hypot(...light);
+  const ln = light.map(c => c/ll);
 
-  return (
-    <g transform={`translate(${ox},${oy}) scale(${s})`}>
-      {/* TV top edge */}
-      <rect x={-50} y={10} width={100} height={25} fill="#1a1a1a" stroke="#333" strokeWidth={0.6} />
-      <text x={0} y={25} textAnchor="middle" fontSize={3.5} fill={COLORS.muted}>TV (rear)</text>
+  const proj = V.map(v => {
+    const r = rot(v, rx, ry);
+    return { x: r[0]*s + ox, y: r[1]*s + oy, z: r[2] };
+  });
 
-      {/* Clip on TV */}
-      <rect x={-15} y={8} width={30} height={6} fill={COLORS.mount} stroke={COLORS.mountStroke} strokeWidth={0.5} rx={1} />
+  const faces = F.map((f, idx) => {
+    const [a,b,c] = f;
+    const pa = proj[a], pb = proj[b], pc = proj[c];
+    const avgZ = (pa.z+pb.z+pc.z)/3;
+    // Face centroid in original coords (on unit sphere, centroid ≈ normal)
+    const cn = [0,1,2].map(d => (V[a][d]+V[b][d]+V[c][d])/3);
+    const cl = Math.hypot(...cn);
+    const n = cn.map(c => c/cl);
+    const rn = rot(n, rx, ry);
+    // Back-face: rn[2] > 0 means facing away (remember y is flipped)
+    if (rn[2] > 0.05) return null;
 
-      {/* Cradle arm */}
-      <rect x={-8} y={-2} width={16} height={12} fill={COLORS.mount} stroke={COLORS.mountStroke} strokeWidth={0.5} rx={1} />
+    const isCut = CLS.baseCut.has(idx);
+    const isMic = CLS.micPorts.has(idx);
+    const isLed = CLS.ledTop.has(idx);
+    const isUpper = cn[1] >= 0;
+    const isLower = cn[1] < 0;
 
-      {/* Board (top-down) */}
-      <circle cx={0} cy={-18} r={35} fill={COLORS.board} stroke={COLORS.boardStroke} strokeWidth={0.8} />
+    if (showBase && isCut) return null;
+    if (filterUpper && isUpper) return null;
+    if (filterLower && isLower && !isCut) return null;
+    if (cutaway && rn[0] > 0.05) return null;
 
-      {/* LEDs on top */}
-      {Array.from({ length: 12 }).map((_, i) => {
-        const a = (i * 30 - 90) * Math.PI / 180;
-        return (
-          <circle key={i} cx={Math.cos(a) * 28} cy={-18 + Math.sin(a) * 28} r={1.5}
-            fill={COLORS.led} opacity={0.5} />
-        );
-      })}
+    const dot = Math.max(0, -(rn[0]*ln[0] + rn[1]*ln[1] + rn[2]*ln[2]));
+    const ambient = 0.15;
+    const bright = Math.min(1, ambient + dot * 0.85);
 
-      {/* USB-C port */}
-      <rect x={-3} y={16} width={6} height={2.5} fill={COLORS.usb} rx={0.5} />
-      <text x={12} y={18.5} fontSize={2.5} fill={COLORS.usb} fontFamily="monospace">USB-C</text>
+    let fill;
+    if (showMic && isMic) {
+      fill = micColor;
+    } else if (showLed && isLed) {
+      const g = Math.round(60 + bright * 100);
+      fill = `rgb(${Math.round(bright*40)},${g},${Math.round(bright*40)})`;
+    } else {
+      const v = Math.round(18 + bright * 38);
+      fill = `rgb(${v},${v},${v})`;
+    }
 
-      {/* Cable routing channel */}
-      <path d="M 0,18.5 L 0,35" stroke={COLORS.usb} strokeWidth={1} strokeDasharray="2,1" />
+    return {
+      pts: `${pa.x},${pa.y} ${pb.x},${pb.y} ${pc.x},${pc.y}`,
+      z: avgZ, fill, isMic, isLed, isCut, isUpper,
+      stroke: showSplit && Math.abs(cn[1]) < 0.08 ? C.accent : C.shellStroke,
+      strokeW: showSplit && Math.abs(cn[1]) < 0.08 ? 1.2 : 0.3,
+      alpha: isCut ? baseAlpha : opacity,
+    };
+  }).filter(Boolean);
 
-      {!compact && (
-        <>
-          <DimLine x1={-35} y1={-58} x2={35} y2={-58} label="70mm" side="top" offset={5} />
-          <DimLine x1={42} y1={-53} x2={42} y2={35} label="~75mm protrusion" side="right" offset={4} />
-          <text x={0} y={-66} textAnchor="middle" fontSize={5} fill={COLORS.accent} fontFamily="system-ui, sans-serif" fontWeight="600">
-            TOP VIEW (LOOKING DOWN)
-          </text>
-        </>
-      )}
-    </g>
-  );
+  faces.sort((a, b) => b.z - a.z);
+  return faces;
 }
 
-// Exploded View: All parts separated vertically
-function ExplodedView({ compact }) {
-  const s = compact ? 1.5 : 2;
-  const ox = compact ? 110 : 150;
-  const oy = compact ? 10 : 10;
+// === VIEW COMPONENTS ===
 
-  return (
-    <g transform={`translate(${ox},${oy}) scale(${s})`}>
-      {/* Part 1: M2 screws (top) */}
-      <g transform="translate(0, 5)">
-        {[0, 120, 240].map((deg, i) => {
-          const a = (deg - 90) * Math.PI / 180;
-          const r = 25;
-          return (
-            <g key={i}>
-              <line x1={Math.cos(a) * r} y1={Math.sin(a) * r - 3} x2={Math.cos(a) * r} y2={Math.sin(a) * r + 3}
-                stroke={COLORS.screw} strokeWidth={1} />
-              <circle cx={Math.cos(a) * r} cy={Math.sin(a) * r - 3} r={1.5}
-                fill="none" stroke={COLORS.screw} strokeWidth={0.5} />
-            </g>
-          );
-        })}
-        <text x={30} y={2} fontSize={3.5} fill={COLORS.text} fontFamily="monospace">3x M2x4mm screws</text>
-      </g>
-
-      {/* Part 2: XVF3800 board */}
-      <g transform="translate(0, 30)">
-        <circle cx={0} cy={0} r={28} fill={COLORS.board} stroke={COLORS.boardStroke} strokeWidth={0.6} />
-        {Array.from({ length: 12 }).map((_, i) => {
-          const a = (i * 30 - 90) * Math.PI / 180;
-          return (
-            <circle key={i} cx={Math.cos(a) * 22} cy={Math.sin(a) * 22} r={1.2} fill={COLORS.led} opacity={0.5} />
-          );
-        })}
-        <text x={0} y={1} textAnchor="middle" fontSize={3.5} fill={COLORS.text} fontFamily="monospace">XVF3800</text>
-        <text x={30} y={2} fontSize={3.5} fill={COLORS.text} fontFamily="monospace">ReSpeaker board</text>
-        {/* Assembly line */}
-        <line x1={0} y1={-30} x2={0} y2={-18} stroke={COLORS.dimLine} strokeWidth={0.3} strokeDasharray="1.5,1" markerEnd="url(#arrowDown)" />
-      </g>
-
-      {/* Part 3: Cradle (ring style) */}
-      <g transform="translate(0, 62)">
-        <circle cx={0} cy={0} r={30} fill="none" stroke={COLORS.mountStroke} strokeWidth={2} />
-        <circle cx={0} cy={0} r={26} fill="none" stroke={COLORS.mountStroke} strokeWidth={0.5} strokeDasharray="2,1" />
-        {/* Mic cutouts */}
-        {[0, 90, 180, 270].map((deg, i) => {
-          const a = (deg - 90) * Math.PI / 180;
-          return (
-            <rect key={i} x={Math.cos(a) * 28 - 3} y={Math.sin(a) * 28 - 2} width={6} height={4}
-              fill={COLORS.bg} stroke={COLORS.mic} strokeWidth={0.3} rx={0.5}
-              transform={`rotate(${deg}, ${Math.cos(a) * 28}, ${Math.sin(a) * 28})`} />
-          );
-        })}
-        {/* Screw posts */}
-        {[0, 120, 240].map((deg, i) => {
-          const a = (deg - 90) * Math.PI / 180;
-          return (
-            <circle key={i} cx={Math.cos(a) * 25} cy={Math.sin(a) * 25} r={2}
-              fill={COLORS.mount} stroke={COLORS.mountStroke} strokeWidth={0.4} />
-          );
-        })}
-        <text x={0} y={2} textAnchor="middle" fontSize={3} fill={COLORS.text} fontFamily="monospace">cradle ring</text>
-        <text x={34} y={2} fontSize={3.5} fill={COLORS.text} fontFamily="monospace">Cradle w/ mic cutouts</text>
-        <line x1={0} y1={-32} x2={0} y2={-20} stroke={COLORS.dimLine} strokeWidth={0.3} strokeDasharray="1.5,1" />
-      </g>
-
-      {/* Part 4: Clip section */}
-      <g transform="translate(0, 95)">
-        <rect x={-12} y={-5} width={24} height={10} fill={COLORS.mount} stroke={COLORS.mountStroke} strokeWidth={0.6} rx={1.5} />
-        <rect x={-4} y={5} width={8} height={8} fill={COLORS.mount} stroke={COLORS.mountStroke} strokeWidth={0.4} rx={0.5} />
-        <rect x={-4} y={5} width={8} height={8} fill="none" stroke={COLORS.pad} strokeWidth={0.5} rx={0.5} strokeDasharray="1,0.5" />
-        <text x={0} y={1} textAnchor="middle" fontSize={3} fill={COLORS.text} fontFamily="monospace">clip</text>
-        <text x={18} y={10} fontSize={3.5} fill={COLORS.text} fontFamily="monospace">TV bezel clip</text>
-        <line x1={0} y1={-7} x2={0} y2={-15} stroke={COLORS.dimLine} strokeWidth={0.3} strokeDasharray="1.5,1" />
-      </g>
-
-      {!compact && (
-        <text x={0} y={-8} textAnchor="middle" fontSize={5} fill={COLORS.accent} fontFamily="system-ui, sans-serif" fontWeight="600">
-          EXPLODED VIEW
-        </text>
-      )}
-
-      <defs>
-        <marker id="arrowDown" markerWidth="4" markerHeight="4" refX="2" refY="4" orient="auto">
-          <path d="M0,0 L2,4 L4,0" fill="none" stroke={COLORS.dimLine} strokeWidth={0.5} />
-        </marker>
-      </defs>
-    </g>
-  );
+function Icosphere({ faces }) {
+  return faces.map((f, i) => (
+    <polygon key={i} points={f.pts} fill={f.fill}
+      stroke={f.stroke} strokeWidth={f.strokeW}
+      opacity={f.alpha} strokeLinejoin="round" />
+  ));
 }
 
-// Render: Proportional 42" TV with mount attached
-function TVRenderView() {
-  // 42" TV: 930mm x 523mm. Mount is 70mm disc.
-  // Scale: 1 SVG unit = ~1.5mm → TV ~620 x 349 SVG units
-  const tvW = 620;
-  const tvH = 349;
-  const bezelW = 8; // ~12mm bezel
-  const screenW = tvW - bezelW * 2;
-  const screenH = tvH - bezelW * 2;
-  const mountR = 23; // 70mm / 3 ≈ 23 SVG units
-  const standW = 200;
-  const standH = 14;
-  const standBaseW = 260;
-  const standBaseH = 6;
-
-  // Center of viewport
-  const cx = 480;
-  const cy = 300;
-  const tvX = cx - tvW / 2;
-  const tvY = cy - tvH / 2 - 20;
+// Product rendering — geosphere on a desk
+function RenderView() {
+  const faces = useMemo(() => renderIco({
+    rx: -0.25, ry: 0.6, s: 160, ox: 480, oy: 260,
+    showMic: true, showLed: true, showBase: true, showSplit: false,
+  }), []);
 
   return (
     <svg width="100%" height="100%" viewBox="0 0 960 540" preserveAspectRatio="xMidYMid meet">
       <defs>
-        {/* TV screen gradient (showing dashboard content) */}
-        <linearGradient id="screenGrad" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stopColor="#0d1117" />
-          <stop offset="100%" stopColor="#161b22" />
+        <linearGradient id="wallG" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#16161a" /><stop offset="100%" stopColor="#0e0e11" />
         </linearGradient>
-        {/* Subtle ambient glow from screen */}
-        <radialGradient id="screenGlow" cx="0.5" cy="0.5" r="0.6">
-          <stop offset="0%" stopColor="#3B82F6" stopOpacity="0.06" />
-          <stop offset="100%" stopColor="#3B82F6" stopOpacity="0" />
+        <linearGradient id="deskG" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#2a2520" /><stop offset="100%" stopColor="#1a1612" />
+        </linearGradient>
+        <radialGradient id="ledGlow" cx="0.5" cy="0.35" r="0.35">
+          <stop offset="0%" stopColor="#4ade80" stopOpacity="0.12" />
+          <stop offset="100%" stopColor="#4ade80" stopOpacity="0" />
         </radialGradient>
-        {/* Mount shadow */}
-        <filter id="mountShadow" x="-50%" y="-50%" width="200%" height="200%">
-          <feDropShadow dx="0" dy="2" stdDeviation="3" floodColor="#000" floodOpacity="0.5" />
-        </filter>
-        {/* LED glow */}
-        <filter id="ledGlow" x="-100%" y="-100%" width="300%" height="300%">
-          <feGaussianBlur stdDeviation="2" result="blur" />
-          <feMerge>
-            <feMergeNode in="blur" />
-            <feMergeNode in="SourceGraphic" />
-          </feMerge>
-        </filter>
-        {/* Wall texture */}
-        <linearGradient id="wallGrad" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#1a1a1e" />
-          <stop offset="100%" stopColor="#111114" />
-        </linearGradient>
-        {/* Surface/shelf */}
-        <linearGradient id="surfaceGrad" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#2a2520" />
-          <stop offset="100%" stopColor="#1e1a16" />
-        </linearGradient>
+        <filter id="shadow"><feDropShadow dx="0" dy="4" stdDeviation="8" floodColor="#000" floodOpacity="0.6"/></filter>
+        <filter id="glow"><feGaussianBlur stdDeviation="6" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
       </defs>
 
-      {/* Background wall */}
-      <rect x="0" y="0" width="960" height="540" fill="url(#wallGrad)" />
+      {/* Wall */}
+      <rect width="960" height="540" fill="url(#wallG)" />
 
-      {/* Surface/console under TV */}
-      <rect x={cx - 340} y={tvY + tvH + standH + standBaseH + 2} width={680} height={100}
-        fill="url(#surfaceGrad)" rx="2" />
-      <line x1={cx - 340} y1={tvY + tvH + standH + standBaseH + 2} x2={cx + 340} y2={tvY + tvH + standH + standBaseH + 2}
-        stroke="#3a3530" strokeWidth={0.5} />
+      {/* Desk surface */}
+      <rect x="0" y="370" width="960" height="170" fill="url(#deskG)" />
+      <line x1="0" y1="370" x2="960" y2="370" stroke="#3a3530" strokeWidth="0.5" />
 
-      {/* TV body */}
-      <rect x={tvX} y={tvY} width={tvW} height={tvH} rx={4}
-        fill="#0c0c0c" stroke="#1a1a1a" strokeWidth={1.5} />
+      {/* Shadow on desk */}
+      <ellipse cx="480" cy="392" rx="100" ry="14" fill="#000" opacity="0.4" />
 
-      {/* Screen */}
-      <rect x={tvX + bezelW} y={tvY + bezelW} width={screenW} height={screenH} rx={2}
-        fill="url(#screenGrad)" />
-      <rect x={tvX + bezelW} y={tvY + bezelW} width={screenW} height={screenH} rx={2}
-        fill="url(#screenGlow)" />
+      {/* LED glow halo */}
+      <circle cx="480" cy="260" r="180" fill="url(#ledGlow)" />
 
-      {/* Dashboard content on screen (simplified) */}
-      <g transform={`translate(${tvX + bezelW + 12}, ${tvY + bezelW + 8})`} opacity={0.4}>
-        {/* Header bar */}
-        <rect x={0} y={0} width={screenW - 24} height={16} rx={2} fill="#1e293b" />
-        <text x={8} y={11} fontSize={7} fill="#94a3b8" fontFamily="system-ui">Home Center</text>
-        <text x={screenW - 80} y={11} fontSize={7} fill="#64748b" fontFamily="monospace">10:42 AM</text>
-
-        {/* Panel grid */}
-        <rect x={0} y={22} width={(screenW - 36) * 0.3} height={120} rx={3} fill="#1e293b" opacity={0.6} />
-        <rect x={(screenW - 36) * 0.3 + 6} y={22} width={(screenW - 36) * 0.4} height={56} rx={3} fill="#1e293b" opacity={0.6} />
-        <rect x={(screenW - 36) * 0.7 + 12} y={22} width={(screenW - 36) * 0.3 - 0} height={56} rx={3} fill="#1e293b" opacity={0.6} />
-        <rect x={(screenW - 36) * 0.3 + 6} y={84} width={(screenW - 36) * 0.4} height={58} rx={3} fill="#1e293b" opacity={0.6} />
-        <rect x={(screenW - 36) * 0.7 + 12} y={84} width={(screenW - 36) * 0.3 - 0} height={58} rx={3} fill="#1e293b" opacity={0.6} />
-
-        {/* Calendar panel content */}
-        <text x={8} y={36} fontSize={5} fill="#64748b" fontFamily="monospace">CALENDAR</text>
-        {[0, 1, 2, 3, 4].map(i => (
-          <rect key={i} x={6} y={42 + i * 14} width={(screenW - 36) * 0.3 - 18} height={9} rx={1.5} fill="#0f172a" />
-        ))}
-
-        {/* Weather panel */}
-        <text x={(screenW - 36) * 0.3 + 14} y={36} fontSize={5} fill="#64748b" fontFamily="monospace">WEATHER</text>
-        <text x={(screenW - 36) * 0.3 + 14} y={52} fontSize={14} fill="#e2e8f0" fontFamily="system-ui">72°</text>
-
-        {/* Photos placeholder */}
-        <text x={(screenW - 36) * 0.3 + 14} y={98} fontSize={5} fill="#64748b" fontFamily="monospace">PHOTOS</text>
+      {/* Geosphere */}
+      <g filter="url(#shadow)">
+        <Icosphere faces={faces} />
       </g>
 
-      {/* TV stand */}
-      <rect x={cx - standW / 2} y={tvY + tvH} width={standW} height={standH}
-        fill="#111" stroke="#1a1a1a" strokeWidth={0.5} />
-      <rect x={cx - standBaseW / 2} y={tvY + tvH + standH} width={standBaseW} height={standBaseH}
-        fill="#0e0e0e" stroke="#1a1a1a" strokeWidth={0.5} rx={2} />
+      {/* Flat base contact line */}
+      <ellipse cx="480" cy="388" rx="52" ry="6" fill="none" stroke="#333" strokeWidth="0.5" />
 
-      {/* === MOUNT ON TOP OF TV === */}
-      <g filter="url(#mountShadow)">
-        {/* Clip (mostly hidden behind TV top) */}
-        <rect x={cx - 14} y={tvY - 3} width={28} height={6}
-          fill={COLORS.mount} stroke={COLORS.mountStroke} strokeWidth={0.5} rx={1.5} />
+      {/* USB-C cable */}
+      <path d="M 560,350 Q 580,380 580,400 Q 580,430 620,450" stroke="#333" strokeWidth="2" fill="none" strokeDasharray="4,3" />
+      <text x="628" y="455" fontSize="9" fill={C.muted} fontFamily="monospace">USB-C to Pi 5</text>
 
-        {/* Cradle disc */}
-        <circle cx={cx} cy={tvY - mountR - 1} r={mountR + 2}
-          fill={COLORS.mount} stroke={COLORS.mountStroke} strokeWidth={0.8} />
-
-        {/* Board */}
-        <circle cx={cx} cy={tvY - mountR - 1} r={mountR}
-          fill={COLORS.board} stroke={COLORS.boardStroke} strokeWidth={0.6} />
-
-        {/* LED ring with glow */}
-        <g filter="url(#ledGlow)">
-          {Array.from({ length: 12 }).map((_, i) => {
-            const a = (i * 30 - 90) * Math.PI / 180;
-            const ledR = mountR * 0.78;
-            return (
-              <circle key={i}
-                cx={cx + Math.cos(a) * ledR}
-                cy={tvY - mountR - 1 + Math.sin(a) * ledR}
-                r={1.3} fill={COLORS.led} opacity={0.8} />
-            );
-          })}
-        </g>
+      {/* Callout */}
+      <line x1="380" y1="180" x2="200" y2="80" stroke={C.dimLine} strokeWidth="0.5" strokeDasharray="3,2" />
+      <g>
+        <rect x="40" y="50" width="210" height="65" rx="5" fill="#111" stroke={C.border} strokeWidth="0.5" />
+        <text x="52" y="72" fontSize="12" fill={C.accent} fontWeight="600" fontFamily="system-ui, sans-serif">Comni Voice Puck</text>
+        <text x="52" y="87" fontSize="9" fill={C.muted} fontFamily="monospace">85mm geosphere, 80 facets</text>
+        <text x="52" y="101" fontSize="9" fill={C.muted} fontFamily="monospace">4 mic ports + 12 LED ring</text>
       </g>
 
-      {/* USB-C cable (thin, running down the back — visible at top) */}
-      <path d={`M ${cx} ${tvY + 1} L ${cx} ${tvY - 1}`}
-        stroke="#333" strokeWidth={1.5} />
-
-      {/* Callout line to mount */}
-      <line x1={cx + mountR + 8} y1={tvY - mountR - 10}
-        x2={cx + 120} y2={tvY - mountR - 40}
-        stroke={COLORS.dimLine} strokeWidth={0.5} strokeDasharray="3,2" />
-      <g transform={`translate(${cx + 124}, ${tvY - mountR - 48})`}>
-        <rect x={-4} y={-14} width={200} height={42} rx={4}
-          fill="#111" stroke={COLORS.border} strokeWidth={0.5} />
-        <text x={4} y={-1} fontSize={9} fill={COLORS.accent} fontFamily="system-ui, sans-serif" fontWeight="600">
-          ReSpeaker XVF3800 Mount
-        </text>
-        <text x={4} y={12} fontSize={7} fill={COLORS.muted} fontFamily="monospace">
-          70mm disc, 12mm above bezel
-        </text>
-        <text x={4} y={23} fontSize={7} fill={COLORS.muted} fontFamily="monospace">
-          4 mics + 12 LEDs + USB-C
-        </text>
-      </g>
-
-      {/* Scale reference */}
-      <g transform={`translate(${tvX + 20}, ${tvY + tvH + standH + standBaseH + 36})`}>
-        <text x={0} y={0} fontSize={8} fill={COLORS.muted} fontFamily="monospace">42" Samsung TV (930 x 523mm)</text>
-        <text x={0} y={14} fontSize={8} fill={COLORS.muted} fontFamily="monospace">Mount: 70mm dia — {(70 / 930 * 100).toFixed(1)}% of TV width</text>
-        <text x={0} y={28} fontSize={7} fill={COLORS.dimLine} fontFamily="monospace">Proportional rendering — all dimensions to scale</text>
+      {/* Mic port callout */}
+      <line x1="405" y1="235" x2="720" y2="140" stroke={C.mic} strokeWidth="0.4" strokeDasharray="2,2" />
+      <g>
+        <rect x="724" y="122" width="180" height="38" rx="4" fill="#111" stroke={C.border} strokeWidth="0.5" />
+        <text x="734" y="140" fontSize="9" fill={C.mic} fontFamily="monospace">Mic port (open face)</text>
+        <text x="734" y="153" fontSize="8" fill={C.muted} fontFamily="monospace">4x evenly spaced</text>
       </g>
 
       {/* Title */}
-      <text x={cx} y={30} textAnchor="middle" fontSize={14} fill={COLORS.accent}
-        fontFamily="system-ui, sans-serif" fontWeight="600">
-        42" TV WITH CLIP MOUNT — FRONT VIEW
+      <text x="480" y="30" textAnchor="middle" fontSize="14" fill={C.accent} fontWeight="600" fontFamily="system-ui, sans-serif">
+        COMNI VOICE PUCK — PRODUCT VIEW
       </text>
 
-      {/* Side profile inset (small) */}
-      <g transform={`translate(${tvX + tvW - 180}, ${tvY + tvH + standH + standBaseH + 20})`}>
-        <rect x={-6} y={-14} width={185} height={90} rx={4}
-          fill="#0d0d0d" stroke={COLORS.border} strokeWidth={0.5} />
-        <text x={2} y={-2} fontSize={7} fill={COLORS.muted} fontFamily="monospace" textTransform="uppercase">Side profile (not to scale)</text>
-
-        {/* Mini side view */}
-        <g transform="translate(90, 38) scale(1.8)">
-          {/* TV bezel */}
-          <rect x={-3} y={-18} width={6} height={36} fill="#0c0c0c" stroke="#222" strokeWidth={0.4} rx={0.5} />
-
-          {/* Clip */}
-          <path d="M -3,-8 L -5,-8 L -5,-10 L 6,-10 L 6,-8 L 3,-8" fill={COLORS.mount} stroke={COLORS.mountStroke} strokeWidth={0.3} />
-          <path d="M 3,-8 L 6,-8 L 6,4 L 3,4" fill={COLORS.mount} stroke={COLORS.mountStroke} strokeWidth={0.3} />
-
-          {/* Cradle arm */}
-          <path d="M -5,-10 L -30,-10 L -30,-7 L -5,-7" fill={COLORS.mount} stroke={COLORS.mountStroke} strokeWidth={0.3} />
-
-          {/* Board */}
-          <rect x={-28} y={-12} width={23} height={1.5} fill={COLORS.board} stroke={COLORS.boardStroke} strokeWidth={0.3} />
-
-          {/* Lip */}
-          <rect x={-30} y={-12} width={1} height={3.5} fill={COLORS.mount} stroke={COLORS.mountStroke} strokeWidth={0.2} />
-
-          {/* Cable */}
-          <path d="M 0,-7 L 0,18" stroke="#333" strokeWidth={0.6} strokeDasharray="1.5,1" />
-          <text x={3} y={16} fontSize={2.5} fill={COLORS.muted} fontFamily="monospace">USB-C</text>
-        </g>
-      </g>
+      {/* Scale ref */}
+      <text x="30" y="520" fontSize="8" fill={C.dimLine} fontFamily="monospace">
+        85mm diameter — approximately baseball-sized
+      </text>
     </svg>
   );
 }
 
-// Specs panel
+// Front view with annotations
+function FrontAnnotated() {
+  const faces = useMemo(() => renderIco({
+    rx: -0.2, ry: 0.4, s: 150, ox: 400, oy: 270,
+    showMic: true, showLed: true, showBase: true, showSplit: true,
+  }), []);
+
+  return (
+    <svg width="100%" height="100%" viewBox="0 0 960 540" preserveAspectRatio="xMidYMid meet">
+      <Icosphere faces={faces} />
+
+      {/* Equator split line label */}
+      <line x1="245" y1="275" x2="180" y2="275" stroke={C.accent} strokeWidth="0.5" strokeDasharray="3,2" />
+      <text x="60" y="272" fontSize="9" fill={C.accent} fontFamily="monospace">Equator split</text>
+      <text x="60" y="284" fontSize="8" fill={C.muted} fontFamily="monospace">Press-fit join</text>
+
+      {/* Mic port label */}
+      <line x1="330" y1="175" x2="180" y2="120" stroke={C.mic} strokeWidth="0.5" strokeDasharray="2,2" />
+      <text x="60" y="117" fontSize="9" fill={C.mic} fontFamily="monospace">Mic port opening</text>
+      <text x="60" y="130" fontSize="8" fill={C.muted} fontFamily="monospace">Open triangle face</text>
+
+      {/* LED glow area */}
+      <line x1="410" y1="130" x2="700" y2="70" stroke={C.led} strokeWidth="0.5" strokeDasharray="2,2" />
+      <text x="710" y="67" fontSize="9" fill={C.led} fontFamily="monospace">LED glow zone</text>
+      <text x="710" y="80" fontSize="8" fill={C.muted} fontFamily="monospace">Translucent top faces</text>
+      <text x="710" y="93" fontSize="8" fill={C.muted} fontFamily="monospace">12x APA102 RGB visible</text>
+
+      {/* Flat base */}
+      <line x1="425" y1="410" x2="700" y2="460" stroke={C.muted} strokeWidth="0.5" strokeDasharray="2,2" />
+      <text x="710" y="457" fontSize="9" fill={C.muted} fontFamily="monospace">Flat base (~48mm dia)</text>
+      <text x="710" y="470" fontSize="8" fill={C.muted} fontFamily="monospace">Truncated 15mm from pole</text>
+
+      {/* USB-C port area */}
+      <line x1="545" y1="340" x2="700" y2="360" stroke={C.usb} strokeWidth="0.5" strokeDasharray="2,2" />
+      <text x="710" y="357" fontSize="9" fill={C.usb} fontFamily="monospace">USB-C port cutout</text>
+      <text x="710" y="370" fontSize="8" fill={C.muted} fontFamily="monospace">Lower hemisphere</text>
+
+      {/* Dimension: diameter */}
+      <line x1="250" y1="50" x2="550" y2="50" stroke={C.dimLine} strokeWidth="0.5" />
+      <line x1="250" y1="45" x2="250" y2="55" stroke={C.dimLine} strokeWidth="0.5" />
+      <line x1="550" y1="45" x2="550" y2="55" stroke={C.dimLine} strokeWidth="0.5" />
+      <text x="400" y="45" textAnchor="middle" fontSize="9" fill={C.dim} fontFamily="monospace">85mm</text>
+
+      <text x="400" y="510" textAnchor="middle" fontSize="10" fill={C.accent} fontWeight="600" fontFamily="system-ui, sans-serif">
+        FRONT VIEW — ANNOTATED
+      </text>
+    </svg>
+  );
+}
+
+// Cross-section view — schematic side cut
+function SectionView() {
+  const R = 130; // sphere radius in SVG units
+  const cx = 400, cy = 260;
+  const baseCutY = cy + R * 0.65; // flat base
+  const baseR = Math.sqrt(R*R - (R*0.65)*(R*0.65));
+  const pcbY = baseCutY - 28; // PCB position
+  const pcbW = R * 1.55; // 70mm PCB in 85mm sphere
+
+  // Generate icosphere outline triangles visible in cross-section
+  // We'll draw the sphere outline plus hatched walls
+  return (
+    <svg width="100%" height="100%" viewBox="0 0 960 540" preserveAspectRatio="xMidYMid meet">
+      {/* Outer sphere outline */}
+      <circle cx={cx} cy={cy} r={R} fill="none" stroke={C.shellStroke} strokeWidth="1.5" />
+      {/* Inner sphere (wall thickness) */}
+      <circle cx={cx} cy={cy} r={R-8} fill="none" stroke={C.shellStroke} strokeWidth="0.5" strokeDasharray="4,3" />
+
+      {/* Wall cross-hatch (right half only for section view) */}
+      {Array.from({length: 20}).map((_, i) => {
+        const angle = -Math.PI/2 + (Math.PI) * (i / 19);
+        const y = cy + Math.sin(angle) * R;
+        if (y > baseCutY) return null;
+        const xOuter = cx + Math.cos(angle) * R;
+        const xInner = cx + Math.cos(angle) * (R - 8);
+        return (
+          <g key={i}>
+            <line x1={xOuter} y1={y} x2={xInner} y2={y} stroke={C.shellStroke} strokeWidth="0.3" />
+          </g>
+        );
+      })}
+
+      {/* Flat base */}
+      <line x1={cx - baseR} y1={baseCutY} x2={cx + baseR} y2={baseCutY} stroke={C.text} strokeWidth="1.5" />
+
+      {/* Equator split line */}
+      <line x1={cx - R - 20} y1={cy} x2={cx + R + 20} y2={cy} stroke={C.accent} strokeWidth="0.8" strokeDasharray="6,3" />
+      <text x={cx + R + 25} y={cy + 4} fontSize="9" fill={C.accent} fontFamily="monospace">Equator split</text>
+
+      {/* Press-fit lip detail */}
+      <rect x={cx + R - 12} y={cy - 3} width="8" height="6" fill="none" stroke={C.accent} strokeWidth="0.5" />
+      <text x={cx + R + 2} y={cy + 18} fontSize="7" fill={C.muted} fontFamily="monospace">1mm press-fit lip</text>
+
+      {/* PCB */}
+      <rect x={cx - pcbW/2} y={pcbY} width={pcbW} height={5} fill={C.board} stroke={C.boardStroke} strokeWidth="0.8" rx="1" />
+      <text x={cx} y={pcbY - 5} textAnchor="middle" fontSize="8" fill={C.boardStroke} fontFamily="monospace">XVF3800 PCB (70mm)</text>
+
+      {/* LEDs on top of PCB */}
+      {[-40, -25, -10, 5, 20, 35].map((dx, i) => (
+        <rect key={i} x={cx + dx - 3} y={pcbY - 3} width="6" height="3" fill={C.led} opacity="0.6" rx="0.5" />
+      ))}
+      <text x={cx + pcbW/2 + 10} y={pcbY} fontSize="7" fill={C.led} fontFamily="monospace">12x LEDs (top)</text>
+
+      {/* MEMS mics on bottom of PCB */}
+      {[-35, -12, 12, 35].map((dx, i) => (
+        <rect key={i} x={cx + dx - 2} y={pcbY + 5} width="4" height="3" fill={C.mic} opacity="0.7" rx="0.5" />
+      ))}
+      <text x={cx + pcbW/2 + 10} y={pcbY + 12} fontSize="7" fill={C.mic} fontFamily="monospace">4x MEMS mics (bottom)</text>
+
+      {/* M2 standoffs */}
+      {[-45, 0, 45].map((dx, i) => (
+        <rect key={i} x={cx + dx - 3} y={pcbY + 5} width="6" height={baseCutY - pcbY - 5} fill={C.screw} opacity="0.5" rx="0.5" />
+      ))}
+      <text x={cx - pcbW/2 - 80} y={baseCutY - 10} fontSize="7" fill={C.screw} fontFamily="monospace">3x M2 standoffs</text>
+
+      {/* Mic port openings (shown as gaps in upper sphere) */}
+      {[-0.55, 0.55].map((angle, i) => {
+        const a = -Math.PI/2 + angle;
+        const x1 = cx + Math.cos(a) * R;
+        const y1 = cy + Math.sin(a) * R;
+        return (
+          <g key={i}>
+            <line x1={x1 - 8} y1={y1 - 8} x2={x1 + 8} y2={y1 + 8} stroke={C.mic} strokeWidth="2" />
+            <line x1={x1 - 8} y1={y1 + 8} x2={x1 + 8} y2={y1 - 8} stroke={C.mic} strokeWidth="2" />
+          </g>
+        );
+      })}
+      <text x={cx - R - 90} y={cy - R * 0.4} fontSize="8" fill={C.mic} fontFamily="monospace">Mic port</text>
+      <text x={cx - R - 90} y={cy - R * 0.4 + 12} fontSize="7" fill={C.muted} fontFamily="monospace">(open face)</text>
+
+      {/* USB-C cutout in lower hemisphere */}
+      <rect x={cx + baseR - 5} y={baseCutY - 25} width="10" height="5" fill={C.bg} stroke={C.usb} strokeWidth="0.8" rx="1" />
+      <text x={cx + baseR + 10} y={baseCutY - 20} fontSize="7" fill={C.usb} fontFamily="monospace">USB-C</text>
+
+      {/* Dimension: outer diameter */}
+      <line x1={cx - R} y1={50} x2={cx + R} y2={50} stroke={C.dimLine} strokeWidth="0.5" />
+      <line x1={cx - R} y1={45} x2={cx - R} y2={55} stroke={C.dimLine} strokeWidth="0.5" />
+      <line x1={cx + R} y1={45} x2={cx + R} y2={55} stroke={C.dimLine} strokeWidth="0.5" />
+      <text x={cx} y={45} textAnchor="middle" fontSize="9" fill={C.dim} fontFamily="monospace">85mm outer</text>
+
+      {/* Dimension: wall thickness */}
+      <line x1={cx + R - 8} y1={cy - R + 30} x2={cx + R} y2={cy - R + 30} stroke={C.dimLine} strokeWidth="0.5" />
+      <text x={cx + R + 5} y={cy - R + 33} fontSize="7" fill={C.dim} fontFamily="monospace">2mm wall</text>
+
+      {/* Dimension: height */}
+      <line x1={cx + R + 50} y1={cy - R} x2={cx + R + 50} y2={baseCutY} stroke={C.dimLine} strokeWidth="0.5" />
+      <line x1={cx + R + 45} y1={cy - R} x2={cx + R + 55} y2={cy - R} stroke={C.dimLine} strokeWidth="0.5" />
+      <line x1={cx + R + 45} y1={baseCutY} x2={cx + R + 55} y2={baseCutY} stroke={C.dimLine} strokeWidth="0.5" />
+      <text x={cx + R + 58} y={cy + 20} fontSize="8" fill={C.dim} fontFamily="monospace">~75mm</text>
+
+      {/* Standoff height */}
+      <line x1={cx - 60} y1={pcbY + 5} x2={cx - 60} y2={baseCutY} stroke={C.dimLine} strokeWidth="0.4" />
+      <text x={cx - 85} y={(pcbY + 5 + baseCutY) / 2 + 3} fontSize="7" fill={C.dim} fontFamily="monospace">5-6mm</text>
+
+      <text x={cx} y={510} textAnchor="middle" fontSize="10" fill={C.accent} fontWeight="600" fontFamily="system-ui, sans-serif">
+        CROSS-SECTION — INTERNAL STRUCTURE
+      </text>
+    </svg>
+  );
+}
+
+// Exploded assembly view
+function ExplodedView() {
+  const upperFaces = useMemo(() => renderIco({
+    rx: -0.2, ry: 0.5, s: 80, ox: 400, oy: 100,
+    showMic: true, showLed: true, showBase: false, showSplit: false,
+    filterLower: true,
+  }), []);
+
+  const lowerFaces = useMemo(() => renderIco({
+    rx: -0.2, ry: 0.5, s: 80, ox: 400, oy: 380,
+    showMic: false, showLed: false, showBase: true, showSplit: false,
+    filterUpper: true,
+  }), []);
+
+  return (
+    <svg width="100%" height="100%" viewBox="0 0 960 540" preserveAspectRatio="xMidYMid meet">
+      {/* Upper dome */}
+      <Icosphere faces={upperFaces} />
+      <text x="600" y="70" fontSize="10" fill={C.text} fontFamily="monospace">Upper dome</text>
+      <text x="600" y="84" fontSize="8" fill={C.muted} fontFamily="monospace">Mic ports + LED glow zone</text>
+      <text x="600" y="98" fontSize="8" fill={C.muted} fontFamily="monospace">Translucent PETG (optional)</text>
+      <line x1="485" y1="80" x2="595" y2="80" stroke={C.dimLine} strokeWidth="0.4" strokeDasharray="2,2" />
+
+      {/* Assembly arrows */}
+      <line x1="400" y1="175" x2="400" y2="210" stroke={C.dimLine} strokeWidth="0.5" markerEnd="url(#arrowD)" />
+      <line x1="400" y1="295" x2="400" y2="260" stroke={C.dimLine} strokeWidth="0.5" markerEnd="url(#arrowD)" />
+
+      {/* PCB in the middle */}
+      <g transform="translate(400, 240)">
+        <ellipse cx="0" cy="0" rx="70" ry="14" fill={C.board} stroke={C.boardStroke} strokeWidth="0.8" />
+        {/* LEDs on top */}
+        {Array.from({length: 12}).map((_, i) => {
+          const a = (i * 30) * Math.PI / 180;
+          return <circle key={i} cx={Math.cos(a)*52} cy={Math.sin(a)*10} r="2.5" fill={C.led} opacity="0.6" />;
+        })}
+        {/* M2 holes */}
+        {[0, 120, 240].map((deg, i) => {
+          const a = deg * Math.PI / 180;
+          return <circle key={i} cx={Math.cos(a)*58} cy={Math.sin(a)*11} r="1.5" fill="none" stroke={C.screw} strokeWidth="0.5" />;
+        })}
+        <text x="0" y="4" textAnchor="middle" fontSize="8" fill={C.text} fontFamily="monospace">XVF3800</text>
+      </g>
+      <text x="600" y="237" fontSize="10" fill={C.text} fontFamily="monospace">XVF3800 PCB</text>
+      <text x="600" y="251" fontSize="8" fill={C.muted} fontFamily="monospace">70mm dia, 3x M2 mount</text>
+      <line x1="475" y1="240" x2="595" y2="240" stroke={C.dimLine} strokeWidth="0.4" strokeDasharray="2,2" />
+
+      {/* 3x M2 screws */}
+      <g transform="translate(400, 200)">
+        {[-30, 0, 30].map((dx, i) => (
+          <g key={i}>
+            <line x1={dx} y1="-5" x2={dx} y2="5" stroke={C.screw} strokeWidth="1.5" />
+            <circle cx={dx} cy="-5" r="2.5" fill="none" stroke={C.screw} strokeWidth="0.5" />
+          </g>
+        ))}
+      </g>
+      <text x="200" y="202" fontSize="8" fill={C.screw} fontFamily="monospace">3x M2x4mm screws</text>
+      <line x1="310" y1="200" x2="365" y2="200" stroke={C.dimLine} strokeWidth="0.4" strokeDasharray="2,2" />
+
+      {/* Lower hemisphere */}
+      <Icosphere faces={lowerFaces} />
+      <text x="600" y="370" fontSize="10" fill={C.text} fontFamily="monospace">Lower hemisphere</text>
+      <text x="600" y="384" fontSize="8" fill={C.muted} fontFamily="monospace">Flat base, standoffs, ports</text>
+      <text x="600" y="398" fontSize="8" fill={C.muted} fontFamily="monospace">USB-C + 3.5mm cutouts</text>
+      <line x1="485" y1="380" x2="595" y2="380" stroke={C.dimLine} strokeWidth="0.4" strokeDasharray="2,2" />
+
+      {/* Standoffs in lower */}
+      <g transform="translate(400, 340)">
+        {[-25, 0, 25].map((dx, i) => (
+          <rect key={i} x={dx-2} y="0" width="4" height="15" fill={C.screw} opacity="0.5" rx="0.5" />
+        ))}
+      </g>
+
+      <text x="400" y="510" textAnchor="middle" fontSize="10" fill={C.accent} fontWeight="600" fontFamily="system-ui, sans-serif">
+        EXPLODED ASSEMBLY
+      </text>
+
+      <defs>
+        <marker id="arrowD" markerWidth="6" markerHeight="6" refX="3" refY="6" orient="auto">
+          <path d="M0,0 L3,6 L6,0" fill="none" stroke={C.dimLine} strokeWidth="0.8" />
+        </marker>
+      </defs>
+    </svg>
+  );
+}
+
+// Compact icosphere for overview grid
+function CompactIco({ rx, ry }) {
+  const faces = useMemo(() => renderIco({
+    rx, ry, s: 45, ox: 110, oy: 62,
+    showMic: true, showLed: true, showBase: true, showSplit: false,
+  }), [rx, ry]);
+  return <Icosphere faces={faces} />;
+}
+
+// Specifications panel
 function SpecsPanel() {
   const specs = [
     ["Component", "Dimension"],
-    ["Board diameter", "70mm"],
-    ["Board thickness", "~5-6mm"],
-    ["Mounting holes", "3x M2, 120° spacing"],
-    ["Hole inset from edge", "~3mm"],
-    ["TV bezel grip range", "5-25mm"],
-    ["Assembly height", "12-15mm above bezel"],
-    ["Forward protrusion", "~75mm"],
-    ["Cable routing", "USB-C, rear channel"],
-    ["LEDs", "12x APA102 RGB (top)"],
-    ["Mics", "4x MEMS (bottom-firing)"],
-    ["Board weight", "~15-20g"],
-    ["Material (proto)", "PETG/ASA, matte black"],
-    ["Material (prod)", "ABS/PC-ABS, soft-touch"],
+    ["Geosphere outer diameter", "85mm"],
+    ["Wall thickness", "2mm"],
+    ["Subdivision level", "2 (80 triangular faces)"],
+    ["Flat base diameter", "~45-50mm"],
+    ["Base cut from bottom pole", "~15mm"],
+    ["PCB diameter (XVF3800)", "70mm"],
+    ["PCB mounting holes", "3x M2, 120\u00b0 spacing"],
+    ["Standoff height", "5-6mm"],
+    ["Split line", "Equator (press-fit)"],
+    ["Mic port openings", "4 triangle faces, open"],
+    ["USB-C cutout", "~9mm x 3.5mm"],
+    ["3.5mm jack cutout", "~6.5mm diameter"],
+    ["Total height", "~75mm"],
+    ["Weight (shell)", "~25-30g (PETG)"],
   ];
 
   const features = [
-    "Spring-loaded adjustable jaw (5-25mm bezels)",
-    "Silicone-padded inner surfaces (no scratches)",
-    "Open-bottom cradle for bottom-firing mics",
-    "USB-C cutout + rear cable routing channel",
-    "Translucent LED ring or 12x light pipes",
-    "Tool-free TV attachment, 3x M2 board screws",
-    "Two-piece print (clip vertical, cradle horizontal)",
-    "Consumer aesthetic — Google Nest Mini profile",
+    "Low poly icosphere aesthetic \u2014 80 triangular facets, visibly polygonal",
+    "Flat base truncation for stable shelf/desk placement",
+    "Two-piece equator split with 1mm press-fit lip",
+    "4x open triangle faces for mic port acoustic access",
+    "Translucent upper dome option for LED ring visibility",
+    "USB-C + 3.5mm audio + JST speaker port cutouts",
+    "3x M2 standoff posts for PCB mounting",
+    "Optional internal CQRobot speaker shelf",
+    "No supports needed for FDM printing (faceted geometry)",
+    "Matte black PETG/ASA, optional smoke translucent upper",
+  ];
+
+  const assembly = [
+    "Screw XVF3800 PCB into lower hemisphere standoffs (3x M2x4mm)",
+    "Route USB-C cable through port cutout",
+    "Optionally mount CQRobot speaker on internal shelf",
+    "Press upper hemisphere onto lower (alignment tabs click)",
+    "Place on shelf, plug USB into Pi 5",
   ];
 
   return (
-    <div style={{ padding: 40, color: COLORS.text, fontFamily: "monospace", fontSize: 14, lineHeight: 1.8 }}>
-      <h2 style={{ color: COLORS.accent, fontFamily: "system-ui, sans-serif", fontSize: 22, marginBottom: 20 }}>
+    <div style={{ padding: "24px 16px", color: C.text, fontFamily: "monospace", fontSize: 13, lineHeight: 1.8 }}>
+      <h2 style={{ color: C.accent, fontFamily: "system-ui, sans-serif", fontSize: 20, marginBottom: 16 }}>
         Specifications
       </h2>
-      <table style={{ borderCollapse: "collapse", marginBottom: 30, width: "100%" }}>
+      <table style={{ borderCollapse: "collapse", marginBottom: 24, width: "100%" }}>
         <tbody>
           {specs.map(([k, v], i) => (
-            <tr key={i} style={{ borderBottom: `1px solid ${COLORS.border}` }}>
-              <td style={{ padding: "6px 20px 6px 0", color: i === 0 ? COLORS.accent : COLORS.muted, fontWeight: i === 0 ? 600 : 400 }}>{k}</td>
-              <td style={{ padding: "6px 0", color: i === 0 ? COLORS.accent : COLORS.text, fontWeight: i === 0 ? 600 : 400 }}>{v}</td>
+            <tr key={i} style={{ borderBottom: "1px solid " + C.border }}>
+              <td style={{ padding: "5px 16px 5px 0", color: i===0 ? C.accent : C.muted, fontWeight: i===0 ? 600 : 400 }}>{k}</td>
+              <td style={{ padding: "5px 0", color: i===0 ? C.accent : C.text, fontWeight: i===0 ? 600 : 400 }}>{v}</td>
             </tr>
           ))}
         </tbody>
       </table>
 
-      <h3 style={{ color: COLORS.accent, fontFamily: "system-ui, sans-serif", fontSize: 18, marginBottom: 12 }}>
+      <h3 style={{ color: C.accent, fontFamily: "system-ui, sans-serif", fontSize: 16, marginBottom: 10 }}>
         Design Features
       </h3>
-      <ul style={{ paddingLeft: 20, color: COLORS.text }}>
-        {features.map((f, i) => (
-          <li key={i} style={{ marginBottom: 6 }}>{f}</li>
-        ))}
+      <ul style={{ paddingLeft: 18, margin: "0 0 20px" }}>
+        {features.map((f, i) => <li key={i} style={{ marginBottom: 4 }}>{f}</li>)}
       </ul>
 
-      <h3 style={{ color: COLORS.accent, fontFamily: "system-ui, sans-serif", fontSize: 18, margin: "24px 0 12px" }}>
-        Assembly Sequence
+      <h3 style={{ color: C.accent, fontFamily: "system-ui, sans-serif", fontSize: 16, marginBottom: 10 }}>
+        Assembly
       </h3>
-      <ol style={{ paddingLeft: 20, color: COLORS.text }}>
-        <li style={{ marginBottom: 4 }}>Clip mount onto TV top bezel (no tools)</li>
-        <li style={{ marginBottom: 4 }}>Place XVF3800 board into cradle recess</li>
-        <li style={{ marginBottom: 4 }}>Secure with 3x M2x4mm screws</li>
-        <li style={{ marginBottom: 4 }}>Route USB-C cable through channel to Pi 5</li>
+      <ol style={{ paddingLeft: 18, margin: 0 }}>
+        {assembly.map((a, i) => <li key={i} style={{ marginBottom: 4 }}>{a}</li>)}
       </ol>
+
+      <h3 style={{ color: C.accent, fontFamily: "system-ui, sans-serif", fontSize: 16, margin: "20px 0 10px" }}>
+        Printing
+      </h3>
+      <ul style={{ paddingLeft: 18, margin: 0, color: C.muted }}>
+        <li>Material: Matte black PETG (upper: translucent/smoke optional)</li>
+        <li>Lower half: flat base down, no supports</li>
+        <li>Upper half: apex down, minimal supports</li>
+        <li>Layer height: 0.15-0.2mm, 0% infill, 3-4 perimeters</li>
+        <li>Brim recommended for upper half</li>
+      </ul>
     </div>
   );
 }
 
+// === MAIN COMPONENT ===
+
+const VIEWS = ["overview", "render", "front", "section", "exploded", "specs"];
+const LABELS = {
+  overview: "Overview", render: "Product", front: "Front",
+  section: "Section", exploded: "Exploded", specs: "Specs",
+};
+const VIEW_TITLES = {
+  overview: "Overview (All Views)",
+  render: "Product Rendering",
+  front: "Front View \u2014 Annotated",
+  section: "Cross-Section",
+  exploded: "Exploded Assembly",
+  specs: "Specifications",
+};
+
 export default function TVClipMountDesign() {
   const [activeView, setActiveView] = useState("overview");
 
-  const viewLabels = {
-    overview: "Overview (All Views)",
-    render: "42\" TV Rendering",
-    front: "Front View",
-    side: "Side Cross-Section",
-    top: "Top View (Looking Down)",
-    exploded: "Exploded Assembly",
-    specs: "Specifications",
-  };
-
-  const buttonLabels = {
-    overview: "Overview",
-    render: "42\" TV",
-    front: "Front",
-    side: "Side",
-    top: "Top",
-    exploded: "Exploded",
-    specs: "Specs",
-  };
-
   return (
     <div style={{
-      width: "100%", minHeight: "100dvh", background: COLORS.bg,
+      width: "100%", minHeight: "100dvh", background: C.bg,
       display: "flex", flexDirection: "column", overflow: "auto",
       fontFamily: "system-ui, sans-serif",
     }}>
       {/* Header */}
       <div style={{
         display: "flex", flexDirection: "column",
-        padding: "12px 16px", borderBottom: `1px solid ${COLORS.border}`, flexShrink: 0,
-        gap: 10,
+        padding: "12px 16px", borderBottom: "1px solid " + C.border, flexShrink: 0, gap: 10,
       }}>
         <div>
-          <span style={{ fontSize: 18, fontWeight: 700, color: COLORS.text }}>
-            XVF3800 Clip Mount
-          </span>
-          <span style={{ fontSize: 12, color: COLORS.muted, marginLeft: 10 }}>
-            Comni
-          </span>
+          <span style={{ fontSize: 18, fontWeight: 700, color: C.text }}>Comni Voice Puck</span>
+          <span style={{ fontSize: 12, color: C.muted, marginLeft: 10 }}>Low Poly Geosphere</span>
         </div>
         <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
-          {VIEWS.map((v) => (
-            <button
-              key={v}
-              onClick={() => setActiveView(v)}
-              style={{
-                background: activeView === v ? COLORS.accent : COLORS.panel,
-                color: activeView === v ? "#fff" : COLORS.muted,
-                border: `1px solid ${activeView === v ? COLORS.accent : COLORS.border}`,
-                borderRadius: 6, padding: "6px 12px", fontSize: 12,
-                cursor: "pointer", fontFamily: "system-ui, sans-serif",
-                fontWeight: activeView === v ? 600 : 400,
-                transition: "all 0.15s",
-                whiteSpace: "nowrap",
-              }}
-            >
-              {buttonLabels[v]}
+          {VIEWS.map(v => (
+            <button key={v} onClick={() => setActiveView(v)} style={{
+              background: activeView === v ? C.accent : C.panel,
+              color: activeView === v ? "#fff" : C.muted,
+              border: "1px solid " + (activeView === v ? C.accent : C.border),
+              borderRadius: 6, padding: "6px 12px", fontSize: 12,
+              cursor: "pointer", fontFamily: "system-ui, sans-serif",
+              fontWeight: activeView === v ? 600 : 400,
+              whiteSpace: "nowrap",
+            }}>
+              {LABELS[v]}
             </button>
           ))}
         </div>
@@ -660,104 +646,62 @@ export default function TVClipMountDesign() {
       {/* Content */}
       <div style={{ flex: 1, display: "flex", flexDirection: "column", minHeight: 0 }}>
         {activeView === "specs" ? (
-          <div style={{ flex: 1, overflow: "auto", padding: "0 20px" }}>
+          <div style={{ flex: 1, overflow: "auto", padding: "0 8px" }}>
             <SpecsPanel />
           </div>
         ) : activeView === "render" ? (
-          <div style={{ flex: 1, minHeight: 400 }}>
-            <TVRenderView />
-          </div>
-        ) : activeView === "overview" ? (
-          /* 2x2 grid of all views */
+          <div style={{ flex: 1, minHeight: 400 }}><RenderView /></div>
+        ) : activeView === "front" ? (
+          <div style={{ flex: 1, minHeight: 400 }}><FrontAnnotated /></div>
+        ) : activeView === "section" ? (
+          <div style={{ flex: 1, minHeight: 400 }}><SectionView /></div>
+        ) : activeView === "exploded" ? (
+          <div style={{ flex: 1, minHeight: 400 }}><ExplodedView /></div>
+        ) : (
+          /* Overview: 2x2 grid */
           <div style={{
             flex: 1, display: "grid", gridTemplateColumns: "1fr 1fr",
-            gridTemplateRows: "1fr 1fr", gap: 1, background: COLORS.border,
-            minHeight: 400,
+            gridTemplateRows: "1fr 1fr", gap: 1, background: C.border, minHeight: 400,
           }}>
             {[
-              { key: "front", label: "Front", View: FrontView },
-              { key: "side", label: "Side Section", View: SideView },
-              { key: "top", label: "Top Down", View: TopView },
-              { key: "exploded", label: "Exploded", View: ExplodedView },
-            ].map(({ key, label, View }) => (
+              { key: "render", label: "Product", rx: -0.25, ry: 0.6 },
+              { key: "front", label: "Front", rx: -0.2, ry: 0.4 },
+              { key: "section", label: "Cross-Section", rx: -0.1, ry: 0.0 },
+              { key: "exploded", label: "Exploded", rx: -0.3, ry: 0.8 },
+            ].map(({ key, label, rx, ry }) => (
               <div key={key} style={{
-                background: COLORS.bg, position: "relative",
-                cursor: "pointer", minHeight: 180,
+                background: C.bg, position: "relative", cursor: "pointer", minHeight: 180,
               }} onClick={() => setActiveView(key)}>
                 <div style={{
-                  position: "absolute", top: 8, left: 12,
-                  fontSize: 11, color: COLORS.muted, fontFamily: "monospace",
-                  textTransform: "uppercase", letterSpacing: 1,
+                  position: "absolute", top: 8, left: 12, fontSize: 11,
+                  color: C.muted, fontFamily: "monospace", textTransform: "uppercase", letterSpacing: 1,
                 }}>
                   {label}
                 </div>
-                <svg width="100%" height="100%" viewBox="0 0 220 120" preserveAspectRatio="xMidYMid meet">
-                  <View compact />
-                </svg>
+                {key === "section" ? (
+                  <svg width="100%" height="100%" viewBox="0 0 220 125" preserveAspectRatio="xMidYMid meet">
+                    <circle cx="110" cy="62" r="42" fill="none" stroke={C.shellStroke} strokeWidth="0.8" />
+                    <circle cx="110" cy="62" r="39" fill="none" stroke={C.shellStroke} strokeWidth="0.3" strokeDasharray="2,2" />
+                    <line x1="68" y1="89" x2="152" y2="89" stroke={C.text} strokeWidth="0.8" />
+                    <line x1="65" y1="62" x2="155" y2="62" stroke={C.accent} strokeWidth="0.5" strokeDasharray="3,2" />
+                    <rect x="88" y="80" width="44" height="2" fill={C.board} stroke={C.boardStroke} strokeWidth="0.4" />
+                    {[-8, 0, 8].map((dx, i) => (
+                      <rect key={i} x={110 + dx - 1} y="82" width="2" height="7" fill={C.screw} opacity="0.5" />
+                    ))}
+                  </svg>
+                ) : key === "exploded" ? (
+                  <svg width="100%" height="100%" viewBox="0 0 220 125" preserveAspectRatio="xMidYMid meet">
+                    <CompactIco rx={-0.3} ry={0.5} />
+                    <line x1="110" y1="72" x2="110" y2="85" stroke={C.dimLine} strokeWidth="0.3" strokeDasharray="1.5,1" />
+                    <ellipse cx="110" cy="92" rx="28" ry="5" fill={C.board} stroke={C.boardStroke} strokeWidth="0.4" />
+                  </svg>
+                ) : (
+                  <svg width="100%" height="100%" viewBox="0 0 220 125" preserveAspectRatio="xMidYMid meet">
+                    <CompactIco rx={rx} ry={ry} />
+                  </svg>
+                )}
               </div>
             ))}
-          </div>
-        ) : (
-          /* Single view */
-          <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: 400 }}>
-            <div style={{
-              fontSize: 12, color: COLORS.muted, marginBottom: 8,
-              fontFamily: "monospace", letterSpacing: 1,
-            }}>
-              {viewLabels[activeView]}
-            </div>
-            <svg width="95%" height="85%" viewBox="0 0 300 160" preserveAspectRatio="xMidYMid meet" style={{ maxHeight: "70vh" }}>
-              {activeView === "front" && <FrontView />}
-              {activeView === "side" && <SideView />}
-              {activeView === "top" && <TopView />}
-              {activeView === "exploded" && <ExplodedView />}
-            </svg>
-          </div>
-        )}
-
-        {/* Notes panel — shown below on mobile, side on desktop */}
-        {!["specs", "overview", "render"].includes(activeView) && (
-          <div style={{
-            borderTop: `1px solid ${COLORS.border}`,
-            padding: 20, fontSize: 13, color: COLORS.muted,
-            fontFamily: "monospace", lineHeight: 1.8, overflow: "auto",
-          }}>
-            <div style={{ color: COLORS.accent, fontSize: 14, fontWeight: 600, marginBottom: 12, fontFamily: "system-ui, sans-serif" }}>
-              Notes
-            </div>
-            {activeView === "front" && (
-              <>
-                <p>Circular PCB face visible to viewer. 12 APA102 RGB LEDs form a ring for wake word feedback.</p>
-                <p style={{ marginTop: 8 }}>3x M2 mounting holes at 120° intervals, ~3mm inboard from edge.</p>
-                <p style={{ marginTop: 8 }}>Cradle ring (dashed) is visible as a thin lip around the board. Matte black finish blends with TV bezel.</p>
-                <p style={{ marginTop: 8 }}>Total visible profile: ~74mm diameter disc, ~12mm tall from bezel top.</p>
-              </>
-            )}
-            {activeView === "side" && (
-              <>
-                <p>Spring-loaded clip grips TV bezels 5-25mm thick. Silicone pads (gold) prevent scratches.</p>
-                <p style={{ marginTop: 8 }}>Cradle arm extends ~37mm forward. Board sits in shallow recess with front lip.</p>
-                <p style={{ marginTop: 8 }}>4x bottom-firing MEMS mics must not be blocked — cradle has cutouts at each mic position.</p>
-                <p style={{ marginTop: 8 }}>USB-C cable routes through integrated channel down TV rear to Pi 5.</p>
-              </>
-            )}
-            {activeView === "top" && (
-              <>
-                <p>Looking straight down at the assembly on the TV's top edge.</p>
-                <p style={{ marginTop: 8 }}>Board centered on TV, clip hidden behind the bezel. Cable channel guides USB-C down the rear.</p>
-                <p style={{ marginTop: 8 }}>Total forward protrusion: ~75mm from TV face (board diameter + cradle lip).</p>
-              </>
-            )}
-            {activeView === "exploded" && (
-              <>
-                <p>4 components assemble without tools (except M2 screws for board).</p>
-                <p style={{ marginTop: 8 }}>1. Clip onto TV bezel</p>
-                <p>2. Place board in cradle recess</p>
-                <p>3. Secure with 3x M2x4mm screws</p>
-                <p>4. Route USB-C cable</p>
-                <p style={{ marginTop: 8 }}>Two-piece 3D print recommended: clip section (vertical orientation) + cradle section (horizontal). Snap or screw together.</p>
-              </>
-            )}
           </div>
         )}
       </div>
