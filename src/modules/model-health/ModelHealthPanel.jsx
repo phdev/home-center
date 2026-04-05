@@ -136,6 +136,7 @@ export function ModelHealthPanel({ selected = false, onExpand }) {
   ) : null;
 
   return (
+    <div onClick={onExpand} style={{ height: "100%", cursor: onExpand ? "pointer" : "default" }}>
     <Panel selected={selected} style={{ height: "100%" }}>
       <PanelHeader
         icon={<ActivityIcon />}
@@ -261,5 +262,6 @@ export function ModelHealthPanel({ selected = false, onExpand }) {
         </div>
       )}
     </Panel>
+    </div>
   );
 }

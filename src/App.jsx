@@ -145,7 +145,7 @@ export default function App() {
     );
   }
 
-  if (forcePage === "model-health" && !isMobile) {
+  if (forcePage === "model-health") {
     return (
       <>
         <FullModelHealthPage onBack={() => goTo("dashboard")} />
