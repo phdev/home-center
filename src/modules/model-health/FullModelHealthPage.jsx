@@ -1,5 +1,8 @@
 import { useTime } from "../../hooks/useTime";
 import { useModelHealth } from "./useModelHealth";
+import { usePerformanceMetrics } from "./usePerformanceMetrics";
+import { WakeWordMetrics } from "./WakeWordMetrics";
+import { TaskMetrics } from "./TaskMetrics";
 import { ArrowLeft } from "lucide-react";
 
 const F = "'Geist','Inter',system-ui,sans-serif";
@@ -159,9 +162,10 @@ function LastQueryCard({ lastQuery }) {
   );
 }
 
-export function FullModelHealthPage({ onBack }) {
+export function FullModelHealthPage({ onBack, workerSettings }) {
   const now = useTime();
   const { data, loading } = useModelHealth();
+  const perf = usePerformanceMetrics(workerSettings);
 
   return (
     <div style={{
@@ -229,6 +233,36 @@ export function FullModelHealthPage({ onBack }) {
 
           {/* Last query */}
           <LastQueryCard lastQuery={data.last_query} />
+
+          {/* Wake Word Detection Metrics */}
+          <div style={{
+            marginTop: 32, background: "rgba(255,255,255,0.02)",
+            border: "1px solid rgba(255,255,255,0.06)", borderRadius: 12, padding: 24,
+          }}>
+            <div style={{
+              fontFamily: F, fontSize: 14, color: "#FFFFFF66", marginBottom: 16,
+              textTransform: "uppercase", letterSpacing: "0.05em",
+              display: "flex", alignItems: "center", gap: 8,
+            }}>
+              <span style={{ fontSize: 18 }}>🎤</span> Wake Word Detection
+            </div>
+            <WakeWordMetrics metrics={perf.wakeMetrics} />
+          </div>
+
+          {/* Task Completion Metrics */}
+          <div style={{
+            marginTop: 20, marginBottom: 32, background: "rgba(255,255,255,0.02)",
+            border: "1px solid rgba(255,255,255,0.06)", borderRadius: 12, padding: 24,
+          }}>
+            <div style={{
+              fontFamily: F, fontSize: 14, color: "#FFFFFF66", marginBottom: 16,
+              textTransform: "uppercase", letterSpacing: "0.05em",
+              display: "flex", alignItems: "center", gap: 8,
+            }}>
+              <span style={{ fontSize: 18 }}>✓</span> Task Completion
+            </div>
+            <TaskMetrics metrics={perf.taskMetrics} />
+          </div>
         </div>
       )}
     </div>

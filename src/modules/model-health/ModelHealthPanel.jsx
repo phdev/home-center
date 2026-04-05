@@ -1,5 +1,6 @@
 import { Panel, PanelHeader } from "../../components/Panel";
 import { useModelHealth } from "./useModelHealth";
+import { usePerformanceMetrics } from "./usePerformanceMetrics";
 
 const TIER_COLORS = {
   ok: "#4ade80",
@@ -87,8 +88,9 @@ function ActivityIcon() {
   );
 }
 
-export function ModelHealthPanel({ selected = false, onExpand }) {
+export function ModelHealthPanel({ selected = false, onExpand, workerSettings }) {
   const { data, loading } = useModelHealth();
+  const perf = usePerformanceMetrics(workerSettings);
 
   if (loading && !data) {
     return (
@@ -228,6 +230,49 @@ export function ModelHealthPanel({ selected = false, onExpand }) {
             </span>
           ))}
       </div>
+
+      {/* Wake word + task compact stats */}
+      {(perf.wakeMetrics || perf.taskMetrics) && (
+        <div
+          style={{
+            display: "flex",
+            gap: 16,
+            marginTop: 12,
+            fontSize: 12,
+            fontFamily: "'Geist','Inter',system-ui,sans-serif",
+            color: "#FFFFFF66",
+          }}
+        >
+          {perf.wakeMetrics && (
+            <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+              <span style={{ fontSize: 11 }}>🎤</span>
+              <span style={{ color: "#4ade80", fontWeight: 600 }}>{perf.wakeMetrics.detections24h}</span>
+              <span>detections</span>
+              {perf.wakeMetrics.commands24h > 0 && (
+                <>
+                  <span style={{ color: "#FFFFFF33" }}>·</span>
+                  <span style={{ color: "#4ECDC4", fontWeight: 600 }}>{perf.wakeMetrics.commands24h}</span>
+                  <span>cmds</span>
+                </>
+              )}
+            </div>
+          )}
+          {perf.taskMetrics && (
+            <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+              <span style={{ fontSize: 11 }}>⏱</span>
+              <span style={{ color: "#60a5fa", fontWeight: 600 }}>{perf.taskMetrics.activeTimers}</span>
+              <span>timers</span>
+              {perf.taskMetrics.llmQueries24h > 0 && (
+                <>
+                  <span style={{ color: "#FFFFFF33" }}>·</span>
+                  <span style={{ color: "#4ECDC4", fontWeight: 600 }}>{perf.taskMetrics.llmQueries24h}</span>
+                  <span>queries</span>
+                </>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Last query */}
       {last_query && (

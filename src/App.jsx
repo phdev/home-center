@@ -148,7 +148,7 @@ export default function App() {
   if (forcePage === "model-health") {
     return (
       <>
-        <FullModelHealthPage onBack={() => goTo("dashboard")} />
+        <FullModelHealthPage onBack={() => goTo("dashboard")} workerSettings={settings.worker} />
         <VoiceActivationOverlay active={hc.listening} />
         <AlarmOverlay expiredTimers={expiredTimers} onDismissAll={dismissAll} />
       </>
@@ -213,7 +213,7 @@ export default function App() {
             <EventsPanel updates={school.updates} loading={school.loading} error={school.error} />
             <AgentTasksPanel />
             <TimersPanel timers={timers} dismissTimer={dismissTimer} />
-            <ModelHealthPanel onExpand={() => goTo("model-health")} />
+            <ModelHealthPanel onExpand={() => goTo("model-health")} workerSettings={settings.worker} />
             <FactPanel />
           </div>
         ) : (
