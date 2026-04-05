@@ -211,6 +211,52 @@
     </div>
   </div>
 
+  <!-- Wake Word Detection -->
+  <div class="card">
+    <h2>🎤 Wake Word Detection</h2>
+    <div class="stats-row" id="wakeStats"></div>
+    <div class="grid-2" style="margin-top:16px">
+      <div>
+        <div style="font-size:12px;color:var(--text-muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.05em">Detections (30 days)</div>
+        <div class="chart-wrap" style="height:180px"><canvas id="wakeDetChart"></canvas></div>
+      </div>
+      <div>
+        <div style="font-size:12px;color:var(--text-muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.05em">Commands by Type</div>
+        <div class="chart-wrap" style="height:180px"><canvas id="wakeCmdChart"></canvas></div>
+      </div>
+    </div>
+    <div style="margin-top:16px">
+      <div style="font-size:12px;color:var(--text-muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.05em">Today's Hourly Activity</div>
+      <div class="chart-wrap" style="height:120px"><canvas id="wakeHourlyChart"></canvas></div>
+    </div>
+  </div>
+
+  <!-- Task Completion -->
+  <div class="card">
+    <h2>✓ Task Completion</h2>
+    <div class="stats-row" id="taskStats"></div>
+    <div class="grid-2" style="margin-top:16px">
+      <div>
+        <div style="font-size:12px;color:var(--text-muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.05em">OpenClaw Tasks (30 days)</div>
+        <div class="chart-wrap" style="height:180px"><canvas id="taskTrendChart"></canvas></div>
+      </div>
+      <div>
+        <div style="font-size:12px;color:var(--text-muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.05em">Task Sources</div>
+        <div class="chart-wrap" style="height:180px"><canvas id="taskSourceChart"></canvas></div>
+      </div>
+    </div>
+    <div class="grid-2" style="margin-top:16px">
+      <div>
+        <div style="font-size:12px;color:var(--text-muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.05em">Timer Sources (30 days)</div>
+        <div class="chart-wrap" style="height:160px"><canvas id="timerSrcChart"></canvas></div>
+      </div>
+      <div>
+        <div style="font-size:12px;color:var(--text-muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.05em">LLM Query Types</div>
+        <div class="chart-wrap" style="height:160px"><canvas id="queryTypeChart"></canvas></div>
+      </div>
+    </div>
+  </div>
+
   <!-- Recent queries -->
   <div class="card">
     <h2>Recent Queries</h2>
@@ -262,11 +308,13 @@ const chartDefaults = {
 };
 
 async function init() {
-  const [state, routing, costs, evalData] = await Promise.all([
+  const [state, routing, costs, evalData, wakeData, taskData] = await Promise.all([
     loadJSON('current-state.json'),
     loadJSON('routing-history.json'),
     loadJSON('cost-history.json'),
     loadJSON('eval-latest.json'),
+    loadJSON('wake-metrics.json'),
+    loadJSON('task-metrics.json'),
   ]);
 
   // Status bar
@@ -404,6 +452,166 @@ async function init() {
         tbody.appendChild(tr);
       }
     }
+  }
+
+  // Wake word metrics
+  if (wakeData && wakeData.length) {
+    const latest = wakeData[wakeData.length - 1];
+    const total30d = wakeData.reduce((s, d) => s + d.detections, 0);
+    const totalCmds = wakeData.reduce((s, d) => s + d.commands, 0);
+    const totalFP = wakeData.reduce((s, d) => s + d.falsePositives, 0);
+    const avgScore = wakeData.reduce((s, d) => s + d.avgDnnScore, 0) / wakeData.length;
+
+    document.getElementById('wakeStats').innerHTML = `
+      <div class="card stat-card"><div class="big-number" style="color:var(--green)">${latest.detections}</div><div class="big-label">Detections Today</div></div>
+      <div class="card stat-card"><div class="big-number" style="color:var(--accent)">${latest.commands}</div><div class="big-label">Commands Today</div></div>
+      <div class="card stat-card"><div class="big-number" style="color:var(--blue)">${avgScore.toFixed(3)}</div><div class="big-label">Avg DNN Score</div></div>
+      <div class="card stat-card"><div class="big-number" style="color:${totalFP > 10 ? 'var(--red)' : 'var(--green)'}">${totalFP}</div><div class="big-label">False Positives (30d)</div></div>
+    `;
+
+    // Detections trend
+    const labels = wakeData.map(d => d.date.slice(5));
+    new Chart(document.getElementById('wakeDetChart'), {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [
+          { label: 'Detections', data: wakeData.map(d => d.detections), backgroundColor: 'rgba(74,222,128,0.6)' },
+          { label: 'Commands', data: wakeData.map(d => d.commands), backgroundColor: 'rgba(78,205,196,0.6)' },
+        ],
+      },
+      options: chartDefaults,
+    });
+
+    // Command type donut
+    const allCmds = {};
+    for (const d of wakeData) {
+      for (const [cmd, count] of Object.entries(d.commandTypes || {})) {
+        allCmds[cmd] = (allCmds[cmd] || 0) + count;
+      }
+    }
+    const cmdColors = ['#4ECDC4', '#4ade80', '#60a5fa', '#fbbf24', '#f87171', '#c084fc', '#e879f9'];
+    new Chart(document.getElementById('wakeCmdChart'), {
+      type: 'doughnut',
+      data: {
+        labels: Object.keys(allCmds),
+        datasets: [{
+          data: Object.values(allCmds),
+          backgroundColor: cmdColors.slice(0, Object.keys(allCmds).length),
+          borderWidth: 0,
+        }],
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { position: 'right', labels: { color: '#8888A0', font: { size: 11 }, padding: 8 } } },
+      },
+    });
+
+    // Hourly chart (today)
+    new Chart(document.getElementById('wakeHourlyChart'), {
+      type: 'bar',
+      data: {
+        labels: Array.from({ length: 24 }, (_, i) => i === 0 ? '12a' : i < 12 ? `${i}a` : i === 12 ? '12p' : `${i-12}p`),
+        datasets: [{
+          data: latest.hourlyDetections,
+          backgroundColor: 'rgba(74,222,128,0.5)',
+          borderRadius: 3,
+        }],
+      },
+      options: { ...chartDefaults, plugins: { legend: { display: false } } },
+    });
+  }
+
+  // Task metrics
+  if (taskData && taskData.length) {
+    const latest = taskData[taskData.length - 1];
+    const totalCreated = taskData.reduce((s, d) => s + d.ocCreated, 0);
+    const totalCompleted = taskData.reduce((s, d) => s + d.ocCompleted, 0);
+    const avgCompletion = taskData.reduce((s, d) => s + d.ocAvgCompletionMin, 0) / taskData.length;
+    const totalLLM = taskData.reduce((s, d) => s + d.llmQueries, 0);
+
+    document.getElementById('taskStats').innerHTML = `
+      <div class="card stat-card"><div class="big-number" style="color:#c084fc">${latest.ocActive}</div><div class="big-label">Active Tasks</div></div>
+      <div class="card stat-card"><div class="big-number" style="color:var(--green)">${totalCompleted}</div><div class="big-label">Completed (30d)</div></div>
+      <div class="card stat-card"><div class="big-number" style="color:var(--amber)">${avgCompletion.toFixed(0)}m</div><div class="big-label">Avg Completion</div></div>
+      <div class="card stat-card"><div class="big-number" style="color:var(--accent)">${totalLLM}</div><div class="big-label">LLM Queries (30d)</div></div>
+    `;
+
+    const labels = taskData.map(d => d.date.slice(5));
+
+    // Task trend (created vs completed)
+    new Chart(document.getElementById('taskTrendChart'), {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [
+          { label: 'Created', data: taskData.map(d => d.ocCreated), borderColor: '#c084fc', backgroundColor: 'rgba(192,132,252,0.1)', fill: true, tension: 0.3 },
+          { label: 'Completed', data: taskData.map(d => d.ocCompleted), borderColor: '#4ade80', backgroundColor: 'rgba(74,222,128,0.1)', fill: true, tension: 0.3 },
+        ],
+      },
+      options: chartDefaults,
+    });
+
+    // Task source breakdown (aggregate 30d)
+    const allSources = {};
+    for (const d of taskData) {
+      for (const [src, count] of Object.entries(d.ocSources || {})) {
+        allSources[src] = (allSources[src] || 0) + count;
+      }
+    }
+    const srcColors = { openclaw: '#c084fc', voice: '#4ade80', dashboard: '#60a5fa', whatsapp: '#25D366', homerci: '#fbbf24' };
+    new Chart(document.getElementById('taskSourceChart'), {
+      type: 'doughnut',
+      data: {
+        labels: Object.keys(allSources),
+        datasets: [{
+          data: Object.values(allSources),
+          backgroundColor: Object.keys(allSources).map(k => srcColors[k] || '#888'),
+          borderWidth: 0,
+        }],
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { position: 'right', labels: { color: '#8888A0', font: { size: 11 }, padding: 8 } } },
+      },
+    });
+
+    // Timer sources stacked bar
+    new Chart(document.getElementById('timerSrcChart'), {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [
+          { label: 'Voice', data: taskData.map(d => d.voiceTimers), backgroundColor: 'rgba(74,222,128,0.7)' },
+          { label: 'Dashboard', data: taskData.map(d => d.dashTimers), backgroundColor: 'rgba(96,165,250,0.7)' },
+        ],
+      },
+      options: { ...chartDefaults, scales: { ...chartDefaults.scales, x: { ...chartDefaults.scales.x, stacked: true }, y: { ...chartDefaults.scales.y, stacked: true } } },
+    });
+
+    // LLM query types (aggregate 30d)
+    const allQTypes = {};
+    for (const d of taskData) {
+      for (const [type, count] of Object.entries(d.llmQueryTypes || {})) {
+        allQTypes[type] = (allQTypes[type] || 0) + count;
+      }
+    }
+    const qtColors = { location: '#4ECDC4', person: '#c084fc', concept: '#60a5fa', event: '#f87171', general: '#8888A0', fauna: '#4ade80', flora: '#fbbf24' };
+    new Chart(document.getElementById('queryTypeChart'), {
+      type: 'doughnut',
+      data: {
+        labels: Object.keys(allQTypes),
+        datasets: [{
+          data: Object.values(allQTypes),
+          backgroundColor: Object.keys(allQTypes).map(k => qtColors[k] || '#888'),
+          borderWidth: 0,
+        }],
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { position: 'right', labels: { color: '#8888A0', font: { size: 11 }, padding: 8 } } },
+      },
+    });
   }
 
   // Recent queries (from routing history — last day's entries from current-state)

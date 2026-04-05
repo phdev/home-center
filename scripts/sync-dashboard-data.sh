@@ -27,5 +27,10 @@ echo "Copying to public/data for TV dashboard..."
 mkdir -p "$ROOT_DIR/public/data"
 cp "$ROOT_DIR/openclaw/logs/dashboard-state.json" "$ROOT_DIR/public/data/model-health.json"
 
+echo "Generating performance seed data (if not present)..."
+if [ ! -f "$DATA_DIR/wake-metrics.json" ] || [ ! -f "$DATA_DIR/task-metrics.json" ]; then
+  node "$ROOT_DIR/scripts/generate-perf-seed-data.js"
+fi
+
 echo "Done! Data written to $DATA_DIR and public/data/"
 ls -la "$DATA_DIR"
