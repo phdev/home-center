@@ -87,7 +87,7 @@ function ActivityIcon() {
   );
 }
 
-export function ModelHealthPanel({ selected = false }) {
+export function ModelHealthPanel({ selected = false, onExpand }) {
   const { data, loading } = useModelHealth();
 
   if (loading && !data) {
@@ -126,12 +126,22 @@ export function ModelHealthPanel({ selected = false }) {
 
   const { tiers, today, last_query } = data;
 
+  const expandBtn = onExpand ? (
+    <span
+      onClick={onExpand}
+      style={{ cursor: "pointer", fontSize: 13, color: "#FFFFFF44", fontFamily: "'Geist','Inter',system-ui,sans-serif" }}
+    >
+      ↗
+    </span>
+  ) : null;
+
   return (
     <Panel selected={selected} style={{ height: "100%" }}>
       <PanelHeader
         icon={<ActivityIcon />}
         label="Models"
         subtitle={`${today.total_queries} today`}
+        right={expandBtn}
       />
 
       {/* Tier status dots */}

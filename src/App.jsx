@@ -35,6 +35,7 @@ import { FamilyMemberPage } from "./components/FamilyMemberPage";
 import { WakeWordDebug } from "./components/WakeWordDebug";
 import { VoiceActivationOverlay } from "./components/VoiceActivationOverlay";
 import { ModelHealthPanel } from "./modules/model-health/ModelHealthPanel";
+import { FullModelHealthPage } from "./modules/model-health/FullModelHealthPage";
 
 export default function App() {
   const now = useTime();
@@ -144,6 +145,16 @@ export default function App() {
     );
   }
 
+  if (forcePage === "model-health" && !isMobile) {
+    return (
+      <>
+        <FullModelHealthPage onBack={() => goTo("dashboard")} />
+        <VoiceActivationOverlay active={hc.listening} />
+        <AlarmOverlay expiredTimers={expiredTimers} onDismissAll={dismissAll} />
+      </>
+    );
+  }
+
   if (forcePage === "history" && !isMobile) {
     return (
       <>
@@ -202,7 +213,7 @@ export default function App() {
             <EventsPanel updates={school.updates} loading={school.loading} error={school.error} />
             <AgentTasksPanel />
             <TimersPanel timers={timers} dismissTimer={dismissTimer} />
-            <ModelHealthPanel />
+            <ModelHealthPanel onExpand={() => goTo("model-health")} />
             <FactPanel />
           </div>
         ) : (

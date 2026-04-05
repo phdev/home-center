@@ -23,5 +23,9 @@ node "$ROOT_DIR/scripts/aggregate-logs.js" --costs > "$DATA_DIR/cost-history.jso
 echo "Copying current dashboard state..."
 cp "$ROOT_DIR/openclaw/logs/dashboard-state.json" "$DATA_DIR/current-state.json"
 
-echo "Done! Data written to $DATA_DIR"
+echo "Copying to public/data for TV dashboard..."
+mkdir -p "$ROOT_DIR/public/data"
+cp "$ROOT_DIR/openclaw/logs/dashboard-state.json" "$ROOT_DIR/public/data/model-health.json"
+
+echo "Done! Data written to $DATA_DIR and public/data/"
 ls -la "$DATA_DIR"

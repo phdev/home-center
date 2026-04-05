@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 
-// Polls dashboard-state.json every 30 seconds for ambient model health display
+// Polls model health state every 30 seconds for ambient TV display
+// Data source: public/data/model-health.json (copied from openclaw/logs/dashboard-state.json by sync script)
 export function useModelHealth() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -8,26 +9,11 @@ export function useModelHealth() {
 
   const load = useCallback(async () => {
     try {
-      // In dev, fetch from the local file system via Vite proxy or public dir
-      // In production, fetch from the known path
-      const paths = [
-        "/home-center/dashboard/data/current-state.json",
-        "/dashboard/data/current-state.json",
-        "/openclaw/logs/dashboard-state.json",
-      ];
-      let result = null;
-      for (const path of paths) {
-        try {
-          const res = await fetch(path);
-          if (res.ok) {
-            result = await res.json();
-            break;
-          }
-        } catch {
-          continue;
-        }
-      }
-      if (result) {
+      // Vite base path is /home-center/ in production, / in dev
+      const base = import.meta.env.BASE_URL || "/";
+      const res = await fetch(`${base}data/model-health.json`);
+      if (res.ok) {
+        const result = await res.json();
         setData(result);
         setError(null);
       }
