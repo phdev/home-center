@@ -269,6 +269,13 @@ export function ModelHealthPanel({ selected = false, onExpand, workerSettings })
                   <span>queries</span>
                 </>
               )}
+              {(perf.taskMetrics.ocActiveTasks || 0) > 0 && (
+                <>
+                  <span style={{ color: "#FFFFFF33" }}>·</span>
+                  <span style={{ color: "#c084fc", fontWeight: 600 }}>{perf.taskMetrics.ocActiveTasks}</span>
+                  <span>tasks</span>
+                </>
+              )}
             </div>
           )}
         </div>

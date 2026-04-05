@@ -80,7 +80,7 @@ export function usePerformanceMetrics(workerSettings) {
     };
   }, []);
 
-  const computeTaskMetrics = useCallback((timers, llmHistory) => {
+  const computeTaskMetrics = useCallback((timers, llmHistory, agentTasks) => {
     const now = Date.now();
 
     // Timer metrics
@@ -99,6 +99,23 @@ export function usePerformanceMetrics(workerSettings) {
       queryTypes[type] = (queryTypes[type] || 0) + 1;
     }
 
+    // OpenClaw agent task metrics
+    const ocActive = agentTasks.filter((t) => t.status === "active");
+    const ocDone = agentTasks.filter((t) => t.status === "done");
+    const ocSources = {};
+    for (const t of agentTasks) {
+      const src = t.source || "openclaw";
+      ocSources[src] = (ocSources[src] || 0) + 1;
+    }
+
+    // Completion time stats (for tasks that have both createdAt and completedAt)
+    const completionTimes = ocDone
+      .filter((t) => t.createdAt && t.completedAt)
+      .map((t) => t.completedAt - t.createdAt);
+    const avgCompletionMs = completionTimes.length
+      ? completionTimes.reduce((a, b) => a + b, 0) / completionTimes.length
+      : 0;
+
     return {
       activeTimers: activeTimers.length,
       completedTimers: completedTimers.length,
@@ -108,6 +125,13 @@ export function usePerformanceMetrics(workerSettings) {
       llmQueries24h: queries24h.length,
       llmQueryTypes: queryTypes,
       recentQueries: queries24h.slice(-10).reverse(),
+      // OpenClaw tasks
+      ocActiveTasks: ocActive.length,
+      ocCompletedTasks: ocDone.length,
+      ocTotalTasks: agentTasks.length,
+      ocSources,
+      ocAvgCompletionMs: Math.round(avgCompletionMs),
+      ocRecentTasks: agentTasks.slice(-10).reverse(),
     };
   }, []);
 
@@ -135,9 +159,10 @@ export function usePerformanceMetrics(workerSettings) {
         }
         setWakeMetrics(computeWakeMetrics(allEventsRef.current));
 
-        // Fetch timers + LLM history for task metrics
+        // Fetch timers + LLM history + agent tasks for task metrics
         let timers = [];
         let llmHistory = [];
+        let agentTasks = [];
 
         const timerUrl = apiUrl(workerUrl, "/api/timers");
         if (timerUrl) {
@@ -156,7 +181,16 @@ export function usePerformanceMetrics(workerSettings) {
           }
         }
 
-        setTaskMetrics(computeTaskMetrics(timers, llmHistory));
+        const tasksUrl = apiUrl(workerUrl, "/api/tasks");
+        if (tasksUrl) {
+          const res = await fetch(tasksUrl, { headers });
+          if (res.ok) {
+            const data = await res.json();
+            agentTasks = data.tasks || [];
+          }
+        }
+
+        setTaskMetrics(computeTaskMetrics(timers, llmHistory, agentTasks));
       } catch {
         // silent
       } finally {

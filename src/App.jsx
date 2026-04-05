@@ -13,6 +13,7 @@ import { useHandController } from "./hooks/useHandController";
 import { useLLMQuery } from "./hooks/useLLMQuery";
 import { useWakeWordDebug } from "./hooks/useWakeWordDebug";
 import { useWakeRecord } from "./hooks/useWakeRecord";
+import { useAgentTasks } from "./hooks/useAgentTasks";
 import { Header } from "./components/Header";
 import { CalendarPanel } from "./components/CalendarPanel";
 import { WeatherPanel } from "./components/WeatherPanel";
@@ -60,6 +61,7 @@ export default function App() {
   const llm = useLLMQuery(settings.worker);
   const wakeDebug = useWakeWordDebug(settings.worker);
   const wakeRecord = useWakeRecord();
+  const agentTasks = useAgentTasks(settings.worker);
 
   // Auto-navigate to LLM response page when a new response arrives
   useEffect(() => {
@@ -211,7 +213,7 @@ export default function App() {
             <WorldClockPanel />
             <BirthdaysPanel birthdays={bdays.birthdays} loading={bdays.loading} error={bdays.error} />
             <EventsPanel updates={school.updates} loading={school.loading} error={school.error} />
-            <AgentTasksPanel />
+            <AgentTasksPanel tasks={agentTasks.tasks} />
             <TimersPanel timers={timers} dismissTimer={dismissTimer} />
             <ModelHealthPanel onExpand={() => goTo("model-health")} workerSettings={settings.worker} />
             <FactPanel />
@@ -259,7 +261,7 @@ export default function App() {
                     <TimersPanel timers={timers} dismissTimer={dismissTimer} selected={hc.selectedPanelId === "timers"} />
                   </div>
                   <div style={{ flex: 1, minHeight: 0 }}>
-                    <AgentTasksPanel selected={hc.selectedPanelId === "agenttasks"} />
+                    <AgentTasksPanel selected={hc.selectedPanelId === "agenttasks"} tasks={agentTasks.tasks} />
                   </div>
                   <FactPanel selected={hc.selectedPanelId === "fact"} />
                 </div>

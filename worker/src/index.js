@@ -112,6 +112,21 @@ export default {
         const id = decodeURIComponent(path.split("/api/timers/")[1].replace("/dismiss", ""));
         return corsResponse(env, await handleTimerDismiss(id, env));
       }
+      // ── Agent Tasks (OpenClaw) ──
+      if (path === "/api/tasks" && request.method === "GET") {
+        return corsResponse(env, await handleTaskGet(env));
+      }
+      if (path === "/api/tasks" && request.method === "POST") {
+        return corsResponse(env, await handleTaskPost(request, env));
+      }
+      if (path.startsWith("/api/tasks/") && path.endsWith("/complete") && request.method === "POST") {
+        const id = decodeURIComponent(path.split("/api/tasks/")[1].replace("/complete", ""));
+        return corsResponse(env, await handleTaskComplete(id, request, env));
+      }
+      if (path.startsWith("/api/tasks/") && request.method === "DELETE") {
+        const id = decodeURIComponent(path.split("/api/tasks/")[1]);
+        return corsResponse(env, await handleTaskDelete(id, env));
+      }
       if (path === "/api/health") {
         // Auth status: check if a valid token was provided (but don't block)
         const auth = request.headers.get("Authorization");
@@ -1262,6 +1277,7 @@ async function handleNavigateGet(env) {
 // ── Timers ──────────────────────────────────────────────────────────
 
 const TIMERS_KEY = "timers";
+const TASKS_KEY = "agent_tasks";
 
 async function handleTimerPost(request, env) {
   if (!env.NOTIFICATIONS) {
@@ -1340,6 +1356,78 @@ async function handleTimerDismissAll(env) {
   await env.NOTIFICATIONS.put(TIMERS_KEY, JSON.stringify(timers));
 
   return json({ ok: true, dismissed: count });
+}
+
+// ── Agent Tasks (OpenClaw) ──────────────────────────────────────────
+
+async function handleTaskPost(request, env) {
+  if (!env.NOTIFICATIONS) {
+    return json({ error: "NOTIFICATIONS KV namespace not configured" }, 500);
+  }
+
+  const body = await request.json();
+  const { title, detail, source } = body;
+  if (!title) {
+    return json({ error: "Requires title (string)" }, 400);
+  }
+
+  const task = {
+    id: `task_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+    title,
+    detail: detail || "",
+    status: "active",
+    source: source || "openclaw",
+    createdAt: Date.now(),
+    completedAt: null,
+  };
+
+  const existing = await env.NOTIFICATIONS.get(TASKS_KEY, { type: "json" }) || [];
+  existing.push(task);
+  // Keep max 100 tasks
+  const capped = existing.slice(-100);
+  await env.NOTIFICATIONS.put(TASKS_KEY, JSON.stringify(capped));
+
+  return json({ ok: true, task });
+}
+
+async function handleTaskGet(env) {
+  if (!env.NOTIFICATIONS) {
+    return json({ tasks: [] });
+  }
+
+  const tasks = await env.NOTIFICATIONS.get(TASKS_KEY, { type: "json" }) || [];
+  return json({ tasks });
+}
+
+async function handleTaskComplete(id, request, env) {
+  if (!env.NOTIFICATIONS) {
+    return json({ error: "NOTIFICATIONS KV namespace not configured" }, 500);
+  }
+
+  const tasks = await env.NOTIFICATIONS.get(TASKS_KEY, { type: "json" }) || [];
+  let found = false;
+  for (const t of tasks) {
+    if (t.id === id && t.status !== "done") {
+      t.status = "done";
+      t.completedAt = Date.now();
+      found = true;
+    }
+  }
+  await env.NOTIFICATIONS.put(TASKS_KEY, JSON.stringify(tasks));
+
+  return json({ ok: true, found });
+}
+
+async function handleTaskDelete(id, env) {
+  if (!env.NOTIFICATIONS) {
+    return json({ error: "NOTIFICATIONS KV namespace not configured" }, 500);
+  }
+
+  const tasks = await env.NOTIFICATIONS.get(TASKS_KEY, { type: "json" }) || [];
+  const filtered = tasks.filter(t => t.id !== id);
+  await env.NOTIFICATIONS.put(TASKS_KEY, JSON.stringify(filtered));
+
+  return json({ ok: true, deleted: tasks.length !== filtered.length });
 }
 
 // ── iCal Parsing ────────────────────────────────────────────────────

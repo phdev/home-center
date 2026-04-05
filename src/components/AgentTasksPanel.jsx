@@ -1,12 +1,14 @@
 import { Bot } from "lucide-react";
 import { Panel, PanelHeader } from "./Panel";
-import { TASKS } from "../data/mockData";
+import { TASKS as MOCK_TASKS } from "../data/mockData";
 
 const F = "'Geist','Inter',system-ui,sans-serif";
 const M = "'JetBrains Mono',ui-monospace,monospace";
 
-export function AgentTasksPanel({ t, selected }) {
-  const activeCount = TASKS.filter((tk) => tk.status === "active").length;
+export function AgentTasksPanel({ t, selected, tasks: liveTasks }) {
+  // Use live tasks from worker, fall back to mock data
+  const tasks = liveTasks && liveTasks.length > 0 ? liveTasks : MOCK_TASKS;
+  const activeCount = tasks.filter((tk) => tk.status === "active").length;
 
   return (
     <Panel style={{ height: "100%" }} selected={selected}>
@@ -20,7 +22,7 @@ export function AgentTasksPanel({ t, selected }) {
                 width: 12,
                 height: 12,
                 borderRadius: "50%",
-                background: "#FFFFFF",
+                background: activeCount > 0 ? "#4ade80" : "#FFFFFF",
               }}
             />
             <span style={{ fontFamily: F, fontSize: 16.5, fontWeight: 500, color: "#FFFFFF88" }}>
@@ -30,9 +32,9 @@ export function AgentTasksPanel({ t, selected }) {
         }
       />
       <div style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: 8 }}>
-        {TASKS.map((tk, i) => (
+        {tasks.map((tk, i) => (
           <div
-            key={i}
+            key={tk.id || i}
             style={{
               display: "flex",
               justifyContent: "space-between",
@@ -49,17 +51,22 @@ export function AgentTasksPanel({ t, selected }) {
               <span style={{ fontFamily: F, fontSize: 16.5, color: "#FFFFFF66" }}>
                 {tk.detail}
               </span>
+              {tk.source && tk.source !== "openclaw" && (
+                <span style={{ fontFamily: M, fontSize: 12, color: "#FFFFFF33", marginTop: 2 }}>
+                  via {tk.source}
+                </span>
+              )}
             </div>
             <span
               style={{
                 fontFamily: M,
                 fontSize: 15,
                 fontWeight: 600,
-                color: "#FFFFFF88",
+                color: tk.status === "done" ? "#4ade80" : "#FFFFFF88",
                 padding: "4px 10px",
                 borderRadius: 999,
-                background: "#FFFFFF15",
-                border: "1px solid #FFFFFF40",
+                background: tk.status === "done" ? "#4ade8015" : "#FFFFFF15",
+                border: `1px solid ${tk.status === "done" ? "#4ade8040" : "#FFFFFF40"}`,
                 flexShrink: 0,
                 marginLeft: 10,
               }}

@@ -101,6 +101,8 @@ export function TaskMetrics({ metrics }) {
         <StatBox value={metrics.completedTimers} label="Completed" color="#FFFFFF88" />
         <StatBox value={metrics.totalTimers} label="Total Timers" color="#60a5fa" />
         <StatBox value={metrics.llmQueries24h} label="LLM Queries (24h)" color="#4ECDC4" />
+        <StatBox value={metrics.ocActiveTasks || 0} label="OpenClaw Active" color="#c084fc" />
+        <StatBox value={metrics.ocCompletedTasks || 0} label="OpenClaw Done" color="#c084fc88" />
       </div>
 
       {/* Timer source breakdown */}
@@ -132,6 +134,66 @@ export function TaskMetrics({ metrics }) {
                   {type} <span style={{ color: "#FFFFFF44" }}>×{count}</span>
                 </div>
               ))}
+          </div>
+        </div>
+      )}
+
+      {/* OpenClaw task details */}
+      {(metrics.ocTotalTasks || 0) > 0 && (
+        <div style={{ marginBottom: 24 }}>
+          <div style={{ fontFamily: F, fontSize: 13, color: "#FFFFFF44", marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+            OpenClaw Tasks
+          </div>
+          {metrics.ocAvgCompletionMs > 0 && (
+            <div style={{
+              display: "flex", gap: 16, marginBottom: 12, padding: "10px 14px",
+              background: "rgba(255,255,255,0.02)", borderRadius: 8,
+            }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontFamily: F, fontSize: 12, color: "#FFFFFF44", marginBottom: 2 }}>Avg Completion Time</div>
+                <div style={{ fontFamily: M, fontSize: 18, fontWeight: 700, color: "#c084fc" }}>
+                  {metrics.ocAvgCompletionMs < 60000
+                    ? `${(metrics.ocAvgCompletionMs / 1000).toFixed(1)}s`
+                    : `${(metrics.ocAvgCompletionMs / 60000).toFixed(1)}m`}
+                </div>
+              </div>
+              {metrics.ocSources && Object.keys(metrics.ocSources).length > 0 && (
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontFamily: F, fontSize: 12, color: "#FFFFFF44", marginBottom: 2 }}>Sources</div>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    {Object.entries(metrics.ocSources).map(([src, count]) => (
+                      <span key={src} style={{ fontFamily: M, fontSize: 12, color: "#c084fc" }}>
+                        {src} <span style={{ color: "#FFFFFF33" }}>×{count}</span>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+          <div style={{ maxHeight: 200, overflowY: "auto" }}>
+            {(metrics.ocRecentTasks || []).map((t, i) => (
+              <div key={t.id || i} style={{
+                display: "flex", alignItems: "center", gap: 10, padding: "6px 0",
+                borderBottom: "1px solid rgba(255,255,255,0.03)", fontSize: 13,
+              }}>
+                <span style={{
+                  padding: "1px 8px", borderRadius: 4, fontSize: 10, fontWeight: 600, flexShrink: 0,
+                  background: t.status === "done" ? "rgba(74,222,128,0.1)" : "rgba(192,132,252,0.1)",
+                  color: t.status === "done" ? "#4ade80" : "#c084fc",
+                }}>
+                  {t.status === "done" ? "done" : "active"}
+                </span>
+                <span style={{ fontFamily: F, fontSize: 13, color: "#FFFFFFCC", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {t.title}
+                </span>
+                {t.source && (
+                  <span style={{ fontFamily: M, fontSize: 11, color: "#FFFFFF33" }}>
+                    {t.source}
+                  </span>
+                )}
+              </div>
+            ))}
           </div>
         </div>
       )}
