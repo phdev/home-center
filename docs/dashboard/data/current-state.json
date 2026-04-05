@@ -1,0 +1,47 @@
+{
+  "updated_at": "2026-04-05T14:40:42.530Z",
+  "tiers": {
+    "edge": {
+      "status": "disabled",
+      "color": "gray"
+    },
+    "cache": {
+      "status": "ok",
+      "hits_today": 41
+    },
+    "local": {
+      "status": "ok",
+      "queries_today": 22,
+      "avg_latency_ms": 1571
+    },
+    "groq": {
+      "status": "ok",
+      "queries_today": 10,
+      "cost_today_usd": 0.001058,
+      "avg_latency_ms": 395
+    },
+    "anthropic": {
+      "status": "ok",
+      "queries_today": 5,
+      "cost_today_usd": 0.012804,
+      "avg_latency_ms": 2604
+    }
+  },
+  "today": {
+    "total_queries": 78,
+    "cache_hit_rate": 0.526,
+    "total_cost_usd": 0.013862,
+    "routing_pct": {
+      "cache": 52.6,
+      "local": 28.2,
+      "groq": 12.8,
+      "anthropic": 6.4
+    }
+  },
+  "last_query": {
+    "text": "analyze the kids' schedule and find a free evening for movie night",
+    "tier": "local",
+    "latency_ms": 1683,
+    "timestamp": "2026-04-05T21:43:39.000Z"
+  }
+}

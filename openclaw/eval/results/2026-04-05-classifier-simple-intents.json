@@ -1,0 +1,45 @@
+{
+  "tier": "classifier",
+  "suite": "simple-intents",
+  "timestamp": "2026-04-05T14:40:42.530Z",
+  "total": 18,
+  "passed": 17,
+  "failed": 1,
+  "results": [
+    {
+      "id": "simple_01",
+      "query": "what time is it",
+      "classification": "simple",
+      "expected_classification": "simple",
+      "pass": true
+    },
+    {
+      "id": "simple_02",
+      "query": "set a timer for 10 minutes",
+      "classification": "simple",
+      "expected_classification": "simple",
+      "pass": true
+    },
+    {
+      "id": "simple_03",
+      "query": "turn off the living room lights",
+      "classification": "simple",
+      "expected_classification": "simple",
+      "pass": true
+    },
+    {
+      "id": "simple_04",
+      "query": "what's the weather",
+      "classification": "simple",
+      "expected_classification": "simple",
+      "pass": true
+    },
+    {
+      "id": "simple_05",
+      "query": "is it going to rain tomorrow",
+      "classification": "simple",
+      "expected_classification": "simple",
+      "pass": true
+    }
+  ]
+}

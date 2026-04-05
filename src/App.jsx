@@ -34,6 +34,7 @@ import { SideNav } from "./components/SideNav";
 import { FamilyMemberPage } from "./components/FamilyMemberPage";
 import { WakeWordDebug } from "./components/WakeWordDebug";
 import { VoiceActivationOverlay } from "./components/VoiceActivationOverlay";
+import { ModelHealthPanel } from "./modules/model-health/ModelHealthPanel";
 
 export default function App() {
   const now = useTime();
@@ -201,6 +202,7 @@ export default function App() {
             <EventsPanel updates={school.updates} loading={school.loading} error={school.error} />
             <AgentTasksPanel />
             <TimersPanel timers={timers} dismissTimer={dismissTimer} />
+            <ModelHealthPanel />
             <FactPanel />
           </div>
         ) : (

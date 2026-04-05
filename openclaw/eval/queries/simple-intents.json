@@ -1,0 +1,20 @@
+[
+  { "id": "simple_01", "query": "what time is it" },
+  { "id": "simple_02", "query": "set a timer for 10 minutes" },
+  { "id": "simple_03", "query": "turn off the living room lights" },
+  { "id": "simple_04", "query": "what's the weather" },
+  { "id": "simple_05", "query": "is it going to rain tomorrow" },
+  { "id": "simple_06", "query": "how cold is it outside" },
+  { "id": "simple_07", "query": "turn on the kitchen lights" },
+  { "id": "simple_08", "query": "set a timer for 5 minutes for eggs" },
+  { "id": "simple_09", "query": "stop" },
+  { "id": "simple_10", "query": "show calendar" },
+  { "id": "simple_11", "query": "show weather" },
+  { "id": "simple_12", "query": "good morning" },
+  { "id": "simple_13", "query": "what's the temperature" },
+  { "id": "simple_14", "query": "go back" },
+  { "id": "simple_15", "query": "play music" },
+  { "id": "simple_16", "query": "will it snow today" },
+  { "id": "simple_17", "query": "lights off" },
+  { "id": "simple_18", "query": "volume up" }
+]

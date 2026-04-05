@@ -1,0 +1,9 @@
+{
+  "tier": "classifier",
+  "suite": "complex",
+  "timestamp": "2026-04-05T14:40:42.530Z",
+  "total": 15,
+  "passed": 13,
+  "failed": 2,
+  "results": []
+}

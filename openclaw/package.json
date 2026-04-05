@@ -1,0 +1,15 @@
+{
+  "name": "openclaw-router",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Tiered model orchestration for OpenClaw",
+  "main": "router/index.js",
+  "scripts": {
+    "route": "node router/index.js",
+    "eval": "node eval/runner.js",
+    "eval-report": "node eval/report.js"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.0.0"
+  }
+}

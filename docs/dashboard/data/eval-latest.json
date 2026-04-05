@@ -1,0 +1,45 @@
+{
+  "generated_at": "2026-04-05T14:40:46.066Z",
+  "tiers": {
+    "classifier": {
+      "model": null,
+      "suites": {
+        "complex": {
+          "pass": 13,
+          "fail": 2,
+          "total": 15,
+          "avg_latency_ms": 0,
+          "avg_cost": 0,
+          "timestamp": "2026-04-05T14:40:42.530Z"
+        },
+        "moderate": {
+          "pass": 14,
+          "fail": 2,
+          "total": 16,
+          "avg_latency_ms": 0,
+          "avg_cost": 0,
+          "timestamp": "2026-04-05T14:40:42.530Z"
+        }
+      }
+    },
+    "classifier-simple": {
+      "model": null,
+      "suites": {
+        "intents": {
+          "pass": 17,
+          "fail": 1,
+          "total": 18,
+          "avg_latency_ms": 0,
+          "avg_cost": 0,
+          "timestamp": "2026-04-05T14:40:42.530Z"
+        }
+      }
+    }
+  },
+  "recommendation": {
+    "simple": "anthropic-sonnet",
+    "moderate": "anthropic-sonnet",
+    "complex": "anthropic-sonnet",
+    "hard": "anthropic-opus"
+  }
+}

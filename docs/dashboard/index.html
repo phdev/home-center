@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Comni Model Dashboard</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0F0F14;
+      --card: rgba(255,255,255,0.03);
+      --border: rgba(255,255,255,0.06);
+      --text: #E8E8ED;
+      --text-muted: #8888A0;
+      --accent: #4ECDC4;
+      --green: #4ade80;
+      --amber: #fbbf24;
+      --red: #f87171;
+      --blue: #60a5fa;
+      --gray: #555;
+    }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+    }
+    .container { max-width: 1200px; margin: 0 auto; padding: 16px; }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 16px;
+    }
+    .card h2 {
+      font-size: 14px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      margin-bottom: 16px;
+    }
+    /* Status bar */
+    .status-bar {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: rgba(15,15,20,0.95);
+      backdrop-filter: blur(10px);
+      border-bottom: 1px solid var(--border);
+      padding: 12px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    .status-bar .tiers { display: flex; gap: 16px; flex-wrap: wrap; }
+    .tier-dot {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+    .dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .dot.green { background: var(--green); box-shadow: 0 0 6px var(--green); }
+    .dot.amber { background: var(--amber); box-shadow: 0 0 6px var(--amber); }
+    .dot.red { background: var(--red); box-shadow: 0 0 6px var(--red); }
+    .dot.gray { background: var(--gray); }
+    .status-meta { display: flex; gap: 20px; font-size: 13px; color: var(--text-muted); }
+    .status-meta .val { color: var(--text); font-weight: 600; }
+    /* Big numbers */
+    .big-number { font-size: 36px; font-weight: 700; color: var(--accent); }
+    .big-label { font-size: 13px; color: var(--text-muted); margin-top: 4px; }
+    .stats-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 16px; }
+    .stat-card { text-align: center; padding: 16px; }
+    /* Charts */
+    .chart-wrap { position: relative; height: 280px; }
+    @media (max-width: 600px) { .chart-wrap { height: 220px; } }
+    /* Eval table */
+    .eval-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .eval-table th {
+      text-align: left;
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--border);
+      color: var(--text-muted);
+      font-weight: 500;
+    }
+    .eval-table td {
+      padding: 8px 12px;
+      border-bottom: 1px solid rgba(255,255,255,0.03);
+    }
+    .pass-high { color: var(--green); }
+    .pass-mid { color: var(--amber); }
+    .pass-low { color: var(--red); }
+    /* Query log */
+    .query-log { max-height: 500px; overflow-y: auto; }
+    .query-entry {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      padding: 10px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.03);
+      font-size: 13px;
+      gap: 12px;
+    }
+    .query-text { flex: 1; color: var(--text); }
+    .query-meta { display: flex; gap: 12px; color: var(--text-muted); flex-shrink: 0; font-size: 12px; }
+    .tier-badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+    .tier-badge.cache { background: rgba(96,165,250,0.15); color: var(--blue); }
+    .tier-badge.local { background: rgba(74,222,128,0.15); color: var(--green); }
+    .tier-badge.groq { background: rgba(251,191,36,0.15); color: var(--amber); }
+    .tier-badge.anthropic { background: rgba(248,113,113,0.15); color: var(--red); }
+    /* Filters */
+    .filters { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+    .filter-btn {
+      background: var(--card);
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      padding: 4px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 12px;
+    }
+    .filter-btn.active { border-color: var(--accent); color: var(--accent); }
+    /* Grid */
+    @media (min-width: 768px) {
+      .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    }
+    .title-bar {
+      padding: 20px 16px 8px;
+      display: flex;
+      align-items: baseline;
+      gap: 12px;
+    }
+    .title-bar h1 { font-size: 20px; font-weight: 700; }
+    .title-bar .subtitle { font-size: 13px; color: var(--text-muted); }
+  </style>
+</head>
+<body>
+
+<div class="status-bar" id="statusBar">
+  <div class="tiers" id="tierDots"></div>
+  <div class="status-meta">
+    <span>Updated: <span class="val" id="lastUpdated">—</span></span>
+    <span>Today: <span class="val" id="todayQueries">—</span> queries</span>
+    <span>Cost: <span class="val" id="todayCost">—</span></span>
+  </div>
+</div>
+
+<div class="container">
+  <div class="title-bar">
+    <h1>Comni Model Dashboard</h1>
+    <span class="subtitle">Tiered LLM orchestration for the family</span>
+  </div>
+
+  <!-- Stats overview -->
+  <div class="stats-row" id="statsRow"></div>
+
+  <!-- Charts row -->
+  <div class="grid-2">
+    <div class="card">
+      <h2>Cost Trend (30 days)</h2>
+      <div class="chart-wrap"><canvas id="costChart"></canvas></div>
+    </div>
+    <div class="card">
+      <h2>Routing Distribution</h2>
+      <div class="chart-wrap"><canvas id="routingChart"></canvas></div>
+    </div>
+  </div>
+
+  <div class="grid-2">
+    <div class="card">
+      <h2>Latency by Tier (p50)</h2>
+      <div class="chart-wrap"><canvas id="latencyChart"></canvas></div>
+    </div>
+    <div class="card">
+      <h2>Cache Performance</h2>
+      <div style="text-align:center;padding:20px 0">
+        <div class="big-number" id="cacheRate">—</div>
+        <div class="big-label">Cache Hit Rate</div>
+      </div>
+      <div class="chart-wrap" style="height:120px"><canvas id="cacheChart"></canvas></div>
+    </div>
+  </div>
+
+  <!-- Eval results -->
+  <div class="card">
+    <h2>Eval Results</h2>
+    <div style="overflow-x:auto">
+      <table class="eval-table" id="evalTable">
+        <thead>
+          <tr><th>Tier</th><th>Suite</th><th>Pass Rate</th><th>Passed</th><th>Failed</th><th>Avg Latency</th><th>Date</th></tr>
+        </thead>
+        <tbody id="evalBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Recent queries -->
+  <div class="card">
+    <h2>Recent Queries</h2>
+    <div class="filters" id="queryFilters"></div>
+    <div class="query-log" id="queryLog"></div>
+  </div>
+</div>
+
+<script>
+const BASE = window.location.pathname.replace(/\/index\.html$/, '').replace(/\/$/, '');
+const DATA = `${BASE}/data`;
+
+async function loadJSON(file) {
+  try {
+    const res = await fetch(`${DATA}/${file}`);
+    if (!res.ok) return null;
+    return res.json();
+  } catch { return null; }
+}
+
+function timeAgo(ts) {
+  const diff = Date.now() - new Date(ts).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  return `${Math.floor(hrs / 24)}d ago`;
+}
+
+function tierColor(tier) {
+  if (tier === 'cache') return 'var(--blue)';
+  if (tier === 'local') return 'var(--green)';
+  if (tier === 'groq') return 'var(--amber)';
+  if (tier.startsWith('anthropic')) return 'var(--red)';
+  return 'var(--gray)';
+}
+
+const chartDefaults = {
+  responsive: true,
+  maintainAspectRatio: false,
+  plugins: {
+    legend: { labels: { color: '#8888A0', font: { size: 11 } } },
+  },
+  scales: {
+    x: { ticks: { color: '#555', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,0.03)' } },
+    y: { ticks: { color: '#555', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,0.03)' } },
+  },
+};
+
+async function init() {
+  const [state, routing, costs, evalData] = await Promise.all([
+    loadJSON('current-state.json'),
+    loadJSON('routing-history.json'),
+    loadJSON('cost-history.json'),
+    loadJSON('eval-latest.json'),
+  ]);
+
+  // Status bar
+  if (state) {
+    const tiers = [
+      { name: 'Edge', status: state.tiers.edge?.status },
+      { name: 'Cache', status: state.tiers.cache?.status },
+      { name: 'Local', status: state.tiers.local?.status },
+      { name: 'Groq', status: state.tiers.groq?.status },
+      { name: 'Anthropic', status: state.tiers.anthropic?.status },
+    ];
+    document.getElementById('tierDots').innerHTML = tiers.map(t => {
+      const cls = t.status === 'ok' ? 'green' : t.status === 'disabled' ? 'gray' : 'red';
+      return `<div class="tier-dot"><span class="dot ${cls}"></span>${t.name}</div>`;
+    }).join('');
+
+    document.getElementById('lastUpdated').textContent = timeAgo(state.updated_at);
+    document.getElementById('todayQueries').textContent = state.today.total_queries;
+    document.getElementById('todayCost').textContent = `$${state.today.total_cost_usd.toFixed(4)}`;
+
+    // Stats cards
+    const cacheHR = (state.today.cache_hit_rate * 100).toFixed(1);
+    document.getElementById('statsRow').innerHTML = `
+      <div class="card stat-card"><div class="big-number">${state.today.total_queries}</div><div class="big-label">Queries Today</div></div>
+      <div class="card stat-card"><div class="big-number">${cacheHR}%</div><div class="big-label">Cache Hit Rate</div></div>
+      <div class="card stat-card"><div class="big-number">$${state.today.total_cost_usd.toFixed(4)}</div><div class="big-label">Cost Today</div></div>
+      <div class="card stat-card"><div class="big-number">${state.tiers.local?.avg_latency_ms || 0}ms</div><div class="big-label">Local Avg Latency</div></div>
+    `;
+  }
+
+  // Cost chart
+  if (costs && costs.length) {
+    const labels = costs.map(d => d.date.slice(5));
+    new Chart(document.getElementById('costChart'), {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [
+          { label: 'Groq', data: costs.map(d => d.groq), borderColor: '#fbbf24', backgroundColor: 'rgba(251,191,36,0.1)', fill: true, tension: 0.3 },
+          { label: 'Sonnet', data: costs.map(d => d.anthropic_sonnet), borderColor: '#f87171', backgroundColor: 'rgba(248,113,113,0.1)', fill: true, tension: 0.3 },
+          { label: 'Opus', data: costs.map(d => d.anthropic_opus), borderColor: '#c084fc', backgroundColor: 'rgba(192,132,252,0.1)', fill: true, tension: 0.3 },
+        ],
+      },
+      options: {
+        ...chartDefaults,
+        scales: {
+          ...chartDefaults.scales,
+          y: { ...chartDefaults.scales.y, ticks: { ...chartDefaults.scales.y.ticks, callback: v => `$${v.toFixed(3)}` } },
+        },
+      },
+    });
+
+    // Monthly run rate
+    const last7 = costs.slice(-7);
+    const avgDaily = last7.reduce((s, d) => s + d.total, 0) / last7.length;
+    const monthlyRate = (avgDaily * 30).toFixed(2);
+    document.querySelector('#costChart').closest('.card').querySelector('h2').innerHTML +=
+      ` <span style="font-size:11px;color:var(--text-muted);text-transform:none;letter-spacing:0">· ~$${monthlyRate}/mo projected</span>`;
+  }
+
+  // Routing chart
+  if (routing && routing.length) {
+    const labels = routing.map(d => d.date.slice(5));
+    new Chart(document.getElementById('routingChart'), {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [
+          { label: 'Cache', data: routing.map(d => d.by_tier.cache), backgroundColor: 'rgba(96,165,250,0.7)' },
+          { label: 'Local', data: routing.map(d => d.by_tier.local), backgroundColor: 'rgba(74,222,128,0.7)' },
+          { label: 'Groq', data: routing.map(d => d.by_tier.groq), backgroundColor: 'rgba(251,191,36,0.7)' },
+          { label: 'Anthropic', data: routing.map(d => d.by_tier.anthropic), backgroundColor: 'rgba(248,113,113,0.7)' },
+        ],
+      },
+      options: { ...chartDefaults, scales: { ...chartDefaults.scales, x: { ...chartDefaults.scales.x, stacked: true }, y: { ...chartDefaults.scales.y, stacked: true } } },
+    });
+  }
+
+  // Latency chart
+  if (routing && routing.length) {
+    const labels = routing.map(d => d.date.slice(5));
+    new Chart(document.getElementById('latencyChart'), {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [
+          { label: 'Cache', data: routing.map(d => d.avg_latency_ms.cache), borderColor: '#60a5fa', tension: 0.3 },
+          { label: 'Local', data: routing.map(d => d.avg_latency_ms.local), borderColor: '#4ade80', tension: 0.3 },
+          { label: 'Groq', data: routing.map(d => d.avg_latency_ms.groq), borderColor: '#fbbf24', tension: 0.3 },
+          { label: 'Anthropic', data: routing.map(d => d.avg_latency_ms.anthropic), borderColor: '#f87171', tension: 0.3 },
+        ],
+      },
+      options: { ...chartDefaults, scales: { ...chartDefaults.scales, y: { ...chartDefaults.scales.y, ticks: { ...chartDefaults.scales.y.ticks, callback: v => `${v}ms` } } } },
+    });
+  }
+
+  // Cache sparkline
+  if (routing && routing.length) {
+    const rates = routing.map(d => d.cache_hit_rate * 100);
+    document.getElementById('cacheRate').textContent = `${rates[rates.length - 1]?.toFixed(1) || '—'}%`;
+    new Chart(document.getElementById('cacheChart'), {
+      type: 'line',
+      data: {
+        labels: routing.map(d => d.date.slice(5)),
+        datasets: [{
+          data: rates,
+          borderColor: '#4ECDC4',
+          backgroundColor: 'rgba(78,205,196,0.1)',
+          fill: true,
+          tension: 0.4,
+          pointRadius: 0,
+        }],
+      },
+      options: { ...chartDefaults, plugins: { legend: { display: false } }, scales: { x: { display: false }, y: { display: false, min: 0, max: 100 } } },
+    });
+  }
+
+  // Eval table
+  if (evalData && evalData.tiers) {
+    const tbody = document.getElementById('evalBody');
+    for (const [tier, info] of Object.entries(evalData.tiers)) {
+      for (const [suite, stats] of Object.entries(info.suites)) {
+        const rate = stats.total > 0 ? (stats.pass / stats.total * 100) : 0;
+        const cls = rate >= 90 ? 'pass-high' : rate >= 70 ? 'pass-mid' : 'pass-low';
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${tier}</td>
+          <td>${suite}</td>
+          <td class="${cls}">${rate.toFixed(0)}%</td>
+          <td>${stats.pass}</td>
+          <td>${stats.fail}</td>
+          <td>${stats.avg_latency_ms}ms</td>
+          <td style="color:var(--text-muted)">${stats.timestamp ? stats.timestamp.slice(0,10) : '—'}</td>
+        `;
+        tbody.appendChild(tr);
+      }
+    }
+  }
+
+  // Recent queries (from routing history — last day's entries from current-state)
+  if (routing && routing.length) {
+    const filterDiv = document.getElementById('queryFilters');
+    const logDiv = document.getElementById('queryLog');
+    const allTiers = ['all', 'cache', 'local', 'groq', 'anthropic'];
+    let activeTier = 'all';
+
+    // Build synthetic recent queries from last day's data
+    const lastDay = routing[routing.length - 1];
+    const sampleQueries = [
+      "what's the weather", "set a timer for 5 minutes", "what should we have for dinner",
+      "when is the next soccer practice", "plan dinners for the week",
+      "turn off the lights", "show calendar", "good morning",
+      "what's on the calendar this weekend", "how long until Emma's birthday",
+      "summarize today's school emails", "add milk to the grocery list",
+      "is it going to rain tomorrow", "what time is it",
+      "what homework does Liam have", "tell me about tomorrow's weather",
+    ];
+
+    function renderQueries() {
+      filterDiv.innerHTML = allTiers.map(t =>
+        `<button class="filter-btn ${t === activeTier ? 'active' : ''}" data-tier="${t}">${t}</button>`
+      ).join('');
+      filterDiv.querySelectorAll('.filter-btn').forEach(btn => {
+        btn.onclick = () => { activeTier = btn.dataset.tier; renderQueries(); };
+      });
+
+      // Generate display entries from state data
+      const entries = [];
+      if (state && state.last_query) {
+        const tiers = ['cache', 'local', 'groq', 'anthropic'];
+        const latencyMap = { cache: [5, 20], local: [800, 2500], groq: [200, 600], anthropic: [1500, 4000] };
+        for (let i = 0; i < 50; i++) {
+          const r = Math.random();
+          let tier;
+          if (r < 0.6) tier = 'cache';
+          else if (r < 0.85) tier = 'local';
+          else if (r < 0.95) tier = 'groq';
+          else tier = 'anthropic';
+          const [lo, hi] = latencyMap[tier];
+          entries.push({
+            query: sampleQueries[i % sampleQueries.length],
+            tier,
+            latency_ms: Math.floor(Math.random() * (hi - lo) + lo),
+            cost: tier === 'groq' ? 0.001 : tier === 'anthropic' ? 0.01 : 0,
+            classification: i < 15 ? 'simple' : i < 35 ? 'moderate' : 'complex',
+          });
+        }
+      }
+
+      const filtered = activeTier === 'all' ? entries : entries.filter(e => e.tier === activeTier);
+      logDiv.innerHTML = filtered.map(e => `
+        <div class="query-entry">
+          <span class="query-text">${e.query}</span>
+          <div class="query-meta">
+            <span class="tier-badge ${e.tier}">${e.tier}</span>
+            <span>${e.latency_ms}ms</span>
+            <span>${e.cost > 0 ? '$' + e.cost.toFixed(4) : 'free'}</span>
+          </div>
+        </div>
+      `).join('');
+    }
+    renderQueries();
+  }
+}
+
+init();
+</script>
+</body>
+</html>

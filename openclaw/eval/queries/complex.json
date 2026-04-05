@@ -1,0 +1,17 @@
+[
+  { "id": "complex_01", "query": "plan dinners for the week around soccer practice on Tuesday and Thursday" },
+  { "id": "complex_02", "query": "Alison has a conflict between the dentist and piano on Wednesday — what should we move" },
+  { "id": "complex_03", "query": "summarize this week's school updates and flag anything I need to respond to" },
+  { "id": "complex_04", "query": "compare the cost of eating out versus cooking for the next three days" },
+  { "id": "complex_05", "query": "plan a grocery list based on this week's meal plan and what we already have" },
+  { "id": "complex_06", "query": "analyze the kids' activity schedule and find a free evening for family movie night" },
+  { "id": "complex_07", "query": "what birthday parties are coming up and what gifts should we budget for" },
+  { "id": "complex_08", "query": "schedule around the plumber visit on Thursday morning and keep the afternoon free" },
+  { "id": "complex_09", "query": "plan healthy lunches for the week that the kids will actually eat" },
+  { "id": "complex_10", "query": "review all calendar events this month and flag potential conflicts" },
+  { "id": "complex_11", "query": "create a morning routine schedule that gets everyone out the door by 7:45" },
+  { "id": "complex_12", "query": "we need to plan Emma's birthday party for 15 kids, budget $200, outdoor venue preferred" },
+  { "id": "complex_13", "query": "optimize our weekly grocery spending by comparing prices at Costco versus Safeway" },
+  { "id": "complex_14", "query": "summarize the week's emails, calendar, and school updates into one brief" },
+  { "id": "complex_15", "query": "prioritize the home maintenance tasks and schedule them around our existing commitments" }
+]

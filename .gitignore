@@ -17,3 +17,7 @@ pi/sounds/
 school-updates/credentials.json
 school-updates/token.json
 school-updates/data/
+
+# OpenClaw router
+openclaw/cache/*.db
+openclaw/logs/*.json

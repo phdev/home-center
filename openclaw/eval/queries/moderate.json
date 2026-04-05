@@ -1,0 +1,18 @@
+[
+  { "id": "mod_01", "query": "what should we have for dinner tonight" },
+  { "id": "mod_02", "query": "summarize today's school emails" },
+  { "id": "mod_03", "query": "when is the next soccer practice" },
+  { "id": "mod_04", "query": "add milk and eggs to the grocery list" },
+  { "id": "mod_05", "query": "what's on the calendar this weekend" },
+  { "id": "mod_06", "query": "how long until Emma's birthday" },
+  { "id": "mod_07", "query": "what homework does Liam have today" },
+  { "id": "mod_08", "query": "read me the latest school newsletter" },
+  { "id": "mod_09", "query": "when does the dentist appointment start" },
+  { "id": "mod_10", "query": "what groceries do we need this week" },
+  { "id": "mod_11", "query": "tell me about tomorrow's weather forecast" },
+  { "id": "mod_12", "query": "what events do we have on Monday" },
+  { "id": "mod_13", "query": "how many days until spring break" },
+  { "id": "mod_14", "query": "remind me about the PTA meeting" },
+  { "id": "mod_15", "query": "what's the lunch menu at school today" },
+  { "id": "mod_16", "query": "when is the next family birthday coming up" }
+]
