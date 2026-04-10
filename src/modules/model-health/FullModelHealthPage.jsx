@@ -1,8 +1,10 @@
 import { useTime } from "../../hooks/useTime";
 import { useModelHealth } from "./useModelHealth";
 import { usePerformanceMetrics } from "./usePerformanceMetrics";
+import { useOrchestratorHistory } from "./useOrchestratorHistory";
 import { WakeWordMetrics } from "./WakeWordMetrics";
 import { TaskMetrics } from "./TaskMetrics";
+import { OrchestratorAnalytics } from "./OrchestratorAnalytics";
 import { ArrowLeft } from "lucide-react";
 
 const F = "'Geist','Inter',system-ui,sans-serif";
@@ -166,6 +168,7 @@ export function FullModelHealthPage({ onBack, workerSettings }) {
   const now = useTime();
   const { data, loading } = useModelHealth();
   const perf = usePerformanceMetrics(workerSettings);
+  const { analytics } = useOrchestratorHistory();
 
   return (
     <div style={{
@@ -233,6 +236,20 @@ export function FullModelHealthPage({ onBack, workerSettings }) {
 
           {/* Last query */}
           <LastQueryCard lastQuery={data.last_query} />
+
+          {/* Orchestrator Analytics (Grafana-style) */}
+          {analytics && (
+            <div style={{ marginTop: 32 }}>
+              <div style={{
+                fontFamily: F, fontSize: 14, color: "#FFFFFF66", marginBottom: 16,
+                textTransform: "uppercase", letterSpacing: "0.05em",
+                display: "flex", alignItems: "center", gap: 8,
+              }}>
+                <span style={{ fontSize: 18 }}>📊</span> Orchestration Analytics
+              </div>
+              <OrchestratorAnalytics analytics={analytics} />
+            </div>
+          )}
 
           {/* Wake Word Detection Metrics */}
           <div style={{

@@ -1,0 +1,212 @@
+[
+  {
+    "date": "2026-03-07",
+    "groq": 0.001225,
+    "anthropic_sonnet": 0.000675,
+    "anthropic_opus": 0,
+    "total": 0.0019
+  },
+  {
+    "date": "2026-03-08",
+    "groq": 0.000428,
+    "anthropic_sonnet": 0.002172,
+    "anthropic_opus": 0,
+    "total": 0.0026
+  },
+  {
+    "date": "2026-03-09",
+    "groq": 0.000422,
+    "anthropic_sonnet": 0.007473,
+    "anthropic_opus": 0.010875,
+    "total": 0.01877
+  },
+  {
+    "date": "2026-03-10",
+    "groq": 0.00025,
+    "anthropic_sonnet": 0.0012,
+    "anthropic_opus": 0.007995,
+    "total": 0.009445
+  },
+  {
+    "date": "2026-03-11",
+    "groq": 0.000827,
+    "anthropic_sonnet": 0,
+    "anthropic_opus": 0,
+    "total": 0.000827
+  },
+  {
+    "date": "2026-03-12",
+    "groq": 0.000655,
+    "anthropic_sonnet": 0.010224,
+    "anthropic_opus": 0.014985,
+    "total": 0.025864
+  },
+  {
+    "date": "2026-03-13",
+    "groq": 0.000315,
+    "anthropic_sonnet": 0.00879,
+    "anthropic_opus": 0,
+    "total": 0.009105
+  },
+  {
+    "date": "2026-03-14",
+    "groq": 0.001195,
+    "anthropic_sonnet": 0.01065,
+    "anthropic_opus": 0.006975,
+    "total": 0.01882
+  },
+  {
+    "date": "2026-03-15",
+    "groq": 0.000515,
+    "anthropic_sonnet": 0.008838,
+    "anthropic_opus": 0.0027,
+    "total": 0.012053
+  },
+  {
+    "date": "2026-03-16",
+    "groq": 0.000744,
+    "anthropic_sonnet": 0.002907,
+    "anthropic_opus": 0.006015,
+    "total": 0.009666
+  },
+  {
+    "date": "2026-03-17",
+    "groq": 0.000197,
+    "anthropic_sonnet": 0.000942,
+    "anthropic_opus": 0.01356,
+    "total": 0.014699
+  },
+  {
+    "date": "2026-03-18",
+    "groq": 0.001024,
+    "anthropic_sonnet": 0.012138,
+    "anthropic_opus": 0.02997,
+    "total": 0.043132
+  },
+  {
+    "date": "2026-03-19",
+    "groq": 0.000497,
+    "anthropic_sonnet": 0.004419,
+    "anthropic_opus": 0.00735,
+    "total": 0.012266
+  },
+  {
+    "date": "2026-03-20",
+    "groq": 0,
+    "anthropic_sonnet": 0.004311,
+    "anthropic_opus": 0.00597,
+    "total": 0.010281
+  },
+  {
+    "date": "2026-03-21",
+    "groq": 0.001556,
+    "anthropic_sonnet": 0.022953,
+    "anthropic_opus": 0,
+    "total": 0.024509
+  },
+  {
+    "date": "2026-03-22",
+    "groq": 0.001341,
+    "anthropic_sonnet": 0.00597,
+    "anthropic_opus": 0.01377,
+    "total": 0.021081
+  },
+  {
+    "date": "2026-03-23",
+    "groq": 0.000857,
+    "anthropic_sonnet": 0.004668,
+    "anthropic_opus": 0.00441,
+    "total": 0.009935
+  },
+  {
+    "date": "2026-03-24",
+    "groq": 0.000827,
+    "anthropic_sonnet": 0.003789,
+    "anthropic_opus": 0,
+    "total": 0.004616
+  },
+  {
+    "date": "2026-03-25",
+    "groq": 0.000241,
+    "anthropic_sonnet": 0.003792,
+    "anthropic_opus": 0,
+    "total": 0.004033
+  },
+  {
+    "date": "2026-03-26",
+    "groq": 0.000665,
+    "anthropic_sonnet": 0.002319,
+    "anthropic_opus": 0,
+    "total": 0.002984
+  },
+  {
+    "date": "2026-03-27",
+    "groq": 0.000167,
+    "anthropic_sonnet": 0.003591,
+    "anthropic_opus": 0.006705,
+    "total": 0.010463
+  },
+  {
+    "date": "2026-03-28",
+    "groq": 0.00131,
+    "anthropic_sonnet": 0.001767,
+    "anthropic_opus": 0.010155,
+    "total": 0.013232
+  },
+  {
+    "date": "2026-03-29",
+    "groq": 0.000802,
+    "anthropic_sonnet": 0.007515,
+    "anthropic_opus": 0.006765,
+    "total": 0.015082
+  },
+  {
+    "date": "2026-03-30",
+    "groq": 0.000312,
+    "anthropic_sonnet": 0.00402,
+    "anthropic_opus": 0,
+    "total": 0.004332
+  },
+  {
+    "date": "2026-03-31",
+    "groq": 0.000691,
+    "anthropic_sonnet": 0.00291,
+    "anthropic_opus": 0.010575,
+    "total": 0.014176
+  },
+  {
+    "date": "2026-04-01",
+    "groq": 0.000666,
+    "anthropic_sonnet": 0.006627,
+    "anthropic_opus": 0.01422,
+    "total": 0.021513
+  },
+  {
+    "date": "2026-04-02",
+    "groq": 0.000637,
+    "anthropic_sonnet": 0.003216,
+    "anthropic_opus": 0.015075,
+    "total": 0.018928
+  },
+  {
+    "date": "2026-04-03",
+    "groq": 0.000581,
+    "anthropic_sonnet": 0.009933,
+    "anthropic_opus": 0,
+    "total": 0.010514
+  },
+  {
+    "date": "2026-04-04",
+    "groq": 0.000996,
+    "anthropic_sonnet": 0.010668,
+    "anthropic_opus": 0.03213,
+    "total": 0.043794
+  },
+  {
+    "date": "2026-04-05",
+    "groq": 0.001058,
+    "anthropic_sonnet": 0.012804,
+    "anthropic_opus": 0,
+    "total": 0.013862
+  }
+]

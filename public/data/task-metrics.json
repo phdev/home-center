@@ -1,0 +1,688 @@
+[
+  {
+    "date": "2026-03-07",
+    "ocCreated": 9,
+    "ocCompleted": 3,
+    "ocActive": 6,
+    "ocSources": {
+      "dashboard": 4,
+      "openclaw": 1,
+      "whatsapp": 2,
+      "homerci": 2
+    },
+    "ocAvgCompletionMin": 28.3,
+    "timers": 7,
+    "voiceTimers": 4,
+    "dashTimers": 3,
+    "llmQueries": 14,
+    "llmQueryTypes": {
+      "general": 3,
+      "location": 3,
+      "event": 4,
+      "concept": 3,
+      "person": 1
+    }
+  },
+  {
+    "date": "2026-03-08",
+    "ocCreated": 6,
+    "ocCompleted": 1,
+    "ocActive": 5,
+    "ocSources": {
+      "homerci": 1,
+      "whatsapp": 1,
+      "voice": 2,
+      "openclaw": 2
+    },
+    "ocAvgCompletionMin": 7,
+    "timers": 3,
+    "voiceTimers": 1,
+    "dashTimers": 2,
+    "llmQueries": 11,
+    "llmQueryTypes": {
+      "location": 4,
+      "concept": 2,
+      "general": 1,
+      "event": 1,
+      "person": 3
+    }
+  },
+  {
+    "date": "2026-03-09",
+    "ocCreated": 8,
+    "ocCompleted": 5,
+    "ocActive": 3,
+    "ocSources": {
+      "voice": 3,
+      "openclaw": 3,
+      "whatsapp": 1,
+      "homerci": 1
+    },
+    "ocAvgCompletionMin": 14.3,
+    "timers": 7,
+    "voiceTimers": 3,
+    "dashTimers": 4,
+    "llmQueries": 6,
+    "llmQueryTypes": {
+      "person": 2,
+      "location": 1,
+      "event": 2,
+      "general": 1
+    }
+  },
+  {
+    "date": "2026-03-10",
+    "ocCreated": 4,
+    "ocCompleted": 2,
+    "ocActive": 2,
+    "ocSources": {
+      "openclaw": 1,
+      "whatsapp": 1,
+      "dashboard": 1,
+      "homerci": 1
+    },
+    "ocAvgCompletionMin": 56.6,
+    "timers": 14,
+    "voiceTimers": 4,
+    "dashTimers": 10,
+    "llmQueries": 18,
+    "llmQueryTypes": {
+      "location": 2,
+      "event": 7,
+      "concept": 5,
+      "general": 1,
+      "person": 3
+    }
+  },
+  {
+    "date": "2026-03-11",
+    "ocCreated": 9,
+    "ocCompleted": 8,
+    "ocActive": 1,
+    "ocSources": {
+      "dashboard": 1,
+      "whatsapp": 3,
+      "homerci": 1,
+      "openclaw": 3,
+      "voice": 1
+    },
+    "ocAvgCompletionMin": 20.2,
+    "timers": 14,
+    "voiceTimers": 5,
+    "dashTimers": 9,
+    "llmQueries": 17,
+    "llmQueryTypes": {
+      "location": 5,
+      "concept": 5,
+      "event": 4,
+      "person": 2,
+      "general": 1
+    }
+  },
+  {
+    "date": "2026-03-12",
+    "ocCreated": 8,
+    "ocCompleted": 2,
+    "ocActive": 6,
+    "ocSources": {
+      "homerci": 3,
+      "dashboard": 2,
+      "voice": 1,
+      "openclaw": 1,
+      "whatsapp": 1
+    },
+    "ocAvgCompletionMin": 54.5,
+    "timers": 10,
+    "voiceTimers": 6,
+    "dashTimers": 4,
+    "llmQueries": 9,
+    "llmQueryTypes": {
+      "event": 2,
+      "general": 1,
+      "concept": 2,
+      "person": 1,
+      "location": 3
+    }
+  },
+  {
+    "date": "2026-03-13",
+    "ocCreated": 9,
+    "ocCompleted": 7,
+    "ocActive": 2,
+    "ocSources": {
+      "dashboard": 3,
+      "voice": 3,
+      "whatsapp": 2,
+      "openclaw": 1
+    },
+    "ocAvgCompletionMin": 5.9,
+    "timers": 3,
+    "voiceTimers": 1,
+    "dashTimers": 2,
+    "llmQueries": 23,
+    "llmQueryTypes": {
+      "event": 6,
+      "general": 7,
+      "location": 5,
+      "concept": 4,
+      "person": 1
+    }
+  },
+  {
+    "date": "2026-03-14",
+    "ocCreated": 10,
+    "ocCompleted": 3,
+    "ocActive": 7,
+    "ocSources": {
+      "whatsapp": 2,
+      "voice": 2,
+      "openclaw": 3,
+      "dashboard": 3
+    },
+    "ocAvgCompletionMin": 13.6,
+    "timers": 14,
+    "voiceTimers": 7,
+    "dashTimers": 7,
+    "llmQueries": 18,
+    "llmQueryTypes": {
+      "concept": 3,
+      "general": 6,
+      "location": 3,
+      "event": 3,
+      "person": 3
+    }
+  },
+  {
+    "date": "2026-03-15",
+    "ocCreated": 7,
+    "ocCompleted": 5,
+    "ocActive": 2,
+    "ocSources": {
+      "openclaw": 4,
+      "voice": 1,
+      "homerci": 1,
+      "dashboard": 1
+    },
+    "ocAvgCompletionMin": 35.5,
+    "timers": 5,
+    "voiceTimers": 2,
+    "dashTimers": 3,
+    "llmQueries": 11,
+    "llmQueryTypes": {
+      "person": 2,
+      "concept": 1,
+      "location": 1,
+      "general": 3,
+      "event": 4
+    }
+  },
+  {
+    "date": "2026-03-16",
+    "ocCreated": 6,
+    "ocCompleted": 3,
+    "ocActive": 3,
+    "ocSources": {
+      "dashboard": 1,
+      "openclaw": 1,
+      "whatsapp": 4
+    },
+    "ocAvgCompletionMin": 12.1,
+    "timers": 4,
+    "voiceTimers": 2,
+    "dashTimers": 2,
+    "llmQueries": 10,
+    "llmQueryTypes": {
+      "location": 1,
+      "event": 2,
+      "concept": 3,
+      "person": 4
+    }
+  },
+  {
+    "date": "2026-03-17",
+    "ocCreated": 8,
+    "ocCompleted": 7,
+    "ocActive": 1,
+    "ocSources": {
+      "dashboard": 3,
+      "openclaw": 1,
+      "voice": 2,
+      "homerci": 2
+    },
+    "ocAvgCompletionMin": 15.1,
+    "timers": 11,
+    "voiceTimers": 3,
+    "dashTimers": 8,
+    "llmQueries": 14,
+    "llmQueryTypes": {
+      "event": 4,
+      "general": 5,
+      "concept": 3,
+      "person": 2
+    }
+  },
+  {
+    "date": "2026-03-18",
+    "ocCreated": 5,
+    "ocCompleted": 5,
+    "ocActive": 0,
+    "ocSources": {
+      "openclaw": 3,
+      "whatsapp": 1,
+      "homerci": 1
+    },
+    "ocAvgCompletionMin": 54.6,
+    "timers": 13,
+    "voiceTimers": 5,
+    "dashTimers": 8,
+    "llmQueries": 20,
+    "llmQueryTypes": {
+      "event": 5,
+      "general": 3,
+      "person": 4,
+      "location": 4,
+      "concept": 4
+    }
+  },
+  {
+    "date": "2026-03-19",
+    "ocCreated": 2,
+    "ocCompleted": 2,
+    "ocActive": 0,
+    "ocSources": {
+      "dashboard": 1,
+      "voice": 1
+    },
+    "ocAvgCompletionMin": 25.6,
+    "timers": 11,
+    "voiceTimers": 4,
+    "dashTimers": 7,
+    "llmQueries": 17,
+    "llmQueryTypes": {
+      "general": 4,
+      "person": 2,
+      "location": 4,
+      "concept": 7
+    }
+  },
+  {
+    "date": "2026-03-20",
+    "ocCreated": 7,
+    "ocCompleted": 5,
+    "ocActive": 2,
+    "ocSources": {
+      "homerci": 1,
+      "dashboard": 2,
+      "whatsapp": 2,
+      "voice": 2
+    },
+    "ocAvgCompletionMin": 25.5,
+    "timers": 9,
+    "voiceTimers": 5,
+    "dashTimers": 4,
+    "llmQueries": 14,
+    "llmQueryTypes": {
+      "event": 5,
+      "general": 4,
+      "location": 2,
+      "concept": 2,
+      "person": 1
+    }
+  },
+  {
+    "date": "2026-03-21",
+    "ocCreated": 4,
+    "ocCompleted": 2,
+    "ocActive": 2,
+    "ocSources": {
+      "homerci": 1,
+      "whatsapp": 3
+    },
+    "ocAvgCompletionMin": 36.6,
+    "timers": 5,
+    "voiceTimers": 3,
+    "dashTimers": 2,
+    "llmQueries": 12,
+    "llmQueryTypes": {
+      "concept": 4,
+      "location": 3,
+      "person": 1,
+      "event": 1,
+      "general": 3
+    }
+  },
+  {
+    "date": "2026-03-22",
+    "ocCreated": 6,
+    "ocCompleted": 6,
+    "ocActive": 0,
+    "ocSources": {
+      "openclaw": 1,
+      "homerci": 2,
+      "dashboard": 1,
+      "voice": 2
+    },
+    "ocAvgCompletionMin": 52,
+    "timers": 4,
+    "voiceTimers": 1,
+    "dashTimers": 3,
+    "llmQueries": 6,
+    "llmQueryTypes": {
+      "event": 2,
+      "person": 3,
+      "location": 1
+    }
+  },
+  {
+    "date": "2026-03-23",
+    "ocCreated": 4,
+    "ocCompleted": 4,
+    "ocActive": 0,
+    "ocSources": {
+      "homerci": 2,
+      "openclaw": 2
+    },
+    "ocAvgCompletionMin": 48.7,
+    "timers": 7,
+    "voiceTimers": 2,
+    "dashTimers": 5,
+    "llmQueries": 7,
+    "llmQueryTypes": {
+      "location": 3,
+      "event": 2,
+      "person": 1,
+      "concept": 1
+    }
+  },
+  {
+    "date": "2026-03-24",
+    "ocCreated": 2,
+    "ocCompleted": 1,
+    "ocActive": 1,
+    "ocSources": {
+      "openclaw": 1,
+      "voice": 1
+    },
+    "ocAvgCompletionMin": 33.4,
+    "timers": 11,
+    "voiceTimers": 7,
+    "dashTimers": 4,
+    "llmQueries": 17,
+    "llmQueryTypes": {
+      "person": 4,
+      "location": 5,
+      "general": 5,
+      "event": 2,
+      "concept": 1
+    }
+  },
+  {
+    "date": "2026-03-25",
+    "ocCreated": 3,
+    "ocCompleted": 1,
+    "ocActive": 2,
+    "ocSources": {
+      "whatsapp": 2,
+      "dashboard": 1
+    },
+    "ocAvgCompletionMin": 59.4,
+    "timers": 10,
+    "voiceTimers": 6,
+    "dashTimers": 4,
+    "llmQueries": 24,
+    "llmQueryTypes": {
+      "person": 6,
+      "concept": 4,
+      "event": 4,
+      "location": 5,
+      "general": 5
+    }
+  },
+  {
+    "date": "2026-03-26",
+    "ocCreated": 2,
+    "ocCompleted": 2,
+    "ocActive": 0,
+    "ocSources": {
+      "voice": 1,
+      "dashboard": 1
+    },
+    "ocAvgCompletionMin": 56.7,
+    "timers": 8,
+    "voiceTimers": 3,
+    "dashTimers": 5,
+    "llmQueries": 15,
+    "llmQueryTypes": {
+      "event": 3,
+      "concept": 4,
+      "general": 2,
+      "person": 3,
+      "location": 3
+    }
+  },
+  {
+    "date": "2026-03-27",
+    "ocCreated": 4,
+    "ocCompleted": 1,
+    "ocActive": 3,
+    "ocSources": {
+      "voice": 1,
+      "homerci": 1,
+      "whatsapp": 1,
+      "openclaw": 1
+    },
+    "ocAvgCompletionMin": 5.2,
+    "timers": 4,
+    "voiceTimers": 1,
+    "dashTimers": 3,
+    "llmQueries": 6,
+    "llmQueryTypes": {
+      "event": 3,
+      "general": 2,
+      "concept": 1
+    }
+  },
+  {
+    "date": "2026-03-28",
+    "ocCreated": 6,
+    "ocCompleted": 3,
+    "ocActive": 3,
+    "ocSources": {
+      "whatsapp": 1,
+      "dashboard": 3,
+      "voice": 2
+    },
+    "ocAvgCompletionMin": 50.7,
+    "timers": 5,
+    "voiceTimers": 1,
+    "dashTimers": 4,
+    "llmQueries": 6,
+    "llmQueryTypes": {
+      "general": 1,
+      "concept": 3,
+      "event": 1,
+      "person": 1
+    }
+  },
+  {
+    "date": "2026-03-29",
+    "ocCreated": 3,
+    "ocCompleted": 3,
+    "ocActive": 0,
+    "ocSources": {
+      "homerci": 1,
+      "dashboard": 2
+    },
+    "ocAvgCompletionMin": 59.7,
+    "timers": 5,
+    "voiceTimers": 2,
+    "dashTimers": 3,
+    "llmQueries": 13,
+    "llmQueryTypes": {
+      "general": 2,
+      "location": 5,
+      "concept": 3,
+      "event": 1,
+      "person": 2
+    }
+  },
+  {
+    "date": "2026-03-30",
+    "ocCreated": 7,
+    "ocCompleted": 5,
+    "ocActive": 2,
+    "ocSources": {
+      "openclaw": 2,
+      "voice": 3,
+      "homerci": 1,
+      "dashboard": 1
+    },
+    "ocAvgCompletionMin": 42.7,
+    "timers": 12,
+    "voiceTimers": 4,
+    "dashTimers": 8,
+    "llmQueries": 6,
+    "llmQueryTypes": {
+      "event": 2,
+      "location": 2,
+      "concept": 2
+    }
+  },
+  {
+    "date": "2026-03-31",
+    "ocCreated": 3,
+    "ocCompleted": 1,
+    "ocActive": 2,
+    "ocSources": {
+      "voice": 1,
+      "dashboard": 1,
+      "homerci": 1
+    },
+    "ocAvgCompletionMin": 31.2,
+    "timers": 11,
+    "voiceTimers": 5,
+    "dashTimers": 6,
+    "llmQueries": 15,
+    "llmQueryTypes": {
+      "location": 4,
+      "concept": 3,
+      "general": 3,
+      "event": 3,
+      "person": 2
+    }
+  },
+  {
+    "date": "2026-04-01",
+    "ocCreated": 4,
+    "ocCompleted": 3,
+    "ocActive": 1,
+    "ocSources": {
+      "dashboard": 3,
+      "homerci": 1
+    },
+    "ocAvgCompletionMin": 49.4,
+    "timers": 10,
+    "voiceTimers": 4,
+    "dashTimers": 6,
+    "llmQueries": 22,
+    "llmQueryTypes": {
+      "event": 3,
+      "person": 5,
+      "location": 5,
+      "concept": 5,
+      "general": 4
+    }
+  },
+  {
+    "date": "2026-04-02",
+    "ocCreated": 7,
+    "ocCompleted": 7,
+    "ocActive": 0,
+    "ocSources": {
+      "voice": 1,
+      "openclaw": 2,
+      "dashboard": 1,
+      "whatsapp": 3
+    },
+    "ocAvgCompletionMin": 30,
+    "timers": 8,
+    "voiceTimers": 4,
+    "dashTimers": 4,
+    "llmQueries": 12,
+    "llmQueryTypes": {
+      "person": 2,
+      "concept": 5,
+      "general": 1,
+      "event": 4
+    }
+  },
+  {
+    "date": "2026-04-03",
+    "ocCreated": 5,
+    "ocCompleted": 2,
+    "ocActive": 3,
+    "ocSources": {
+      "openclaw": 2,
+      "dashboard": 3
+    },
+    "ocAvgCompletionMin": 28.8,
+    "timers": 6,
+    "voiceTimers": 3,
+    "dashTimers": 3,
+    "llmQueries": 22,
+    "llmQueryTypes": {
+      "person": 6,
+      "concept": 3,
+      "location": 4,
+      "event": 5,
+      "general": 4
+    }
+  },
+  {
+    "date": "2026-04-04",
+    "ocCreated": 5,
+    "ocCompleted": 1,
+    "ocActive": 4,
+    "ocSources": {
+      "openclaw": 2,
+      "voice": 2,
+      "whatsapp": 1
+    },
+    "ocAvgCompletionMin": 36.2,
+    "timers": 15,
+    "voiceTimers": 4,
+    "dashTimers": 11,
+    "llmQueries": 23,
+    "llmQueryTypes": {
+      "concept": 5,
+      "person": 8,
+      "general": 4,
+      "location": 4,
+      "event": 2
+    }
+  },
+  {
+    "date": "2026-04-05",
+    "ocCreated": 5,
+    "ocCompleted": 4,
+    "ocActive": 1,
+    "ocSources": {
+      "voice": 1,
+      "homerci": 1,
+      "openclaw": 2,
+      "dashboard": 1
+    },
+    "ocAvgCompletionMin": 20,
+    "timers": 5,
+    "voiceTimers": 3,
+    "dashTimers": 2,
+    "llmQueries": 18,
+    "llmQueryTypes": {
+      "person": 4,
+      "location": 2,
+      "general": 5,
+      "concept": 3,
+      "event": 4
+    }
+  }
+]

@@ -26,6 +26,9 @@ cp "$ROOT_DIR/openclaw/logs/dashboard-state.json" "$DATA_DIR/current-state.json"
 echo "Copying to public/data for TV dashboard..."
 mkdir -p "$ROOT_DIR/public/data"
 cp "$ROOT_DIR/openclaw/logs/dashboard-state.json" "$ROOT_DIR/public/data/model-health.json"
+cp "$DATA_DIR/routing-history.json" "$ROOT_DIR/public/data/routing-history.json"
+cp "$DATA_DIR/cost-history.json" "$ROOT_DIR/public/data/cost-history.json"
+cp "$DATA_DIR/task-metrics.json" "$ROOT_DIR/public/data/task-metrics.json"
 
 echo "Generating performance seed data (if not present)..."
 if [ ! -f "$DATA_DIR/wake-metrics.json" ] || [ ! -f "$DATA_DIR/task-metrics.json" ]; then
