@@ -6,8 +6,8 @@ import { useCycler } from "../hooks/useCycler";
 import { FACTS } from "../data/mockData";
 
 const F = "'Geist','Inter',system-ui,sans-serif";
-// Telegram deep link — replace "OpenClawBot" with your @BotFather bot username.
-const QR_URL = "https://t.me/OpenClawBot?start=hello";
+// Telegram deep link to the family OpenClaw bot (@howellfelton_bot on Telegram).
+const QR_URL = "https://t.me/howellfelton_bot?start=hello";
 
 export function FactPanel({ t, selected }) {
   const [fact, factIndex] = useCycler(FACTS, 8000);
