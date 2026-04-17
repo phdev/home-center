@@ -136,6 +136,18 @@ Do this automatically without being asked. Every pencil design must be viewable 
 | LLM Response Page | `dMUil` | `full-llm-response-page` |
 | History Page | `Tbtje` | `full-history-page` |
 | Transcription Overlay | `DeP7G` | `transcription-overlay` |
+| OpenClaw UI Additions | `ONYZi` | `openclaw-ui-additions` |
+
+### OpenClaw-driven Derived State
+
+The upcoming cards (morning checklist, takeout/lunch decisions, claw suggestions, etc.) are driven by derived-state flags, not ad-hoc conditions. Three layers:
+
+1. **Raw data** — iCloud calendar events, meal plan, birthday records, bedtime settings, school emails (via email-triage), takeout history.
+2. **Derived state** (the real UI driver) — boolean/structured flags evaluated on a tick:
+   `has_morning_overlap`, `warn_peter_0800_0900`, `show_morning_checklist`, `checklist_context {weather, hot}`, `school_items[] {kind, urgency, due, child, action}`, `birthday_gift_needed_for[]`, `claw_suggestions[] (ranked)`, `takeout_decision_pending`, `suggested_vendors[]`, `lunch_decision_pending`, `school_lunch_option`, `bedtime_reminder_active`.
+3. **UI presentation** — React components render based on flags; OpenClaw enhances title/summary/suggested-action/explanation strings at request time via the worker's `/api/ask`.
+
+Rule of thumb: a card mounts/unmounts on a flag, then fills in OpenClaw-authored copy once the flag flips true. Never embed decision logic inside components.
 
 ### Key Files
 

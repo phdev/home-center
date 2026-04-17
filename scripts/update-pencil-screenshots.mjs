@@ -17,6 +17,7 @@ const pages = [
   { slug: "full-llm-response-page", nodeId: "dMUil" },
   { slug: "full-history-page", nodeId: "Tbtje" },
   { slug: "transcription-overlay", nodeId: "DeP7G" },
+  { slug: "openclaw-ui-additions", nodeId: "ONYZi" },
 ];
 
 let msgId = 0;

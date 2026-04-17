@@ -15,6 +15,7 @@ const PENCIL_PAGES = [
   { slug: "full-llm-response-page", label: "LLM Response Page Design", nodeId: "dMUil" },
   { slug: "full-history-page", label: "History Page Design", nodeId: "Tbtje" },
   { slug: "transcription-overlay", label: "Transcription Overlay Design", nodeId: "DeP7G" },
+  { slug: "openclaw-ui-additions", label: "OpenClaw UI Additions (8 new cards)", nodeId: "ONYZi" },
 ];
 
 // Live view pages (rendered via iframe with URL params)
