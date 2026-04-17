@@ -6,8 +6,8 @@ import { useCycler } from "../hooks/useCycler";
 import { FACTS } from "../data/mockData";
 
 const F = "'Geist','Inter',system-ui,sans-serif";
-// Update this to the OpenClaw WhatsApp chat link once NanoClaw is configured
-const QR_URL = "https://wa.me/?text=Hey%20OpenClaw";
+// Telegram deep link — replace "OpenClawBot" with your @BotFather bot username.
+const QR_URL = "https://t.me/OpenClawBot?start=hello";
 
 export function FactPanel({ t, selected }) {
   const [fact, factIndex] = useCycler(FACTS, 8000);

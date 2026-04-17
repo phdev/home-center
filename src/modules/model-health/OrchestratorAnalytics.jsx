@@ -21,7 +21,7 @@ const SOURCE_COLORS = {
   openclaw: "#c084fc",
   voice: "#4ade80",
   dashboard: "#60a5fa",
-  whatsapp: "#22d3ee",
+  telegram: "#22d3ee",
   homerci: "#fbbf24",
   manual: "#f87171",
 };

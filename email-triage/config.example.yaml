@@ -32,11 +32,13 @@ notifications:
   worker_url: https://home-center-api.phhowell.workers.dev
   worker_token: ""               # AUTH_TOKEN for the worker
 
-  # WhatsApp via NanoClaw messaging pipeline
-  nanoclaw:
+  # Telegram via the OpenClaw bridge on the Mac Mini (same LAN as the Pi).
+  # Create a bot with @BotFather to obtain TELEGRAM_BOT_TOKEN for the bridge,
+  # then paste the numeric chat/group ID below.
+  telegram:
     enabled: false
-    webhook_url: ""              # NanoClaw webhook endpoint
-    target_chat: ""              # WhatsApp chat/group ID
+    openclaw_url: "http://localhost:3100"   # OpenClaw bridge URL (Mac Mini hostname on same LAN)
+    target_chat: ""                          # Telegram chat ID (numeric; negative for groups)
 
 database:
   path: email_triage.db

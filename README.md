@@ -13,7 +13,7 @@ A family TV dashboard running on a Raspberry Pi in Chromium kiosk mode, displaye
 - **Notifications** — email triage summaries, school updates
 - **Birthdays** — upcoming family birthdays
 - **Search / Ask Anything** — LLM-powered Q&A via Cloudflare Worker
-- **OpenClaw** — family WhatsApp assistant (scan QR to chat)
+- **OpenClaw** — family Telegram assistant (scan QR to open the bot chat)
 - **5 themes** — Midnight Observatory, Morning Paper, Retro Terminal, Soft Playroom, Glass Noir
 
 ## Pages
@@ -34,7 +34,7 @@ A family TV dashboard running on a Raspberry Pi in Chromium kiosk mode, displaye
 | Machine | Role |
 |---------|------|
 | **Raspberry Pi** (`homecenter.local`) | Chromium kiosk dashboard + wake word service + HDMI-CEC |
-| **Mac Mini** (`macmini.local`) | OpenClaw WhatsApp bridge, Homer CI, email triage, school updates |
+| **Mac Mini** (`macmini.local`) | OpenClaw Telegram bridge, Homer CI, email triage, school updates |
 | **Cloudflare Worker** | API proxy, LLM queries, data aggregation |
 
 ## Voice Control

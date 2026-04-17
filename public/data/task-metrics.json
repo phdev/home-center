@@ -7,7 +7,7 @@
     "ocSources": {
       "dashboard": 4,
       "openclaw": 1,
-      "whatsapp": 2,
+      "telegram": 2,
       "homerci": 2
     },
     "ocAvgCompletionMin": 28.3,
@@ -30,7 +30,7 @@
     "ocActive": 5,
     "ocSources": {
       "homerci": 1,
-      "whatsapp": 1,
+      "telegram": 1,
       "voice": 2,
       "openclaw": 2
     },
@@ -55,7 +55,7 @@
     "ocSources": {
       "voice": 3,
       "openclaw": 3,
-      "whatsapp": 1,
+      "telegram": 1,
       "homerci": 1
     },
     "ocAvgCompletionMin": 14.3,
@@ -77,7 +77,7 @@
     "ocActive": 2,
     "ocSources": {
       "openclaw": 1,
-      "whatsapp": 1,
+      "telegram": 1,
       "dashboard": 1,
       "homerci": 1
     },
@@ -101,7 +101,7 @@
     "ocActive": 1,
     "ocSources": {
       "dashboard": 1,
-      "whatsapp": 3,
+      "telegram": 3,
       "homerci": 1,
       "openclaw": 3,
       "voice": 1
@@ -129,7 +129,7 @@
       "dashboard": 2,
       "voice": 1,
       "openclaw": 1,
-      "whatsapp": 1
+      "telegram": 1
     },
     "ocAvgCompletionMin": 54.5,
     "timers": 10,
@@ -152,7 +152,7 @@
     "ocSources": {
       "dashboard": 3,
       "voice": 3,
-      "whatsapp": 2,
+      "telegram": 2,
       "openclaw": 1
     },
     "ocAvgCompletionMin": 5.9,
@@ -174,7 +174,7 @@
     "ocCompleted": 3,
     "ocActive": 7,
     "ocSources": {
-      "whatsapp": 2,
+      "telegram": 2,
       "voice": 2,
       "openclaw": 3,
       "dashboard": 3
@@ -224,7 +224,7 @@
     "ocSources": {
       "dashboard": 1,
       "openclaw": 1,
-      "whatsapp": 4
+      "telegram": 4
     },
     "ocAvgCompletionMin": 12.1,
     "timers": 4,
@@ -268,7 +268,7 @@
     "ocActive": 0,
     "ocSources": {
       "openclaw": 3,
-      "whatsapp": 1,
+      "telegram": 1,
       "homerci": 1
     },
     "ocAvgCompletionMin": 54.6,
@@ -313,7 +313,7 @@
     "ocSources": {
       "homerci": 1,
       "dashboard": 2,
-      "whatsapp": 2,
+      "telegram": 2,
       "voice": 2
     },
     "ocAvgCompletionMin": 25.5,
@@ -336,7 +336,7 @@
     "ocActive": 2,
     "ocSources": {
       "homerci": 1,
-      "whatsapp": 3
+      "telegram": 3
     },
     "ocAvgCompletionMin": 36.6,
     "timers": 5,
@@ -422,7 +422,7 @@
     "ocCompleted": 1,
     "ocActive": 2,
     "ocSources": {
-      "whatsapp": 2,
+      "telegram": 2,
       "dashboard": 1
     },
     "ocAvgCompletionMin": 59.4,
@@ -468,7 +468,7 @@
     "ocSources": {
       "voice": 1,
       "homerci": 1,
-      "whatsapp": 1,
+      "telegram": 1,
       "openclaw": 1
     },
     "ocAvgCompletionMin": 5.2,
@@ -488,7 +488,7 @@
     "ocCompleted": 3,
     "ocActive": 3,
     "ocSources": {
-      "whatsapp": 1,
+      "telegram": 1,
       "dashboard": 3,
       "voice": 2
     },
@@ -602,7 +602,7 @@
       "voice": 1,
       "openclaw": 2,
       "dashboard": 1,
-      "whatsapp": 3
+      "telegram": 3
     },
     "ocAvgCompletionMin": 30,
     "timers": 8,
@@ -646,7 +646,7 @@
     "ocSources": {
       "openclaw": 2,
       "voice": 2,
-      "whatsapp": 1
+      "telegram": 1
     },
     "ocAvgCompletionMin": 36.2,
     "timers": 15,

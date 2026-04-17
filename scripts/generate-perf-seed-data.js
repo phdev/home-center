@@ -65,7 +65,7 @@ console.log('Generated wake-metrics.json');
 
 // Generate task metrics
 const taskHistory = [];
-const sources = ['openclaw', 'voice', 'dashboard', 'whatsapp', 'homerci'];
+const sources = ['openclaw', 'voice', 'dashboard', 'telegram', 'homerci'];
 
 for (let i = 29; i >= 0; i--) {
   const date = new Date(today);

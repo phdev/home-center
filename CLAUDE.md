@@ -289,21 +289,21 @@ After setup, migrate services off the Pi:
 bash .openclaw/mac-mini/migrate-from-pi.sh
 ```
 
-## OpenClaw (Family WhatsApp Assistant)
+## OpenClaw (Family Telegram Assistant)
 
 ### Architecture
 
-A Node.js service (`openclaw/index.js`) running on the **Mac Mini** provides a WhatsApp bridge using `whatsapp-web.js`. It exposes a local HTTP API for sending messages and forwards incoming messages to the worker's `/api/ask` LLM endpoint for bot replies.
+A Node.js service (`openclaw/index.js`) running on the **Mac Mini** (same LAN as the Pi) provides a Telegram bridge using `node-telegram-bot-api`. It exposes a local HTTP API for sending messages and forwards incoming messages to the worker's `/api/ask` LLM endpoint for bot replies.
 
-**OpenClaw is the family-facing assistant.** Family members scan the QR code on the TV dashboard, text questions ("when's Emma's science fair?"), and get LLM-powered answers. It also delivers email triage notifications and school updates to a family group chat.
+**OpenClaw is the family-facing assistant.** Family members scan the Telegram deep-link QR on the TV dashboard (`https://t.me/<BotUsername>?start=hello`), text questions ("when's Emma's science fair?"), and get LLM-powered answers. It also delivers email triage notifications and school updates to a family group chat.
 
 **Homer CI** (see below) is the separate dev-facing orchestrator that uses this same bridge as transport for build/PR notifications to Peter's personal chat.
 
+Chat IDs are numeric Telegram IDs (positive for DMs, negative for groups, `-100…` for supergroups) — no `@c.us`/`@g.us` suffixes.
+
 ### API Endpoints (localhost:3100 on Mac Mini)
 
-- `GET /status` — connection health, QR pending state
-- `GET /qr` — QR code data for pairing
-- `GET /chats` — list recent chats (for finding chat IDs)
+- `GET /status` — connection health and bot identity
 - `POST /send` — send message: `{ chatId, message }`
 - `GET /messages` — unacknowledged incoming messages (Homer CI polls this)
 - `POST /messages/ack` — acknowledge processed messages: `{ ids: [...] }`
@@ -312,47 +312,47 @@ A Node.js service (`openclaw/index.js`) running on the **Mac Mini** provides a W
 
 - **Service:** `launchctl {load|unload} ~/Library/LaunchAgents/com.openclaw.bridge.plist`
 - **Logs:** `tail -f .openclaw/logs/openclaw-bridge-stdout.log`
-- **Plist template:** `.openclaw/mac-mini/plists/com.openclaw.bridge.plist`
-- **Auth data:** `openclaw/.wwebjs_auth/` (persists WhatsApp session)
-- **Browser:** Uses Puppeteer's bundled Chrome on Mac (no `PUPPETEER_EXECUTABLE_PATH` needed)
+- **Plist template:** `.openclaw/mac-mini/plists/com.openclaw.bridge.plist` (set `TELEGRAM_BOT_TOKEN`)
+- **Auth:** `TELEGRAM_BOT_TOKEN` env var (from @BotFather) — no QR scan, no session directory, no Puppeteer
 
 ### Key Files
 
 | File | Purpose |
 |---|---|
-| `openclaw/index.js` | Main service — Express API + whatsapp-web.js client + message queue |
-| `openclaw/package.json` | Dependencies (whatsapp-web.js, express, qrcode-terminal) |
+| `openclaw/index.js` | Main service — Express API + node-telegram-bot-api client + message queue |
+| `openclaw/package.json` | Dependencies (node-telegram-bot-api, express) |
 | `openclaw/openclaw.service` | Legacy Pi systemd unit (kept for reference) |
 | `.openclaw/mac-mini/plists/com.openclaw.bridge.plist` | Mac Mini launchd plist |
 
 ### Integration with Other Services
 
 - **Email triage** (`email-triage/email_triage/notifier.py`) — posts to `http://localhost:3100/send` (same machine)
-- **Dashboard QR code** (`src/components/FactPanel.jsx`) — "Chat with OpenClaw" QR links to WhatsApp
+- **Dashboard QR code** (`src/components/FactPanel.jsx`) — "Chat with OpenClaw" QR links to Telegram deep link
 - **Dashboard panel** (`src/components/AgentTasksPanel.jsx`) — header labeled "OpenClaw"
 - **Incoming messages** — forwarded to worker `/api/ask` for LLM-powered replies
 - **Homer CI** — polls `GET /messages` for dev task requests, sends notifications via `POST /send`
 
 ### Setup
 
-1. Start the service: `launchctl load ~/Library/LaunchAgents/com.openclaw.bridge.plist`
-2. Watch logs for QR code: `tail -f .openclaw/logs/openclaw-bridge-stdout.log`
-3. Scan QR with WhatsApp on your phone
-4. Check connection: `curl http://localhost:3100/status`
-5. Find chat IDs: `curl http://localhost:3100/chats`
-6. Set `chat_id` in `email-triage/config.yaml` and enable WhatsApp
+1. Create a bot via **@BotFather** on Telegram → copy the bot token.
+2. Set `TELEGRAM_BOT_TOKEN` in `.openclaw/mac-mini/plists/com.openclaw.bridge.plist` (replace `__TELEGRAM_BOT_TOKEN__`).
+3. Start the service: `launchctl load ~/Library/LaunchAgents/com.openclaw.bridge.plist`
+4. Check connection: `curl http://localhost:3100/status` (should report `ready: true` + bot username)
+5. Message the bot, then get your numeric chat ID:
+   `curl "https://api.telegram.org/bot<TOKEN>/getUpdates"` → look for `chat.id`.
+6. Set `target_chat` in `email-triage/config.yaml` under `notifications.telegram` and set `enabled: true`.
 
 ## Homer CI (Autonomous Dev Orchestrator)
 
 ### Architecture
 
-Homer CI is an autonomous dev orchestrator running on the **Mac Mini**. It listens for WhatsApp messages, plans tasks with Claude, spawns coding agents, monitors their progress via GitHub Actions CI, and notifies via WhatsApp when PRs are ready.
+Homer CI is an autonomous dev orchestrator running on the **Mac Mini**. It listens for Telegram messages, plans tasks with Claude, spawns coding agents, monitors their progress via GitHub Actions CI, and notifies via Telegram when PRs are ready.
 
-**Homer CI is NOT OpenClaw.** OpenClaw is the family assistant. Homer CI uses the OpenClaw WhatsApp bridge as transport but targets Peter's personal chat, not the family group.
+**Homer CI is NOT OpenClaw.** OpenClaw is the family assistant. Homer CI uses the OpenClaw Telegram bridge as transport but targets Peter's personal chat, not the family group.
 
 ### How It Works (Autonomous Mode)
 
-1. You text Homer CI on WhatsApp: "add sunrise times to the weather panel"
+1. You text Homer CI on Telegram: "add sunrise times to the weather panel"
 2. Homer CI reads the codebase module map, asks Claude to plan the task
 3. Claude picks files, chooses Claude Code (frontend) or Codex (backend), writes the prompt
 4. Homer CI spawns the agent in tmux, texts you confirmation
@@ -361,7 +361,7 @@ Homer CI is an autonomous dev orchestrator running on the **Mac Mini**. It liste
 7. Homer CI polls CI results every 15 min, texts you when PR passes all gates
 8. You review and merge over morning coffee
 
-### WhatsApp Commands
+### Telegram Commands
 
 - **Any text** → treated as a task request, planned and spawned automatically
 - **"status"** → returns active agents and recent PRs
@@ -375,13 +375,13 @@ Every hour, Homer CI pulls family data (school updates, notifications) and if no
 
 | File | Purpose |
 |---|---|
-| `.openclaw/homer-ci.sh` | Main daemon — polls WhatsApp, plans tasks, spawns agents, monitors |
+| `.openclaw/homer-ci.sh` | Main daemon — polls Telegram, plans tasks, spawns agents, monitors |
 | `.openclaw/orchestrator-prompt.md` | Homer CI system prompt with architecture + rules |
 | `.openclaw/active-tasks.json` | Task registry (status, gates, PR numbers) |
 | `.openclaw/audit.log` | All agent actions logged here |
 | `.openclaw/scripts/spawn-agent.sh` | Launch agent in tmux with branch isolation |
 | `.openclaw/scripts/check-agents.sh` | Reads CI results, sends notifications |
-| `.openclaw/scripts/notify-whatsapp.sh` | Send dev notifications via OpenClaw bridge |
+| `.openclaw/scripts/notify-telegram.sh` | Send dev notifications via OpenClaw bridge |
 | `.openclaw/scripts/review-pr.sh` | Manual fallback for local PR review |
 | `.openclaw/scripts/build-context.sh` | Generate module map from codebase |
 | `.openclaw/scripts/detect-tasks.sh` | Proactive task suggestions from family context |
@@ -394,7 +394,8 @@ Every hour, Homer CI pulls family data (school updates, notifications) and if no
 ### Environment Variables
 
 ```bash
-HOMER_CI_CHAT_ID="<your-personal-whatsapp-id>@c.us"
+HOMER_CI_CHAT_ID="<your-numeric-telegram-chat-id>"   # e.g. 123456789 (or -100... for supergroups)
+TELEGRAM_BOT_TOKEN="<bot-token-from-@BotFather>"      # required by the bridge
 HOMER_CI_OPENCLAW_URL="http://localhost:3100"  # Same machine on Mac Mini
 ```
 
