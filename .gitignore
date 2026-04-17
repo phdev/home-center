@@ -21,3 +21,10 @@ school-updates/data/
 # OpenClaw router
 openclaw/cache/*.db
 openclaw/logs/*.json
+
+# Email triage — local config with secrets + chat IDs
+email-triage/config.yaml
+email-triage/credentials.json
+email-triage/token.json
+email-triage/email_triage.db
+email-triage/email_triage.log
