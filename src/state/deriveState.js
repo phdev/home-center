@@ -416,6 +416,11 @@ function computeNextTransition(derived, ctx) {
  * @param {RawState} raw
  * @param {DerivedContext} ctx
  * @returns {DerivedState}
+ *
+ * NOTE: Modifying logic inside here changes what flags flip when.
+ *       Update docs/home_center_derived_states.md (flag contract + edge
+ *       cases) and consider a decisions-log entry if you change an
+ *       invariant. See CLAUDE.md → Compound Step.
  */
 export function computeDerivedState(raw, ctx) {
   const events = raw.calendar?.events ?? [];

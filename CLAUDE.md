@@ -46,6 +46,33 @@ the four docs in `docs/`:
   Consequence**.
 - Run `npm test` + `npm run build`. Both must pass.
 
+### Compound Step (capture what was learned)
+
+After any meaningful change, capture what the repo just learned so the next
+change starts from a better baseline. Small fixes don't need this; anything
+that adds, renames, moves, or changes behavior of a flag, card, adapter, or
+invariant does.
+
+Before you open the PR, update the gbrain docs with three things:
+
+1. **What changed.** The flag/card/adapter and its new shape — update
+   `docs/home_center_state_model.md`, `docs/home_center_derived_states.md`,
+   or `docs/home_center_ui_card_contracts.md` as relevant.
+2. **What new rule, invariant, or pattern should be reused.** If this change
+   establishes a pattern ("adapters always do X") or an invariant ("cards
+   never do Y"), say so — so the next similar change doesn't reinvent it.
+3. **Any new edge cases you hit.** Add them to the flag's "Edge cases"
+   section so tests and future callers stay aware.
+
+If the change involves an architecture-level insight — a new boundary, a
+reversed assumption, a pattern that should be repeated — add a dated entry
+in `docs/home_center_decisions_log.md` with **Context / Decision /
+Consequence**. One paragraph is enough. The point is that an architectural
+choice lives in the decisions log, not in a commit message.
+
+Do not let the Compound Step block small bug fixes or cleanup. Use judgment:
+if the change produced a lesson, capture it.
+
 ## Git Workflow
 
 - **Always push and merge into `main`** for every change.

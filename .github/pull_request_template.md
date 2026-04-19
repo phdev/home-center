@@ -20,6 +20,20 @@ what doesn't:
       `docs/home_center_decisions_log.md`
 - [ ] `npm test` and `npm run build` pass locally
 
+## Compound Step
+
+If this PR changed behavior, architecture, or a pattern, capture what the
+repo learned so the next change starts from a better baseline:
+
+- [ ] Updated relevant gbrain docs (state model, derived states, UI card
+      contracts) if behavior changed
+- [ ] Added/updated an entry in `docs/home_center_decisions_log.md` for
+      any new rule, invariant, edge case, or architecture-level insight
+- [ ] Confirmed this change does not introduce logic outside
+      `raw data → derived state → UI`
+
+Small bug fixes and cleanup don't need the Compound Step — use judgment.
+
 ## Test plan
 
 - [ ]

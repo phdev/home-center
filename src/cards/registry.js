@@ -32,6 +32,10 @@ import { ClawSuggestionsCard } from "./ClawSuggestionsCard";
  * @property {string} enhancementFeature
  */
 
+// NOTE: Adding, removing, or changing the `visible` predicate of a card
+//       belongs in docs/home_center_ui_card_contracts.md. If the predicate
+//       relies on a new derived flag, also update
+//       docs/home_center_derived_states.md. See CLAUDE.md → Compound Step.
 /** @type {CardDef[]} */
 export const CARDS = [
   {
