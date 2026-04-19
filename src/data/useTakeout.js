@@ -1,11 +1,14 @@
 import { useEffect, useState, useCallback } from "react";
+import { readWithFallback, writeWithFallback } from "./_storage";
+
+const LOCAL_KEY = "hc:takeout";
 
 /**
- * Takeout decision for tonight.
+ * Today's takeout decision.
  *
- * Reads `{date, decision, vendor?}` from the worker `/api/takeout/today`.
- * Falls back to localStorage so the card works before the worker endpoint
- * exists. Exposes `setDecision` so the UI can write locally + optimistically.
+ * Routing through readWithFallback/writeWithFallback keeps components and
+ * cards source-agnostic — they never know whether the value came from the
+ * worker or localStorage.
  *
  * @param {{url?:string, token?:string}} [workerSettings]
  * @returns {import('../state/types').TakeoutDecision | null}
@@ -15,40 +18,50 @@ export function useTakeout(workerSettings) {
 
   useEffect(() => {
     let cancelled = false;
-    if (!workerSettings?.url) return;
     (async () => {
-      try {
-        const res = await fetch(`${workerSettings.url}/api/takeout/today`, {
-          headers: workerSettings.token
-            ? { Authorization: `Bearer ${workerSettings.token}` }
-            : {},
-        });
-        if (!res.ok) return;
-        const data = await res.json();
-        if (!cancelled && data && typeof data === "object") {
-          setToday(data);
-          writeLocal(data);
-        }
-      } catch {
-        // silent — fall back to local
-      }
+      const data = await readWithFallback({
+        workerSettings,
+        path: "/api/takeout/today",
+        readLocal,
+        writeLocal,
+        parse: (d) => (d && typeof d === "object" && d.date === todayKey() ? d : null),
+      });
+      if (!cancelled && data) setToday(data);
     })();
+    // Listen for same-tab writes so multiple components stay in sync.
+    const handler = (e) => setToday(e.detail);
+    window.addEventListener("hc:takeout-updated", handler);
     return () => {
       cancelled = true;
+      window.removeEventListener("hc:takeout-updated", handler);
     };
   }, [workerSettings?.url, workerSettings?.token]);
 
   return today;
 }
 
-/** @returns {(patch:Partial<import('../state/types').TakeoutDecision>)=>void} */
-export function useTakeoutWriter() {
-  return useCallback((patch) => {
-    const prev = readLocal() ?? { date: todayKey(), decision: null };
-    const next = { ...prev, ...patch, decidedAt: new Date().toISOString() };
-    writeLocal(next);
-    window.dispatchEvent(new CustomEvent("hc:takeout-updated", { detail: next }));
-  }, []);
+/**
+ * Returns a writer that persists via the worker with localStorage fallback.
+ * Components call this without knowing the storage source.
+ */
+export function useTakeoutWriter(workerSettings) {
+  return useCallback(
+    async (patch) => {
+      const prev = readLocal() ?? { date: todayKey(), decision: null };
+      const next = { ...prev, ...patch, decidedAt: new Date().toISOString() };
+      await writeWithFallback({
+        workerSettings,
+        path: "/api/takeout/today",
+        method: "POST",
+        body: next,
+        writeLocalOnFailure: () => writeLocal(next),
+        writeLocalOnSuccess: () => writeLocal(next),
+      });
+      window.dispatchEvent(new CustomEvent("hc:takeout-updated", { detail: next }));
+      return next;
+    },
+    [workerSettings?.url, workerSettings?.token],
+  );
 }
 
 function todayKey() {
@@ -58,7 +71,7 @@ function todayKey() {
 
 function readLocal() {
   try {
-    const raw = localStorage.getItem("hc:takeout");
+    const raw = localStorage.getItem(LOCAL_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     if (parsed?.date !== todayKey()) return null;
@@ -70,6 +83,6 @@ function readLocal() {
 
 function writeLocal(d) {
   try {
-    localStorage.setItem("hc:takeout", JSON.stringify(d));
+    localStorage.setItem(LOCAL_KEY, JSON.stringify(d));
   } catch {}
 }

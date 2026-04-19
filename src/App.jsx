@@ -254,7 +254,7 @@ export default function App() {
             </div>
             <WorldClockPanel />
             <BirthdaysPanel birthdays={bdays.birthdays} loading={bdays.loading} error={bdays.error} derived={derived} />
-            <EventsPanel updates={school.updates} loading={school.loading} error={school.error} />
+            <EventsPanel derived={derived} />
             <AgentTasksPanel tasks={agentTasks.tasks} />
             <TimersPanel timers={timers} dismissTimer={dismissTimer} />
             <ModelHealthPanel onExpand={() => goTo("model-health")} workerSettings={settings.worker} />
@@ -304,7 +304,7 @@ export default function App() {
                       />
                     </div>
                     <div style={{ width: 340, flexShrink: 0, minHeight: 0 }}>
-                      <EventsPanel updates={school.updates} loading={school.loading} error={school.error} selected={hc.selectedPanelId === "events"} />
+                      <EventsPanel derived={derived} selected={hc.selectedPanelId === "events"} />
                     </div>
                   </div>
                 </div>

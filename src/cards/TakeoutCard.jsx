@@ -1,11 +1,13 @@
 import { Utensils, Bot } from "lucide-react";
 import { Panel, PanelHeader } from "../components/Panel";
 import { useTakeoutWriter } from "../data/useTakeout";
+import { useSettings } from "../hooks/useSettings";
 
 const F = "'Geist','Inter',system-ui,sans-serif";
 
 export function TakeoutCard({ derived, enhanced = {}, selected }) {
-  const write = useTakeoutWriter();
+  const { settings } = useSettings();
+  const write = useTakeoutWriter(settings?.worker);
   const state = derived.takeoutState;
   const suggested = enhanced.topPicks?.length
     ? enhanced.topPicks.map((p) => p.name ?? p)

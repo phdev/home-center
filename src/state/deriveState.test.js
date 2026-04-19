@@ -665,8 +665,14 @@ describe("computeDerivedState — claw suggestions ranking", () => {
 // ─── graceful degradation ────────────────────────────────────────────────
 
 describe("computeDerivedState — degradation", () => {
-  it("works on emptyRawState() without throwing", () => {
-    const d = computeDerivedState(emptyRawState(), { now: new Date(), user: PETER });
+  it("works on emptyRawState() without throwing at a mid-day weekday", () => {
+    // Noon Wednesday: outside every deterministic flip window (no morning
+    // overlap, no morning checklist, no takeout/lunch/bedtime). This test
+    // documents that an empty raw state + off-hours clock produces no
+    // suggestions — it must NOT use `new Date()` (CI runs in UTC and would
+    // hit the 16:30/18:00 windows, making the assertion non-deterministic).
+    const now = at(2026, 4, 22, 12, 0);
+    const d = computeDerivedState(emptyRawState(), { now, user: PETER });
     expect(d.hasMorningOverlap).toBe(false);
     expect(d.clawSuggestions).toEqual([]);
   });
