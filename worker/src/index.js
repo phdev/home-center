@@ -127,6 +127,29 @@ export default {
         const id = decodeURIComponent(path.split("/api/tasks/")[1]);
         return corsResponse(env, await handleTaskDelete(id, env));
       }
+      // ── Takeout (tonight's dinner decision) ──
+      if (path === "/api/takeout/today" && request.method === "GET") {
+        return corsResponse(env, await handleTakeoutGet(env));
+      }
+      if (path === "/api/takeout/today" && request.method === "POST") {
+        return corsResponse(env, await handleTakeoutPost(request, env));
+      }
+      // ── Lunch decisions per date ──
+      if (path === "/api/lunch/decisions" && request.method === "GET") {
+        return corsResponse(env, await handleLunchGet(env));
+      }
+      if (path === "/api/lunch/decisions" && request.method === "POST") {
+        return corsResponse(env, await handleLunchPost(request, env));
+      }
+      // ── School lunch menu (read-only; ingestion is a separate task) ──
+      if (path === "/api/school-lunch" && request.method === "GET") {
+        return corsResponse(env, await handleSchoolLunchGet(env));
+      }
+      // ── Birthday gift-status overrides ──
+      if (path.startsWith("/api/birthdays/") && request.method === "PATCH") {
+        const id = decodeURIComponent(path.split("/api/birthdays/")[1]);
+        return corsResponse(env, await handleBirthdayPatch(id, request, env));
+      }
       if (path === "/api/health") {
         // Auth status: check if a valid token was provided (but don't block)
         const auth = request.headers.get("Authorization");
@@ -623,6 +646,9 @@ async function fetchCalDAV(appleId, appPassword, debug = false) {
 
 // ── Birthdays ────────────────────────────────────────────────────────
 
+const BIRTHDAY_GIFTS_KEY = "hc:birthday:gifts";
+const VALID_GIFT_STATUS = new Set(["ready", "ordered", "needed", "unknown"]);
+
 async function handleBirthdays(env) {
   if (!env.ICLOUD_APPLE_ID || !env.ICLOUD_APP_PASSWORD) {
     return json({ error: "CalDAV not configured. Set ICLOUD_APPLE_ID + ICLOUD_APP_PASSWORD." }, 500);
@@ -630,10 +656,45 @@ async function handleBirthdays(env) {
 
   try {
     const birthdays = await fetchBirthdays(env.ICLOUD_APPLE_ID, env.ICLOUD_APP_PASSWORD);
-    return json({ birthdays });
+    const overrides = env.NOTIFICATIONS
+      ? (await env.NOTIFICATIONS.get(BIRTHDAY_GIFTS_KEY, { type: "json" })) ?? {}
+      : {};
+    const merged = birthdays.map((b) => {
+      const o = overrides[b.id ?? b.uid ?? b.name];
+      if (!o) return b;
+      return { ...b, giftStatus: o.giftStatus, giftNotes: o.giftNotes };
+    });
+    return json({ birthdays: merged });
   } catch (e) {
     return json({ error: `Birthdays: ${e.message}`, birthdays: [] }, 500);
   }
+}
+
+async function handleBirthdayPatch(id, request, env) {
+  if (!env.NOTIFICATIONS) return json({ error: "KV not configured" }, 500);
+  if (!id) return json({ error: "id required" }, 400);
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return json({ error: "Invalid JSON" }, 400);
+  }
+  const { giftStatus, giftNotes } = body ?? {};
+  if (!VALID_GIFT_STATUS.has(giftStatus)) {
+    return json({ error: `giftStatus must be one of ${[...VALID_GIFT_STATUS].join(", ")}` }, 400);
+  }
+  if (giftNotes != null && typeof giftNotes !== "string") {
+    return json({ error: "giftNotes must be a string" }, 400);
+  }
+  const overrides =
+    (await env.NOTIFICATIONS.get(BIRTHDAY_GIFTS_KEY, { type: "json" })) ?? {};
+  overrides[id] = {
+    giftStatus,
+    giftNotes: giftNotes ?? overrides[id]?.giftNotes ?? null,
+    updatedAt: new Date().toISOString(),
+  };
+  await env.NOTIFICATIONS.put(BIRTHDAY_GIFTS_KEY, JSON.stringify(overrides));
+  return json({ ok: true, id, override: overrides[id] });
 }
 
 async function fetchBirthdays(appleId, appPassword) {
@@ -891,6 +952,136 @@ async function handleSchoolUpdatesGet(env) {
 
   return json(data);
 }
+
+// ── Takeout (tonight's dinner decision) ─────────────────────────────
+
+const VALID_TAKEOUT_DECISIONS = new Set(["takeout", "home"]);
+
+function takeoutKeyForDate(date) {
+  return `hc:takeout:${date}`;
+}
+
+function todayKey() {
+  const n = new Date();
+  const y = n.getUTCFullYear();
+  const m = String(n.getUTCMonth() + 1).padStart(2, "0");
+  const d = String(n.getUTCDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+async function handleTakeoutGet(env) {
+  if (!env.NOTIFICATIONS) return json(null);
+  const today = todayKey();
+  const raw = await env.NOTIFICATIONS.get(takeoutKeyForDate(today), { type: "json" });
+  if (!raw) return json(null);
+  return json(raw);
+}
+
+async function handleTakeoutPost(request, env) {
+  if (!env.NOTIFICATIONS) return json({ error: "KV not configured" }, 500);
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return json({ error: "Invalid JSON" }, 400);
+  }
+  const { date, decision, vendor, decidedBy } = body ?? {};
+  if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    return json({ error: "date must be YYYY-MM-DD" }, 400);
+  }
+  if (decision !== null && !VALID_TAKEOUT_DECISIONS.has(decision)) {
+    return json({ error: `decision must be one of ${[...VALID_TAKEOUT_DECISIONS].join(", ")} or null` }, 400);
+  }
+  const record = {
+    date,
+    decision,
+    vendor: typeof vendor === "string" ? vendor : undefined,
+    decidedAt: new Date().toISOString(),
+    decidedBy: typeof decidedBy === "string" ? decidedBy : undefined,
+  };
+  await env.NOTIFICATIONS.put(takeoutKeyForDate(date), JSON.stringify(record), {
+    // Keep for ~3 days; cheap insurance against long-running stale keys.
+    expirationTtl: 60 * 60 * 24 * 3,
+  });
+  return json({ ok: true, record });
+}
+
+// ── Lunch decisions per date ────────────────────────────────────────
+
+const LUNCH_INDEX_KEY = "hc:lunch:index";
+function lunchKeyForDate(date) {
+  return `hc:lunch:${date}`;
+}
+
+async function handleLunchGet(env) {
+  if (!env.NOTIFICATIONS) return json({});
+  const index = (await env.NOTIFICATIONS.get(LUNCH_INDEX_KEY, { type: "json" })) ?? [];
+  const out = {};
+  for (const date of index) {
+    const rec = await env.NOTIFICATIONS.get(lunchKeyForDate(date), { type: "json" });
+    if (rec) out[date] = rec;
+  }
+  return json(out);
+}
+
+async function handleLunchPost(request, env) {
+  if (!env.NOTIFICATIONS) return json({ error: "KV not configured" }, 500);
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return json({ error: "Invalid JSON" }, 400);
+  }
+  const { date, child, choice } = body ?? {};
+  if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    return json({ error: "date must be YYYY-MM-DD" }, 400);
+  }
+  if (typeof child !== "string" || !child) {
+    return json({ error: "child required" }, 400);
+  }
+  if (choice !== "school" && choice !== "home" && choice !== null) {
+    return json({ error: "choice must be 'school', 'home', or null" }, 400);
+  }
+  const existing =
+    (await env.NOTIFICATIONS.get(lunchKeyForDate(date), { type: "json" })) ?? {
+      date,
+      perChild: {},
+    };
+  existing.perChild[child] = choice;
+  existing.updatedAt = new Date().toISOString();
+  await env.NOTIFICATIONS.put(lunchKeyForDate(date), JSON.stringify(existing), {
+    expirationTtl: 60 * 60 * 24 * 14,
+  });
+  // Update the date index (trim to last 14 dates).
+  const index = (await env.NOTIFICATIONS.get(LUNCH_INDEX_KEY, { type: "json" })) ?? [];
+  const next = [date, ...index.filter((d) => d !== date)].slice(0, 14);
+  await env.NOTIFICATIONS.put(LUNCH_INDEX_KEY, JSON.stringify(next));
+  return json({ ok: true, record: existing });
+}
+
+// ── School lunch menu (read-only; ingestion is a separate task) ─────
+
+const SCHOOL_LUNCH_KEY = "hc:school-lunch:menu";
+
+async function handleSchoolLunchGet(env) {
+  if (!env.NOTIFICATIONS) return json({ days: [] });
+  const raw = await env.NOTIFICATIONS.get(SCHOOL_LUNCH_KEY, { type: "json" });
+  if (!raw || !Array.isArray(raw.days)) return json({ days: [] });
+  return json(raw);
+}
+
+/*
+ * TODO: school-lunch ingestion (out of scope for this PR).
+ *
+ * Write a scheduled worker that monthly:
+ *   1. Fetches the two district PDFs (see README / docs).
+ *   2. Parses menu items per date.
+ *   3. Writes the result to KV at SCHOOL_LUNCH_KEY as `{days: [{date, items, noSchool?}]}`.
+ *
+ * Until that exists, the dashboard's LunchCard renders a
+ * "Menu not loaded yet — check with school" fallback and the derived
+ * `lunchDecisionNeeded` flag still works.
+ */
 
 // ── Photos ──────────────────────────────────────────────────────────
 

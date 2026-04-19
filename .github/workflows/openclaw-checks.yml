@@ -1,0 +1,197 @@
+name: Homer CI — PR Checks
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  build:
+    name: Build Verification
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+  tests:
+    name: Architecture Test Suite
+    # Blocking: the test suite is the enforcement mechanism for the
+    # raw → derived → UI architectural invariants. See
+    # docs/home_center_state_model.md and CLAUDE.md → Testing.
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run Vitest suite
+        run: npm test
+
+  code-review:
+    name: Automated Code Review
+    runs-on: ubuntu-latest
+    if: startsWith(github.head_ref, 'openclaw/')
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get PR diff
+        id: diff
+        run: |
+          DIFF=$(gh pr diff ${{ github.event.pull_request.number }} --repo ${{ github.repository }})
+          # Save to file to avoid shell escaping issues
+          echo "$DIFF" > /tmp/pr-diff.txt
+          echo "lines=$(echo "$DIFF" | wc -l)" >> "$GITHUB_OUTPUT"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Review with Claude
+        if: steps.diff.outputs.lines != '0'
+        run: |
+          # Truncate large diffs
+          head -500 /tmp/pr-diff.txt > /tmp/pr-diff-truncated.txt
+
+          DIFF_CONTENT=$(cat /tmp/pr-diff-truncated.txt)
+
+          REVIEW=$(curl -s -X POST "https://api.anthropic.com/v1/messages" \
+            -H "Content-Type: application/json" \
+            -H "x-api-key: $ANTHROPIC_API_KEY" \
+            -H "anthropic-version: 2023-06-01" \
+            -d "$(python3 -c "
+          import json, sys
+          diff = open('/tmp/pr-diff-truncated.txt').read()
+          prompt = '''Review this PR diff for a Vite/React dashboard project (plain JavaScript). Check for:
+          1. Correctness — does the code work?
+          2. Style — inline styles, lucide-react icons, consistent patterns
+          3. Security — no XSS, no secrets, no console.log in production
+          4. Performance — no unnecessary re-renders, missing useEffect deps
+          5. Build safety — will npm run build pass?
+
+          Be concise. If good, say LGTM. If issues, bullet points only.
+
+          Diff:
+          \`\`\`
+          ''' + diff + '''
+          \`\`\`'''
+          msg = {
+              'model': 'claude-sonnet-4-20250514',
+              'max_tokens': 1024,
+              'messages': [{'role': 'user', 'content': prompt}]
+          }
+          print(json.dumps(msg))
+          ")")
+
+          # Extract text from response
+          REVIEW_TEXT=$(echo "$REVIEW" | python3 -c "
+          import json, sys
+          data = json.load(sys.stdin)
+          blocks = data.get('content', [])
+          print('\n'.join(b.get('text', '') for b in blocks if b.get('type') == 'text'))
+          ")
+
+          # Post as PR comment
+          gh pr comment ${{ github.event.pull_request.number }} \
+            --repo ${{ github.repository }} \
+            --body "## 🤖 Claude Code Review
+
+          $REVIEW_TEXT
+
+          ---
+          *Automated review by Homer CI*"
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    if: startsWith(github.head_ref, 'openclaw/')
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check for secrets in diff
+        run: |
+          DIFF=$(gh pr diff ${{ github.event.pull_request.number }} --repo ${{ github.repository }})
+
+          # Check for common secret patterns in added lines
+          SECRETS_FOUND=$(echo "$DIFF" | grep '^+' | grep -iE \
+            '(api[_-]?key|secret|password|token|credential|private[_-]?key)\s*[:=]\s*["\x27][^"\x27]{8,}' \
+            || true)
+
+          if [ -n "$SECRETS_FOUND" ]; then
+            echo "::error::Potential secrets detected in PR diff"
+            echo "$SECRETS_FOUND"
+            gh pr comment ${{ github.event.pull_request.number }} \
+              --repo ${{ github.repository }} \
+              --body "## 🔴 Security Alert
+
+          Potential secrets detected in this PR. Please review the following lines:
+
+          \`\`\`
+          $SECRETS_FOUND
+          \`\`\`
+
+          ---
+          *Automated scan by Homer CI*"
+            exit 1
+          fi
+
+          echo "No secrets detected"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Check for forbidden operations
+        run: |
+          DIFF=$(gh pr diff ${{ github.event.pull_request.number }} --repo ${{ github.repository }})
+
+          # Check for SSH commands, deployment commands, or Pi access in added code
+          FORBIDDEN=$(echo "$DIFF" | grep '^+' | grep -iE \
+            '(ssh\s+pi@|wrangler\s+deploy|git\s+push.*main|homecenter\.local)' \
+            || true)
+
+          if [ -n "$FORBIDDEN" ]; then
+            echo "::warning::Agent attempted forbidden operations"
+            gh pr comment ${{ github.event.pull_request.number }} \
+              --repo ${{ github.repository }} \
+              --body "## ⚠️ Security Warning
+
+          This PR contains references to forbidden operations (Pi SSH, deployment, push to main). Agent code should never include these.
+
+          \`\`\`
+          $FORBIDDEN
+          \`\`\`
+
+          ---
+          *Automated scan by Homer CI*"
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

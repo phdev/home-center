@@ -1,11 +1,13 @@
 import { Sandwich, Bot } from "lucide-react";
 import { Panel, PanelHeader } from "../components/Panel";
 import { useLunchWriter } from "../data/useLunch";
+import { useSettings } from "../hooks/useSettings";
 
 const F = "'Geist','Inter',system-ui,sans-serif";
 
 export function LunchCard({ derived, raw, enhanced = {}, selected }) {
-  const write = useLunchWriter();
+  const { settings } = useSettings();
+  const write = useLunchWriter(settings?.worker);
   const ctx = derived.lunchContext;
   if (!ctx) return null;
 

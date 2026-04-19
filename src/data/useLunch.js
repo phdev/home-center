@@ -1,16 +1,13 @@
 import { useEffect, useState, useCallback } from "react";
+import { readWithFallback, writeWithFallback } from "./_storage";
+
+const LOCAL_KEY = "hc:lunchDecisions";
 
 /**
- * Lunch decisions per date, keyed by ISO date string.
+ * Lunch decisions per date.
  *
- * Shape:
- *   {
- *     '2026-04-20': { date, perChild: { emma: 'school', jack: 'home' } },
- *   }
- *
- * Reads from worker `/api/lunch/decisions` when available, otherwise
- * localStorage. Writes flow through useLunchWriter and optimistically
- * update localStorage.
+ * Shape: `{ [date]: { date, perChild: { emma: 'school', jack: 'home' } } }`.
+ * Routing through the shared storage helper keeps components source-agnostic.
  *
  * @param {{url?:string, token?:string}} [workerSettings]
  * @returns {Object.<string, import('../state/types').LunchDecision>}
@@ -20,36 +17,31 @@ export function useLunchDecisions(workerSettings) {
 
   useEffect(() => {
     let cancelled = false;
-    if (!workerSettings?.url) return;
     (async () => {
-      try {
-        const res = await fetch(`${workerSettings.url}/api/lunch/decisions`, {
-          headers: workerSettings.token
-            ? { Authorization: `Bearer ${workerSettings.token}` }
-            : {},
-        });
-        if (!res.ok) return;
-        const data = await res.json();
-        if (!cancelled && data && typeof data === "object") {
-          setDecisions(data);
-          writeLocal(data);
-        }
-      } catch {
-        // silent
-      }
+      const data = await readWithFallback({
+        workerSettings,
+        path: "/api/lunch/decisions",
+        readLocal,
+        writeLocal,
+        parse: (d) => (d && typeof d === "object" ? d : null),
+      });
+      if (!cancelled && data) setDecisions(data);
     })();
+    const handler = (e) => setDecisions(e.detail);
+    window.addEventListener("hc:lunch-updated", handler);
     return () => {
       cancelled = true;
+      window.removeEventListener("hc:lunch-updated", handler);
     };
   }, [workerSettings?.url, workerSettings?.token]);
 
   return decisions;
 }
 
-export function useLunchWriter() {
+export function useLunchWriter(workerSettings) {
   return useCallback(
-    /** @param {string} dateISO @param {{child:string, choice:'school'|'home'}} payload */
-    (dateISO, { child, choice }) => {
+    /** @param {string} dateISO @param {{child:string, choice:'school'|'home'|null}} payload */
+    async (dateISO, { child, choice }) => {
       const all = readLocal() ?? {};
       const existing = all[dateISO] ?? { date: dateISO, perChild: {} };
       const next = {
@@ -59,16 +51,24 @@ export function useLunchWriter() {
           perChild: { ...existing.perChild, [child]: choice },
         },
       };
-      writeLocal(next);
+      await writeWithFallback({
+        workerSettings,
+        path: "/api/lunch/decisions",
+        method: "POST",
+        body: { date: dateISO, child, choice },
+        writeLocalOnFailure: () => writeLocal(next),
+        writeLocalOnSuccess: () => writeLocal(next),
+      });
       window.dispatchEvent(new CustomEvent("hc:lunch-updated", { detail: next }));
+      return next;
     },
-    [],
+    [workerSettings?.url, workerSettings?.token],
   );
 }
 
 function readLocal() {
   try {
-    const raw = localStorage.getItem("hc:lunchDecisions");
+    const raw = localStorage.getItem(LOCAL_KEY);
     return raw ? JSON.parse(raw) : {};
   } catch {
     return {};
@@ -77,6 +77,6 @@ function readLocal() {
 
 function writeLocal(d) {
   try {
-    localStorage.setItem("hc:lunchDecisions", JSON.stringify(d));
+    localStorage.setItem(LOCAL_KEY, JSON.stringify(d));
   } catch {}
 }
