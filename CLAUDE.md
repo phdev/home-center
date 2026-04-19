@@ -1,5 +1,51 @@
 # CLAUDE.md — Project Memory
 
+## Project Brain (gbrain) — READ FIRST
+
+Before making meaningful changes to Home Center — adding a card, changing a
+derived-state flag, touching data ingestion, wiring an enhancement — read
+the four docs in `docs/`:
+
+1. [`docs/README.md`](docs/README.md) — the gbrain contract (rules everything follows)
+2. [`docs/home_center_state_model.md`](docs/home_center_state_model.md) — raw sources → derived state → UI map
+3. [`docs/home_center_derived_states.md`](docs/home_center_derived_states.md) — per-flag contracts
+4. [`docs/home_center_ui_card_contracts.md`](docs/home_center_ui_card_contracts.md) — per-card contracts
+5. [`docs/home_center_decisions_log.md`](docs/home_center_decisions_log.md) — decisions log
+
+### Rules (non-negotiable)
+
+1. **Raw data → derived state → UI is the only flow.** Do not bypass it.
+2. **UI visibility is driven only by derived state.** Never put visibility
+   logic (`if now.hour >= …`, `if fetch result …`) inside a component. If a
+   card needs a new trigger, add a flag in `src/state/deriveState.js` first.
+3. **OpenClaw enhances, it does not decide.** Copy, summaries, ordering
+   hints — yes. Card visibility, reminder timing, flag truth value — no.
+   Every enhancement call must degrade gracefully to deterministic copy.
+4. **Storage source is invisible to components.** Worker-vs-localStorage
+   routing stays in `src/data/_storage.js` + adapter wrappers.
+5. **Reminder timing is deterministic arithmetic**, not an LLM call.
+
+### Workflow — what to do before/after a change
+
+**Before implementing:**
+- Skim the relevant doc(s) to confirm contracts and edge cases.
+- If the change doesn't fit the existing contract, decide whether to
+  extend the contract (update the doc) or rethink the change.
+
+**While implementing:**
+- Put state logic in `src/state/deriveState.js` (pure, testable).
+- Put visibility predicates in `src/cards/registry.js`.
+- Put storage routing in `src/data/*` adapters.
+- Put enhancement calls behind `useEnhancement(...)` with fallback.
+
+**After implementing:**
+- Update the relevant gbrain doc(s). At minimum: the flag contract or card
+  contract for what you changed.
+- If you changed an invariant, rule, or architectural pattern, add an
+  entry to `docs/home_center_decisions_log.md` with **Context / Decision /
+  Consequence**.
+- Run `npm test` + `npm run build`. Both must pass.
+
 ## Git Workflow
 
 - **Always push and merge into `main`** for every change.

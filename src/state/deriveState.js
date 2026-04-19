@@ -4,7 +4,13 @@
  * No React, no clock, no network. Every time comparison uses ctx.now so tests
  * can freeze time.
  *
- * See docs/home_center_derived_states.md for the contract of every flag here.
+ * This is the SINGLE place card visibility is decided. Do not move any of
+ * this logic into components or cards (see docs/README.md — gbrain contract).
+ *
+ * Docs that MUST be updated when you change logic here:
+ *   - docs/home_center_derived_states.md (per-flag contracts)
+ *   - docs/home_center_state_model.md (if you change inputs or ownership)
+ *   - docs/home_center_decisions_log.md (if you change an invariant)
  */
 
 /** @typedef {import('./types').RawState} RawState */

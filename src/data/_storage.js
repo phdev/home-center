@@ -1,8 +1,9 @@
 /**
  * Shared storage primitives for data adapters.
  *
- * Contract (see docs/home_center_decisions_log.md — "Separate ingestion from
- * rendering"):
+ * Contract (see docs/README.md — rule #4 "Storage source is invisible to
+ * components", plus docs/home_center_decisions_log.md →
+ * "Worker-backed persistence with local fallback"):
  *
  *   - All worker-vs-localStorage routing lives HERE (plus the per-adapter
  *     wrappers that call this). Components / cards never see the difference.
@@ -10,6 +11,9 @@
  *     non-2xx, timeout) falls back to localStorage.
  *   - Writes go to both on success, so a later `read()` returns the right
  *     thing even if the worker becomes unavailable mid-session.
+ *
+ * If you add a new adapter, route it through this helper. Bypassing it
+ * breaks the invariant that components are storage-source-agnostic.
  */
 
 const DEFAULT_TIMEOUT_MS = 6_000;

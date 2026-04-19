@@ -5,6 +5,75 @@ Newest at top.
 
 ---
 
+## 2026-04-19 — Gbrain is an active part of the workflow
+
+**Context**
+The four docs in `docs/` described the architecture accurately, but nothing
+in the repo made it clear they should be *read before* and *updated after*
+meaningful changes. Drift between code and docs was one rebase away.
+
+**Decision**
+- Add `docs/README.md` as the explicit gbrain contract — lists the four docs,
+  the rules, and the before/after workflow.
+- Add a "Project Brain (gbrain) — READ FIRST" section at the top of
+  `CLAUDE.md` so AI assistants see the contract immediately.
+- Add a PR template (`.github/pull_request_template.md`) that asks
+  contributors whether they updated the relevant doc(s).
+- Add a contributor section to the repo `README.md` pointing at the docs.
+- Add inline pointers in key state/registry files so developers who grep
+  find the docs.
+
+**Consequence**
+Docs and code are expected to stay in sync in the same PR. An architectural
+change that doesn't log an entry here is a regression.
+
+---
+
+## 2026-04-19 — Worker-backed persistence with local fallback
+
+**Context**
+Takeout / lunch decisions and birthday gift-status were localStorage-only.
+Decisions made on the TV never reached a phone and vice-versa. Long-term
+this would be confusing for the family.
+
+**Decision**
+Introduce `src/data/_storage.js` (`readWithFallback` / `writeWithFallback`)
+as the **only** place that knows about worker-vs-local routing. All
+adapters (takeout, lunch, school-lunch, birthday gift) route through it.
+Worker endpoints (`POST /api/takeout/today`, `POST /api/lunch/decisions`,
+`GET /api/school-lunch`, `PATCH /api/birthdays/:id`) are KV-backed behind
+Bearer auth.
+
+**Consequence**
+Components remain storage-source-agnostic (invariant, not coincidence).
+Decisions sync across devices when the worker is up, survive reloads
+when it isn't. The fallback path is tested — if someone adds a new
+adapter they must use this helper or violate the invariant visibly.
+
+---
+
+## 2026-04-19 — Scheduling uses nextMeaningfulTransition
+
+**Context**
+A 30 s generic tick wastes cycles and can miss sharp flag edges by up to
+30 s. A purely transition-driven schedule leaves the dashboard stuck if
+`nextMeaningfulTransition` is missing or invalid.
+
+**Decision**
+`src/state/useDerivedState.js` runs **both**:
+- A precise `setTimeout` against `derived.nextMeaningfulTransition` when
+  it's valid, in the future, and ≤ 10 min away.
+- A 60 s fallback interval that always runs.
+
+Invalid / far-future transitions are ignored silently; the interval
+carries us forward.
+
+**Consequence**
+Flag edges land within ~1 s, CPU stays low. Missing / malformed
+transitions never deadlock the scheduler.
+
+---
+
 ## 2026-04-19 — Adopt three-layer state-driven architecture
 
 **Context**

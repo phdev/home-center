@@ -8,6 +8,11 @@
  *
  * `visible(derived)` must be deterministic and derived-state-driven — do
  * not read props, refs, DOM, or localStorage here.
+ *
+ * When you add or change a card here, update:
+ *   - docs/home_center_ui_card_contracts.md (per-card contract)
+ *   - docs/home_center_derived_states.md (if it relies on a new flag)
+ * See docs/README.md for the full gbrain contract.
  */
 
 import { MorningChecklistCard } from "./MorningChecklistCard";

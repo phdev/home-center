@@ -51,12 +51,20 @@ The Pi runs a wake word service (`pi/wake_word_service.py`) using openWakeWord +
 
 Meta Ray-Ban glasses stream video to a HandController iOS app, which detects hand gestures and sends them to the Pi. Wave to navigate between panels, pinch to open/close fullscreen pages.
 
+## Contributing
+
+**Before touching state, cards, or data flow:** read the project brain in
+[`docs/README.md`](docs/README.md). The four docs there define how state is
+derived, what makes a card visible, and which decisions have already been
+made. Meaningful changes should update the relevant doc(s) in the same PR.
+
 ## Development
 
 ```bash
 npm install
 npm run dev        # http://localhost:5173
 npm run build      # outputs to ./dist
+npm test           # Vitest suite (architecture invariants)
 ```
 
 **Display target:** 1920x1080 logical (rendered at 2x on 4K TV via `--force-device-scale-factor=2`).

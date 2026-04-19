@@ -21,6 +21,10 @@ const MAX_PRECISE_SCHEDULE_MS = 10 * 60_000;
  *       `derived.nextMeaningfulTransition` when that timestamp is valid,
  *       in the future, and within `MAX_PRECISE_SCHEDULE_MS`. The two
  *       mechanisms compose — whichever fires first calls setNow.
+ *
+ * See docs/home_center_decisions_log.md → "Scheduling uses
+ * nextMeaningfulTransition" for the rationale. Changing these constants
+ * means updating that entry.
  */
 export function useDerivedState({ user = { isPeter: true } } = {}) {
   const raw = useRawState();

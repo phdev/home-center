@@ -33,14 +33,15 @@ implementation is wrong (refactor it).
 
 | Source | Owner | Adapter | Refresh | Notes |
 |---|---|---|---|---|
-| Howell Family iCloud calendar | Cloudflare Worker `/api/calendar` | `src/hooks/useCalendar.js` → `src/data/calendar.js` normalizer | 5 min | Already live |
-| Weather | Worker `/api/weather` | `src/hooks/useWeather.js` → `src/data/weather.js` | 15 min | Already live |
-| Birthday records | User-owned JSON in worker KV (`/api/birthdays`) | `src/hooks/useBirthdays.js` → `src/data/birthdays.js` | 1 h | Add `gift_ordered` field + audit (see §Gift status) |
-| Meal plan / takeout decisions | Worker KV (`/api/takeout/today`) + local quick-set | `src/data/takeout.js` | on write | New endpoint; store `{date, decision: 'takeout'|'home'|null, vendor?, decidedAt, decidedBy}` |
-| Bedtime settings | `src/services/settings.js` | `src/data/bedtime.js` | on change | Per-child schedule `{weekday, weekend, reminderLeadMin}` |
-| Checklist config | Static + overrides in settings | `src/data/checklist.js` | on change | Base items + context-conditional items |
-| School emails | `email-triage` service → Worker `/api/school-updates` | `src/hooks/useSchoolUpdates.js` → `src/data/schoolUpdates.js` | 5 min | Semantic pipeline — see Feature Pass 2 |
-| School lunch menus | Static PDFs ingested into worker KV (`/api/school-lunch?date=…`) | `src/data/schoolLunch.js` | weekly | Source: district menu PDFs; ingest monthly via worker cron |
+| Howell Family iCloud calendar | Cloudflare Worker `/api/calendar` (CalDAV backend) | `src/hooks/useCalendar.js` → `src/data/calendar.js` normalizer | 5 min | Live |
+| Weather | Worker `/api/weather` | `src/hooks/useWeather.js` → `src/data/weather.js` | 15 min | Live |
+| Birthday records | Worker `/api/birthdays` — CalDAV feed merged with KV gift overrides (`PATCH /api/birthdays/:id`) | `src/hooks/useBirthdays.js` → `src/data/birthdays.js`; gift writer `src/data/useBirthdayGift.js` | 1 h + on write | Live |
+| Takeout decisions | Worker `GET`/`POST /api/takeout/today` (KV) with localStorage fallback via `src/data/_storage.js` | `src/data/useTakeout.js` (reader + `useTakeoutWriter`) | on write | Live |
+| Lunch decisions | Worker `GET`/`POST /api/lunch/decisions` (KV-indexed by date, 14-day retention) with localStorage fallback | `src/data/useLunch.js` (reader + `useLunchWriter`) | on write | Live |
+| School lunch menus | Worker `GET /api/school-lunch` (KV read-only) with localStorage fallback | `src/data/useSchoolLunch.js` | weekly | **Read live; ingestion (PDF → KV) still TODO** — stub in `worker/src/index.js` |
+| Bedtime settings | `useSettings()` + `src/data/useBedtime.js` default | `src/data/useBedtime.js` | on change | Per-child schedule `{weekday, weekend, reminderLeadMin}` |
+| Checklist config | `useSettings()` override + `src/data/useChecklist.js` default | `src/data/useChecklist.js` | on change | Base items + condition-gated items (`always` / `cold` / `hot` / `rain`) |
+| School emails | `email-triage` service → Worker `/api/school-updates` → derived ranking + `src/data/schoolHeuristics.js` (pre-LLM kind/urgency/dueDate/dedup) | `src/hooks/useSchoolUpdates.js` → `src/data/schoolUpdates.js` | 5 min | Live. Regex heuristics applied first; LLM classifier results (when present) override |
 
 ## Normalization contracts
 
@@ -62,11 +63,13 @@ Full catalog lives in `src/state/types.js`.
 |---|---|
 | External API integration | `src/services/` |
 | Caching + retries | service layer |
+| Worker-vs-localStorage routing | `src/data/_storage.js` + per-adapter wrappers — the **only** place that knows about both sources |
 | Normalization + shape guarantees | `src/data/*` adapters |
 | React data wiring | `src/hooks/*` (wraps adapters, triggers refresh) |
 | **Derived state computation** | `src/state/deriveState.js` — **only place** |
+| Recompute scheduling | `src/state/useDerivedState.js` — precise `setTimeout` off `nextMeaningfulTransition` + 60 s fallback interval |
 | OpenClaw enhancement | `src/ai/openclaw.js` |
-| Card visibility rules | derived state only (never components) |
+| Card visibility rules | derived state only (never components). Registered in `src/cards/registry.js` |
 | Card rendering | `src/cards/*` + existing `src/components/*` |
 
 ## Deterministic vs OpenClaw-enhanced logic
@@ -102,13 +105,14 @@ Full catalog lives in `src/state/types.js`.
 
 | Failure | Behavior |
 |---|---|
-| Worker down | Cached last-known raw data; stale badge in top nav |
-| OpenClaw down | Deterministic copy shown; no silent failure messages |
-| Time source drift | Derived state recomputes on every tick (~30s); clock-bound cards hide/show correctly |
-| Adapter throws | Isolated — its derived slice = `null`, dependent cards hide; unrelated cards unaffected |
+| Worker down | `src/data/_storage.js` → `readWithFallback` returns localStorage value; `writeWithFallback` persists to localStorage so a later read works. No user-visible error. |
+| OpenClaw down | `src/ai/openclaw.js` → `enhance()` returns `{fields: {}, source: 'fallback'}`. Cards render deterministic fallback copy. |
+| Time source drift | Derived state recomputes on a 60 s safety-net interval and on every precise `nextMeaningfulTransition` (when in the future + ≤ 10 min away). |
+| Adapter throws | Isolated — adapter returns `null`/`[]`, dependent cards hide or render their empty state. Unrelated cards unaffected. |
 
 ## Related docs
 
+- [`README.md`](./README.md) — the gbrain contract (read first)
 - `home_center_derived_states.md` — per-flag spec
 - `home_center_ui_card_contracts.md` — per-card contract
 - `home_center_decisions_log.md` — architecture decisions log
