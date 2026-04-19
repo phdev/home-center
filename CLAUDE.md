@@ -301,6 +301,49 @@ After setup, migrate services off the Pi:
 bash .openclaw/mac-mini/migrate-from-pi.sh
 ```
 
+## State-Driven Architecture
+
+The dashboard follows a **raw → derived → UI** pipeline. See the detailed specs:
+
+- `docs/home_center_state_model.md` — data sources, ownership, failure modes
+- `docs/home_center_derived_states.md` — per-flag contracts (inputs, rules, edge cases)
+- `docs/home_center_ui_card_contracts.md` — per-card visibility / data / enhancement / actions
+- `docs/home_center_decisions_log.md` — architecture decisions log
+
+### Directory layout
+
+| Path | Purpose |
+|---|---|
+| `src/services/` | External API clients (no React) |
+| `src/data/` | Normalizers + small hooks that adapt service output to canonical RawState shapes |
+| `src/hooks/` | Existing React data-fetching hooks — kept as-is |
+| `src/state/` | `types.js` (JSDoc typedefs), `deriveState.js` (pure fn), `useDerivedState.js` |
+| `src/cards/` | New feature cards + `registry.js` + `ContextualSlot.jsx` |
+| `src/ai/openclaw.js` | Enhancement helper — timeout + graceful fallback |
+
+### Guardrails (see decisions log)
+
+- **Card visibility is deterministic.** Components never compute `should I show?`; they read from `DerivedState`.
+- **OpenClaw is enrichment, not dependency.** Cards must render correctly with the enhancer offline.
+- **Reminder timing is deterministic.** Bedtime / 16:30 / 18:00 thresholds are arithmetic, not LLM calls.
+- **Adding a new card = edit `src/cards/registry.js`.** That file is the only place that maps flags → components.
+
+### Contextual slot
+
+The mid-bottom Photos slot is a registry-driven `ContextualSlot`. It renders the
+highest-tier visible card (Lunch Decision, Takeout Decision, Morning Checklist),
+falling back to `<PhotoPanel>`. The right-column `FactPanel` slot similarly
+flips to `<ClawSuggestionsCard>` when suggestions exist.
+
+### Adding a feature
+
+1. Document the flag(s) in `docs/home_center_derived_states.md`.
+2. Add the card contract to `docs/home_center_ui_card_contracts.md`.
+3. Extend `src/state/types.js` with the new fields.
+4. Implement the rule in `src/state/deriveState.js`.
+5. Add the card under `src/cards/` and register it in `src/cards/registry.js`.
+6. (Optional) Wire an OpenClaw enhancer via `useEnhancement("featureKey", state, workerSettings)`.
+
 ## OpenClaw (Family Telegram Assistant)
 
 ### Architecture

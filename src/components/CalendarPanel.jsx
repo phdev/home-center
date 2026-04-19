@@ -1,4 +1,4 @@
-import { Calendar } from "lucide-react";
+import { Calendar, TriangleAlert } from "lucide-react";
 import { Panel, PanelHeader } from "./Panel";
 import { CALENDAR } from "../data/mockData";
 
@@ -15,8 +15,9 @@ function dedup(events) {
   });
 }
 
-export function CalendarPanel({ t, events, loading, error, selected }) {
+export function CalendarPanel({ t, events, loading, error, selected, derived }) {
   const items = dedup(events || CALENDAR);
+  const conflictBanner = buildConflictBanner(derived);
 
   // Group events by day label
   const groups = [];
@@ -42,6 +43,30 @@ export function CalendarPanel({ t, events, loading, error, selected }) {
         label="Calendar"
         subtitle={subtitle}
       />
+      {conflictBanner && (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "flex-start",
+            gap: 8,
+            padding: "8px 12px",
+            borderRadius: 8,
+            background: "#F59E0B15",
+            border: "1px solid #F59E0B60",
+            marginBottom: 8,
+          }}
+        >
+          <TriangleAlert size={16} color="#F59E0B" style={{ flexShrink: 0, marginTop: 2 }} />
+          <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+            <span style={{ fontFamily: F, fontSize: 13, fontWeight: 600, color: "#F59E0B" }}>
+              {conflictBanner.title}
+            </span>
+            <span style={{ fontFamily: F, fontSize: 12, color: "#FFFFFFCC", lineHeight: 1.35 }}>
+              {conflictBanner.detail}
+            </span>
+          </div>
+        </div>
+      )}
       <div
         style={{
           display: "flex",
@@ -122,4 +147,23 @@ export function CalendarPanel({ t, events, loading, error, selected }) {
       </div>
     </Panel>
   );
+}
+
+function buildConflictBanner(derived) {
+  if (!derived) return null;
+  if (!derived.hasMorningOverlap && !derived.peter0800_0900Risk) return null;
+  if (derived.hasMorningOverlap && derived.conflicts[0]) {
+    const c = derived.conflicts[0];
+    const t = new Date(c.at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+    return {
+      title: `Heads up — ${t} overlap`,
+      detail: `${c.a.title} and ${c.b.title} both at ${t}.${
+        derived.peter0800_0900Risk ? " Peter: watch your 8–9 block." : ""
+      }`,
+    };
+  }
+  return {
+    title: "Watch the 8–9 block",
+    detail: "You've got something scheduled 8–9 on a weekday.",
+  };
 }

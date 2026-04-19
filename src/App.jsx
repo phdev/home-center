@@ -37,6 +37,18 @@ import { WakeWordDebug } from "./components/WakeWordDebug";
 import { VoiceActivationOverlay } from "./components/VoiceActivationOverlay";
 import { ModelHealthPanel } from "./modules/model-health/ModelHealthPanel";
 import { FullModelHealthPage } from "./modules/model-health/FullModelHealthPage";
+import { computeDerivedState } from "./state/deriveState";
+import { normalizeCalendar } from "./data/calendar";
+import { normalizeBirthdays } from "./data/birthdays";
+import { normalizeWeather } from "./data/weather";
+import { normalizeSchoolItems } from "./data/schoolUpdates";
+import { useTakeout } from "./data/useTakeout";
+import { useBedtimeSettings } from "./data/useBedtime";
+import { useChecklistConfig } from "./data/useChecklist";
+import { useLunchDecisions } from "./data/useLunch";
+import { useSchoolLunchMenu } from "./data/useSchoolLunch";
+import { ContextualSlot, RightColumnCards, OverlayCards } from "./cards/ContextualSlot";
+import { useMemo } from "react";
 
 export default function App() {
   const now = useTime();
@@ -62,6 +74,36 @@ export default function App() {
   const wakeDebug = useWakeWordDebug(settings.worker);
   const wakeRecord = useWakeRecord();
   const agentTasks = useAgentTasks(settings.worker);
+
+  // Derived-state layer (see docs/home_center_state_model.md)
+  const takeout = useTakeout(settings.worker);
+  const bedtimeSettings = useBedtimeSettings(settings);
+  const checklist = useChecklistConfig(settings);
+  const lunchDecisions = useLunchDecisions(settings.worker);
+  const schoolLunchMenu = useSchoolLunchMenu(settings.worker);
+
+  const rawState = useMemo(
+    () => ({
+      calendar: { events: normalizeCalendar(calendar) },
+      weather: { today: normalizeWeather(weather.data ?? weather) },
+      birthdays: normalizeBirthdays(bdays),
+      bedtime: bedtimeSettings,
+      checklist,
+      takeout: { today: takeout ?? null },
+      lunchDecisions: lunchDecisions ?? {},
+      schoolLunchMenu: schoolLunchMenu ?? [],
+      schoolItems: normalizeSchoolItems(school),
+      settings: {},
+    }),
+    [
+      calendar, weather, bdays, bedtimeSettings, checklist,
+      takeout, lunchDecisions, schoolLunchMenu, school,
+    ],
+  );
+  const derived = useMemo(
+    () => computeDerivedState(rawState, { now, user: { isPeter: true } }),
+    [rawState, now],
+  );
 
   // Auto-navigate to LLM response page when a new response arrives
   useEffect(() => {
@@ -205,13 +247,13 @@ export default function App() {
 
         {isMobile ? (
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            <CalendarPanel events={calendar.events} loading={calendar.loading} error={calendar.error} />
+            <CalendarPanel events={calendar.events} loading={calendar.loading} error={calendar.error} derived={derived} />
             <WeatherPanel weatherData={weather.data} loading={weather.loading} error={weather.error} />
             <div style={{ height: 220 }}>
               <PhotoPanel photos={photos.photos} photosLoading={photos.loading} photosError={photos.error} />
             </div>
             <WorldClockPanel />
-            <BirthdaysPanel birthdays={bdays.birthdays} loading={bdays.loading} error={bdays.error} />
+            <BirthdaysPanel birthdays={bdays.birthdays} loading={bdays.loading} error={bdays.error} derived={derived} />
             <EventsPanel updates={school.updates} loading={school.loading} error={school.error} />
             <AgentTasksPanel tasks={agentTasks.tasks} />
             <TimersPanel timers={timers} dismissTimer={dismissTimer} />
@@ -227,14 +269,14 @@ export default function App() {
               <div style={{ display: "flex", gap: 16, flex: 1, minHeight: 0, marginLeft: 16 }}>
                 {/* Left column: Calendar */}
                 <div style={{ width: 400, flexShrink: 0, minHeight: 0 }}>
-                  <CalendarPanel events={calendar.events} loading={calendar.loading} error={calendar.error} selected={hc.selectedPanelId === "calendar"} />
+                  <CalendarPanel events={calendar.events} loading={calendar.loading} error={calendar.error} selected={hc.selectedPanelId === "calendar"} derived={derived} />
                 </div>
 
                 {/* Middle column */}
                 <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 16, minHeight: 0 }}>
                   <div style={{ display: "flex", gap: 16, height: 270, flexShrink: 0 }}>
                     <div style={{ width: 340, flexShrink: 0, minHeight: 0 }}>
-                      <BirthdaysPanel birthdays={bdays.birthdays} loading={bdays.loading} error={bdays.error} selected={hc.selectedPanelId === "birthdays"} />
+                      <BirthdaysPanel birthdays={bdays.birthdays} loading={bdays.loading} error={bdays.error} selected={hc.selectedPanelId === "birthdays"} derived={derived} />
                     </div>
                     <div style={{ flex: 1, display: "flex", gap: 16, minHeight: 0 }}>
                       <div style={{ flex: 1, minHeight: 0 }}>
@@ -247,7 +289,19 @@ export default function App() {
                   </div>
                   <div style={{ display: "flex", gap: 16, flex: 1, minHeight: 0 }}>
                     <div style={{ flex: 1, minHeight: 0 }}>
-                      <PhotoPanel photos={photos.photos} photosLoading={photos.loading} photosError={photos.error} selected={hc.selectedPanelId === "photos"} />
+                      <ContextualSlot
+                        derived={derived}
+                        raw={rawState}
+                        selected={hc.selectedPanelId === "photos"}
+                        fallback={
+                          <PhotoPanel
+                            photos={photos.photos}
+                            photosLoading={photos.loading}
+                            photosError={photos.error}
+                            selected={hc.selectedPanelId === "photos"}
+                          />
+                        }
+                      />
                     </div>
                     <div style={{ width: 340, flexShrink: 0, minHeight: 0 }}>
                       <EventsPanel updates={school.updates} loading={school.loading} error={school.error} selected={hc.selectedPanelId === "events"} />
@@ -263,7 +317,12 @@ export default function App() {
                   <div style={{ flex: 1, minHeight: 0 }}>
                     <AgentTasksPanel selected={hc.selectedPanelId === "agenttasks"} tasks={agentTasks.tasks} />
                   </div>
-                  <FactPanel selected={hc.selectedPanelId === "fact"} />
+                  <RightColumnCards
+                    derived={derived}
+                    raw={rawState}
+                    selected={hc.selectedPanelId === "fact"}
+                    fallback={<FactPanel selected={hc.selectedPanelId === "fact"} />}
+                  />
                 </div>
               </div>
             )}
@@ -272,6 +331,7 @@ export default function App() {
       </div>
       <TranscriptionOverlay query={llm.latestResponse?.query} visible={!!llm.latestResponse && forcePage !== "llm-response"} />
       <AlarmOverlay expiredTimers={expiredTimers} onDismissAll={dismissAll} />
+      <OverlayCards derived={derived} raw={rawState} />
       <WakeWordDebug events={wakeDebug.events} connected={wakeDebug.connected} onClear={wakeDebug.clearEvents} workerUrl={settings.worker?.url} workerToken={settings.worker?.token} />
     </>
   );
