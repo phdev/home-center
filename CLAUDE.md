@@ -340,9 +340,16 @@ flips to `<ClawSuggestionsCard>` when suggestions exist.
 1. Document the flag(s) in `docs/home_center_derived_states.md`.
 2. Add the card contract to `docs/home_center_ui_card_contracts.md`.
 3. Extend `src/state/types.js` with the new fields.
-4. Implement the rule in `src/state/deriveState.js`.
-5. Add the card under `src/cards/` and register it in `src/cards/registry.js`.
-6. (Optional) Wire an OpenClaw enhancer via `useEnhancement("featureKey", state, workerSettings)`.
+4. Write a failing test in `src/state/deriveState.test.js` for the new flag (red).
+5. Implement the rule in `src/state/deriveState.js` until green.
+6. Add the card under `src/cards/` and register it in `src/cards/registry.js`. Add a registry test covering its visibility in `src/cards/registry.test.js`.
+7. (Optional) Wire an OpenClaw enhancer via `useEnhancement("featureKey", state, workerSettings)` — the `fallback.integration.test.js` suite enforces that the card still works offline.
+
+### Testing
+
+- `npm test` runs the full Vitest suite (unit + integration). `npm run test:watch` for red/green flow while coding.
+- Layers tested: normalization (`src/data/*.test.js`), state engine (`src/state/deriveState.test.js`), heuristics (`src/data/schoolHeuristics.test.js`), card registry (`src/cards/registry.test.js`), OpenClaw fallback (`src/ai/openclaw.test.js`), cross-layer integration (`src/__tests__/fallback.integration.test.js`).
+- **The integration suite enforces the key invariant: no card depends on OpenClaw to appear.** If you add a card whose visibility reads a network / timer / LLM result, the integration tests will fail.
 
 ## OpenClaw (Family Telegram Assistant)
 
