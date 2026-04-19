@@ -5,6 +5,49 @@ Newest at top.
 
 ---
 
+## 2026-04-19 — Model IDs never hardcoded; OpenClaw must survive model changes
+
+**Context**
+LLM providers retire dated model IDs on short notice. A hardcoded
+`"gpt-4o-mini"` or `"claude-haiku-4-5-20251001"` means that when the
+provider deprecates it, every surface using that string silently breaks
+until someone redeploys. The worker already reads `OPENAI_MODEL` from
+env, but `email-triage/email_triage/cloud_llm.py` pins both the OpenAI
+and Anthropic model names in source.
+
+**Decision**
+Every place that names a model reads it from config with a safe fallback
+— never from a literal in source. Concretely:
+
+1. Worker (`worker/src/index.js`) — already OK; `env.OPENAI_MODEL` +
+   default. Any future model pin (e.g. `ANTHROPIC_MODEL` for
+   `/api/claw/enhance`) must follow the same pattern.
+2. `email-triage/email_triage/cloud_llm.py` — replace the two hardcoded
+   model IDs with config values loaded from `config.yaml` under
+   `llm.cloud.openai_model` and `llm.cloud.anthropic_model`, each with
+   a safe default.
+3. `openclaw/index.js` Telegram bridge — no model pin today (it forwards
+   to the worker's `/api/ask`). This is the pattern: the bridge stays
+   thin and the worker is the only place model choice is configured.
+
+**Consequence**
+When a model deprecates, updating a single config value (worker secret
+or `email-triage/config.yaml`) keeps everything running — no code push,
+no redeploy of the Telegram bridge. If someone adds a new LLM-calling
+surface in the future, code review rejects any PR that hardcodes a
+model name.
+
+**Action items** (backlog):
+- [ ] Move `email-triage` model IDs from code into `config.yaml` with
+  defaults read via `config.get("llm.cloud.*_model", "…")`
+- [ ] When implementing `POST /api/claw/enhance` (feature A2), use
+  `env.ANTHROPIC_MODEL` with a current safe default
+- [ ] Add a grep-based CI guard (optional) that fails PRs containing
+  literal strings matching `/(gpt|claude|sonnet|haiku|opus)-[\d.-]+/`
+  outside of tests and this decisions log
+
+---
+
 ## 2026-04-19 — Gbrain is an active part of the workflow
 
 **Context**
