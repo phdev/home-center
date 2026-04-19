@@ -78,7 +78,7 @@ volume, tall affordances, one primary action per card.
 | **Required data** | `derived.birthdaysRanked[] = {id, name, daysUntil, giftStatus}` |
 | **Optional OpenClaw fields** | `enhanced.giftIdeas[]` per person: `[{idea, priceEstimate, rationale}]` |
 | **Deterministic fallback copy** | `Find ideas` button still enabled — OpenClaw call happens on click |
-| **Actions** | Toggle `giftStatus`: `needed` → `ordered` → `ready`; `Find ideas` opens an ideas modal (OpenClaw-populated at open time) |
+| **Actions** | Clicking the pill cycles `giftStatus`: `unknown → needed → ordered → ready → unknown`. Optimistic update; persists via `useBirthdayGiftWriter` → `PATCH /api/birthdays/:id` with localStorage fallback. |
 | **Priority** | Tier 3 when `giftStatus in {needed,unknown}` within 14 days |
 
 ## Bedtime Card (Toast Overlay)

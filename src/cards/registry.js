@@ -8,6 +8,11 @@
  *
  * `visible(derived)` must be deterministic and derived-state-driven — do
  * not read props, refs, DOM, or localStorage here.
+ *
+ * When you add or change a card here, update:
+ *   - docs/home_center_ui_card_contracts.md (per-card contract)
+ *   - docs/home_center_derived_states.md (if it relies on a new flag)
+ * See docs/README.md for the full gbrain contract.
  */
 
 import { MorningChecklistCard } from "./MorningChecklistCard";
@@ -27,6 +32,10 @@ import { ClawSuggestionsCard } from "./ClawSuggestionsCard";
  * @property {string} enhancementFeature
  */
 
+// NOTE: Adding, removing, or changing the `visible` predicate of a card
+//       belongs in docs/home_center_ui_card_contracts.md. If the predicate
+//       relies on a new derived flag, also update
+//       docs/home_center_derived_states.md. See CLAUDE.md → Compound Step.
 /** @type {CardDef[]} */
 export const CARDS = [
   {
