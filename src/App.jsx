@@ -13,18 +13,14 @@ import { useHandController } from "./hooks/useHandController";
 import { useLLMQuery } from "./hooks/useLLMQuery";
 import { useWakeWordDebug } from "./hooks/useWakeWordDebug";
 import { useWakeRecord } from "./hooks/useWakeRecord";
-import { useAgentTasks } from "./hooks/useAgentTasks";
 import { Header } from "./components/Header";
 import { CalendarPanel } from "./components/CalendarPanel";
 import { WeatherPanel } from "./components/WeatherPanel";
 import { PhotoPanel } from "./components/PhotoPanel";
 import { FactPanel } from "./components/FactPanel";
-import { AgentTasksPanel } from "./components/AgentTasksPanel";
 import { EventsPanel } from "./components/EventsPanel";
 import { BirthdaysPanel } from "./components/BirthdaysPanel";
-import { TimersPanel } from "./components/TimersPanel";
 import { AlarmOverlay } from "./components/AlarmOverlay";
-import { WorldClockPanel } from "./components/WorldClockPanel";
 import { FullCalendarPage } from "./components/FullCalendarPage";
 import { FullWeatherPage } from "./components/FullWeatherPage";
 import { FullPhotosPage } from "./components/FullPhotosPage";
@@ -73,7 +69,6 @@ export default function App() {
   const llm = useLLMQuery(settings.worker);
   const wakeDebug = useWakeWordDebug(settings.worker);
   const wakeRecord = useWakeRecord();
-  const agentTasks = useAgentTasks(settings.worker);
 
   // Derived-state layer (see docs/home_center_state_model.md)
   const takeout = useTakeout(settings.worker);
@@ -252,11 +247,8 @@ export default function App() {
             <div style={{ height: 220 }}>
               <PhotoPanel photos={photos.photos} photosLoading={photos.loading} photosError={photos.error} />
             </div>
-            <WorldClockPanel />
             <BirthdaysPanel birthdays={bdays.birthdays} loading={bdays.loading} error={bdays.error} derived={derived} />
             <EventsPanel derived={derived} />
-            <AgentTasksPanel tasks={agentTasks.tasks} />
-            <TimersPanel timers={timers} dismissTimer={dismissTimer} />
             <ModelHealthPanel onExpand={() => goTo("model-health")} workerSettings={settings.worker} />
             <FactPanel />
           </div>
@@ -278,13 +270,8 @@ export default function App() {
                     <div style={{ width: 340, flexShrink: 0, minHeight: 0 }}>
                       <BirthdaysPanel birthdays={bdays.birthdays} loading={bdays.loading} error={bdays.error} selected={hc.selectedPanelId === "birthdays"} derived={derived} />
                     </div>
-                    <div style={{ flex: 1, display: "flex", gap: 16, minHeight: 0 }}>
-                      <div style={{ flex: 1, minHeight: 0 }}>
-                        <WeatherPanel weatherData={weather.data} loading={weather.loading} error={weather.error} selected={hc.selectedPanelId === "weather"} />
-                      </div>
-                      <div style={{ flex: 1, minHeight: 0 }}>
-                        <WorldClockPanel selected={hc.selectedPanelId === "worldclock"} />
-                      </div>
+                    <div style={{ flex: 1, minHeight: 0 }}>
+                      <WeatherPanel weatherData={weather.data} loading={weather.loading} error={weather.error} selected={hc.selectedPanelId === "weather"} />
                     </div>
                   </div>
                   <div style={{ display: "flex", gap: 16, flex: 1, minHeight: 0 }}>
@@ -309,14 +296,8 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* Right column */}
+                {/* Right column — Claw Suggestions (replaces Fun Fact when suggestions exist) */}
                 <div style={{ width: 400, flexShrink: 0, display: "flex", flexDirection: "column", gap: 16, minHeight: 0 }}>
-                  <div style={{ height: 270, flexShrink: 0 }}>
-                    <TimersPanel timers={timers} dismissTimer={dismissTimer} selected={hc.selectedPanelId === "timers"} />
-                  </div>
-                  <div style={{ flex: 1, minHeight: 0 }}>
-                    <AgentTasksPanel selected={hc.selectedPanelId === "agenttasks"} tasks={agentTasks.tasks} />
-                  </div>
                   <RightColumnCards
                     derived={derived}
                     raw={rawState}

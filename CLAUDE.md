@@ -110,8 +110,9 @@ architectural invariants described in `docs/`.
 
 - **Desktop grid:** Two rows
   - Top row (36% height): Calendar (1fr) | Weather (1.3fr) | Photos (1fr) | Facts (0.8fr)
-  - Bottom row (64% height): Notifications+AgentTasks | Events+Timers | Birthdays | Search/Ask Anything
+  - Bottom row (64% height): Notifications | Events | Birthdays+Weather | Claw Suggestions/Facts
 - **Gaps:** 14px between panels, 20px 44px 12px padding
+- **Removed cards (2026-04-17):** World Clock, Timers panel (voice-set timers still fire via AlarmOverlay), and OpenClaw Tasks (AgentTasksPanel) were removed from the dashboard for a cleaner TV layout.
 
 ### Typography
 
@@ -150,9 +151,8 @@ architectural invariants described in `docs/`.
 
 **Spatial navigation** (dashboard only):
 ```
-Row 0:  Calendar → Birthdays → Weather → WorldClock → Timers
-Row 1:  Calendar → Photos    → Events  →             → AgentTasks
-Row 2:  Calendar →           →         →             → Fact
+Row 0:  Calendar → Birthdays → Weather
+Row 1:  Calendar → Photos    → Events  → ClawSuggestions/Fact
 ```
 - Wave right/left/up/down navigates spatially between panels
 - Calendar is selected by default on load
@@ -452,7 +452,6 @@ Chat IDs are numeric Telegram IDs (positive for DMs, negative for groups, `-100�
 
 - **Email triage** (`email-triage/email_triage/notifier.py`) — posts to `http://localhost:3100/send` (same machine)
 - **Dashboard QR code** (`src/components/FactPanel.jsx`) — "Chat with OpenClaw" QR links to Telegram deep link
-- **Dashboard panel** (`src/components/AgentTasksPanel.jsx`) — header labeled "OpenClaw"
 - **Incoming messages** — forwarded to worker `/api/ask` for LLM-powered replies
 
 ### Setup

@@ -5,6 +5,36 @@ Newest at top.
 
 ---
 
+## 2026-04-17 — Remove World Clock, Timers, and OpenClaw Tasks from TV dashboard
+
+**Context**
+The TV dashboard was visually busy: five top-row cards (Calendar, Birthdays,
+Weather, World Clock, Fun Fact) and a right column stacked with Timers,
+OpenClaw Tasks, and Fun Fact. World Clock was cosmetic, Timers duplicated
+information already surfaced by `AlarmOverlay` (which is how voice-set timers
+actually fire), and the "OpenClaw Tasks" panel (`AgentTasksPanel`) was a
+dev-oriented queue view — not useful on a family TV.
+
+**Decision**
+Removed three cards from `src/App.jsx` (mobile + desktop layouts):
+`WorldClockPanel`, `TimersPanel`, `AgentTasksPanel`. `useTimers` stays —
+voice-set timers still fire via `AlarmOverlay` on expiry; we just don't
+show the pending queue as a card. Pencil design (`home-center.pen`, frame
+`8pkH2`) updated to match: nodes `oeqaR` (World Clock), `Sog3C` (Timers),
+and `WvqUf` (OpenClaw Tasks) deleted.
+
+**Consequence**
+- Top row is now 3 cards (Calendar | Birthdays | Weather); right column
+  shows Claw Suggestions / Fun Fact via the existing registry slot.
+- Spatial gesture nav map shrinks — WorldClock/Timers/AgentTasks targets
+  removed from the grid.
+- Voice timer UX unchanged — `AlarmOverlay` still covers create + dismiss.
+- `src/components/AgentTasksPanel.jsx` and `src/hooks/useAgentTasks.js`
+  remain in-repo but unreferenced; future cleanup can delete them outright
+  if nothing else imports them.
+
+---
+
 ## 2026-04-20 — School updates go through OpenClaw, not direct SDK calls
 
 **Context**
