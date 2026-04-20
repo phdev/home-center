@@ -21,13 +21,14 @@ paths = [
 ]
 # Literal matches (not regex-wide — each string is allowlisted exactly):
 #
-# - The 2026-02-22 Cloudflare token — already revoked 2026-04-20; kept in
-#   the decisions log as incident history.
-# - The Cloudflare token's dashboard ID — same reason.
-# - PHOTOS_ALBUM_TOKEN — Google Photos album share token intentionally
-#   committed in worker/wrangler.toml under [vars]. FOLLOW-UP: migrate
-#   this to `wrangler secret put PHOTOS_ALBUM_TOKEN` and remove from the
-#   plaintext block. Tracked in docs/home_center_decisions_log.md.
+# - The 2026-02-22 Cloudflare API token — revoked 2026-04-20.
+# - That token's Cloudflare dashboard ID.
+# - PHOTOS_ALBUM_TOKEN — moved from `[vars]` to `wrangler secret` in
+#   PR #9, but the value is still in git history at commit 54092ba3.
+#   Google Photos share tokens are rotated by "Reset link" in Google
+#   Photos settings, which invalidates the old value at Google's side.
+#   Until that's done, the allowlist entry below stays; after rotation,
+#   drop it.
 regexes = [
   '''Wk6MoCA1xDk3VWqs16gDjo1_Q_ShfFKR3r4GG1uh''',
   '''088c3b034ce3bc775cba91b223edceb7''',
