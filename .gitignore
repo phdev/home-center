@@ -2,16 +2,39 @@ node_modules
 dist
 .DS_Store
 *.local
+
+# Claude Code scratchpad — never a product artifact
+.claude/
+
+# Pencil workflow residue (user-local, machine-specific paths)
 .pencil-queue.json
+.pencil-watcher.sh
+
+# Homer CI / personal dev-orchestrator workspace (see
+# docs/home_center_decisions_log.md — "Repo boundary cleanup").
+# Relocated out of this repo — belt-and-braces ignore in case anyone
+# ever recreates the dir locally.
+.openclaw/
+
+# Python bytecode — catches school-updates/__pycache__ etc.
+**/__pycache__/
 
 # Pi wake word
 pi/__pycache__/
 pi/.venv/
 pi/.env
+# Training artifacts — large, machine-specific, regenerable
 pi/models/*.tflite
 pi/models/*.onnx
 pi/models/*.ppn
+pi/models/*.pt
+pi/models/*.npz
+pi/models/*.npy
+pi/models/recorded_samples/
 pi/sounds/
+
+# Unreferenced local design scaffolding
+src/design/
 
 # School updates agent
 school-updates/credentials.json

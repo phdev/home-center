@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Template for the OpenClaw Telegram bridge launchd agent.
+
+  Copy to ~/Library/LaunchAgents/com.openclaw.bridge.plist and substitute
+  the placeholders below. Never commit a copy with real values.
+
+    __REPO_DIR__           absolute path to the home-center clone
+                           (e.g. /Users/peter/home-center)
+    __TELEGRAM_BOT_TOKEN__ token from @BotFather
+    __NODE_PATH__          full path to node (`which node`); on Apple Silicon
+                           Homebrew this is /opt/homebrew/bin/node
+    __WORKER_URL__         Home Center Cloudflare Worker URL
+                           (e.g. https://home-center-api.<you>.workers.dev)
+
+  Then load with:
+    launchctl load ~/Library/LaunchAgents/com.openclaw.bridge.plist
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.openclaw.bridge</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>__NODE_PATH__</string>
+        <string>__REPO_DIR__/openclaw/index.js</string>
+        <string>--port</string>
+        <string>3100</string>
+        <string>--llm-url</string>
+        <string>__WORKER_URL__/api/ask</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>__REPO_DIR__/openclaw</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>NODE_ENV</key>
+        <string>production</string>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+        <key>TELEGRAM_BOT_TOKEN</key>
+        <string>__TELEGRAM_BOT_TOKEN__</string>
+    </dict>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>KeepAlive</key>
+    <true/>
+
+    <key>StandardOutPath</key>
+    <string>__REPO_DIR__/openclaw/logs/bridge-stdout.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>__REPO_DIR__/openclaw/logs/bridge-stderr.log</string>
+</dict>
+</plist>

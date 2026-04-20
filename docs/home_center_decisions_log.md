@@ -5,6 +5,59 @@ Newest at top.
 
 ---
 
+## 2026-04-19 — Product repo boundary cleanup
+
+**Context**
+The repo had grown to hold three overlapping concerns: the Home Center
+product (dashboard, worker, Telegram bridge, gbrain), a personal
+developer-agent orchestrator ("Homer CI") under `.openclaw/`, and
+workspace/audit/launchd clutter from the Mac Mini that ran all three.
+An audit turned up concrete hazards: a leaked Cloudflare API token in a
+tracked `deploy-worker.sh`, direct-to-main PAT instructions in
+`CLAUDE.md` that contradicted the PR workflow, repeated references to
+the old project name (`phdev/accel-driv`), hardcoded user paths in
+`.pencil-watcher.sh`, and a `.claude/settings.json` auto-starting
+`http-server` on `/home/user/accel-driv`.
+
+**Decision**
+Cut the repo down to the Home Center product plus a clean `deploy/`
+surface. Specifically:
+
+- Removed the obsolete `deploy-worker.sh` (leaked token; replaced by
+  `wrangler deploy`), `PLAN-openclaw-swarm.md` (superseded by the gbrain
+  docs), `.claude/settings.json` (wrong-project hook), the pencil
+  watcher/queue residue, and the entire `.openclaw/` subtree (personal
+  dev-agent orchestration + runtime state).
+- Promoted the OpenClaw bot prompts (persona, operating instructions,
+  family-assistant skill) to versioned product artifacts at
+  `openclaw/prompts/`. The family Telegram bot is a product surface; its
+  prompts belong in the repo.
+- Moved Mac Mini launchd plist templates + a sanitized bridge setup
+  script to `deploy/mac-mini/`. No personal Apple IDs, no hardcoded
+  chat IDs — all real values substituted at install time.
+- Rewrote the Git Workflow section of `CLAUDE.md` to require PRs, not
+  direct-to-main PAT pushes. Removed the Homer CI section entirely and
+  replaced it with a short pointer noting that personal dev-agent
+  orchestration lives outside this repo.
+- Extended `.gitignore` to cover `.claude/`, `.openclaw/`,
+  `.pencil-queue.json`, `.pencil-watcher.sh`, and `**/__pycache__/` so
+  these can't drift back in.
+
+**Consequence**
+The repo boundary is now product-only: dashboard, worker, Telegram
+bridge with its prompts, integration services (email-triage,
+school-updates, pi, deploy). Contributors (human or AI) see only
+reviewable product artifacts. Personal developer-agent automation
+integrates via the bridge's public API (`/send`, `/messages`,
+`/messages/ack`) from a separate repo or local-only directory — the
+contract surface is stable, the personal-state coupling is gone.
+
+**Action item (manual, not code)** The Cloudflare API token that was
+hardcoded in `deploy-worker.sh` is already in git history. **Rotate it
+at Cloudflare** before relying on the cleanup alone.
+
+---
+
 ## 2026-04-19 — Model IDs never hardcoded; OpenClaw must survive model changes
 
 **Context**

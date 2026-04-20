@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Template: school-updates agent launchd agent.
+
+  Substitute:
+    __REPO_DIR__   absolute path to the home-center clone
+    __WORKER_URL__ Home Center Cloudflare Worker URL
+
+  Requires: school-updates/.venv (pip install -r requirements.txt)
+  and school-updates/credentials.json + token.json for Gmail OAuth.
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.homecenter.school-updates</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>__REPO_DIR__/school-updates/.venv/bin/python3</string>
+        <string>agent.py</string>
+        <string>--interval</string>
+        <string>900</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>__REPO_DIR__/school-updates</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PYTHONUNBUFFERED</key>
+        <string>1</string>
+        <key>WORKER_URL</key>
+        <string>__WORKER_URL__</string>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+    </dict>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>KeepAlive</key>
+    <true/>
+
+    <key>StandardOutPath</key>
+    <string>__REPO_DIR__/school-updates/logs/stdout.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>__REPO_DIR__/school-updates/logs/stderr.log</string>
+</dict>
+</plist>
