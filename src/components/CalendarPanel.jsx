@@ -1,6 +1,8 @@
 import { Calendar, TriangleAlert } from "lucide-react";
 import { Panel, PanelHeader } from "./Panel";
 import { CALENDAR } from "../data/mockData";
+import { useEnhancement } from "../ai/openclaw";
+import { useSettings } from "../hooks/useSettings";
 
 const F = "'Geist','Inter',system-ui,sans-serif";
 const M = "'JetBrains Mono',ui-monospace,monospace";
@@ -17,7 +19,27 @@ function dedup(events) {
 
 export function CalendarPanel({ t, events, loading, error, selected, derived }) {
   const items = dedup(events || CALENDAR);
-  const conflictBanner = buildConflictBanner(derived);
+  const { settings } = useSettings();
+
+  // Only request enhancement when there's something to summarize — avoids a
+  // wasted round-trip + a useless cache entry when the banner is hidden.
+  const conflictState = derived?.hasMorningOverlap || derived?.peter0800_0900Risk
+    ? {
+        conflicts: (derived.conflicts ?? []).map((c) => ({
+          a: { title: c.a?.title, start: c.a?.start },
+          b: { title: c.b?.title, start: c.b?.start },
+          at: c.at,
+        })),
+        peter0800_0900Risk: !!derived.peter0800_0900Risk,
+      }
+    : null;
+  const enhancement = useEnhancement(
+    "calendarConflict",
+    conflictState,
+    settings?.worker,
+    { enabled: !!conflictState },
+  );
+  const conflictBanner = buildConflictBanner(derived, enhancement?.fields);
 
   // Group events by day label
   const groups = [];
@@ -149,21 +171,28 @@ export function CalendarPanel({ t, events, loading, error, selected, derived }) 
   );
 }
 
-function buildConflictBanner(derived) {
+function buildConflictBanner(derived, enhanced) {
   if (!derived) return null;
   if (!derived.hasMorningOverlap && !derived.peter0800_0900Risk) return null;
+
+  // Deterministic baseline — always available, works with OpenClaw offline.
+  let title;
+  let detail;
   if (derived.hasMorningOverlap && derived.conflicts[0]) {
     const c = derived.conflicts[0];
     const t = new Date(c.at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
-    return {
-      title: `Heads up — ${t} overlap`,
-      detail: `${c.a.title} and ${c.b.title} both at ${t}.${
-        derived.peter0800_0900Risk ? " Peter: watch your 8–9 block." : ""
-      }`,
-    };
+    title = `Heads up — ${t} overlap`;
+    detail = `${c.a.title} and ${c.b.title} both at ${t}.${
+      derived.peter0800_0900Risk ? " Peter: watch your 8–9 block." : ""
+    }`;
+  } else {
+    title = "Watch the 8–9 block";
+    detail = "You've got something scheduled 8–9 on a weekday.";
   }
-  return {
-    title: "Watch the 8–9 block",
-    detail: "You've got something scheduled 8–9 on a weekday.",
-  };
+
+  // OpenClaw-enhanced copy (optional — takes over title/detail when present).
+  if (enhanced?.summary) title = enhanced.summary;
+  if (enhanced?.suggestion) detail = enhanced.suggestion;
+
+  return { title, detail };
 }
