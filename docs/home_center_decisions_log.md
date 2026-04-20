@@ -57,13 +57,25 @@ is required.
 - CI diff-scanning is cheap insurance; pair it with provider
   push-protection for defense in depth.
 
-**Remaining action** (user, low priority)
-Rotate the iCloud Photos share token. The value `B1o5nhQST2MGod` is
-live in git history at commit 54092ba3 and still accepts traffic on
-Apple's side. Procedure: Photos app → shared album → toggle
-"Public Website" off/on → `wrangler secret put PHOTOS_ALBUM_TOKEN`
-with the new value → remove the allowlist entry from
-`.gitleaks.toml`.
+**Residual risk — accepted**
+The iCloud Shared Album token `B1o5nhQST2MGod` is still live in git
+history at commit 54092ba3 and still accepts traffic on Apple's side.
+Evaluated and accepted as-is on 2026-04-20 because:
+
+- The token is **view-only on one personal shared album** — not a
+  credential. Blast radius is "whoever reads the git history can see
+  that album's photos."
+- Opportunistic GitHub secret scrapers target credentials (AWS, CF,
+  OAuth). Passive view tokens for personal albums aren't on their
+  target list.
+- The album's contents are benign family material; no identifiable
+  sensitive content where the calculus would flip.
+- The rotation path stays easy if the content profile ever changes:
+  Photos app → shared album → toggle "Public Website" off/on →
+  `wrangler secret put PHOTOS_ALBUM_TOKEN` → drop the allowlist
+  entry in `.gitleaks.toml`.
+
+This is a conscious acceptance, not a forgotten follow-up.
 
 ---
 

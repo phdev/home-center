@@ -24,11 +24,14 @@ paths = [
 # - The 2026-02-22 Cloudflare API token — revoked 2026-04-20.
 # - That token's Cloudflare dashboard ID.
 # - PHOTOS_ALBUM_TOKEN — iCloud Shared Album share token. Moved from
-#   `[vars]` to `wrangler secret` in PR #9, but the value is still in
-#   git history at commit 54092ba3. iCloud share tokens are rotated
-#   by turning off "Public Website" / "Shared Album" in the album
-#   settings and re-enabling it, which issues a new token. Until that
-#   rotation happens, the allowlist entry below stays; after, drop it.
+#   `[vars]` to `wrangler secret` in PR #9; the historical value lives
+#   at commit 54092ba3 and is accepted residual risk: view-only access
+#   to one personal shared album, not a credential. See the 2026-04-20
+#   entry in docs/home_center_decisions_log.md for the reasoning.
+#   If that album's contents later become sensitive, rotate by
+#   toggling "Public Website" off/on in the Photos app → then
+#   `wrangler secret put PHOTOS_ALBUM_TOKEN` with the new value →
+#   remove this entry.
 regexes = [
   '''Wk6MoCA1xDk3VWqs16gDjo1_Q_ShfFKR3r4GG1uh''',
   '''088c3b034ce3bc775cba91b223edceb7''',
