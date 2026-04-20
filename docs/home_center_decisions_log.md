@@ -5,6 +5,39 @@ Newest at top.
 
 ---
 
+## 2026-04-20 — Product decisions for the next feature pass
+
+Three design questions locked before implementation:
+
+### No phone-push reminders
+Dashboard is the only reminder surface. No Telegram push (or other
+phone notification) at the 16:30 takeout cutoff, the 18:00 lunch
+prompt, or 30 min before bedtime. The derived-state flags stay the
+source of truth; if the TV is off, the reminder doesn't fire —
+acceptable. Removes ~2 hr of scheduled-worker / cron work from the
+backlog.
+
+### Gift-ideas entry point is a Claw Suggestions row
+When `derived.birthdayGiftNeeded` is true, the Claw Suggestions card
+surfaces an "Order gift for {name}" row. Tapping it opens an ideas
+view populated by `/api/claw/enhance`. Birthdays card stays read-only
+for gift content — the click-cycle pill is the only action there. No
+"Find ideas" button, no fullscreen birthday detail page.
+
+### School lunch ingestion stays manual
+`scripts/school-lunch/ingest.sh` is the official update path. RBUSD's
+PDF URLs embed a fresh random token per month, so a scheduled worker
+would still need human input every month — same effort, more
+machinery to drift silently. No scheduled ingestion worker in scope.
+
+### A2 (`/api/claw/enhance`) uses OpenAI GPT 5.4-mini
+Enhancement calls hit OpenAI, not Anthropic. Default model
+`gpt-5.4-mini`, configurable via `OPENAI_ENHANCE_MODEL` env var on
+the worker (per the "model IDs never hardcoded" decision). Worker
+already has `OPENAI_API_KEY` as a secret — no new credential surface.
+
+---
+
 ## 2026-04-20 — Cloudflare API token leak — incident closed
 
 **Context**
