@@ -51,6 +51,23 @@ jobs:
       - name: Run Vitest suite
         run: npm test
 
+  secret-scan:
+    name: Secret Scan (gitleaks)
+    # Blocking: catches inline credentials before they hit main. See
+    # docs/home_center_decisions_log.md → "Repo boundary cleanup".
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # full history so PR-diff scanning works
+
+      - name: Run gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_CONFIG: .gitleaks.toml
+
   code-review:
     name: Automated Code Review
     runs-on: ubuntu-latest

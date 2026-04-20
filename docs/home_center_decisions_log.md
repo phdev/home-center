@@ -5,6 +5,80 @@ Newest at top.
 
 ---
 
+## 2026-04-20 — Cloudflare API token leak — incident closed
+
+**Context**
+A Cloudflare user-scoped API token (`Wk6MoCA1…`, id
+`088c3b03…`) was committed into `deploy-worker.sh` on 2026-02-22 and
+sat in the public repo until 2026-04-19, when the repo boundary
+cleanup surfaced it. ~2-month public exposure.
+
+**Response**
+- 2026-04-20: verified via `/client/v4/user/tokens/verify` → still
+  live. Cloudflare's own secret-scanning partnership had not
+  auto-revoked it.
+- 2026-04-20: deleted via the Cloudflare dashboard (User API Tokens,
+  not the account-scoped page the token's deploy script implied). The
+  token's scopes did not include "User API Tokens: Write", so it
+  could not self-delete via API — required the owner's dashboard
+  session.
+- Post-revocation: `verify` returned 1000 / "Invalid API Token" —
+  confirmed dead.
+- Audit log review covering the exposure window showed **only the
+  owner (Peter) and Cloudflare's own system activity**. No
+  unrecognized IPs, no unexpected mutations (workers, DNS, zones).
+  Incident closed with zero observed abuse.
+
+**Decision**
+Treat this as a near-miss rather than an active breach. No downstream
+cleanup (no credentials rotated on other services, no worker rollback)
+is required.
+
+**Preventive measures added in follow-ups**
+- PR #9 (\`claude/gitleaks-ci\`) — blocking gitleaks CI step on every
+  PR. Default ruleset + narrow allowlist documented in
+  `.gitleaks.toml`. Diff-only scan; runs alongside the existing
+  Architecture Test Suite + Build Verification jobs.
+- GitHub secret-scanning + push-protection were already enabled at
+  the repo level, verified via API. Optional hardening
+  (`secret_scanning_validity_checks`,
+  `secret_scanning_non_provider_patterns`) toggled on via Settings →
+  Code security.
+- PR #9 also migrated `PHOTOS_ALBUM_TOKEN` from the plaintext
+  `[vars]` block in `worker/wrangler.toml` to `wrangler secret put`,
+  removing the last tracked plaintext secret from the repo.
+
+**Lessons** (for the next time a secret tries to slip in)
+- Inline-secret convenience patterns compound: `CF_TOKEN=` and
+  `SSHPASS=` and a plaintext photos token all came from the same
+  "skip the setup step, inline the value" instinct.
+- The only durable fix is prevention at push time. Post-hoc git-history
+  cleanup cannot invalidate a live credential; only rotation can.
+- CI diff-scanning is cheap insurance; pair it with provider
+  push-protection for defense in depth.
+
+**Residual risk — accepted**
+The iCloud Shared Album token `B1o5nhQST2MGod` is still live in git
+history at commit 54092ba3 and still accepts traffic on Apple's side.
+Evaluated and accepted as-is on 2026-04-20 because:
+
+- The token is **view-only on one personal shared album** — not a
+  credential. Blast radius is "whoever reads the git history can see
+  that album's photos."
+- Opportunistic GitHub secret scrapers target credentials (AWS, CF,
+  OAuth). Passive view tokens for personal albums aren't on their
+  target list.
+- The album's contents are benign family material; no identifiable
+  sensitive content where the calculus would flip.
+- The rotation path stays easy if the content profile ever changes:
+  Photos app → shared album → toggle "Public Website" off/on →
+  `wrangler secret put PHOTOS_ALBUM_TOKEN` → drop the allowlist
+  entry in `.gitleaks.toml`.
+
+This is a conscious acceptance, not a forgotten follow-up.
+
+---
+
 ## 2026-04-19 — Product repo boundary cleanup
 
 **Context**
