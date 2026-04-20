@@ -1,3 +1,4 @@
+import { useState } from "react";
 import {
   Bot,
   AlertTriangle,
@@ -9,6 +10,8 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { Panel, PanelHeader } from "../components/Panel";
+import { GiftIdeasModal } from "./GiftIdeasModal";
+import { useSettings } from "../hooks/useSettings";
 
 const F = "'Geist','Inter',system-ui,sans-serif";
 
@@ -36,6 +39,21 @@ const ACCENTS = {
 export function ClawSuggestionsCard({ derived, enhanced = {}, selected, onAction }) {
   const base = derived.clawSuggestions;
   const enhancedById = new Map((enhanced.items ?? []).map((i) => [i.id, i]));
+  const { settings } = useSettings();
+  const [giftModal, setGiftModal] = useState(null); // birthday view model or null
+
+  const handleClick = (s) => {
+    if (s.actionKind === "orderGift" && s.targetRef?.birthdayId) {
+      const b = (derived.birthdaysRanked ?? []).find(
+        (x) => x.id === s.targetRef.birthdayId,
+      );
+      if (b) {
+        setGiftModal(b);
+        return;
+      }
+    }
+    onAction?.(s);
+  };
 
   return (
     <Panel selected={selected}>
@@ -56,7 +74,7 @@ export function ClawSuggestionsCard({ derived, enhanced = {}, selected, onAction
           return (
             <button
               key={s.id}
-              onClick={() => onAction?.(s)}
+              onClick={() => handleClick(s)}
               style={{
                 display: "flex",
                 alignItems: "center",
@@ -104,6 +122,12 @@ export function ClawSuggestionsCard({ derived, enhanced = {}, selected, onAction
           );
         })}
       </div>
+      <GiftIdeasModal
+        open={!!giftModal}
+        birthday={giftModal}
+        workerSettings={settings?.worker}
+        onClose={() => setGiftModal(null)}
+      />
     </Panel>
   );
 }
