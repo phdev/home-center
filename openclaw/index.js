@@ -27,6 +27,11 @@ const { values: args } = parseArgs({
 const PORT = parseInt(args.port, 10);
 const LLM_URL = args["llm-url"];
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+// Optional — only required when the worker enforces AUTH_TOKEN.
+// If the worker is open-access, leave unset and the bridge posts
+// without Authorization. If the worker rejects, read the 401 in the
+// bridge log and set this on the launchd plist.
+const WORKER_AUTH_TOKEN = process.env.WORKER_AUTH_TOKEN || "";
 
 if (!BOT_TOKEN) {
   console.error("ERROR: TELEGRAM_BOT_TOKEN env var is required.");
@@ -94,12 +99,22 @@ bot.on("message", async (msg) => {
   try {
     const res = await fetch(LLM_URL, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        ...(WORKER_AUTH_TOKEN
+          ? { Authorization: `Bearer ${WORKER_AUTH_TOKEN}` }
+          : {}),
+      },
       body: JSON.stringify({ query: msg.text }),
     });
 
     if (!res.ok) {
-      console.error(`LLM returned ${res.status}`);
+      console.error(
+        `LLM returned ${res.status}` +
+          (res.status === 401 && !WORKER_AUTH_TOKEN
+            ? " — worker requires AUTH_TOKEN; set WORKER_AUTH_TOKEN env var on the bridge."
+            : ""),
+      );
       return;
     }
 
