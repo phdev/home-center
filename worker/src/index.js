@@ -150,6 +150,10 @@ export default {
         const id = decodeURIComponent(path.split("/api/birthdays/")[1]);
         return corsResponse(env, await handleBirthdayPatch(id, request, env));
       }
+      // ── OpenClaw enhancement (copy, summaries, suggestions) ──
+      if (path === "/api/claw/enhance" && request.method === "POST") {
+        return corsResponse(env, await handleClawEnhance(request, env));
+      }
       if (path === "/api/health") {
         // Auth status: check if a valid token was provided (but don't block)
         const auth = request.headers.get("Authorization");
@@ -696,6 +700,286 @@ async function handleBirthdayPatch(id, request, env) {
   await env.NOTIFICATIONS.put(BIRTHDAY_GIFTS_KEY, JSON.stringify(overrides));
   return json({ ok: true, id, override: overrides[id] });
 }
+
+// ── OpenClaw enhancement (copy, summaries, suggestions) ────────────
+//
+// Contract (see docs/home_center_decisions_log.md):
+//   - OpenClaw enhances, it does not decide. The client must render
+//     correctly with fields === {}.
+//   - Every call is cached per (feature, stateHash) for 1 h to bound cost.
+//   - Model ID is read from env.OPENAI_ENHANCE_MODEL with the safe default
+//     below — never inlined elsewhere (see "model IDs never hardcoded"
+//     decision, 2026-04-19).
+//   - Failure modes (no OpenAI key, non-2xx, malformed JSON, unknown
+//     feature) all return {fields: {}, error: "..."} and 200 OK. Client
+//     treats any response with empty fields as "use deterministic fallback".
+
+const CLAW_ENHANCE_CACHE_TTL = 3600;              // 1 h
+const CLAW_ENHANCE_DEFAULT_MODEL = "gpt-5.4-mini";
+
+async function handleClawEnhance(request, env) {
+  if (!env.OPENAI_API_KEY) {
+    return json({ fields: {}, source: "fallback", error: "openai-not-configured" });
+  }
+
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return json({ error: "Invalid JSON" }, 400);
+  }
+
+  const { feature, state } = body ?? {};
+  const builder = CLAW_ENHANCERS[feature];
+  if (!builder) {
+    return json({ fields: {}, source: "fallback", error: `unknown-feature:${feature}` });
+  }
+
+  const cacheKey = await clawCacheKey(feature, state);
+
+  // Cache hit
+  if (env.NOTIFICATIONS) {
+    const cached = await env.NOTIFICATIONS.get(cacheKey, { type: "json" });
+    if (cached) {
+      return json({ fields: cached, source: "cache" });
+    }
+  }
+
+  const spec = builder(state ?? {});
+  if (!spec) {
+    return json({ fields: {}, source: "fallback", error: "empty-state" });
+  }
+
+  const model = env.OPENAI_ENHANCE_MODEL || CLAW_ENHANCE_DEFAULT_MODEL;
+
+  let raw;
+  try {
+    const res = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${env.OPENAI_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model,
+        messages: [
+          { role: "system", content: spec.system },
+          { role: "user", content: spec.user },
+        ],
+        response_format: { type: "json_object" },
+        // GPT-5.x rejected `max_tokens`; use `max_completion_tokens`.
+        // Temperature left at server default — newer reasoning-family
+        // models reject non-default values.
+        max_completion_tokens: 400,
+      }),
+    });
+    if (!res.ok) {
+      const detail = (await res.text()).slice(0, 300);
+      return json({
+        fields: {},
+        source: "fallback",
+        error: `openai-${res.status}`,
+        detail,
+      });
+    }
+    const data = await res.json();
+    raw = data.choices?.[0]?.message?.content;
+  } catch (e) {
+    return json({ fields: {}, source: "fallback", error: `openai-threw:${e.message}` });
+  }
+
+  if (!raw) {
+    return json({ fields: {}, source: "fallback", error: "no-content" });
+  }
+
+  let parsed;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return json({ fields: {}, source: "fallback", error: "bad-json-from-model" });
+  }
+
+  const validated = spec.validate(parsed);
+
+  if (env.NOTIFICATIONS) {
+    await env.NOTIFICATIONS.put(cacheKey, JSON.stringify(validated), {
+      expirationTtl: CLAW_ENHANCE_CACHE_TTL,
+    });
+  }
+
+  return json({ fields: validated, source: "openclaw", model });
+}
+
+async function clawCacheKey(feature, state) {
+  const buf = new TextEncoder().encode(
+    `${feature}:${safeStringify(state)}`,
+  );
+  const hash = await crypto.subtle.digest("SHA-256", buf);
+  const hex = Array.from(new Uint8Array(hash))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("")
+    .slice(0, 16);
+  return `hc:claw:enhance:${feature}:${hex}`;
+}
+
+function safeStringify(v) {
+  try {
+    return JSON.stringify(v ?? null);
+  } catch {
+    return String(v);
+  }
+}
+
+// Utilities used by enhancers
+function clampStr(s, max) {
+  if (typeof s !== "string") return "";
+  return s.trim().slice(0, max);
+}
+function asStringArray(v, maxLen, maxItems) {
+  if (!Array.isArray(v)) return [];
+  return v
+    .map((x) => clampStr(String(x), maxLen))
+    .filter((x) => x.length > 0)
+    .slice(0, maxItems);
+}
+
+// ── Per-feature prompt builders ────────────────────────────────────
+
+const CLAW_ENHANCERS = {
+  // Morning checklist intro
+  // state:  { variant: {highTempF, needsJacket, hotDay, rain}, items: [...] }
+  // output: { intro: string (≤100 chars) }
+  morningChecklist(state) {
+    const v = state?.variant ?? {};
+    return {
+      system:
+        'You write ONE short, warm, slightly varied line of copy for a family TV dashboard checklist shown to kids heading to school. Max 100 characters. Casual tone, not robotic. Never scold. Respond with strict JSON: {"intro": "..."}.',
+      user: `Today's weather: highTempF=${v.highTempF ?? "?"}, needsJacket=${!!v.needsJacket}, hotDay=${!!v.hotDay}, rain=${!!v.rain}. Write a single "before you head out" opener for the checklist.`,
+      validate: (fields) => ({ intro: clampStr(fields?.intro, 140) }),
+    };
+  },
+
+  // Bedtime toast softener
+  // state:  { bedtimeAt, minutesUntil, kidsInRange: [{childId, childName}] }
+  // output: { copy: string (≤160 chars) }
+  bedtime(state) {
+    const kids = (state?.kidsInRange ?? []).map((k) => k.childName).filter(Boolean).join(" & ");
+    const mins = state?.minutesUntil ?? 30;
+    return {
+      system:
+        'You write ONE gentle bedtime-approaching reminder for a family TV dashboard. Max 160 characters. Soft, contextual, never scolding. No emojis. Respond with strict JSON: {"copy": "..."}.',
+      user: `Bedtime for ${kids || "the kids"} is in ${mins} minutes. Write a single line that nudges them to start winding down.`,
+      validate: (fields) => ({ copy: clampStr(fields?.copy, 200) }),
+    };
+  },
+
+  // Takeout decision suggestions
+  // state:  { decision, vendor?, suggestedVendors: string[] }
+  // output: { intro: string, topPicks: [{name, reason}] (≤2) }
+  takeout(state) {
+    const vendors = Array.isArray(state?.suggestedVendors) ? state.suggestedVendors : [];
+    return {
+      system:
+        'You help a family decide on dinner takeout. Pick TWO vendors from the provided list and give each a one-phrase reason. Write one short intro line (≤120 chars). No emojis. Respond with strict JSON: {"intro":"...","topPicks":[{"name":"...","reason":"..."},{"name":"...","reason":"..."}]}. The "name" field must be exactly as provided in the input list.',
+      user: `It's past 4:30 PM and no dinner decision has been made. Rotation suggests: ${vendors.join(", ")}. Pick the two you'd lean toward and explain briefly.`,
+      validate: (fields) => {
+        const validNames = new Set(vendors);
+        const picks = Array.isArray(fields?.topPicks) ? fields.topPicks : [];
+        return {
+          intro: clampStr(fields?.intro, 140),
+          topPicks: picks
+            .filter((p) => p && validNames.has(p.name))
+            .slice(0, 2)
+            .map((p) => ({ name: p.name, reason: clampStr(p.reason, 80) })),
+        };
+      },
+    };
+  },
+
+  // Lunch hint
+  // state:  { dateLabel, dateISO, isSchoolDay, menu: string[] }
+  // output: { kidPreferenceHint: string (≤160 chars) }
+  lunch(state) {
+    const menu = Array.isArray(state?.menu) ? state.menu.slice(0, 5) : [];
+    return {
+      system:
+        'You write ONE short helpful hint about tomorrow\'s school lunch for a family deciding school-vs-home lunch. Max 160 chars. Do not invent kid names or preferences — if the menu is empty, say so briefly. No emojis. Respond with strict JSON: {"kidPreferenceHint":"..."}.',
+      user: `Tomorrow is ${state?.dateLabel ?? "a school day"}. School menu: ${menu.length ? menu.join(", ") : "(not loaded)"}. Write one line noting whether school lunch looks appealing.`,
+      validate: (fields) => ({
+        kidPreferenceHint: clampStr(fields?.kidPreferenceHint, 200),
+      }),
+    };
+  },
+
+  // Calendar conflict summary
+  // state:  { conflicts: [{a:{title,start}, b:{title,start}, at}], peter0800_0900Risk }
+  // output: { summary, suggestion }
+  calendarConflict(state) {
+    const c = Array.isArray(state?.conflicts) ? state.conflicts[0] : null;
+    return {
+      system:
+        'You summarize a single calendar conflict in friendly everyday language for a family TV dashboard. Exactly two fields: summary (≤120 chars), suggestion (≤140 chars). No emojis. Respond with strict JSON: {"summary":"...","suggestion":"..."}.',
+      user: c
+        ? `Two things overlap at ${c.at}: "${c.a?.title}" and "${c.b?.title}". Peter has a work block risk 8–9 AM: ${!!state?.peter0800_0900Risk}. Summarize the clash and suggest one small way to handle it.`
+        : "There is a morning overlap today but no details. Write a generic heads-up.",
+      validate: (fields) => ({
+        summary: clampStr(fields?.summary, 160),
+        suggestion: clampStr(fields?.suggestion, 180),
+      }),
+    };
+  },
+
+  // Claw suggestions re-phrasing (never re-ranks across tiers; only polishes copy)
+  // state:  [{id, tier, title}]
+  // output: { items: [{id, title, detail}] }
+  clawSuggestions(state) {
+    const rows = Array.isArray(state) ? state.slice(0, 6) : [];
+    return {
+      system:
+        'You polish short suggestion titles for a family TV dashboard. Keep each title ≤40 chars and each detail ≤80 chars. Do NOT change the order and do NOT invent new ids. For every input id you must emit a matching output object. No emojis. Respond with strict JSON: {"items":[{"id":"...","title":"...","detail":"..."}]}.',
+      user: `Rewrite these suggestions so the titles feel less robotic and the details feel specific:\n${rows.map((r, i) => `${i + 1}. id=${r.id} tier=${r.tier} title=${r.title}`).join("\n")}`,
+      validate: (fields) => {
+        const validIds = new Set(rows.map((r) => r.id));
+        const items = Array.isArray(fields?.items) ? fields.items : [];
+        return {
+          items: items
+            .filter((it) => it && validIds.has(it.id))
+            .map((it) => ({
+              id: it.id,
+              title: clampStr(it.title, 60),
+              detail: clampStr(it.detail, 120),
+            }))
+            .slice(0, rows.length),
+        };
+      },
+    };
+  },
+
+  // Birthday gift ideas
+  // state:  { name, relation?, daysUntil, constraints?: string[] }
+  // output: { ideas: [{idea, priceEstimate, rationale}] (3–5) }
+  birthdayGiftIdeas(state) {
+    const constraints = asStringArray(state?.constraints, 80, 5);
+    return {
+      system:
+        'You generate 3 to 5 concrete birthday gift ideas for a family member or friend. Each idea: 3–8 word name, rough USD price estimate (e.g. "$25–$40"), and a one-sentence rationale. No generic filler. No emojis. Respond with strict JSON: {"ideas":[{"idea":"...","priceEstimate":"...","rationale":"..."}]}.',
+      user: `Recipient: ${state?.name ?? "(unknown)"}${state?.relation ? ` (${state.relation})` : ""}. Birthday in ${state?.daysUntil ?? "?"} days.${constraints.length ? ` Constraints: ${constraints.join("; ")}.` : ""} Generate 3–5 specific gift ideas.`,
+      validate: (fields) => {
+        const ideas = Array.isArray(fields?.ideas) ? fields.ideas : [];
+        return {
+          ideas: ideas
+            .slice(0, 5)
+            .map((it) => ({
+              idea: clampStr(it?.idea, 80),
+              priceEstimate: clampStr(it?.priceEstimate, 40),
+              rationale: clampStr(it?.rationale, 200),
+            }))
+            .filter((it) => it.idea.length > 0),
+        };
+      },
+    };
+  },
+};
 
 async function fetchBirthdays(appleId, appPassword) {
   const auth = btoa(`${appleId}:${appPassword}`);
