@@ -5,6 +5,55 @@ Newest at top.
 
 ---
 
+## 2026-04-20 — School updates go through OpenClaw, not direct SDK calls
+
+**Context**
+Three separate places held school-email logic: `email-triage/` (general
+classifier with "school" as one of 9 categories, direct OpenAI/Anthropic
+SDK), `school-updates/` (dedicated school pipeline, direct SDK), and
+`src/data/schoolHeuristics.js` (client-side regex baseline). Two of them
+called LLM APIs directly from the Mac Mini, each with its own model ID,
+each with its own API key. The user asked that only *actionable* school
+emails reach Telegram — not the general noise email-triage was firing.
+
+**Decision**
+Route all new service-side LLM calls through the worker's
+`/api/claw/enhance` endpoint — the single enhancement surface we already
+standardized on for UI cards. Specifically:
+
+1. Added `schoolUpdates` feature to `CLAW_ENHANCERS` in the worker.
+   Per-email input; structured output including `isRelevant` (default
+   false — the model must justify surfacing). Validators clamp every
+   string and refuse invalid kinds.
+2. Rewrote `school-updates/agent.py`: fetch via Gmail pre-filter → POST
+   to `/api/claw/enhance` per candidate → publish batch to
+   `/api/school-updates` → fire one Telegram ping per actionable item.
+   No `openai`/`anthropic` imports on the Mac Mini side for this service.
+3. Disabled `email-triage/`'s Telegram notifier. It keeps feeding the TV
+   Notifications card but no longer pings the phone. Only
+   `school-updates/` reaches Telegram.
+4. `email-triage/` stays on direct SDK calls for now. Migration path
+   below.
+5. `src/data/schoolHeuristics.js` untouched. Client-side regex baseline
+   remains the deterministic safety net per the 2026-04-19 "OpenClaw is
+   enrichment, not dependency" decision.
+
+**Consequence**
+- Single source of model config: `OPENAI_ENHANCE_MODEL` on the worker.
+- Single LLM-key surface: worker's `OPENAI_API_KEY` secret.
+- Free dedup: `/api/claw/enhance` caches by `(feature, stateHash)` 1 h.
+- Poll cadence: school-updates runs every **30 min** (explicit user
+  decision). Lower than email-triage's 5-min cadence — school mail is
+  less time-sensitive and LLM cost stays bounded.
+
+**Migration path for `email-triage/`**
+Add an `emailTriage` feature to `CLAW_ENHANCERS` mirroring its classifier
+output, rewrite `classifier.py` to POST instead of calling SDKs, drop
+`openai` + `anthropic` from `requirements.txt`, remove the `provider:`
+key from `config.yaml`. Not in scope today.
+
+---
+
 ## 2026-04-20 — Product decisions for the next feature pass
 
 Three design questions locked before implementation:

@@ -979,6 +979,71 @@ const CLAW_ENHANCERS = {
       },
     };
   },
+
+  // School-email relevance + structured extraction.
+  // state:  { subject, from, snippet, receivedAt }
+  // output: {
+  //   isRelevant, kind, title, summary, dueDate?, eventDate?,
+  //   child?, location?, urgency, suggestedAction?
+  // }
+  //
+  // Policy (matches the family's explicit ask: "only flag actionable"):
+  //   - Default is isRelevant=false. The model must justify surfacing.
+  //   - Relevance requires EITHER a concrete action the family can take
+  //     (sign, return, RSVP, pay, bring, volunteer) OR a dated event
+  //     that affects the family's schedule.
+  //   - Pure informational school content (newsletters w/ no date/action,
+  //     fundraising blurbs, general "here's what's happening" updates)
+  //     returns isRelevant=false.
+  schoolUpdates(state) {
+    return {
+      system:
+        'You classify a single email for a family dashboard showing school items. Return strict JSON: ' +
+        '{"isRelevant": bool, "kind": "action"|"event"|"reminder"|"info", "title": str, ' +
+        '"summary": str, "dueDate": "YYYY-MM-DD"|null, "eventDate": "YYYY-MM-DD"|null, ' +
+        '"child": str|null, "location": str|null, "urgency": 0..1, "suggestedAction": str|null}. ' +
+        'Only return isRelevant=true if the email contains: (a) a concrete action the family must take ' +
+        '(sign/return/RSVP/pay/bring/volunteer) OR (b) a dated school event affecting the family schedule. ' +
+        'Newsletters, fundraising, and informational blurbs without dates or actions → isRelevant=false. ' +
+        'Non-school emails (retail, shipping, etc.) → isRelevant=false. ' +
+        'Keep title ≤60 chars; summary ≤160 chars; suggestedAction ≤100 chars. No emojis.',
+      user: [
+        `From: ${state?.from ?? "(unknown)"}`,
+        `Subject: ${state?.subject ?? ""}`,
+        `Received: ${state?.receivedAt ?? ""}`,
+        "",
+        "Body snippet:",
+        String(state?.snippet ?? "").slice(0, 1500),
+      ].join("\n"),
+      validate: (fields) => {
+        const isRelevant = fields?.isRelevant === true;
+        if (!isRelevant) {
+          return { isRelevant: false };
+        }
+        const kind = ["action", "event", "reminder", "info"].includes(fields?.kind)
+          ? fields.kind
+          : "info";
+        const urgency = (() => {
+          const n = Number(fields?.urgency);
+          if (!Number.isFinite(n)) return 0.5;
+          return Math.max(0, Math.min(1, n));
+        })();
+        const dateRe = /^\d{4}-\d{2}-\d{2}$/;
+        return {
+          isRelevant: true,
+          kind,
+          title: clampStr(fields?.title, 80),
+          summary: clampStr(fields?.summary, 200),
+          dueDate: dateRe.test(fields?.dueDate ?? "") ? fields.dueDate : null,
+          eventDate: dateRe.test(fields?.eventDate ?? "") ? fields.eventDate : null,
+          child: clampStr(fields?.child, 60) || null,
+          location: clampStr(fields?.location, 80) || null,
+          urgency,
+          suggestedAction: clampStr(fields?.suggestedAction, 140) || null,
+        };
+      },
+    };
+  },
 };
 
 async function fetchBirthdays(appleId, appPassword) {

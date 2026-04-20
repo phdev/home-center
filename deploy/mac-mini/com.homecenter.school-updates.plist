@@ -19,9 +19,11 @@
     <array>
         <string>__REPO_DIR__/school-updates/.venv/bin/python3</string>
         <string>agent.py</string>
-        <string>--interval</string>
-        <string>900</string>
     </array>
+    <!-- Poll interval comes from school-updates/config.yaml
+         (poll_interval_seconds). Override on the command line with
+         --interval <seconds> if you need to. -->
+
 
     <key>WorkingDirectory</key>
     <string>__REPO_DIR__/school-updates</string>
