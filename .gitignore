@@ -40,6 +40,8 @@ src/design/
 school-updates/credentials.json
 school-updates/token.json
 school-updates/data/
+school-updates/config.yaml
+school-updates/seen.json
 
 # OpenClaw router
 openclaw/cache/*.db
