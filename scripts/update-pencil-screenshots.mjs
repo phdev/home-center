@@ -1,10 +1,26 @@
 import { spawn } from "child_process";
 import fs from "fs";
+import os from "os";
+import path from "path";
 import readline from "readline";
+import { fileURLToPath } from "url";
 
-const MCP_BIN = "/Applications/Pencil.app/Contents/Resources/app.asar.unpacked/out/mcp-server-darwin-arm64";
-const PEN_FILE = "/Users/peterhowell/Documents/home-center.pen";
-const OUT_DIR = "/Users/peterhowell/home-center/public/pencil-screenshots";
+// Location of the Pencil MCP binary (macOS install location).
+// Override with PENCIL_MCP_BIN if installed elsewhere.
+const MCP_BIN =
+  process.env.PENCIL_MCP_BIN ||
+  "/Applications/Pencil.app/Contents/Resources/app.asar.unpacked/out/mcp-server-darwin-arm64";
+
+// Path to the .pen file. Override with HOME_CENTER_PEN_FILE if you
+// keep your designs somewhere other than ~/Documents.
+const PEN_FILE =
+  process.env.HOME_CENTER_PEN_FILE ||
+  path.join(os.homedir(), "Documents", "home-center.pen");
+
+// Screenshots land alongside the repo's public/ folder — resolved
+// relative to this script so it works on any checkout.
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const OUT_DIR = path.resolve(__dirname, "..", "public", "pencil-screenshots");
 fs.mkdirSync(OUT_DIR, { recursive: true });
 
 const pages = [

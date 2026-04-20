@@ -75,32 +75,20 @@ if the change produced a lesson, capture it.
 
 ## Git Workflow
 
-- **Always push and merge into `main`** for every change.
-- GitHub Pages deploys automatically from `main` via GitHub Actions (`.github/workflows/deploy.yml`).
+- **Open a PR. Don't push directly to `main`.**
+- Branch off `origin/main` with a `claude/<slug>` branch name.
+- Push, then `gh pr create` — the PR template in
+  `.github/pull_request_template.md` carries the gbrain + Compound Step
+  checklists.
+- CI (`.github/workflows/openclaw-checks.yml`) runs the Vitest suite + build.
+  Both are blocking.
+- Merge only after CI is green and the gbrain checklist is honored. Squash
+  merges keep `main` history readable.
+- GitHub Pages deploys automatically from `main` via
+  `.github/workflows/deploy.yml` after merge.
 
-### Push & Merge Process (Direct to Main via PAT)
-
-Bypass pull requests entirely using two sequential pushes:
-
-1. Commit changes on the `claude/` feature branch.
-2. Push the feature branch to origin:
-   ```
-   git push -u origin claude/<branch-name>
-   ```
-3. Push the feature branch directly onto `main` via PAT-authenticated URL:
-   ```
-   git push https://x-access-token:<PAT>@github.com/phdev/accel-driv.git claude/<branch-name>:main
-   ```
-   - `x-access-token` is the username GitHub expects for PAT-based HTTPS auth.
-   - The refspec `branch:main` fast-forwards `main` to the feature branch tip.
-   - No PR, no merge commit, no review step.
-   - GitHub Pages deploys immediately after push succeeds.
-
-**PAT is stored outside the repo (never committed).** Use the token provided at session start.
-
-### Retry Policy
-
-- If push fails due to network errors, retry up to 4 times with exponential backoff (2s, 4s, 8s, 16s).
+Never bypass the PR — the test gate is the enforcement mechanism for the
+architectural invariants described in `docs/`.
 
 ## Project Overview
 
@@ -356,7 +344,6 @@ ssh pi@homecenter.local "/home/pi/home-center/pi/.venv/bin/pip install <package>
 | Dashboard kiosk | Pi | systemd (`home-center-kiosk`) | — |
 | Wake word | Pi | systemd (`wake-word`) | — |
 | OpenClaw bridge | Mac Mini | launchd (`com.openclaw.bridge`) | 3100 |
-| Homer CI | Mac Mini | launchd (`com.homerci.daemon`) | — |
 | Email triage | Mac Mini | launchd (`com.homecenter.email-triage`) | — |
 | School updates | Mac Mini | launchd (`com.homecenter.school-updates`) | — |
 | Cloudflare Worker | Cloudflare | — | — |
@@ -364,15 +351,16 @@ ssh pi@homecenter.local "/home/pi/home-center/pi/.venv/bin/pip install <package>
 ### Mac Mini Setup
 
 ```bash
-git clone https://github.com/phdev/accel-driv.git home-center
+git clone https://github.com/phdev/home-center.git
 cd home-center
-bash .openclaw/mac-mini/setup.sh
+export TELEGRAM_BOT_TOKEN="<from @BotFather>"
+export WORKER_URL="https://home-center-api.<you>.workers.dev"
+bash deploy/mac-mini/setup-openclaw-bridge.sh
 ```
 
-After setup, migrate services off the Pi:
-```bash
-bash .openclaw/mac-mini/migrate-from-pi.sh
-```
+Plist templates for the email-triage and school-updates services live in
+`deploy/mac-mini/` — see `deploy/mac-mini/README.md` for the render-and-load
+steps.
 
 ## State-Driven Architecture
 
@@ -457,7 +445,8 @@ Chat IDs are numeric Telegram IDs (positive for DMs, negative for groups, `-100�
 | `openclaw/index.js` | Main service — Express API + node-telegram-bot-api client + message queue |
 | `openclaw/package.json` | Dependencies (node-telegram-bot-api, express) |
 | `openclaw/openclaw.service` | Legacy Pi systemd unit (kept for reference) |
-| `.openclaw/mac-mini/plists/com.openclaw.bridge.plist` | Mac Mini launchd plist |
+| `openclaw/prompts/` | Versioned bot prompts (persona, operating instructions, family-assistant skill) |
+| `deploy/mac-mini/com.openclaw.bridge.plist` | Mac Mini launchd template — rendered by `deploy/mac-mini/setup-openclaw-bridge.sh` |
 
 ### Integration with Other Services
 
@@ -465,87 +454,34 @@ Chat IDs are numeric Telegram IDs (positive for DMs, negative for groups, `-100�
 - **Dashboard QR code** (`src/components/FactPanel.jsx`) — "Chat with OpenClaw" QR links to Telegram deep link
 - **Dashboard panel** (`src/components/AgentTasksPanel.jsx`) — header labeled "OpenClaw"
 - **Incoming messages** — forwarded to worker `/api/ask` for LLM-powered replies
-- **Homer CI** — polls `GET /messages` for dev task requests, sends notifications via `POST /send`
 
 ### Setup
 
-1. Create a bot via **@BotFather** on Telegram → copy the bot token.
-2. Set `TELEGRAM_BOT_TOKEN` in `.openclaw/mac-mini/plists/com.openclaw.bridge.plist` (replace `__TELEGRAM_BOT_TOKEN__`).
-3. Start the service: `launchctl load ~/Library/LaunchAgents/com.openclaw.bridge.plist`
-4. Check connection: `curl http://localhost:3100/status` (should report `ready: true` + bot username)
-5. Message the bot, then get your numeric chat ID:
-   `curl "https://api.telegram.org/bot<TOKEN>/getUpdates"` → look for `chat.id`.
-6. Set `target_chat` in `email-triage/config.yaml` under `notifications.telegram` and set `enabled: true`.
-
-## Homer CI (Autonomous Dev Orchestrator)
-
-### Architecture
-
-Homer CI is an autonomous dev orchestrator running on the **Mac Mini**. It listens for Telegram messages, plans tasks with Claude, spawns coding agents, monitors their progress via GitHub Actions CI, and notifies via Telegram when PRs are ready.
-
-**Homer CI is NOT OpenClaw.** OpenClaw is the family assistant. Homer CI uses the OpenClaw Telegram bridge as transport but targets Peter's personal chat, not the family group.
-
-### How It Works (Autonomous Mode)
-
-1. You text Homer CI on Telegram: "add sunrise times to the weather panel"
-2. Homer CI reads the codebase module map, asks Claude to plan the task
-3. Claude picks files, chooses Claude Code (frontend) or Codex (backend), writes the prompt
-4. Homer CI spawns the agent in tmux, texts you confirmation
-5. Agent works autonomously, commits, pushes, opens PR
-6. GitHub Actions runs build, code review, security scan
-7. Homer CI polls CI results every 15 min, texts you when PR passes all gates
-8. You review and merge over morning coffee
-
-### Telegram Commands
-
-- **Any text** → treated as a task request, planned and spawned automatically
-- **"status"** → returns active agents and recent PRs
-- **"stop"** → kills all running agents
-
-### Proactive Mode
-
-Every hour, Homer CI pulls family data (school updates, notifications) and if no agents are running, texts you task suggestions based on what it finds.
-
-### Key Files
-
-| File | Purpose |
-|---|---|
-| `.openclaw/homer-ci.sh` | Main daemon — polls Telegram, plans tasks, spawns agents, monitors |
-| `.openclaw/orchestrator-prompt.md` | Homer CI system prompt with architecture + rules |
-| `.openclaw/active-tasks.json` | Task registry (status, gates, PR numbers) |
-| `.openclaw/audit.log` | All agent actions logged here |
-| `.openclaw/scripts/spawn-agent.sh` | Launch agent in tmux with branch isolation |
-| `.openclaw/scripts/check-agents.sh` | Reads CI results, sends notifications |
-| `.openclaw/scripts/notify-telegram.sh` | Send dev notifications via OpenClaw bridge |
-| `.openclaw/scripts/review-pr.sh` | Manual fallback for local PR review |
-| `.openclaw/scripts/build-context.sh` | Generate module map from codebase |
-| `.openclaw/scripts/detect-tasks.sh` | Proactive task suggestions from family context |
-| `.openclaw/templates/frontend-agent.md` | Prompt template for UI tasks (Claude Code) |
-| `.openclaw/templates/backend-agent.md` | Prompt template for worker/Pi tasks (Codex) |
-| `.openclaw/context/module-map.md` | Auto-generated codebase map |
-| `.github/workflows/openclaw-checks.yml` | CI: build + code review + security scan |
-| `.openclaw/mac-mini/plists/com.homerci.daemon.plist` | Mac Mini launchd plist |
-
-### Environment Variables
+See `deploy/mac-mini/README.md` for the end-to-end setup. The short version:
 
 ```bash
-HOMER_CI_CHAT_ID="<your-numeric-telegram-chat-id>"   # e.g. 123456789 (or -100... for supergroups)
-TELEGRAM_BOT_TOKEN="<bot-token-from-@BotFather>"      # required by the bridge
-HOMER_CI_OPENCLAW_URL="http://localhost:3100"  # Same machine on Mac Mini
+export TELEGRAM_BOT_TOKEN="<from @BotFather>"
+export WORKER_URL="https://home-center-api.<you>.workers.dev"
+bash deploy/mac-mini/setup-openclaw-bridge.sh
 ```
 
-### Mac Mini Setup Files
+To wire Telegram notifications into email-triage, set `target_chat` in
+`email-triage/config.yaml` under `notifications.telegram` and set
+`enabled: true`.
 
-| File | Purpose |
-|---|---|
-| `.openclaw/mac-mini/setup.sh` | One-time Mac Mini setup (deps, venvs, plists) |
-| `.openclaw/mac-mini/migrate-from-pi.sh` | Stop/disable migrated services on Pi |
-| `.openclaw/mac-mini/plists/` | All launchd plist templates |
+## Developer automation (lives outside this repo)
 
-### Security
+A personal developer-agent orchestrator ("Homer CI") previously lived
+under `.openclaw/`. It spawned coding agents, watched CI, and pinged a
+personal Telegram chat when PRs were ready.
 
-- Agents get ZERO access to family data
-- Agents never SSH to Pi or deploy
-- All quality gates run in GitHub Actions (not locally)
-- External data wrapped in `<UNTRUSTED_EXTERNAL_CONTEXT>` tags
-- Everything logged to `.openclaw/audit.log`
+**It has been moved out of the product repo.** That system is not part of
+Home Center — it just happened to reuse the OpenClaw Telegram bridge as
+transport. Keeping it here blurred the product boundary, mixed personal
+orchestration state (audit logs, active tasks) into reviews, and made it
+easy to accidentally commit machine-specific config.
+
+If you're maintaining that system, it belongs in a separate repo (or a
+machine-local `~/.homer-ci/` directory). The OpenClaw bridge API
+(`/send`, `/messages`, `/messages/ack`) remains stable and is the only
+contract an external dev-agent system needs to integrate.
