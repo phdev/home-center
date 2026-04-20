@@ -1,0 +1,35 @@
+# gitleaks config for Home Center
+#
+# Uses the default rule set plus a short allowlist so legitimate
+# documentation of the 2026-02-22 leak in the decisions log and this
+# config itself doesn't trip the scanner.
+#
+# See docs/home_center_decisions_log.md → "Repo boundary cleanup" for
+# the incident context.
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Documentation of the already-revoked 2026-02-22 Cloudflare token"
+# Path-scoped: the decisions log deliberately references the token ID
+# that was revoked on 2026-04-20. Any other file matching the pattern
+# should still fail the scan.
+paths = [
+  '''docs/home_center_decisions_log\.md''',
+  '''\.gitleaks\.toml''',
+]
+# Literal matches (not regex-wide — each string is allowlisted exactly):
+#
+# - The 2026-02-22 Cloudflare token — already revoked 2026-04-20; kept in
+#   the decisions log as incident history.
+# - The Cloudflare token's dashboard ID — same reason.
+# - PHOTOS_ALBUM_TOKEN — Google Photos album share token intentionally
+#   committed in worker/wrangler.toml under [vars]. FOLLOW-UP: migrate
+#   this to `wrangler secret put PHOTOS_ALBUM_TOKEN` and remove from the
+#   plaintext block. Tracked in docs/home_center_decisions_log.md.
+regexes = [
+  '''Wk6MoCA1xDk3VWqs16gDjo1_Q_ShfFKR3r4GG1uh''',
+  '''088c3b034ce3bc775cba91b223edceb7''',
+  '''B1o5nhQST2MGod''',
+]
