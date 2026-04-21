@@ -10,11 +10,14 @@ import json
 import os
 import re
 import sys
+import time
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable, TypeVar
 
 from openai import OpenAI
+
+T = TypeVar("T")
 
 MODEL = "gpt-5.4-mini"
 
@@ -133,6 +136,54 @@ def extract_json_block(text: str) -> Any:
         raise
 
 
+_RETRYABLE_NAMES = {
+    "APIConnectionError",
+    "APITimeoutError",
+    "InternalServerError",
+    "RateLimitError",
+    "URLError",
+    "TimeoutError",
+    "ConnectionError",
+    "ConnectionResetError",
+    "IncompleteRead",
+}
+
+
+def _is_retryable(exc: BaseException) -> bool:
+    name = type(exc).__name__
+    if name in _RETRYABLE_NAMES:
+        return True
+    code = getattr(exc, "code", None)
+    try:
+        if code is not None and 500 <= int(code) < 600:
+            return True
+    except (TypeError, ValueError):
+        pass
+    return False
+
+
+def with_retries(fn: Callable[[], T], attempts: int = 3, backoff: tuple[int, ...] = (2, 6)) -> T:
+    """Call fn() with bounded retries on transient network/5xx errors.
+
+    Non-retryable exceptions (e.g. auth errors) are raised immediately.
+    """
+    last: BaseException | None = None
+    for i in range(attempts):
+        try:
+            return fn()
+        except (KeyboardInterrupt, SystemExit):
+            raise
+        except BaseException as exc:
+            last = exc
+            if i + 1 >= attempts or not _is_retryable(exc):
+                raise
+            delay = backoff[i] if i < len(backoff) else backoff[-1]
+            print(f"warning: {type(exc).__name__} — retrying in {delay}s", file=sys.stderr)
+            time.sleep(delay)
+    assert last is not None
+    raise last
+
+
 def call_responses(client: OpenAI, prompt: str, payload_blocks: list[tuple[str, str]]) -> str:
     """Run the Responses API with the prompt + an ordered list of labeled
     input blocks (e.g. the snapshot, memory, topic). Returns raw text."""
@@ -141,7 +192,8 @@ def call_responses(client: OpenAI, prompt: str, payload_blocks: list[tuple[str, 
         parts.append(f"## {label}")
         parts.append(content)
         parts.append("")
-    response = client.responses.create(model=MODEL, input="\n".join(parts))
+    input_text = "\n".join(parts)
+    response = with_retries(lambda: client.responses.create(model=MODEL, input=input_text))
     return extract_output_text(response)
 
 

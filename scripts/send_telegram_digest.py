@@ -32,6 +32,7 @@ from _design_claw import (
     load_last_daily,
     read_json,
     require_env,
+    with_retries,
 )
 
 TELEGRAM_API = "https://api.telegram.org"
@@ -109,7 +110,7 @@ def main() -> int:
 
     token = require_env("TELEGRAM_BOT_TOKEN")
     chat_id = require_env("TELEGRAM_CHAT_ID")
-    result = send_message(token, chat_id, digest)
+    result = with_retries(lambda: send_message(token, chat_id, digest))
     if not result.get("ok"):
         print(f"error: Telegram API returned: {result}", file=sys.stderr)
         return 1
