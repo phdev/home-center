@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Template for the Home Center voice service launchd agent.
+
+  Copy to ~/Library/LaunchAgents/com.homecenter.voice.plist and substitute
+  the placeholders below. Never commit a copy with real values.
+
+    __REPO_DIR__      absolute path to the home-center clone
+                      (e.g. /Users/peter/home-center)
+    __PYTHON_PATH__   path to the voice-service venv python
+                      (e.g. __REPO_DIR__/voice-service/.venv/bin/python3)
+    __MIC_HOST__      Pi hostname, e.g. homecenter.local
+    __WORKER_URL__    Home Center Cloudflare Worker URL
+    __WORKER_TOKEN__  Worker API auth token (if any)
+    __WHISPER_MODEL__ faster-whisper model name (medium.en recommended)
+
+  Then load with:
+    launchctl load ~/Library/LaunchAgents/com.homecenter.voice.plist
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.homecenter.voice</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>__PYTHON_PATH__</string>
+        <string>__REPO_DIR__/voice-service/voice_service.py</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>__REPO_DIR__/voice-service</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+        <key>MIC_STREAM_HOST</key>
+        <string>__MIC_HOST__</string>
+        <key>MIC_STREAM_PORT</key>
+        <string>8766</string>
+        <key>PI_COMMAND_URL</key>
+        <string>http://__MIC_HOST__:8765</string>
+        <key>WORKER_URL</key>
+        <string>__WORKER_URL__</string>
+        <key>WORKER_TOKEN</key>
+        <string>__WORKER_TOKEN__</string>
+        <key>WHISPER_MODEL</key>
+        <string>__WHISPER_MODEL__</string>
+        <key>MODEL_DIR</key>
+        <string>__REPO_DIR__/pi/models</string>
+    </dict>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>KeepAlive</key>
+    <true/>
+
+    <key>StandardOutPath</key>
+    <string>__REPO_DIR__/voice-service/logs/voice-stdout.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>__REPO_DIR__/voice-service/logs/voice-stderr.log</string>
+</dict>
+</plist>

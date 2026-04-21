@@ -1,5 +1,5 @@
 [Unit]
-Description=Home Center Wake Word Listener (Hey Homer)
+Description=Home Center command server (dashboard state, CEC, timers, chime)
 After=sound.target
 Wants=sound.target
 
@@ -7,7 +7,9 @@ Wants=sound.target
 Type=simple
 User=__USER__
 WorkingDirectory=__REPO_DIR__
-ExecStart=__REPO_DIR__/pi/.venv/bin/python __REPO_DIR__/pi/wake_word_service.py
+# --no-wake-detection: the wake-word DNN + Whisper now run on the Mac mini
+# voice-service and drive this server via HTTP (/api/tv/on, /api/chime, …).
+ExecStart=__REPO_DIR__/pi/.venv/bin/python __REPO_DIR__/pi/wake_word_service.py --no-wake-detection
 Restart=always
 RestartSec=3
 

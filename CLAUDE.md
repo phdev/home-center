@@ -219,38 +219,97 @@ Rule of thumb: a card mounts/unmounts on a flag, then fills in OpenClaw-authored
 | `scripts/update-pencil-screenshots.mjs` | Generates static PNGs from pencil designs via MCP |
 | `public/pencil-screenshots/` | Generated PNG files served by TV Preview |
 
-## Wake Word Service (Raspberry Pi)
+## Wake Word + Voice Service
 
-### Architecture
+### Architecture (2026-04-21)
 
-A Python service (`pi/wake_word_service.py`) runs on a Raspberry Pi, continuously listening for voice commands via a ReSpeaker 2-Mic Pi HAT. On detection, it controls a TV via HDMI-CEC (`cec-client`).
+Detection and speech-to-text moved **off the Pi and onto the Mac mini**. The Pi
+was CPU-bound to Whisper-base and openWakeWord at low confidence; the Mac mini
+runs `medium.en` Whisper with comfortable headroom, which made detection
+dramatically more reliable.
 
-**Commands:**
-- "Hey Homer" → Turn TV on + set Pi as active HDMI source
-- "Hey Homer, turn off" → Put TV in standby
-- "Hey Homer, turn on" → Turn TV on (explicit variant)
+Hardware also changed: the **ReSpeaker XVF3800 USB 4-Mic Array** replaces the
+ReSpeaker 2-Mics Pi HAT. The XVF3800 has onboard AEC / beamforming / dereverb,
+so the DNN no longer has to fight room echo and TV bleed in software. It stays
+plugged into the Pi (user preference — the Pi sits by the TV).
 
-### Pi Access
+```
+Pi (homecenter.local)                Mac mini (peters-mac-mini.lan)
+──────────────────────────           ─────────────────────────────────
+XVF3800 USB mic                      voice-service/voice_service.py
+  │                                    · openWakeWord (hey_homer)
+  ▼                                    · faster-whisper medium.en
+mic_streamer.py  ──TCP :8766───────▶   · parse_command → dispatch
+wake_word_service.py                 ◀─HTTP :8765──
+  --no-wake-detection                    /api/chime
+  · /api/chime (play chime)              /api/tv/on, /api/tv/off
+  · /api/tv/on, /api/tv/off              /api/navigate, /api/timers
+  · /api/navigate, /api/timers
+  · /api/gesture (HandController)      (also POSTs directly to the worker's
+  · AlarmThread (timer chimes)          /api/ask-query for LLM queries)
+  · dashboard polling state
+```
+
+**Commands (wake word → Whisper → parse → HTTP dispatch):**
+- "Hey Homer" → `POST pi:8765/api/tv/on` (TV on via CEC)
+- "Hey Homer, turn off" → `POST pi:8765/api/tv/off` (TV standby)
+- "Hey Homer, set a timer for X minutes for Y" → `POST pi:8765/api/timers`
+- "Hey Homer, stop" → `POST pi:8765/api/timers/dismiss-all`
+- "Hey Homer, show calendar/weather/photos" → `POST pi:8765/api/navigate`
+- "Hey Homer, go back" → navigate dashboard
+- "Hey Homer, [question]" → `POST worker/api/ask-query`
+
+Every detection also POSTs `/api/chime` before dispatch, so the user gets
+immediate audible acknowledgement (routes through TV speakers via HDMI when
+the TV is on, else through the XVF3800's 3.5mm jack).
+
+### Pi access + services
 
 - **SSH:** `ssh pi@homecenter.local`
-- **Service:** `sudo systemctl {start|stop|restart|status} wake-word`
-- **Logs:** `sudo journalctl -u wake-word -f`
+- **Mic streamer:** `sudo systemctl {start|stop|restart|status} mic-streamer`
+  — runs `pi/mic_streamer.py`, TCP `:8766`, auto-detects XVF3800 at `hw:3,0`
+- **Command server:** `sudo systemctl {...} wake-word`
+  — runs `pi/wake_word_service.py --no-wake-detection`, HTTP `:8765`
+- **Logs:** `sudo journalctl -u mic-streamer -f` / `-u wake-word -f`
 - **Venv:** `/home/pi/home-center/pi/.venv/`
-- **Service unit:** `/etc/systemd/system/wake-word.service`
-- **Audio device:** ReSpeaker 2-Mic HAT (WM8960 codec, typically `hw:2,0`)
+- **Audio device:** `card N: Array [reSpeaker XVF3800 4-Mic Array]` (USB Audio Class — no driver install needed)
+
+### Mac mini access + service
+
+- **SSH:** `ssh peter@peters-mac-mini.lan`
+- **Service:** `launchctl kickstart -k gui/$(id -u)/com.homecenter.voice`
+- **Plist:** `~/Library/LaunchAgents/com.homecenter.voice.plist`
+  (rendered from `deploy/mac-mini/com.homecenter.voice.plist` by
+  `deploy/mac-mini/setup-voice-service.sh`)
+- **Logs:** `tail -f ~/home-center/voice-service/logs/voice-stderr.log`
+- **Venv:** `~/home-center/voice-service/.venv/`
+- **Whisper model:** `medium.en` (configurable via `WHISPER_MODEL` env var)
 
 ### Key Files
 
 | File | Purpose |
 |---|---|
-| `pi/wake_word_service.py` | Main service — audio capture, wake word detection, CEC control, chime playback |
-| `pi/train_hey_homer.py` | Training script for openWakeWord custom models |
-| `pi/models/` | ONNX/PT model files for openWakeWord |
-| `pi/sounds/acknowledge.wav` | Two-tone chime (C5+E5) played on detection |
+| `pi/mic_streamer.py` | XVF3800 ALSA → TCP streamer (Pi, always on) |
+| `pi/wake_word_service.py` | Pi command server — HTTP `:8765`, CEC, timers, chime, AlarmThread. `--no-wake-detection` skips the legacy DNN loop. |
+| `pi/services/mic-streamer.service` | systemd unit for the streamer |
+| `pi/services/wake-word.service` | systemd unit for the command server (renders with `--no-wake-detection`) |
+| `voice-service/voice_service.py` | Mac mini listener — TCP client → openWakeWord → Whisper → dispatch |
+| `voice-service/requirements.txt` | Mac mini Python deps (openwakeword, faster-whisper, torch, onnxruntime) |
+| `deploy/mac-mini/com.homecenter.voice.plist` | launchd plist template |
+| `deploy/mac-mini/setup-voice-service.sh` | Mac mini installer (renders plist, creates venv) |
+| `pi/train_hey_homer.py` | Training script for openWakeWord custom models (still runs on Pi — uses XVF3800 directly) |
+| `pi/models/` | ONNX/PT model files. Voice-service on Mac mini reads `hey_homer.onnx` from here. |
+| `pi/sounds/acknowledge.wav` | Two-tone chime (C5+E5) played on detection (Pi plays it) |
 
-### Current Status (as of 2026-03-12)
+### Current Status (as of 2026-04-21)
 
-Uses openWakeWord with custom ONNX models trained via `pi/train_hey_homer.py`. After wake word detection, uses faster-whisper (tiny model, int8, local) for speech-to-text to parse voice commands.
+Uses openWakeWord with custom ONNX models trained via `pi/train_hey_homer.py`.
+Detection + Whisper (`medium.en`, int8) now run on the **Mac mini**
+voice-service; the Pi just streams XVF3800 audio over TCP and receives HTTP
+command POSTs. See the `Wake Word + Voice Service` section above for the
+architecture. The rest of this section describes the detection pipeline
+itself — most of the code lives in `voice-service/voice_service.py` now, but
+the approach hasn't changed.
 
 **Commands (via STT after wake word):**
 - "Hey Homer, set a timer for X minutes for Y" → creates timer via worker API
@@ -312,19 +371,22 @@ Uses openWakeWord with custom ONNX models trained via `pi/train_hey_homer.py`. A
 | `src/components/RecordingIndicator.jsx` | Red pulsing mic + counter in header |
 | `src/hooks/useWakeRecord.js` | Polls `/api/wake-record` every 2s |
 
-The systemd service runs with `--debug` for diagnostics. Worker URL is configured via `--worker-url`.
+The Pi's `wake-word.service` runs with `--no-wake-detection` (command server
+only). The Mac mini's `com.homecenter.voice` launchd agent does detection
++ Whisper and POSTs commands back.
 
-### Deploying to Pi
+### Deploying changes
 
 ```bash
-# Copy a file to the Pi
-scp pi/wake_word_service.py pi@homecenter.local:/home/pi/home-center/pi/
+# --- Pi (command server + mic streamer) ---
+scp pi/wake_word_service.py pi/mic_streamer.py pi@homecenter.local:/home/pi/home-center/pi/
+ssh pi@homecenter.local "sudo systemctl restart mic-streamer wake-word"
+ssh pi@homecenter.local "sudo journalctl -u mic-streamer -u wake-word -f"
 
-# Restart the service after changes
-ssh pi@homecenter.local "sudo systemctl restart wake-word"
-
-# Install a Python package in the Pi's venv
-ssh pi@homecenter.local "/home/pi/home-center/pi/.venv/bin/pip install <package>"
+# --- Mac mini (voice service) ---
+rsync -av voice-service/ peter@peters-mac-mini.lan:/Users/peter/home-center/voice-service/
+ssh peter@peters-mac-mini.lan "launchctl kickstart -k gui/\$(id -u)/com.homecenter.voice"
+ssh peter@peters-mac-mini.lan "tail -f ~/home-center/voice-service/logs/voice-stderr.log"
 ```
 
 ## Hardware Architecture
@@ -333,8 +395,8 @@ ssh pi@homecenter.local "/home/pi/home-center/pi/.venv/bin/pip install <package>
 
 | Machine | Hostname | Role |
 |---|---|---|
-| **Raspberry Pi** | `homecenter.local` | Display-only: Chromium kiosk dashboard + wake word + HDMI-CEC |
-| **Mac Mini** | `macmini.local` (TBD) | Compute: OpenClaw bridge, Homer CI, email-triage, school-updates, agent spawning |
+| **Raspberry Pi** | `homecenter.local` | Chromium kiosk dashboard, HDMI-CEC, XVF3800 mic host, command server |
+| **Mac Mini** | `peters-mac-mini.lan` | Compute: voice service, OpenClaw bridge, email-triage, school-updates, design-claw |
 | **Laptop** | — | Development only (optional) |
 
 ### What runs where
@@ -342,7 +404,9 @@ ssh pi@homecenter.local "/home/pi/home-center/pi/.venv/bin/pip install <package>
 | Service | Machine | Manager | Port |
 |---|---|---|---|
 | Dashboard kiosk | Pi | systemd (`home-center-kiosk`) | — |
-| Wake word | Pi | systemd (`wake-word`) | — |
+| Command server (CEC, timers, chime, dashboard state) | Pi | systemd (`wake-word`, `--no-wake-detection`) | 8765 |
+| XVF3800 mic streamer | Pi | systemd (`mic-streamer`) | 8766 |
+| Voice service (openWakeWord + Whisper) | Mac Mini | launchd (`com.homecenter.voice`) | — |
 | OpenClaw bridge | Mac Mini | launchd (`com.openclaw.bridge`) | 3100 |
 | Email triage | Mac Mini | launchd (`com.homecenter.email-triage`) | — |
 | School updates | Mac Mini | launchd (`com.homecenter.school-updates`) | — |
