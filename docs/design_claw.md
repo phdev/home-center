@@ -55,7 +55,9 @@ group.
 
 ```bash
 OPENAI_API_KEY=sk-... python scripts/run_daily_design_claw.py
-# or
+# or, with HTML + PNG mockup:
+OPENAI_API_KEY=sk-... python scripts/run_daily_design_claw.py --render
+# or, the full pipeline (scheduled launchd job uses this):
 make design-daily
 ```
 
@@ -75,6 +77,14 @@ Flow:
    - `design_outputs/daily/<date>-<screen>.json` (machine-readable)
    - `design_outputs/.last_daily.json` (state pointer for `send`)
    - an entry in `design_memory/iteration_log.jsonl`.
+6. **If `--render` is passed** (default for `run_daily_design_and_send.py`):
+   - A second Responses call with `claws/design_html_renderer.md` +
+     the just-written JSON produces a grayscale box-and-label HTML
+     mockup.
+   - Headless Chromium (Playwright) screenshots it at 1920×1080 to
+     `design_outputs/daily/<date>-<screen>.png`.
+   - Render failures log a warning but do not fail the daily — the
+     text concept is still saved and delivered.
 
 ## Telegram delivery
 
@@ -86,9 +96,11 @@ make design-send
 
 Reads the most recent daily JSON (via `.last_daily.json`, falling back
 to the newest file in `design_outputs/daily/`), builds a plain-text
-digest (~1 Telegram message), and POSTs to
-`/bot<token>/sendMessage`. `--dry-run` prints the digest without
-sending.
+digest, and POSTs to `/bot<token>/sendMessage`. **If a matching
+`<stem>.png` exists** (produced by `--render`), the sender switches
+to `sendPhoto` with a shorter caption so the mockup lands as the
+primary artifact. `--dry-run` prints what would be sent without
+hitting Telegram.
 
 ## Combined run
 
@@ -138,21 +150,32 @@ Concatenates the last week of daily markdown artifacts + the current
 memory, asks for a strategic synthesis via `claws/design_review.md`,
 and saves to `design_outputs/weekly/<date>-review.md`.
 
-## Scheduling (later, optional)
+## Scheduling (Mac Mini)
 
-No scheduler is installed. An example launchd plist sits at
-`docs/examples/com.homecenter.design-claw.plist` — **this file is
-documentation only**. To wire it up on a Mac Mini later:
+The Design Claw is intended to run on the Mac Mini, next to the other
+long-running Home Center services. Template + setup script live at:
 
-1. Render the env vars (the plist uses `__OPENAI_API_KEY__` /
-   `__TELEGRAM_BOT_TOKEN__` / `__TELEGRAM_CHAT_ID__` placeholders).
-2. Render the working-directory path (`__REPO_DIR__`).
-3. Copy the rendered file to `~/Library/LaunchAgents/`.
-4. `launchctl load ~/Library/LaunchAgents/com.homecenter.design-claw.plist`.
+- `deploy/mac-mini/com.homecenter.design-claw.plist` (template)
+- `deploy/mac-mini/setup-design-claw.sh` (render + load)
 
-The plist runs `scripts/run_daily_design_and_send.py` once a day at
-08:15 local. Change the `StartCalendarInterval` block if you want a
-different time.
+On the Mac Mini, from a clone of this repo:
+
+```bash
+export OPENAI_API_KEY="sk-..."
+export TELEGRAM_BOT_TOKEN="<design-bot token from @BotFather>"
+export TELEGRAM_CHAT_ID="<your DM chat id>"
+bash deploy/mac-mini/setup-design-claw.sh
+```
+
+The script installs the `openai` Python package, renders the plist
+into `~/Library/LaunchAgents/` with `chmod 600`, and loads the agent.
+Daily run fires at 08:15 local; change `StartCalendarInterval` if you
+want a different time. `RunAtLoad` is false so installing the agent
+doesn't fire an unwanted digest.
+
+**Do not run the Design Claw on your laptop** — laptops sleep and lose
+WiFi, so scheduled jobs silently skip. The Mac Mini is always on and
+matches the pattern for the other services in this directory.
 
 ## File map
 
@@ -161,6 +184,8 @@ different time.
 | `claws/design_daily.md` | Prompt — one concept per day |
 | `claws/design_feedback_parser.md` | Prompt — normalize feedback to JSON |
 | `claws/design_review.md` | Prompt — weekly synthesis |
+| `claws/design_html_renderer.md` | Prompt — structural HTML mockup from a concept |
+| `scripts/render_concept.py` | Generate HTML + PNG for a daily artifact (`--render`) |
 | `claws/design_explorer.md` / `design_critic.md` / `pattern_translator.md` | Preserved one-shot explorer prompts |
 | `design_inputs/daily_topics.json` | Rotation of daily themes |
 | `design_inputs/dashboard.json` | Screen-state snapshot |
@@ -177,7 +202,8 @@ different time.
 | `scripts/update_design_memory.py` | Merge parsed feedback into memory |
 | `scripts/run_design_review.py` | Weekly synthesis |
 | `scripts/run_design_explorer.py` | Preserved one-shot explorer |
-| `docs/examples/com.homecenter.design-claw.plist` | Template launchd job (not installed) |
+| `deploy/mac-mini/com.homecenter.design-claw.plist` | launchd template (rendered + loaded by the setup script) |
+| `deploy/mac-mini/setup-design-claw.sh` | One-shot setup on the Mac Mini |
 
 ## Editing memory by hand
 
