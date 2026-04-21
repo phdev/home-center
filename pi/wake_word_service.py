@@ -181,27 +181,26 @@ def is_tv_on() -> bool:
 # ---------------------------------------------------------------------------
 
 def generate_chime(path: Path) -> None:
-    """Generate a bright three-tone rising arpeggio chime (ding-ding-DING)."""
+    """Crisp, assistant-style rising swoosh — two tight frequency sweeps
+    with fast attack and a slight harmonic sparkle, total ~200ms."""
     path.parent.mkdir(parents=True, exist_ok=True)
-    sr = 44100  # Higher sample rate for clarity on TV speakers
+    sr = 44100
 
-    def tone(freq: float, duration: float, amp: float = 1.0) -> np.ndarray:
-        t = np.linspace(0, duration, int(sr * duration), endpoint=False)
-        attack = np.minimum(t / 0.008, 1.0)
-        decay = np.exp(-t / (duration * 0.8))
+    def sweep(start_hz: float, end_hz: float, duration: float, amp: float = 1.0) -> np.ndarray:
+        n = int(sr * duration)
+        t = np.linspace(0, duration, n, endpoint=False)
+        freq = np.linspace(start_hz, end_hz, n)
+        phase = 2 * np.pi * np.cumsum(freq) / sr
+        attack = np.minimum(t / 0.004, 1.0)
+        decay = np.exp(-t / (duration * 0.55))
         env = attack * decay * amp
-        # Rich harmonics for TV speaker presence
-        signal = env * (np.sin(2 * np.pi * freq * t)
-                        + 0.4 * np.sin(4 * np.pi * freq * t)
-                        + 0.15 * np.sin(6 * np.pi * freq * t))
-        return signal
+        # Sine fundamental + a soft 2x for a touch of sparkle
+        return env * (np.sin(phase) + 0.2 * np.sin(2 * phase))
 
     chime = np.concatenate([
-        tone(659.25, 0.12, 0.7),    # E5 — soft lead-in
-        np.zeros(int(sr * 0.04)),
-        tone(783.99, 0.12, 0.85),   # G5 — middle
-        np.zeros(int(sr * 0.04)),
-        tone(1046.50, 0.25, 1.0),   # C6 — bright resolve
+        sweep(750, 1400, 0.09, 0.75),
+        np.zeros(int(sr * 0.012)),
+        sweep(1400, 2000, 0.10, 1.0),
     ])
     chime = (chime / np.max(np.abs(chime)) * 32700).astype(np.int16)
 
