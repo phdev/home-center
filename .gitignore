@@ -53,3 +53,8 @@ email-triage/credentials.json
 email-triage/token.json
 email-triage/email_triage.db
 email-triage/email_triage.log
+
+# Design Claw — runtime-only state (see docs/design_claw.md)
+design_outputs/.last_daily.json
+design_outputs/.launchd.stdout.log
+design_outputs/.launchd.stderr.log
