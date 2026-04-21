@@ -110,6 +110,11 @@ def main() -> int:
         type=Path,
         help="override the screen snapshot path (defaults to design_inputs/<screen>.json)",
     )
+    parser.add_argument(
+        "--render",
+        action="store_true",
+        help="also generate <stem>.html + <stem>.png (requires playwright + chromium)",
+    )
     args = parser.parse_args()
 
     ensure_dirs()
@@ -164,6 +169,26 @@ def main() -> int:
 
     print(f"saved: {md_path}")
     print(f"saved: {json_path}")
+
+    if args.render:
+        # Lazy import so non-render runs don't require playwright.
+        from render_concept import render_concept
+
+        try:
+            html_path, png_path = render_concept(json_path, client)
+            print(f"saved: {html_path}")
+            print(f"saved: {png_path}")
+            append_iteration_log(
+                "daily_render",
+                f"Rendered concept '{concept.get('concept_name', '(unnamed)')}'",
+                png_path=str(png_path),
+            )
+        except Exception as exc:
+            # Render is a nice-to-have; the text concept still counts as a
+            # successful daily. Log and continue — Telegram send will fall
+            # back to text-only when no PNG exists.
+            print(f"warning: render failed ({type(exc).__name__}): {exc}", file=sys.stderr)
+
     print()
     print(f"concept: {concept.get('concept_name', '(unnamed)')}")
     return 0

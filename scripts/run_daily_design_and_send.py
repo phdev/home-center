@@ -19,9 +19,9 @@ import run_daily_design_claw
 import send_telegram_digest
 
 
-def _call(module, name: str) -> int:
+def _call(module, argv: list[str]) -> int:
     original = sys.argv
-    sys.argv = [name]
+    sys.argv = argv
     try:
         return module.main()
     finally:
@@ -29,11 +29,13 @@ def _call(module, name: str) -> int:
 
 
 def main() -> int:
-    rc = _call(run_daily_design_claw, "run_daily_design_claw")
+    # --render attempts to produce a PNG mockup; send_telegram_digest picks
+    # it up automatically via sendPhoto when the .png sibling exists.
+    rc = _call(run_daily_design_claw, ["run_daily_design_claw", "--render"])
     if rc != 0:
         return rc
     print()
-    return _call(send_telegram_digest, "send_telegram_digest")
+    return _call(send_telegram_digest, ["send_telegram_digest"])
 
 
 if __name__ == "__main__":

@@ -20,10 +20,13 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import io
 import json
+import mimetypes
 import sys
 import urllib.parse
 import urllib.request
+import uuid
 from pathlib import Path
 from typing import Any
 
@@ -36,7 +39,8 @@ from _design_claw import (
 )
 
 TELEGRAM_API = "https://api.telegram.org"
-MAX_LEN = 3800  # Telegram hard cap is 4096; leave headroom.
+MAX_LEN = 3800        # sendMessage hard cap is 4096; leave headroom.
+CAPTION_MAX = 1000    # sendPhoto caption hard cap is 1024; leave headroom.
 
 
 def resolve_json_path(cli_path: Path | None) -> Path:
@@ -61,7 +65,7 @@ def resolve_json_path(cli_path: Path | None) -> Path:
     return candidates[-1]
 
 
-def build_digest(payload: dict[str, Any]) -> str:
+def build_digest(payload: dict[str, Any], limit: int = MAX_LEN) -> str:
     topic = payload.get("topic") or {}
     concept = payload.get("concept") or {}
     lines = [
@@ -79,8 +83,8 @@ def build_digest(payload: dict[str, Any]) -> str:
         f"Prototype first: {(concept.get('prototype_first') or '').strip()}",
     ]
     message = "\n".join(line for line in lines if line is not None)
-    if len(message) > MAX_LEN:
-        message = message[: MAX_LEN - 1] + "…"
+    if len(message) > limit:
+        message = message[: limit - 1] + "…"
     return message
 
 
@@ -94,6 +98,45 @@ def send_message(token: str, chat_id: str, text: str) -> dict[str, Any]:
         return json.loads(resp.read().decode("utf-8"))
 
 
+def send_photo(token: str, chat_id: str, photo_path: Path, caption: str) -> dict[str, Any]:
+    """POST multipart/form-data to Telegram's sendPhoto. Stdlib only."""
+    url = f"{TELEGRAM_API}/bot{token}/sendPhoto"
+    boundary = f"----HomeCenterDesignClaw-{uuid.uuid4().hex}"
+    nl = b"\r\n"
+
+    def field(name: str, value: str) -> bytes:
+        return (
+            f'--{boundary}{nl.decode()}'
+            f'Content-Disposition: form-data; name="{name}"{nl.decode()}{nl.decode()}'
+            f"{value}{nl.decode()}"
+        ).encode("utf-8")
+
+    mimetype = mimetypes.guess_type(str(photo_path))[0] or "image/png"
+    file_bytes = photo_path.read_bytes()
+    file_header = (
+        f'--{boundary}\r\n'
+        f'Content-Disposition: form-data; name="photo"; filename="{photo_path.name}"\r\n'
+        f"Content-Type: {mimetype}\r\n\r\n"
+    ).encode("utf-8")
+
+    body = io.BytesIO()
+    body.write(field("chat_id", chat_id))
+    body.write(field("caption", caption))
+    body.write(file_header)
+    body.write(file_bytes)
+    body.write(nl)
+    body.write(f"--{boundary}--\r\n".encode("utf-8"))
+
+    req = urllib.request.Request(
+        url,
+        data=body.getvalue(),
+        method="POST",
+        headers={"Content-Type": f"multipart/form-data; boundary={boundary}"},
+    )
+    with urllib.request.urlopen(req, timeout=30) as resp:
+        return json.loads(resp.read().decode("utf-8"))
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--json", type=Path, help="path to a daily JSON artifact")
@@ -102,20 +145,34 @@ def main() -> int:
 
     json_path = resolve_json_path(args.json)
     payload = read_json(json_path)
-    digest = build_digest(payload)
+    png_path = json_path.with_suffix(".png")
+    has_png = png_path.exists()
+
+    if has_png:
+        caption = build_digest(payload, limit=CAPTION_MAX)
+        preview = f"[would sendPhoto {png_path.name} with caption]\n\n{caption}"
+    else:
+        preview = build_digest(payload)
 
     if args.dry_run:
-        print(digest)
+        print(preview)
         return 0
 
     token = require_env("TELEGRAM_BOT_TOKEN")
     chat_id = require_env("TELEGRAM_CHAT_ID")
-    result = with_retries(lambda: send_message(token, chat_id, digest))
+
+    if has_png:
+        caption = build_digest(payload, limit=CAPTION_MAX)
+        result = with_retries(lambda: send_photo(token, chat_id, png_path, caption))
+    else:
+        digest = build_digest(payload)
+        result = with_retries(lambda: send_message(token, chat_id, digest))
+
     if not result.get("ok"):
         print(f"error: Telegram API returned: {result}", file=sys.stderr)
         return 1
 
-    print(f"sent digest for: {json_path}")
+    print(f"sent digest for: {json_path}" + (" (photo)" if has_png else " (text)"))
     return 0
 
 

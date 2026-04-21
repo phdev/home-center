@@ -48,8 +48,12 @@ if [[ "$PYTHON_BIN" == *"/.pyenv/shims/"* ]]; then
 fi
 echo "Python: $PYTHON_BIN ($($PYTHON_BIN --version))"
 
-# ─── 2. Install the one runtime dependency ───────────────────────────
-"$PYTHON_BIN" -m pip install --quiet --upgrade openai
+# ─── 2. Install Python runtime deps ──────────────────────────────────
+# openai → Responses API client
+# playwright + chromium → HTML mockup → PNG screenshot for Telegram digest
+"$PYTHON_BIN" -m pip install --quiet --upgrade openai playwright
+"$PYTHON_BIN" -m playwright install --with-deps chromium >/dev/null 2>&1 || \
+  "$PYTHON_BIN" -m playwright install chromium
 
 # ─── 3. Ensure output directory exists (launchd writes its logs here) ─
 mkdir -p "$LAUNCH_DIR" "$REPO_DIR/design_outputs/daily" "$REPO_DIR/design_outputs/weekly"
