@@ -45,6 +45,7 @@ steady-state workflow.
 | `OPENAI_API_KEY` | `run_daily_design_claw.py`, `parse_design_feedback.py`, `run_design_review.py`, `run_design_explorer.py` | any LLM call |
 | `TELEGRAM_BOT_TOKEN` | `send_telegram_digest.py` | Telegram delivery |
 | `TELEGRAM_CHAT_ID` | `send_telegram_digest.py` | Telegram delivery |
+| `DESIGN_CLAW_MODEL` | all LLM calls (via `_design_claw.MODEL`) | optional — defaults to `gpt-5.4-mini`. Set to try a newer model without editing code. |
 
 The Telegram bot + chat ID are **independent of the OpenClaw family-bot
 credentials**. Use a different bot (or the same bot with a different
@@ -176,6 +177,31 @@ doesn't fire an unwanted digest.
 **Do not run the Design Claw on your laptop** — laptops sleep and lose
 WiFi, so scheduled jobs silently skip. The Mac Mini is always on and
 matches the pattern for the other services in this directory.
+
+### Swapping models
+
+Set `DESIGN_CLAW_MODEL` before re-running the setup script:
+
+```bash
+export DESIGN_CLAW_MODEL="<new-model-id>"
+bash deploy/mac-mini/setup-design-claw.sh
+```
+
+The script renders the new model id into the plist's
+`EnvironmentVariables` block and reloads the agent. Failure modes are
+loud, not silent:
+
+- **Unparseable JSON** or **missing required fields** (`concept_name`,
+  `layout_idea`, `why_it_fits`, `tradeoff`, `prototype_first`) → daily
+  runner exits 3 and saves raw output to
+  `design_outputs/daily/<date>-{raw,schema}-error.txt`. `.last_daily`
+  pointer is not updated, so `design-send` will not deliver stale data.
+- **Render failure** (model doesn't return `<!doctype html>`) → logged
+  as a warning; text concept still saves and Telegram falls back to
+  text-only delivery.
+- **Model deprecated / unavailable** → OpenAI API returns a clean
+  error; the retry wrapper raises on the third attempt; launchd stderr
+  gets a single line.
 
 ## File map
 

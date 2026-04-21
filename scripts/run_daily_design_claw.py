@@ -62,6 +62,27 @@ def default_snapshot_for(topic: dict[str, Any]) -> Path:
     return DESIGN_INPUTS / "dashboard.json"
 
 
+REQUIRED_CONCEPT_FIELDS = (
+    "concept_name",
+    "layout_idea",
+    "why_it_fits",
+    "tradeoff",
+    "prototype_first",
+)
+
+
+def validate_concept(concept: Any) -> str | None:
+    """Return None if the concept has all required non-empty string fields,
+    otherwise a reason string suitable for stderr."""
+    if not isinstance(concept, dict):
+        return f"expected a JSON object, got {type(concept).__name__}"
+    for key in REQUIRED_CONCEPT_FIELDS:
+        value = concept.get(key)
+        if not isinstance(value, str) or not value.strip():
+            return f"required field '{key}' is missing, empty, or not a string"
+    return None
+
+
 def render_markdown(concept: dict[str, Any], topic: dict[str, Any], date: str) -> str:
     hint = concept.get("implementation_hint", "")
     reinforces = concept.get("memory_alignment", {}).get("reinforces", []) or []
@@ -146,6 +167,16 @@ def main() -> int:
         debug_path = DESIGN_OUTPUTS_DAILY / f"{today_str()}-raw-error.txt"
         write_text(debug_path, raw)
         print(f"error: could not parse JSON from model output; raw saved to {debug_path}", file=sys.stderr)
+        return 3
+
+    schema_error = validate_concept(concept)
+    if schema_error:
+        debug_path = DESIGN_OUTPUTS_DAILY / f"{today_str()}-schema-error.txt"
+        write_text(debug_path, f"Schema error: {schema_error}\n\n---RAW MODEL OUTPUT---\n{raw}")
+        print(
+            f"error: concept schema invalid — {schema_error}; raw saved to {debug_path}",
+            file=sys.stderr,
+        )
         return 3
 
     date = today_str()

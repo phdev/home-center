@@ -38,10 +38,15 @@ from _design_claw import (
 
 
 def _strip_html_fences(text: str) -> str:
-    """Model may wrap in ```html …``` — peel it off, keep raw doc."""
+    """Model may wrap in ```html …```, prefix with prose, or append
+    explanation. Peel it all away and keep just the HTML document."""
     match = re.search(r"```(?:html)?\s*(.+?)```", text, re.DOTALL)
     candidate = match.group(1).strip() if match else text.strip()
-    # Drop any trailing prose after </html>
+    # Trim any leading prose before the doctype.
+    lead = candidate.lower().find("<!doctype html")
+    if lead > 0:
+        candidate = candidate[lead:]
+    # Drop any trailing prose after </html>.
     end = candidate.lower().rfind("</html>")
     if end != -1:
         candidate = candidate[: end + len("</html>")]
@@ -90,11 +95,19 @@ def screenshot(html_path: Path, png_path: Path) -> None:
 
 
 def render_concept(json_path: Path, client) -> Tuple[Path, Path]:
-    """Render <stem>.html + <stem>.png next to json_path. Returns both paths."""
+    """Render <stem>.html + <stem>.png next to json_path. Returns both paths.
+
+    Raises if the model output doesn't start with <!doctype html> — the
+    caller is expected to catch and log a warning so the daily run's text
+    concept still counts as a success.
+    """
     payload = read_json(json_path)
     html = generate_html(payload, client)
-    if not html.lower().startswith("<!doctype html"):
-        html = "<!doctype html>\n" + html
+    if not html.lower().lstrip().startswith("<!doctype html"):
+        preview = html[:200].replace("\n", " ")
+        raise ValueError(
+            f"HTML output missing <!doctype html> — got: {preview!r}"
+        )
     html_path = json_path.with_suffix(".html")
     png_path = json_path.with_suffix(".png")
     write_text(html_path, html)

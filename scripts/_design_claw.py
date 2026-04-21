@@ -19,7 +19,7 @@ from openai import OpenAI
 
 T = TypeVar("T")
 
-MODEL = "gpt-5.4-mini"
+MODEL = os.environ.get("DESIGN_CLAW_MODEL", "gpt-5.4-mini")
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 CLAWS = REPO_ROOT / "claws"
