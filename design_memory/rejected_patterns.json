@@ -1,6 +1,18 @@
 {
   "items": [
     {
+      "id": "rp-information-dense",
+      "text": "Information-dense screens that trade clarity for coverage.",
+      "added": "2026-04-21",
+      "source": "seed"
+    },
+    {
+      "id": "rp-secondary-alongside-primary",
+      "text": "Rendering secondary items alongside a primary prompt (they compete for attention and dilute the decision).",
+      "added": "2026-04-21",
+      "source": "seed"
+    },
+    {
       "id": "rp-todo-list-feel",
       "text": "Rendering family items as a checkable to-do list.",
       "added": "2026-04-20",

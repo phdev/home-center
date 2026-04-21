@@ -137,12 +137,11 @@ def main() -> int:
 
     try:
         concept = extract_json_block(raw)
-    except Exception as exc:
-        # Save the raw output for debugging, then re-raise a clear error.
+    except Exception:
         debug_path = DESIGN_OUTPUTS_DAILY / f"{today_str()}-raw-error.txt"
         write_text(debug_path, raw)
         print(f"error: could not parse JSON from model output; raw saved to {debug_path}", file=sys.stderr)
-        raise
+        return 3
 
     date = today_str()
     screen = topic.get("screen", "dashboard")

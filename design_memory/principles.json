@@ -1,6 +1,18 @@
 {
   "items": [
     {
+      "id": "p-essential-only",
+      "text": "Show only the essential information at this moment. Every element on screen must justify its presence.",
+      "added": "2026-04-21",
+      "source": "seed"
+    },
+    {
+      "id": "p-clarity-over-completeness",
+      "text": "Clarity beats completeness — prefer leaving something out to crowding the primary signal.",
+      "added": "2026-04-21",
+      "source": "seed"
+    },
+    {
       "id": "p-glanceable",
       "text": "The primary signal must be readable in under two seconds from across a room.",
       "added": "2026-04-20",

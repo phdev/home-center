@@ -1,20 +1,25 @@
 {
-  "note": "Rotating list of daily design themes. The runner picks one per run — by default, day-of-year modulo list length, so the rotation is deterministic. Edit freely; order matters.",
+  "note": "Rotating list of daily design themes. The runner picks one per run — by default, day-of-year modulo list length, so the rotation is deterministic. Order matters. Index 6 is the first pick on 2026-04-21.",
   "topics": [
     {
-      "id": "reduce-morning-overload",
-      "screen": "dashboard",
-      "theme": "reduce morning overload — fewer things on screen between 7am–9am"
-    },
-    {
-      "id": "ambient-vs-interruptive",
-      "screen": "dashboard",
-      "theme": "ambient vs interruptive balance — which flags deserve an overlay vs. a quiet card"
+      "id": "evening-wind-down",
+      "screen": "dashboard-evening",
+      "theme": "evening wind-down — strip the screen to kids' bedtime + tomorrow's setup only"
     },
     {
       "id": "multi-flag-prioritization",
       "screen": "dashboard",
-      "theme": "prioritization when 3+ derived flags are simultaneously true"
+      "theme": "prioritization when 3+ derived flags are simultaneously true — which one owns the hero slot"
+    },
+    {
+      "id": "weekend-vs-weekday",
+      "screen": "dashboard",
+      "theme": "weekend vs weekday dashboards — which cards disappear, which expand"
+    },
+    {
+      "id": "afternoon-takeout-lead-time",
+      "screen": "dashboard-afternoon",
+      "theme": "afternoon takeout decision — surface the choice early enough to act without cluttering the screen"
     },
     {
       "id": "deadline-first-school",
@@ -27,14 +32,9 @@
       "theme": "passive gift planning — birthdays compound into a calm lead-time signal, not a prompt"
     },
     {
-      "id": "bedtime-wind-down",
-      "screen": "dashboard",
-      "theme": "bedtime wind-down — what the dashboard becomes after bedtimeReminderActive fires"
-    },
-    {
-      "id": "weekend-vs-weekday",
-      "screen": "dashboard",
-      "theme": "weekend vs weekday dashboards — which cards disappear, which expand"
+      "id": "reduce-morning-overload",
+      "screen": "dashboard-morning",
+      "theme": "reduce morning overload — show only what the family must see between 7am–9am"
     }
   ]
 }
