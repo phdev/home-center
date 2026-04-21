@@ -1,0 +1,16 @@
+{
+  "items": [
+    {
+      "id": "pref-cards-lists-overlays",
+      "text": "Prefer cards, lists, and a single overlay over novel components.",
+      "added": "2026-04-20",
+      "source": "seed"
+    },
+    {
+      "id": "pref-no-productivity-feel",
+      "text": "The dashboard should not feel like a productivity app (no todo lists, progress bars, streaks).",
+      "added": "2026-04-20",
+      "source": "seed"
+    }
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "items": [
+    {
+      "id": "rp-todo-list-feel",
+      "text": "Rendering family items as a checkable to-do list.",
+      "added": "2026-04-20",
+      "source": "seed"
+    },
+    {
+      "id": "rp-multi-column-dense",
+      "text": "Dense multi-column dashboards that trade glanceability for information density.",
+      "added": "2026-04-20",
+      "source": "seed"
+    }
+  ]
+}

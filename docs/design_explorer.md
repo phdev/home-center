@@ -5,6 +5,11 @@ snapshot of a screen's state, it asks an LLM to generate three
 structurally-different UI alternatives, grounded in Home Center's design
 principles.
 
+> **Looking for the daily workflow?** The Design Explorer is the
+> one-shot "give me three alternatives" tool. The steady-state workflow
+> — one concept per day, persistent memory, Telegram digest — lives in
+> [`docs/design_claw.md`](./design_claw.md).
+
 ## What this is
 
 - A manual script you run when you want a second opinion on screen

@@ -1,0 +1,40 @@
+{
+  "note": "Rotating list of daily design themes. The runner picks one per run — by default, day-of-year modulo list length, so the rotation is deterministic. Edit freely; order matters.",
+  "topics": [
+    {
+      "id": "reduce-morning-overload",
+      "screen": "dashboard",
+      "theme": "reduce morning overload — fewer things on screen between 7am–9am"
+    },
+    {
+      "id": "ambient-vs-interruptive",
+      "screen": "dashboard",
+      "theme": "ambient vs interruptive balance — which flags deserve an overlay vs. a quiet card"
+    },
+    {
+      "id": "multi-flag-prioritization",
+      "screen": "dashboard",
+      "theme": "prioritization when 3+ derived flags are simultaneously true"
+    },
+    {
+      "id": "deadline-first-school",
+      "screen": "school_updates",
+      "theme": "school updates as a deadline-first layout — earliest due date drives the hero slot"
+    },
+    {
+      "id": "passive-gift-planning",
+      "screen": "birthdays",
+      "theme": "passive gift planning — birthdays compound into a calm lead-time signal, not a prompt"
+    },
+    {
+      "id": "bedtime-wind-down",
+      "screen": "dashboard",
+      "theme": "bedtime wind-down — what the dashboard becomes after bedtimeReminderActive fires"
+    },
+    {
+      "id": "weekend-vs-weekday",
+      "screen": "dashboard",
+      "theme": "weekend vs weekday dashboards — which cards disappear, which expand"
+    }
+  ]
+}
