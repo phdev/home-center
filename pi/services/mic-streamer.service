@@ -1,0 +1,23 @@
+[Unit]
+Description=Home Center XVF3800 Mic Streamer (TCP → Mac mini voice-service)
+After=sound.target
+Wants=sound.target
+
+[Service]
+Type=simple
+User=__USER__
+WorkingDirectory=__REPO_DIR__
+ExecStart=__REPO_DIR__/pi/.venv/bin/python __REPO_DIR__/pi/mic_streamer.py
+Restart=always
+RestartSec=3
+
+# Audio device access
+SupplementaryGroups=audio
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=mic-streamer
+
+[Install]
+WantedBy=multi-user.target

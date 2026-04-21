@@ -13,7 +13,15 @@ and transcribes it with faster-whisper to parse voice commands:
 Also runs a background alarm thread that polls for expired timers and
 plays an alarm sound on the Pi speaker until dismissed.
 
-Hardware: ReSpeaker 2-Mics Pi HAT (or any ALSA-compatible microphone)
+Hardware: ReSpeaker XVF3800 USB 4-Mic Array (or any ALSA-compatible mic).
+
+Runs in two modes:
+  * Default — full pipeline on the Pi (legacy, used when the Mac mini
+    voice-service is offline).
+  * --no-wake-detection — HTTP + chimes + alarms only. The Mac mini
+    voice-service reads audio from pi/mic_streamer.py and drives this
+    server via /api/tv/on, /api/tv/off, /api/chime, /api/navigate,
+    /api/timers, etc. This is the normal production mode.
 """
 
 import argparse
@@ -56,7 +64,7 @@ def _inference_framework() -> str:
 WAKE_WORD = "hey_jarvis"
 SAMPLE_RATE = 16000
 CHUNK_SIZE = 1280  # 80ms at 16kHz — required by openWakeWord
-CHANNELS = 2  # ReSpeaker 2-Mic HAT is stereo; we downmix to mono
+CHANNELS = 2  # XVF3800 USB exposes stereo (L = ASR, R = comms); we downmix to mono
 
 # Default tunable parameters (can be overridden via /api/wake-config)
 _DEFAULT_CONFIG = {
@@ -173,27 +181,26 @@ def is_tv_on() -> bool:
 # ---------------------------------------------------------------------------
 
 def generate_chime(path: Path) -> None:
-    """Generate a bright three-tone rising arpeggio chime (ding-ding-DING)."""
+    """Crisp, assistant-style rising swoosh — two tight frequency sweeps
+    with fast attack and a slight harmonic sparkle, total ~200ms."""
     path.parent.mkdir(parents=True, exist_ok=True)
-    sr = 44100  # Higher sample rate for clarity on TV speakers
+    sr = 44100
 
-    def tone(freq: float, duration: float, amp: float = 1.0) -> np.ndarray:
-        t = np.linspace(0, duration, int(sr * duration), endpoint=False)
-        attack = np.minimum(t / 0.008, 1.0)
-        decay = np.exp(-t / (duration * 0.8))
+    def sweep(start_hz: float, end_hz: float, duration: float, amp: float = 1.0) -> np.ndarray:
+        n = int(sr * duration)
+        t = np.linspace(0, duration, n, endpoint=False)
+        freq = np.linspace(start_hz, end_hz, n)
+        phase = 2 * np.pi * np.cumsum(freq) / sr
+        attack = np.minimum(t / 0.004, 1.0)
+        decay = np.exp(-t / (duration * 0.55))
         env = attack * decay * amp
-        # Rich harmonics for TV speaker presence
-        signal = env * (np.sin(2 * np.pi * freq * t)
-                        + 0.4 * np.sin(4 * np.pi * freq * t)
-                        + 0.15 * np.sin(6 * np.pi * freq * t))
-        return signal
+        # Sine fundamental + a soft 2x for a touch of sparkle
+        return env * (np.sin(phase) + 0.2 * np.sin(2 * phase))
 
     chime = np.concatenate([
-        tone(659.25, 0.12, 0.7),    # E5 — soft lead-in
-        np.zeros(int(sr * 0.04)),
-        tone(783.99, 0.12, 0.85),   # G5 — middle
-        np.zeros(int(sr * 0.04)),
-        tone(1046.50, 0.25, 1.0),   # C6 — bright resolve
+        sweep(750, 1400, 0.09, 0.75),
+        np.zeros(int(sr * 0.012)),
+        sweep(1400, 2000, 0.10, 1.0),
     ])
     chime = (chime / np.max(np.abs(chime)) * 32700).astype(np.int16)
 
@@ -266,7 +273,18 @@ def find_speaker_device(prefer_hat: bool = False) -> str | None:
 
 
 def set_mic_gain(card: str = "2", gain: int = 60) -> None:
-    """Set ReSpeaker PGA capture gain (0-119, ~0.5dB steps). Default 32 is too low."""
+    """Boost WM8960 PGA capture gain on the legacy 2-Mic HAT.
+
+    The XVF3800 USB array has onboard AGC and does not expose numid=34;
+    this is a no-op for it. Detects the card type from /proc/asound/cards.
+    """
+    try:
+        cards = Path("/proc/asound/cards").read_text().lower()
+    except Exception:
+        cards = ""
+    if "wm8960" not in cards and "seeed2mic" not in cards:
+        log.debug("set_mic_gain: no WM8960 card present — skipping PGA adjust")
+        return
     try:
         subprocess.run(
             ["amixer", "-c", card, "-q", "cset", "numid=34", f"{gain},{gain}"],
@@ -413,14 +431,14 @@ def play_acknowledgement() -> None:
         generate_chime(CHIME_PATH)
     # Use cached TV state (non-blocking) to decide routing:
     # TV on → HDMI only (user hears it through TV speakers)
-    # TV off → HAT only (user hears it through ReSpeaker speaker)
+    # TV off → mic board's 3.5mm jack (XVF3800, or legacy 2-Mic HAT speaker)
     tv_on = _local_server.is_tv_on_cached() if _local_server else False
     if tv_on:
         play_sound(CHIME_PATH, prefer_hat=False)
         log.info("Playing acknowledgement chime (HDMI — TV is on)")
     else:
         play_sound(CHIME_PATH, prefer_hat=True)
-        log.info("Playing acknowledgement chime (HAT — TV is off)")
+        log.info("Playing acknowledgement chime (mic board — TV is off)")
 
 
 # ---------------------------------------------------------------------------
@@ -428,21 +446,30 @@ def play_acknowledgement() -> None:
 # ---------------------------------------------------------------------------
 
 def find_respeaker_device() -> str | None:
+    """Locate the mic. Prefer XVF3800 USB array; fall back to legacy 2-Mic HAT."""
     try:
         result = subprocess.run(
             ["arecord", "-l"], capture_output=True, text=True, timeout=5,
         )
+        xvf = None
+        hat = None
         for line in result.stdout.splitlines():
             lower = line.lower()
-            if lower.startswith("card") and any(
-                kw in lower for kw in ("respeaker", "seeed", "wm8960", "2mic")
-            ):
-                card_num = lower.split(":")[0].replace("card", "").strip()
-                device = f"hw:{card_num},0"
-                log.info("Found ReSpeaker at %s", device)
-                return device
+            if not lower.startswith("card"):
+                continue
+            card_num = lower.split(":")[0].replace("card", "").strip()
+            if any(k in lower for k in ("xvf3800", "array", "4-mic")):
+                xvf = card_num
+            elif any(k in lower for k in ("seeed2mic", "wm8960", "2mic")):
+                hat = card_num
+        if xvf:
+            log.info("Found XVF3800 USB array at hw:%s,0", xvf)
+            return f"hw:{xvf},0"
+        if hat:
+            log.warning("XVF3800 not found — using legacy 2-Mic HAT at hw:%s,0", hat)
+            return f"hw:{hat},0"
     except Exception as e:
-        log.warning("Error scanning for ReSpeaker: %s", e)
+        log.warning("Error scanning for microphone: %s", e)
     return None
 
 
@@ -1574,6 +1601,18 @@ class RecordingManager:
                         mgr._enroll_buffer = []
                     self._respond_json({"ok": True})
 
+                elif self.path == "/api/tv/on":
+                    threading.Thread(target=turn_on_tv, daemon=True).start()
+                    self._respond_json({"ok": True})
+
+                elif self.path == "/api/tv/off":
+                    threading.Thread(target=turn_off_tv, daemon=True).start()
+                    self._respond_json({"ok": True})
+
+                elif self.path == "/api/chime":
+                    threading.Thread(target=play_acknowledgement, daemon=True).start()
+                    self._respond_json({"ok": True})
+
                 else:
                     self._respond_json({"error": "not found"}, 404)
 
@@ -1786,6 +1825,9 @@ def main() -> None:
                         help="Worker API base URL (e.g., https://your-worker.workers.dev)")
     parser.add_argument("--worker-token", type=str, default=None,
                         help="Worker API auth token")
+    parser.add_argument("--no-wake-detection", action="store_true",
+                        help="Run as command server only (no mic capture or wake-word DNN). "
+                             "Use when wake detection runs on the Mac mini voice-service.")
     args = parser.parse_args()
 
     if args.debug:
@@ -1810,38 +1852,45 @@ def main() -> None:
     if not ENROLL_COMPLETE_PATH.exists():
         generate_enroll_complete(ENROLL_COMPLETE_PATH)
 
-    # Pre-load models so first command is fast
-    try:
-        get_whisper_model()
-    except Exception as e:
-        log.warning("Could not pre-load whisper model: %s", e)
-    try:
-        get_silero_vad()
-    except Exception as e:
-        log.warning("Could not pre-load Silero VAD: %s", e)
+    # Pre-load models so first command is fast (skipped in command-server-only mode)
+    if not args.no_wake_detection:
+        try:
+            get_whisper_model()
+        except Exception as e:
+            log.warning("Could not pre-load whisper model: %s", e)
+        try:
+            get_silero_vad()
+        except Exception as e:
+            log.warning("Could not pre-load Silero VAD: %s", e)
 
-    # Load wake word model
-    model = get_or_train_model()
-    wake_words = list(model.models.keys())
-    log.info("Listening for wake words: %s (threshold=%.2f)", wake_words, args.threshold)
+        # Load wake word model
+        model = get_or_train_model()
+        wake_words = list(model.models.keys())
+        log.info("Listening for wake words: %s (threshold=%.2f)", wake_words, args.threshold)
 
-    # Find the ReSpeaker device
-    device = args.device or find_respeaker_device()
-    if device is None:
-        log.error("No ReSpeaker found! Check your HAT connection or specify --device")
-        sys.exit(1)
+        # Find the XVF3800 USB array (falls back to legacy 2-Mic HAT if present)
+        device = args.device or find_respeaker_device()
+        if device is None:
+            log.error("No microphone found! Check USB connection or specify --device")
+            sys.exit(1)
 
-    # Boost mic gain — default 32/119 is too quiet for across-room detection
-    mic_card = device.replace("hw:", "").split(",")[0] if device else "2"
-    set_mic_gain(mic_card, gain=80)
+        # Legacy 2-Mic HAT (WM8960) needs a PGA gain boost; XVF3800 has its own DSP.
+        mic_card = device.replace("hw:", "").split(",")[0] if device else None
+        if mic_card:
+            set_mic_gain(mic_card, gain=80)
 
-    # Open ALSA capture
-    log.info("Opening ALSA capture on %s (%d ch, %d Hz)", device, CHANNELS, SAMPLE_RATE)
-    try:
-        pcm = open_alsa_capture(device, CHANNELS, SAMPLE_RATE, CHUNK_SIZE)
-    except alsaaudio.ALSAAudioError as e:
-        log.error("Failed to open ALSA device %s: %s", device, e)
-        sys.exit(1)
+        # Open ALSA capture
+        log.info("Opening ALSA capture on %s (%d ch, %d Hz)", device, CHANNELS, SAMPLE_RATE)
+        try:
+            pcm = open_alsa_capture(device, CHANNELS, SAMPLE_RATE, CHUNK_SIZE)
+        except alsaaudio.ALSAAudioError as e:
+            log.error("Failed to open ALSA device %s: %s", device, e)
+            sys.exit(1)
+    else:
+        model = None
+        pcm = None
+        wake_words = []
+        log.info("Wake detection disabled — running as command server only.")
 
     gesture_thread = None
 
@@ -1865,6 +1914,20 @@ def main() -> None:
         gesture_thread = GestureThread(args.worker_url, args.worker_token, args.dry_run)
         gesture_thread.start()
         log.info("Gesture thread started (polling worker every 2s)")
+
+    if args.no_wake_detection:
+        log.info("Command server running on :%d (wake detection off).", rec_mgr.HTTP_PORT)
+        try:
+            while True:
+                time.sleep(60)
+        except KeyboardInterrupt:
+            log.info("Shutting down.")
+        finally:
+            if alarm_thread:
+                alarm_thread.stop()
+            if gesture_thread:
+                gesture_thread.stop()
+        return
 
     log.info("=== openWakeWord DNN mode (no Whisper verification) ===")
     log.info("Microphone stream open. Listening...")

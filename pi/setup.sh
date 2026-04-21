@@ -50,26 +50,14 @@ if [ "${NODE_VERSION:-0}" -lt 18 ]; then
   sudo apt-get install -y nodejs
 fi
 
-# ---------- ReSpeaker 2-Mics Pi HAT driver ----------
-log "Installing ReSpeaker 2-Mics Pi HAT driver..."
-# The seeed-voicecard driver for WM8960 codec
-if [ ! -d "$USER_HOME/seeed-voicecard" ]; then
-  git clone https://github.com/HinTak/seeed-voicecard.git "$USER_HOME/seeed-voicecard" || {
-    # Fallback to original repo if HinTak fork unavailable
-    git clone https://github.com/respeaker/seeed-voicecard.git "$USER_HOME/seeed-voicecard" || true
-  }
-fi
-
-if [ -d "$USER_HOME/seeed-voicecard" ]; then
-  cd "$USER_HOME/seeed-voicecard"
-  # Try to install; non-fatal if Pi 5 kernel headers differ
-  sudo ./install.sh || {
-    err "ReSpeaker driver install failed. This is common on Pi 5."
-    err "The wake word service will fall back to any available ALSA mic (USB or built-in)."
-    log "You can try a USB microphone as an alternative."
-  }
-  cd "$REPO_DIR"
-fi
+# ---------- Microphone ----------
+# Home Center now uses the ReSpeaker XVF3800 USB 4-Mic Array. It enumerates
+# as a standard USB Audio Class device — no driver install needed. Just plug
+# it in and confirm it shows up in `arecord -l` as card "Array".
+#
+# (The legacy ReSpeaker 2-Mics Pi HAT driver install has been removed. If you
+# need that hardware path, see the seeed-voicecard repo and install manually.)
+log "Skipping mic driver install — XVF3800 uses USB Audio Class (no driver needed)."
 
 # ---------- Python virtual environment for wake word ----------
 log "Setting up Python virtual environment..."
@@ -96,14 +84,21 @@ sudo cp "$SCRIPT_DIR/services/home-center-kiosk.service" /etc/systemd/system/
 sudo sed -i "s|__REPO_DIR__|$REPO_DIR|g" /etc/systemd/system/home-center-kiosk.service
 sudo sed -i "s|__USER__|$USER|g" /etc/systemd/system/home-center-kiosk.service
 
-# Wake word service
+# Command server (formerly full wake-word service — now --no-wake-detection only,
+# because wake detection runs on the Mac mini voice-service).
 sudo cp "$SCRIPT_DIR/services/wake-word.service" /etc/systemd/system/
 sudo sed -i "s|__REPO_DIR__|$REPO_DIR|g" /etc/systemd/system/wake-word.service
 sudo sed -i "s|__USER__|$USER|g" /etc/systemd/system/wake-word.service
 
+# Mic streamer — streams XVF3800 audio to the Mac mini voice-service over TCP.
+sudo cp "$SCRIPT_DIR/services/mic-streamer.service" /etc/systemd/system/
+sudo sed -i "s|__REPO_DIR__|$REPO_DIR|g" /etc/systemd/system/mic-streamer.service
+sudo sed -i "s|__USER__|$USER|g" /etc/systemd/system/mic-streamer.service
+
 sudo systemctl daemon-reload
 sudo systemctl enable home-center-kiosk.service
 sudo systemctl enable wake-word.service
+sudo systemctl enable mic-streamer.service
 
 # ---------- Configure autologin to desktop ----------
 log "Configuring autologin..."

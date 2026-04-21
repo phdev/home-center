@@ -12,6 +12,8 @@ environment variables or sed substitution.
 | OpenClaw Telegram bridge | Family-facing chat bot (persona + skill live in `openclaw/prompts/`) | `com.openclaw.bridge` |
 | Email triage | Classify Gmail, fan out to worker + Telegram | `com.homecenter.email-triage` |
 | School updates | Pull school emails into the worker | `com.homecenter.school-updates` |
+| Design Claw | Daily design-exploration digest to Telegram (runs once at 08:15) | `com.homecenter.design-claw` |
+| Voice service | Wake word + Whisper for "Hey Homer" (reads mic stream from the Pi) | `com.homecenter.voice` |
 
 ## What does **not** live here
 
@@ -61,6 +63,39 @@ launchctl load ~/Library/LaunchAgents/com.homecenter.email-triage.plist
 ```
 
 Same pattern for `com.homecenter.school-updates.plist`.
+
+### Design Claw
+
+A separate, **design-focused** bot (not the OpenClaw family bot) and a
+separate OpenAI key. See [`docs/design_claw.md`](../../docs/design_claw.md)
+for the end-to-end workflow; setup on the Mac Mini is one command:
+
+```bash
+export OPENAI_API_KEY="sk-..."
+export TELEGRAM_BOT_TOKEN="<design-bot token from @BotFather>"
+export TELEGRAM_CHAT_ID="<your DM chat id>"
+bash deploy/mac-mini/setup-design-claw.sh
+```
+
+The script installs `openai`, renders `com.homecenter.design-claw.plist`
+into `~/Library/LaunchAgents/` with `chmod 600`, and loads the agent.
+Daily run fires at 08:15 local.
+
+### Voice service
+
+openWakeWord + faster-whisper, driven by the Pi's mic stream (XVF3800 USB
+array over TCP `:8766`). Dispatches commands back to the Pi's command
+server on `:8765`. See `voice-service/README.md` for details.
+
+```bash
+export WORKER_URL="https://home-center-api.<you>.workers.dev"
+export MIC_HOST="homecenter.local"
+export WHISPER_MODEL="medium.en"
+bash deploy/mac-mini/setup-voice-service.sh
+```
+
+The script creates `voice-service/.venv`, installs dependencies, and
+loads `com.homecenter.voice`.
 
 ## Troubleshooting
 
