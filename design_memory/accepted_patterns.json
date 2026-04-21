@@ -1,0 +1,16 @@
+{
+  "items": [
+    {
+      "id": "ap-contextual-slot",
+      "text": "A single contextual slot that swaps its card based on the highest-tier active flag.",
+      "added": "2026-04-20",
+      "source": "seed"
+    },
+    {
+      "id": "ap-single-overlay",
+      "text": "Interruptive behavior is a single overlay (e.g. bedtime toast), never multiple simultaneous modals.",
+      "added": "2026-04-20",
+      "source": "seed"
+    }
+  ]
+}

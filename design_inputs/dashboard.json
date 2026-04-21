@@ -1,0 +1,47 @@
+{
+  "screen": "dashboard",
+  "goal": "help the family know what matters right now",
+  "constraints": {
+    "device": "shared 4K TV, viewed from across a room",
+    "interaction": "ambient by default; voice ('Hey Homer') and gesture optional",
+    "glanceability": "primary signal readable in under 2 seconds",
+    "max_visible_cards": 6
+  },
+  "design_principles": [
+    "one primary thing, clearly, before secondary things",
+    "actionable beats informational",
+    "low cognitive load — group related items",
+    "deterministic derived state drives UI visibility",
+    "simple web UI — cards, lists, overlays only"
+  ],
+  "derived_state": {
+    "showMorningChecklist": false,
+    "takeoutDecisionPending": true,
+    "lunchDecisionNeeded": false,
+    "birthdayGiftNeeded": true,
+    "bedtimeReminderActive": false,
+    "hasMorningOverlap": false,
+    "showClawSuggestions": true
+  },
+  "current_structure": {
+    "layout": "stacked_cards",
+    "rows": [
+      {
+        "region": "top",
+        "cards": [
+          { "id": "calendar",   "priority": 2 },
+          { "id": "birthdays",  "priority": 3 },
+          { "id": "weather",    "priority": 4 },
+          { "id": "clawSuggestions", "priority": 1 }
+        ]
+      },
+      {
+        "region": "mid",
+        "cards": [
+          { "id": "contextualSlot", "priority": 1, "note": "renders Dinner Tonight / Lunch / Morning Checklist depending on flags" },
+          { "id": "schoolUpdates",  "priority": 3 }
+        ]
+      }
+    ]
+  }
+}

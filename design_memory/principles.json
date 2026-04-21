@@ -1,0 +1,28 @@
+{
+  "items": [
+    {
+      "id": "p-glanceable",
+      "text": "The primary signal must be readable in under two seconds from across a room.",
+      "added": "2026-04-20",
+      "source": "seed"
+    },
+    {
+      "id": "p-one-primary",
+      "text": "One primary thing, clearly, before any secondary things.",
+      "added": "2026-04-20",
+      "source": "seed"
+    },
+    {
+      "id": "p-derived-state-drives-ui",
+      "text": "Card visibility is driven by deterministic derived-state flags, never by LLM output.",
+      "added": "2026-04-20",
+      "source": "seed"
+    },
+    {
+      "id": "p-actionable-over-informational",
+      "text": "A prompt that produces a decision beats pure information.",
+      "added": "2026-04-20",
+      "source": "seed"
+    }
+  ]
+}
