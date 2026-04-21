@@ -21,6 +21,10 @@
     __TELEGRAM_CHAT_ID__      Target chat (typically your personal DM —
                               positive integer for a DM, negative for a
                               group)
+    __DESIGN_CLAW_MODEL__     OpenAI model id (default: gpt-5.4-mini).
+                              Override via the DESIGN_CLAW_MODEL env var
+                              when running setup-design-claw.sh; edit
+                              the rendered plist directly to swap later.
 
   Then load with:
     launchctl load ~/Library/LaunchAgents/com.homecenter.design-claw.plist
@@ -50,6 +54,8 @@
         <string>__TELEGRAM_BOT_TOKEN__</string>
         <key>TELEGRAM_CHAT_ID</key>
         <string>__TELEGRAM_CHAT_ID__</string>
+        <key>DESIGN_CLAW_MODEL</key>
+        <string>__DESIGN_CLAW_MODEL__</string>
     </dict>
 
     <key>StartCalendarInterval</key>

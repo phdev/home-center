@@ -26,6 +26,10 @@ set -euo pipefail
 : "${OPENAI_API_KEY:?must be exported before running}"
 : "${TELEGRAM_BOT_TOKEN:?must be exported before running}"
 : "${TELEGRAM_CHAT_ID:?must be exported before running}"
+# Model override — defaults to gpt-5.4-mini. Override by exporting
+# DESIGN_CLAW_MODEL before running this script (e.g. to try a newer model
+# without editing code). Change later by editing the rendered plist.
+DESIGN_CLAW_MODEL="${DESIGN_CLAW_MODEL:-gpt-5.4-mini}"
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_DIR="${REPO_DIR:-$(cd "$SCRIPT_DIR/../.." && pwd)}"
@@ -67,6 +71,7 @@ sed \
     -e "s|__OPENAI_API_KEY__|$(esc "$OPENAI_API_KEY")|g" \
     -e "s|__TELEGRAM_BOT_TOKEN__|$(esc "$TELEGRAM_BOT_TOKEN")|g" \
     -e "s|__TELEGRAM_CHAT_ID__|$(esc "$TELEGRAM_CHAT_ID")|g" \
+    -e "s|__DESIGN_CLAW_MODEL__|$(esc "$DESIGN_CLAW_MODEL")|g" \
     "$SCRIPT_DIR/com.homecenter.design-claw.plist" > "$PLIST"
 
 chmod 600 "$PLIST"
