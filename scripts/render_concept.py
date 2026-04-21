@@ -50,14 +50,22 @@ def _strip_html_fences(text: str) -> str:
 
 def generate_html(payload: dict[str, Any], client) -> str:
     prompt = read_text(CLAWS / "design_html_renderer.md")
-    raw = call_responses(
-        client,
-        prompt,
-        payload_blocks=[
-            ("Concept", json.dumps(payload.get("concept", {}), indent=2)),
-            ("Topic", json.dumps(payload.get("topic", {}), indent=2)),
-        ],
-    )
+
+    # Include the original screen snapshot — the renderer uses it to
+    # decide which cards to populate with dummy data.
+    blocks = [
+        ("Concept", json.dumps(payload.get("concept", {}), indent=2)),
+        ("Topic", json.dumps(payload.get("topic", {}), indent=2)),
+    ]
+    snapshot_path = payload.get("snapshot_path")
+    if snapshot_path:
+        try:
+            snapshot = read_json(Path(snapshot_path))
+            blocks.append(("Screen snapshot", json.dumps(snapshot, indent=2)))
+        except (FileNotFoundError, json.JSONDecodeError):
+            pass
+
+    raw = call_responses(client, prompt, payload_blocks=blocks)
     return _strip_html_fences(raw)
 
 

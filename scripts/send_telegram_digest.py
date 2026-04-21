@@ -65,6 +65,23 @@ def resolve_json_path(cli_path: Path | None) -> Path:
     return candidates[-1]
 
 
+def build_caption(payload: dict[str, Any]) -> str:
+    """Short caption for a photo send. Pairs with a follow-up text message
+    that carries the full why/tradeoff/prototype text."""
+    topic = payload.get("topic") or {}
+    concept = payload.get("concept") or {}
+    lines = [
+        f"🪶 Design Claw — {payload.get('date', '')}",
+        f"Topic: {topic.get('theme') or topic.get('id', '')}",
+        "",
+        f"Concept: {concept.get('concept_name', '(unnamed)')}",
+    ]
+    message = "\n".join(lines)
+    if len(message) > CAPTION_MAX:
+        message = message[: CAPTION_MAX - 1] + "…"
+    return message
+
+
 def build_digest(payload: dict[str, Any], limit: int = MAX_LEN) -> str:
     topic = payload.get("topic") or {}
     concept = payload.get("concept") or {}
@@ -148,31 +165,35 @@ def main() -> int:
     png_path = json_path.with_suffix(".png")
     has_png = png_path.exists()
 
-    if has_png:
-        caption = build_digest(payload, limit=CAPTION_MAX)
-        preview = f"[would sendPhoto {png_path.name} with caption]\n\n{caption}"
-    else:
-        preview = build_digest(payload)
+    digest = build_digest(payload)
 
     if args.dry_run:
-        print(preview)
+        if has_png:
+            caption = build_caption(payload)
+            print(f"[would sendPhoto {png_path.name} with caption]\n{caption}\n")
+            print("[then sendMessage with]")
+        print(digest)
         return 0
 
     token = require_env("TELEGRAM_BOT_TOKEN")
     chat_id = require_env("TELEGRAM_CHAT_ID")
 
+    # With a PNG: send the photo first (short caption), then the full
+    # why/tradeoff/prototype text as a second message. Without a PNG:
+    # single text message. In either case the full text is delivered.
     if has_png:
-        caption = build_digest(payload, limit=CAPTION_MAX)
+        caption = build_caption(payload)
         result = with_retries(lambda: send_photo(token, chat_id, png_path, caption))
-    else:
-        digest = build_digest(payload)
-        result = with_retries(lambda: send_message(token, chat_id, digest))
+        if not result.get("ok"):
+            print(f"error: Telegram sendPhoto returned: {result}", file=sys.stderr)
+            return 1
 
+    result = with_retries(lambda: send_message(token, chat_id, digest))
     if not result.get("ok"):
-        print(f"error: Telegram API returned: {result}", file=sys.stderr)
+        print(f"error: Telegram sendMessage returned: {result}", file=sys.stderr)
         return 1
 
-    print(f"sent digest for: {json_path}" + (" (photo)" if has_png else " (text)"))
+    print(f"sent digest for: {json_path}" + (" (photo + text)" if has_png else " (text)"))
     return 0
 
 
