@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Template for the Home Center Design Claw daily launchd agent.
+
+  Copy to ~/Library/LaunchAgents/com.homecenter.design-claw.plist and
+  substitute the placeholders below. Never commit a copy with real
+  values — the plist sits outside the repo once rendered.
+
+    __REPO_DIR__              absolute path to the home-center clone
+                              (e.g. /Users/peter/home-center)
+    __PYTHON_BIN__            full path to python3 (`which python3`);
+                              on Apple Silicon Homebrew this is
+                              /opt/homebrew/bin/python3; in a venv it's
+                              <venv>/bin/python3
+    __OPENAI_API_KEY__        OpenAI API key (workshop use only — keep
+                              the Design Claw key separate from the
+                              worker's OPENAI_API_KEY secret)
+    __TELEGRAM_BOT_TOKEN__    Design Claw bot token (NOT the OpenClaw
+                              family-bot token — use a separate bot so
+                              design pings don't land in the family group)
+    __TELEGRAM_CHAT_ID__      Target chat (typically your personal DM —
+                              positive integer for a DM, negative for a
+                              group)
+
+  Then load with:
+    launchctl load ~/Library/LaunchAgents/com.homecenter.design-claw.plist
+
+  Schedule: 08:15 local, daily. Edit <StartCalendarInterval> if desired.
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.homecenter.design-claw</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>__PYTHON_BIN__</string>
+        <string>__REPO_DIR__/scripts/run_daily_design_and_send.py</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>__REPO_DIR__</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>OPENAI_API_KEY</key>
+        <string>__OPENAI_API_KEY__</string>
+        <key>TELEGRAM_BOT_TOKEN</key>
+        <string>__TELEGRAM_BOT_TOKEN__</string>
+        <key>TELEGRAM_CHAT_ID</key>
+        <string>__TELEGRAM_CHAT_ID__</string>
+    </dict>
+
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Hour</key>
+        <integer>8</integer>
+        <key>Minute</key>
+        <integer>15</integer>
+    </dict>
+
+    <key>StandardOutPath</key>
+    <string>__REPO_DIR__/design_outputs/.launchd.stdout.log</string>
+    <key>StandardErrorPath</key>
+    <string>__REPO_DIR__/design_outputs/.launchd.stderr.log</string>
+
+    <key>RunAtLoad</key>
+    <false/>
+</dict>
+</plist>
