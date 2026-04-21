@@ -40,13 +40,23 @@ PREBUFFER_SECONDS = 2.0  # rolling buffer of raw audio for "wake word + command"
 TAIL_SECONDS = 1.5       # audio captured after detection
 
 DEFAULT_CONFIG = {
-    "detection_threshold": 0.25,
+    # Raised from 0.25 to cut the long tail of DNN false positives (ambient
+    # "homer" / "okay" / "you" in the room). Real "hey homer" scores 0.8+.
+    "detection_threshold": 0.55,
     "cooldown_seconds": 5,
     "min_rms_energy": 200,
     "min_consecutive": 3,
     "score_smooth_window": 3,
     "post_action_mute": 3.0,
 }
+
+# Whisper must find one of these in its transcript for a detection to count.
+# Covers the common mis-transcriptions of "hey homer" ("homework", "home her",
+# bare "homer", etc.). Without this gate the DNN chimes on ambient speech.
+WAKE_CONFIRM_RE = re.compile(
+    r"\b(homer|homework|home her|home\s*her|comni|jarvis|jervis)\b",
+    re.IGNORECASE,
+)
 
 logging.basicConfig(
     level=logging.INFO,
@@ -491,10 +501,6 @@ def main() -> None:
                     consecutive[ww] = 0
                 last_trigger = now
 
-                # Immediate audible ack on the Pi
-                if not args.dry_run:
-                    threading.Thread(target=dispatcher.chime, daemon=True).start()
-
                 # Capture: 2s prebuffer + 1.5s tail from stream
                 pre_audio = (
                     np.concatenate(list(prebuffer)) if prebuffer else np.array([], dtype=np.int16)
@@ -517,6 +523,17 @@ def main() -> None:
                 except Exception as e:
                     log.exception("Whisper failed: %s", e)
                     text = ""
+
+                # Two-stage: DNN fires, but we only act if Whisper confirms the
+                # wake word in the transcript. Drops false positives silently.
+                if not WAKE_CONFIRM_RE.search(text):
+                    log.info("Whisper did not confirm wake word in %r — ignoring.", text)
+                    last_action = time.time()
+                    break
+
+                # Confirmed — chime + dispatch
+                if not args.dry_run:
+                    threading.Thread(target=dispatcher.chime, daemon=True).start()
 
                 command = parse_command(text)
                 if args.dry_run:
