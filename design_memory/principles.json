@@ -8,7 +8,7 @@
     },
     {
       "id": "p-clarity-over-completeness",
-      "text": "Clarity beats completeness — prefer leaving something out to crowding the primary signal.",
+      "text": "Clarity beats completeness \u2014 prefer leaving something out to crowding the primary signal.",
       "added": "2026-04-21",
       "source": "seed"
     },
@@ -35,6 +35,12 @@
       "text": "A prompt that produces a decision beats pure information.",
       "added": "2026-04-20",
       "source": "seed"
+    },
+    {
+      "id": "p-avoid-patterns-that-make-the-interface-f",
+      "text": "Avoid patterns that make the interface feel like a checklist app rather than a home.",
+      "added": "2026-04-21",
+      "source": "feedback"
     }
   ]
 }

@@ -23,6 +23,12 @@
       "text": "Dense multi-column dashboards that trade glanceability for information density.",
       "added": "2026-04-20",
       "source": "seed"
+    },
+    {
+      "id": "rp-progress-bars",
+      "text": "Progress bars on the dashboard (they signal a productivity app, not a home).",
+      "added": "2026-04-21",
+      "source": "feedback"
     }
   ]
 }

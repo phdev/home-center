@@ -11,6 +11,18 @@
       "text": "Interruptive behavior is a single overlay (e.g. bedtime toast), never multiple simultaneous modals.",
       "added": "2026-04-20",
       "source": "seed"
+    },
+    {
+      "id": "ap-keep-the-single-runway-card-direction",
+      "text": "Keep the Single Runway Card direction (morning dashboard = one full-width checklist card + inline risk line).",
+      "added": "2026-04-21",
+      "source": "feedback"
+    },
+    {
+      "id": "ap-hide-header-clock-morning",
+      "text": "In Morning mode, hide the clock in the header — the kitchen already has one.",
+      "added": "2026-04-21",
+      "source": "feedback"
     }
   ]
 }
