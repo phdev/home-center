@@ -115,33 +115,33 @@ def send_message(token: str, chat_id: str, text: str) -> dict[str, Any]:
         return json.loads(resp.read().decode("utf-8"))
 
 
+def _multipart_field(boundary: str, name: str, value: str) -> bytes:
+    return (
+        f"--{boundary}\r\n"
+        f'Content-Disposition: form-data; name="{name}"\r\n\r\n'
+        f"{value}\r\n"
+    ).encode("utf-8")
+
+
+def _multipart_file(boundary: str, name: str, path: Path) -> bytes:
+    mimetype = mimetypes.guess_type(str(path))[0] or "image/png"
+    header = (
+        f"--{boundary}\r\n"
+        f'Content-Disposition: form-data; name="{name}"; filename="{path.name}"\r\n'
+        f"Content-Type: {mimetype}\r\n\r\n"
+    ).encode("utf-8")
+    return header + path.read_bytes() + b"\r\n"
+
+
 def send_photo(token: str, chat_id: str, photo_path: Path, caption: str) -> dict[str, Any]:
     """POST multipart/form-data to Telegram's sendPhoto. Stdlib only."""
     url = f"{TELEGRAM_API}/bot{token}/sendPhoto"
     boundary = f"----HomeCenterDesignClaw-{uuid.uuid4().hex}"
-    nl = b"\r\n"
-
-    def field(name: str, value: str) -> bytes:
-        return (
-            f'--{boundary}{nl.decode()}'
-            f'Content-Disposition: form-data; name="{name}"{nl.decode()}{nl.decode()}'
-            f"{value}{nl.decode()}"
-        ).encode("utf-8")
-
-    mimetype = mimetypes.guess_type(str(photo_path))[0] or "image/png"
-    file_bytes = photo_path.read_bytes()
-    file_header = (
-        f'--{boundary}\r\n'
-        f'Content-Disposition: form-data; name="photo"; filename="{photo_path.name}"\r\n'
-        f"Content-Type: {mimetype}\r\n\r\n"
-    ).encode("utf-8")
 
     body = io.BytesIO()
-    body.write(field("chat_id", chat_id))
-    body.write(field("caption", caption))
-    body.write(file_header)
-    body.write(file_bytes)
-    body.write(nl)
+    body.write(_multipart_field(boundary, "chat_id", chat_id))
+    body.write(_multipart_field(boundary, "caption", caption))
+    body.write(_multipart_file(boundary, "photo", photo_path))
     body.write(f"--{boundary}--\r\n".encode("utf-8"))
 
     req = urllib.request.Request(
@@ -154,6 +154,44 @@ def send_photo(token: str, chat_id: str, photo_path: Path, caption: str) -> dict
         return json.loads(resp.read().decode("utf-8"))
 
 
+def send_media_group(
+    token: str,
+    chat_id: str,
+    photo_paths: list[Path],
+    caption: str,
+) -> dict[str, Any]:
+    """POST to sendMediaGroup with 2+ photos as a Telegram album. The
+    caption is attached to the first photo only."""
+    if len(photo_paths) < 2:
+        raise ValueError("sendMediaGroup requires at least 2 photos")
+    url = f"{TELEGRAM_API}/bot{token}/sendMediaGroup"
+    boundary = f"----HomeCenterDesignClaw-{uuid.uuid4().hex}"
+
+    media = []
+    for i, path in enumerate(photo_paths):
+        attach_name = f"photo{i}"
+        entry: dict[str, Any] = {"type": "photo", "media": f"attach://{attach_name}"}
+        if i == 0:
+            entry["caption"] = caption
+        media.append(entry)
+
+    body = io.BytesIO()
+    body.write(_multipart_field(boundary, "chat_id", chat_id))
+    body.write(_multipart_field(boundary, "media", json.dumps(media)))
+    for i, path in enumerate(photo_paths):
+        body.write(_multipart_file(boundary, f"photo{i}", path))
+    body.write(f"--{boundary}--\r\n".encode("utf-8"))
+
+    req = urllib.request.Request(
+        url,
+        data=body.getvalue(),
+        method="POST",
+        headers={"Content-Type": f"multipart/form-data; boundary={boundary}"},
+    )
+    with urllib.request.urlopen(req, timeout=60) as resp:
+        return json.loads(resp.read().decode("utf-8"))
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--json", type=Path, help="path to a daily JSON artifact")
@@ -163,12 +201,19 @@ def main() -> int:
     json_path = resolve_json_path(args.json)
     payload = read_json(json_path)
     png_path = json_path.with_suffix(".png")
+    polish_path = json_path.parent / f"{json_path.stem}-polish.png"
     has_png = png_path.exists()
+    has_polish = polish_path.exists()
 
     digest = build_digest(payload)
 
     if args.dry_run:
-        if has_png:
+        if has_png and has_polish:
+            caption = build_caption(payload)
+            print(f"[would sendMediaGroup: {png_path.name} + {polish_path.name}]")
+            print(f"[caption on first image]\n{caption}\n")
+            print("[then sendMessage with]")
+        elif has_png:
             caption = build_caption(payload)
             print(f"[would sendPhoto {png_path.name} with caption]\n{caption}\n")
             print("[then sendMessage with]")
@@ -178,22 +223,35 @@ def main() -> int:
     token = require_env("TELEGRAM_BOT_TOKEN")
     chat_id = require_env("TELEGRAM_CHAT_ID")
 
-    # With a PNG: send the photo first (short caption), then the full
-    # why/tradeoff/prototype text as a second message. Without a PNG:
-    # single text message. In either case the full text is delivered.
-    if has_png:
-        caption = build_caption(payload)
+    # Delivery strategy:
+    #   both images → sendMediaGroup (album of 2, caption on structural)
+    #   structural only → sendPhoto
+    #   neither → skip the photo step
+    # In every branch the full text digest follows as a second sendMessage.
+    caption = build_caption(payload)
+    if has_png and has_polish:
+        result = with_retries(
+            lambda: send_media_group(token, chat_id, [png_path, polish_path], caption)
+        )
+        if not result.get("ok"):
+            print(f"error: Telegram sendMediaGroup returned: {result}", file=sys.stderr)
+            return 1
+        mode = "album + text"
+    elif has_png:
         result = with_retries(lambda: send_photo(token, chat_id, png_path, caption))
         if not result.get("ok"):
             print(f"error: Telegram sendPhoto returned: {result}", file=sys.stderr)
             return 1
+        mode = "photo + text"
+    else:
+        mode = "text"
 
     result = with_retries(lambda: send_message(token, chat_id, digest))
     if not result.get("ok"):
         print(f"error: Telegram sendMessage returned: {result}", file=sys.stderr)
         return 1
 
-    print(f"sent digest for: {json_path}" + (" (photo + text)" if has_png else " (text)"))
+    print(f"sent digest for: {json_path} ({mode})")
     return 0
 
 
