@@ -65,18 +65,30 @@ def resolve_json_path(cli_path: Path | None) -> Path:
     return candidates[-1]
 
 
-def build_caption(payload: dict[str, Any]) -> str:
-    """Short caption for a photo send. Pairs with a follow-up text message
-    that carries the full why/tradeoff/prototype text."""
+def build_caption(payload: dict[str, Any], variant: str | None = None) -> str:
+    """Short caption for a photo send. `variant` tags the image so the
+    user can tell structural vs. polish apart when swiping through the
+    album in Telegram.
+
+    - None        → full header (single-photo path)
+    - "structural" → full header + "(1/2 · structural)" tag
+    - "polish"    → compact "Polish view" label (2/2)
+    """
     topic = payload.get("topic") or {}
     concept = payload.get("concept") or {}
+
+    if variant == "polish":
+        name = concept.get("concept_name", "(unnamed)")
+        return f"✨ Polish view (2/2) — {name}"[:CAPTION_MAX]
+
+    tag = "\n\n📐 Structural view (1/2)" if variant == "structural" else ""
     lines = [
         f"🪶 Design Claw — {payload.get('date', '')}",
         f"Topic: {topic.get('theme') or topic.get('id', '')}",
         "",
         f"Concept: {concept.get('concept_name', '(unnamed)')}",
     ]
-    message = "\n".join(lines)
+    message = "\n".join(lines) + tag
     if len(message) > CAPTION_MAX:
         message = message[: CAPTION_MAX - 1] + "…"
     return message
@@ -158,21 +170,27 @@ def send_media_group(
     token: str,
     chat_id: str,
     photo_paths: list[Path],
-    caption: str,
+    captions: list[str],
 ) -> dict[str, Any]:
-    """POST to sendMediaGroup with 2+ photos as a Telegram album. The
-    caption is attached to the first photo only."""
+    """POST to sendMediaGroup with 2+ photos as a Telegram album. Each
+    photo gets its own caption from `captions` — Telegram shows the
+    caption under the image when the user swipes to it in full-screen
+    view."""
     if len(photo_paths) < 2:
         raise ValueError("sendMediaGroup requires at least 2 photos")
+    if len(captions) != len(photo_paths):
+        raise ValueError("captions must align 1:1 with photo_paths")
+
     url = f"{TELEGRAM_API}/bot{token}/sendMediaGroup"
     boundary = f"----HomeCenterDesignClaw-{uuid.uuid4().hex}"
 
     media = []
-    for i, path in enumerate(photo_paths):
-        attach_name = f"photo{i}"
-        entry: dict[str, Any] = {"type": "photo", "media": f"attach://{attach_name}"}
-        if i == 0:
-            entry["caption"] = caption
+    for i, (path, cap) in enumerate(zip(photo_paths, captions)):
+        entry: dict[str, Any] = {
+            "type": "photo",
+            "media": f"attach://photo{i}",
+            "caption": cap,
+        }
         media.append(entry)
 
     body = io.BytesIO()
@@ -228,16 +246,20 @@ def main() -> int:
     #   structural only → sendPhoto
     #   neither → skip the photo step
     # In every branch the full text digest follows as a second sendMessage.
-    caption = build_caption(payload)
     if has_png and has_polish:
+        captions = [
+            build_caption(payload, variant="structural"),
+            build_caption(payload, variant="polish"),
+        ]
         result = with_retries(
-            lambda: send_media_group(token, chat_id, [png_path, polish_path], caption)
+            lambda: send_media_group(token, chat_id, [png_path, polish_path], captions)
         )
         if not result.get("ok"):
             print(f"error: Telegram sendMediaGroup returned: {result}", file=sys.stderr)
             return 1
         mode = "album + text"
     elif has_png:
+        caption = build_caption(payload)
         result = with_retries(lambda: send_photo(token, chat_id, png_path, caption))
         if not result.get("ok"):
             print(f"error: Telegram sendPhoto returned: {result}", file=sys.stderr)
