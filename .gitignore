@@ -56,5 +56,8 @@ email-triage/email_triage.log
 
 # Design Claw — runtime-only state (see docs/design_claw.md)
 design_outputs/.last_daily.json
+design_outputs/.last_telegram_update.json
 design_outputs/.launchd.stdout.log
 design_outputs/.launchd.stderr.log
+design_outputs/.launchd-listener.stdout.log
+design_outputs/.launchd-listener.stderr.log

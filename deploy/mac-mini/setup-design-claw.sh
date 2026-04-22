@@ -34,10 +34,12 @@ DESIGN_CLAW_MODEL="${DESIGN_CLAW_MODEL:-gpt-5.4-mini}"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_DIR="${REPO_DIR:-$(cd "$SCRIPT_DIR/../.." && pwd)}"
 LAUNCH_DIR="$HOME/Library/LaunchAgents"
-PLIST="$LAUNCH_DIR/com.homecenter.design-claw.plist"
+DAILY_PLIST="$LAUNCH_DIR/com.homecenter.design-claw.plist"
+LISTENER_PLIST="$LAUNCH_DIR/com.homecenter.design-claw-listener.plist"
 
-echo "Repo:   $REPO_DIR"
-echo "Plist:  $PLIST"
+echo "Repo:           $REPO_DIR"
+echo "Daily plist:    $DAILY_PLIST"
+echo "Listener plist: $LISTENER_PLIST"
 echo ""
 
 # ─── 1. Python dependency ────────────────────────────────────────────
@@ -62,30 +64,44 @@ echo "Python: $PYTHON_BIN ($($PYTHON_BIN --version))"
 # ─── 3. Ensure output directory exists (launchd writes its logs here) ─
 mkdir -p "$LAUNCH_DIR" "$REPO_DIR/design_outputs/daily" "$REPO_DIR/design_outputs/weekly"
 
-# ─── 4. Render plist from template ───────────────────────────────────
+# ─── 4. Render both plists from templates ────────────────────────────
 esc() { printf '%s' "$1" | sed -e 's/[\/&|]/\\&/g'; }
 
-sed \
+render() {
+  local template="$1"
+  local output="$2"
+  sed \
     -e "s|__REPO_DIR__|$(esc "$REPO_DIR")|g" \
     -e "s|__PYTHON_BIN__|$(esc "$PYTHON_BIN")|g" \
     -e "s|__OPENAI_API_KEY__|$(esc "$OPENAI_API_KEY")|g" \
     -e "s|__TELEGRAM_BOT_TOKEN__|$(esc "$TELEGRAM_BOT_TOKEN")|g" \
     -e "s|__TELEGRAM_CHAT_ID__|$(esc "$TELEGRAM_CHAT_ID")|g" \
     -e "s|__DESIGN_CLAW_MODEL__|$(esc "$DESIGN_CLAW_MODEL")|g" \
-    "$SCRIPT_DIR/com.homecenter.design-claw.plist" > "$PLIST"
+    "$template" > "$output"
+  chmod 600 "$output"
+  plutil -lint "$output"
+}
 
-chmod 600 "$PLIST"
-plutil -lint "$PLIST"
+render "$SCRIPT_DIR/com.homecenter.design-claw.plist"           "$DAILY_PLIST"
+render "$SCRIPT_DIR/com.homecenter.design-claw-listener.plist"  "$LISTENER_PLIST"
 
-# ─── 5. (Re)load launchd agent ───────────────────────────────────────
-launchctl unload "$PLIST" 2>/dev/null || true
-launchctl load "$PLIST"
+# ─── 5. (Re)load both launchd agents ─────────────────────────────────
+for plist in "$DAILY_PLIST" "$LISTENER_PLIST"; do
+  launchctl unload "$plist" 2>/dev/null || true
+  launchctl load "$plist"
+done
 
 echo ""
-echo "Design Claw launchd agent loaded."
-echo "  Daily at 08:15 local."
-echo "  Logs: $REPO_DIR/design_outputs/.launchd.{stdout,stderr}.log"
+echo "Design Claw launchd agents loaded:"
+echo "  com.homecenter.design-claw          — daily digest at 08:15 local"
+echo "  com.homecenter.design-claw-listener — feedback polling every 5 min"
 echo ""
-echo "Test-fire once now? (optional — sends a real Telegram digest):"
+echo "Logs:"
+echo "  Daily:    $REPO_DIR/design_outputs/.launchd.{stdout,stderr}.log"
+echo "  Listener: $REPO_DIR/design_outputs/.launchd-listener.{stdout,stderr}.log"
+echo ""
+echo "Test-fire the daily now? (sends a real Telegram digest):"
 echo "  launchctl start com.homecenter.design-claw"
-echo "  tail -f $REPO_DIR/design_outputs/.launchd.stderr.log"
+echo ""
+echo "The listener RunAtLoad=true, so it fires immediately after this"
+echo "script — send David a message to verify it's alive."

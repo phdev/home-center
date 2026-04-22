@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Template for the Home Center Design Claw Telegram listener launchd
+  agent — pairs with com.homecenter.design-claw.plist (the daily job).
+
+  Rendered + loaded by deploy/mac-mini/setup-design-claw.sh. Do NOT
+  commit a copy with real values.
+
+    __REPO_DIR__              absolute path to the home-center clone
+    __PYTHON_BIN__            full path to python3
+    __OPENAI_API_KEY__        OpenAI API key (same one the daily uses)
+    __TELEGRAM_BOT_TOKEN__    Design Claw bot token (same as daily)
+    __TELEGRAM_CHAT_ID__      Target DM chat id
+    __DESIGN_CLAW_MODEL__     Model id (default gpt-5.4-mini)
+
+  Polls every 300 seconds. Edit <StartInterval> to change cadence.
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.homecenter.design-claw-listener</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>__PYTHON_BIN__</string>
+        <string>__REPO_DIR__/scripts/design_listener.py</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>__REPO_DIR__</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>OPENAI_API_KEY</key>
+        <string>__OPENAI_API_KEY__</string>
+        <key>TELEGRAM_BOT_TOKEN</key>
+        <string>__TELEGRAM_BOT_TOKEN__</string>
+        <key>TELEGRAM_CHAT_ID</key>
+        <string>__TELEGRAM_CHAT_ID__</string>
+        <key>DESIGN_CLAW_MODEL</key>
+        <string>__DESIGN_CLAW_MODEL__</string>
+    </dict>
+
+    <key>StartInterval</key>
+    <integer>300</integer>
+
+    <key>StandardOutPath</key>
+    <string>__REPO_DIR__/design_outputs/.launchd-listener.stdout.log</string>
+    <key>StandardErrorPath</key>
+    <string>__REPO_DIR__/design_outputs/.launchd-listener.stderr.log</string>
+
+    <key>RunAtLoad</key>
+    <true/>
+</dict>
+</plist>

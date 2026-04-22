@@ -12,6 +12,8 @@ environment variables or sed substitution.
 | OpenClaw Telegram bridge | Family-facing chat bot (persona + skill live in `openclaw/prompts/`) | `com.openclaw.bridge` |
 | Email triage | Classify Gmail, fan out to worker + Telegram | `com.homecenter.email-triage` |
 | School updates | Pull school emails into the worker | `com.homecenter.school-updates` |
+| Design Claw | Daily design-exploration digest to Telegram (runs once at 08:15) | `com.homecenter.design-claw` |
+| Design Claw listener | Polls Telegram DMs every 5 min; parses replies as design feedback, merges into memory | `com.homecenter.design-claw-listener` |
 
 ## What does **not** live here
 
@@ -61,6 +63,27 @@ launchctl load ~/Library/LaunchAgents/com.homecenter.email-triage.plist
 ```
 
 Same pattern for `com.homecenter.school-updates.plist`.
+
+### Design Claw (daily + listener)
+
+A separate **design-focused** bot (not the OpenClaw family bot) and a
+separate OpenAI key. One script installs both launchd jobs (the 08:15
+daily and the 5-minute feedback poller). See
+[`docs/design_claw.md`](../../docs/design_claw.md) for the workflow.
+
+```bash
+export OPENAI_API_KEY="sk-..."
+export TELEGRAM_BOT_TOKEN="<design-bot token from @BotFather>"
+export TELEGRAM_CHAT_ID="<your DM chat id>"
+bash deploy/mac-mini/setup-design-claw.sh
+```
+
+The script installs `openai` + `playwright` (with Chromium), renders
+both plists into `~/Library/LaunchAgents/` at mode `600`, and loads
+both agents. After that, replying to David in Telegram is a valid
+feedback channel — the listener picks up the message within 5 minutes,
+parses it via the feedback prompt, merges into `design_memory/`, and
+acks.
 
 ## Troubleshooting
 
