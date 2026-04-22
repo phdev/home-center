@@ -13,7 +13,8 @@
     __TELEGRAM_CHAT_ID__      Target DM chat id
     __DESIGN_CLAW_MODEL__     Model id (default gpt-5.4-mini)
 
-  Polls every 300 seconds. Edit <StartInterval> to change cadence.
+  Polls every 5 min at the :00/:05/:10/.../:55 mark. Edit the
+  <StartCalendarInterval> array to change cadence.
 -->
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -44,8 +45,24 @@
         <string>__DESIGN_CLAW_IMAGE_MODEL__</string>
     </dict>
 
-    <key>StartInterval</key>
-    <integer>300</integer>
+    <!-- Calendar-based schedule fires more reliably than StartInterval
+         in GUI-session LaunchAgents (which can get paused by AppNap /
+         QoS throttling). Every 5 min at :00, :05, :10, ..., :55. -->
+    <key>StartCalendarInterval</key>
+    <array>
+        <dict><key>Minute</key><integer>0</integer></dict>
+        <dict><key>Minute</key><integer>5</integer></dict>
+        <dict><key>Minute</key><integer>10</integer></dict>
+        <dict><key>Minute</key><integer>15</integer></dict>
+        <dict><key>Minute</key><integer>20</integer></dict>
+        <dict><key>Minute</key><integer>25</integer></dict>
+        <dict><key>Minute</key><integer>30</integer></dict>
+        <dict><key>Minute</key><integer>35</integer></dict>
+        <dict><key>Minute</key><integer>40</integer></dict>
+        <dict><key>Minute</key><integer>45</integer></dict>
+        <dict><key>Minute</key><integer>50</integer></dict>
+        <dict><key>Minute</key><integer>55</integer></dict>
+    </array>
 
     <key>StandardOutPath</key>
     <string>__REPO_DIR__/design_outputs/.launchd-listener.stdout.log</string>
