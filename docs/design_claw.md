@@ -112,6 +112,30 @@ python scripts/run_daily_design_and_send.py
 Runs daily generation then Telegram delivery in one process. This is
 the single command you'd schedule.
 
+## Feedback via Telegram (listener)
+
+After setup on the Mac Mini, **replying to David in Telegram is a valid
+feedback channel**. A companion launchd job
+(`com.homecenter.design-claw-listener`) polls `getUpdates` every five
+minutes; when it sees new text messages from the configured chat it:
+
+1. Batches them into one feedback blob (messages arriving within the
+   same poll window get concatenated — so a burst of replies becomes
+   one memory update, not five).
+2. Passes the blob through `claws/design_feedback_parser.md` to get
+   structured `accepted_patterns` / `rejected_patterns` /
+   `principle_updates` / `preference_updates` / `open_questions`.
+3. Merges via the same `update_design_memory.apply_update()` the CLI
+   path uses — same dedup, same `iteration_log.jsonl` entry, tagged
+   with `source: telegram`.
+4. Acks with a one-line summary: `🪶 merged into memory: 1 accepted · 1 principle`.
+
+Messages that start with `/start`, `/help`, `/ack` are ignored (common
+Telegram noise). Messages from other chats are ignored for safety.
+State (last processed `update_id`) sits at
+`design_outputs/.last_telegram_update.json` — if you need a clean
+slate, delete it.
+
 ## Feedback compounding
 
 ```bash
@@ -228,8 +252,10 @@ loud, not silent:
 | `scripts/update_design_memory.py` | Merge parsed feedback into memory |
 | `scripts/run_design_review.py` | Weekly synthesis |
 | `scripts/run_design_explorer.py` | Preserved one-shot explorer |
-| `deploy/mac-mini/com.homecenter.design-claw.plist` | launchd template (rendered + loaded by the setup script) |
-| `deploy/mac-mini/setup-design-claw.sh` | One-shot setup on the Mac Mini |
+| `deploy/mac-mini/com.homecenter.design-claw.plist` | launchd template — daily digest at 08:15 |
+| `deploy/mac-mini/com.homecenter.design-claw-listener.plist` | launchd template — Telegram feedback poller (5 min cadence) |
+| `deploy/mac-mini/setup-design-claw.sh` | One-shot setup on the Mac Mini (renders + loads both) |
+| `scripts/design_listener.py` | The listener — pulls new DMs, parses, merges, acks |
 
 ## Editing memory by hand
 
