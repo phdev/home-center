@@ -136,6 +136,11 @@ def main() -> int:
         action="store_true",
         help="also generate <stem>.html + <stem>.png (requires playwright + chromium)",
     )
+    parser.add_argument(
+        "--no-polish",
+        action="store_true",
+        help="skip the Images 2.0 polish pass even when --render is set",
+    )
     args = parser.parse_args()
 
     ensure_dirs()
@@ -205,6 +210,7 @@ def main() -> int:
         # Lazy import so non-render runs don't require playwright.
         from render_concept import render_concept
 
+        structural_ok = False
         try:
             html_path, png_path = render_concept(json_path, client)
             print(f"saved: {html_path}")
@@ -214,11 +220,34 @@ def main() -> int:
                 f"Rendered concept '{concept.get('concept_name', '(unnamed)')}'",
                 png_path=str(png_path),
             )
+            structural_ok = True
         except Exception as exc:
-            # Render is a nice-to-have; the text concept still counts as a
-            # successful daily. Log and continue — Telegram send will fall
-            # back to text-only when no PNG exists.
-            print(f"warning: render failed ({type(exc).__name__}): {exc}", file=sys.stderr)
+            # Structural render is a nice-to-have; the text concept still
+            # counts as a successful daily. Log and continue.
+            print(f"warning: structural render failed ({type(exc).__name__}): {exc}", file=sys.stderr)
+
+        # Polish pass — only runs when the structural mockup succeeded.
+        # Different failure domain (image model vs text model), so its
+        # own try/except and its own --no-polish opt-out.
+        if structural_ok and not args.no_polish:
+            from render_polish import render_polish
+
+            try:
+                polish_path = render_polish(json_path, client)
+                print(f"saved: {polish_path}")
+                append_iteration_log(
+                    "daily_polish",
+                    f"Polished mockup for '{concept.get('concept_name', '(unnamed)')}'",
+                    polish_path=str(polish_path),
+                )
+            except Exception as exc:
+                # Polish failure leaves the structural mockup as the sole
+                # image — Telegram delivery still works via the existing
+                # single-photo path.
+                print(
+                    f"warning: polish pass failed ({type(exc).__name__}): {exc}",
+                    file=sys.stderr,
+                )
 
     print()
     print(f"concept: {concept.get('concept_name', '(unnamed)')}")

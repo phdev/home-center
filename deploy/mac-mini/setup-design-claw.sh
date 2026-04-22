@@ -30,6 +30,8 @@ set -euo pipefail
 # DESIGN_CLAW_MODEL before running this script (e.g. to try a newer model
 # without editing code). Change later by editing the rendered plist.
 DESIGN_CLAW_MODEL="${DESIGN_CLAW_MODEL:-gpt-5.4-mini}"
+# Image model for the polish pass (Images 2.0). Default is gpt-image-1.
+DESIGN_CLAW_IMAGE_MODEL="${DESIGN_CLAW_IMAGE_MODEL:-gpt-image-1}"
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_DIR="${REPO_DIR:-$(cd "$SCRIPT_DIR/../.." && pwd)}"
@@ -77,6 +79,7 @@ render() {
     -e "s|__TELEGRAM_BOT_TOKEN__|$(esc "$TELEGRAM_BOT_TOKEN")|g" \
     -e "s|__TELEGRAM_CHAT_ID__|$(esc "$TELEGRAM_CHAT_ID")|g" \
     -e "s|__DESIGN_CLAW_MODEL__|$(esc "$DESIGN_CLAW_MODEL")|g" \
+    -e "s|__DESIGN_CLAW_IMAGE_MODEL__|$(esc "$DESIGN_CLAW_IMAGE_MODEL")|g" \
     "$template" > "$output"
   chmod 600 "$output"
   plutil -lint "$output"

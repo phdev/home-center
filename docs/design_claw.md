@@ -45,7 +45,8 @@ steady-state workflow.
 | `OPENAI_API_KEY` | `run_daily_design_claw.py`, `parse_design_feedback.py`, `run_design_review.py`, `run_design_explorer.py` | any LLM call |
 | `TELEGRAM_BOT_TOKEN` | `send_telegram_digest.py` | Telegram delivery |
 | `TELEGRAM_CHAT_ID` | `send_telegram_digest.py` | Telegram delivery |
-| `DESIGN_CLAW_MODEL` | all LLM calls (via `_design_claw.MODEL`) | optional — defaults to `gpt-5.4-mini`. Set to try a newer model without editing code. |
+| `DESIGN_CLAW_MODEL` | all text LLM calls (via `_design_claw.MODEL`) | optional — defaults to `gpt-5.4-mini`. Set to try a newer model without editing code. |
+| `DESIGN_CLAW_IMAGE_MODEL` | polish-pass image generation (`render_polish.py`) | optional — defaults to `gpt-image-1`. Set to swap the Images 2.0 model. |
 
 The Telegram bot + chat ID are **independent of the OpenClaw family-bot
 credentials**. Use a different bot (or the same bot with a different
@@ -80,12 +81,24 @@ Flow:
    - an entry in `design_memory/iteration_log.jsonl`.
 6. **If `--render` is passed** (default for `run_daily_design_and_send.py`):
    - A second Responses call with `claws/design_html_renderer.md` +
-     the just-written JSON produces a grayscale box-and-label HTML
-     mockup.
+     the just-written JSON produces a high-fidelity HTML mockup.
    - Headless Chromium (Playwright) screenshots it at 1920×1080 to
-     `design_outputs/daily/<date>-<screen>.png`.
-   - Render failures log a warning but do not fail the daily — the
-     text concept is still saved and delivered.
+     `design_outputs/daily/<date>-<screen>.png` (**structural** mockup).
+   - Render failures log a warning but do not fail the daily.
+7. **Polish pass** (runs after structural when `--render` is set and
+   `--no-polish` is not):
+   - `scripts/render_polish.py` calls OpenAI Images 2.0
+     (`gpt-image-1` by default) via `images.edit`, passing the
+     structural PNG as a reference so the polished output preserves
+     the same regions/hierarchy.
+   - Saves `design_outputs/daily/<date>-<screen>-polish.png`.
+   - Polish failures log a warning. Telegram delivery gracefully falls
+     back to the single-photo path when the polish PNG is missing.
+8. **Telegram delivery** (`send_telegram_digest.py`):
+   - Both images present → `sendMediaGroup` album of 2, caption on
+     structural + full text digest as follow-up `sendMessage`.
+   - Structural only → `sendPhoto` + `sendMessage`.
+   - Neither → single `sendMessage` with the full digest.
 
 ## Telegram delivery
 
@@ -235,7 +248,9 @@ loud, not silent:
 | `claws/design_feedback_parser.md` | Prompt — normalize feedback to JSON |
 | `claws/design_review.md` | Prompt — weekly synthesis |
 | `claws/design_html_renderer.md` | Prompt — structural HTML mockup from a concept |
-| `scripts/render_concept.py` | Generate HTML + PNG for a daily artifact (`--render`) |
+| `claws/design_polish_renderer.md` | Prompt — polish pass (Images 2.0) preserving structural regions |
+| `scripts/render_concept.py` | Generate HTML + structural PNG for a daily artifact (`--render`) |
+| `scripts/render_polish.py` | Generate `<stem>-polish.png` via Images 2.0, using the structural PNG as reference |
 | `claws/design_explorer.md` / `design_critic.md` / `pattern_translator.md` | Preserved one-shot explorer prompts |
 | `design_inputs/daily_topics.json` | Rotation of daily themes |
 | `design_inputs/dashboard.json` | Screen-state snapshot |

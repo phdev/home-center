@@ -40,6 +40,8 @@
         <string>__TELEGRAM_CHAT_ID__</string>
         <key>DESIGN_CLAW_MODEL</key>
         <string>__DESIGN_CLAW_MODEL__</string>
+        <key>DESIGN_CLAW_IMAGE_MODEL</key>
+        <string>__DESIGN_CLAW_IMAGE_MODEL__</string>
     </dict>
 
     <key>StartInterval</key>
