@@ -58,6 +58,13 @@ BUFFER_SAMPLES = int(SAMPLE_RATE * BUFFER_SECONDS)
 # hallucinations on ambient noise.
 RMS_GATE = 180.0
 
+# After wake detection, capture this much audio and transcribe it as the
+# command body. Handles the common case where the wake phrase and command
+# land in different 3-second Whisper windows ("hey homer" ← one window,
+# "open calendar" ← next window). 4s is plenty for typical commands like
+# "set a timer for ten minutes for the laundry".
+COMMAND_CAPTURE_SECONDS = 4.0
+
 # Cooldown after a successful wake → dispatch so we don't re-fire on the
 # trailing audio of the just-processed command.
 POST_ACTION_MUTE = 4.0
@@ -404,13 +411,57 @@ def main() -> None:
             log.info("[%.0f rms] %s%s", rms, "★ " if wake_hit else "  ", text)
 
         if wake_hit:
-            tail = text[wake_hit.end():].strip(" ,.:;!?-")
-            log.info("Wake phrase matched. Command body: %r", tail)
+            # Tail from the same window is often short or empty (the user
+            # barely got past "Hey Homer" before the window closed). We'll
+            # use it as a hint but re-capture a fresh 4s chunk from the live
+            # stream for the authoritative command transcription.
+            first_pass_tail = text[wake_hit.end():].strip(" ,.:;!?-")
+            log.info("Wake phrase matched. first-pass tail=%r", first_pass_tail)
 
             if not args.dry_run:
                 threading.Thread(target=dispatcher.chime, daemon=True).start()
 
-            command = parse_command(tail)
+            # Mark "listening" so the dashboard caption pulses while we
+            # collect the command.
+            threading.Thread(
+                target=dispatcher.transcription,
+                args=(text, True),
+                daemon=True,
+            ).start()
+
+            # Capture a fresh post-wake audio segment and transcribe it as
+            # the command. Fix for the split-window case: the user says
+            # "Hey Homer [pause] open calendar" and the command only fully
+            # lands in a window AFTER the wake phrase.
+            time.sleep(COMMAND_CAPTURE_SECONDS)
+            need = int(COMMAND_CAPTURE_SECONDS * SAMPLE_RATE)
+            with buf_lock:
+                command_window = state["buf"][-need:].copy()
+
+            command_text = transcribe_window(command_window, args.whisper_model)
+            log.info("Command window transcript: %r", command_text)
+
+            # Strip a leading repeated wake phrase if Whisper caught it again.
+            m = WAKE_PHRASE_RE.search(command_text)
+            body = command_text[m.end():] if m else command_text
+            body = body.strip(" ,.:;!?-")
+
+            # Fall back to the first-pass tail if the fresh capture was empty
+            # (Whisper VAD can over-trim when the user paused).
+            if not body and first_pass_tail:
+                body = first_pass_tail
+
+            log.info("Dispatch body: %r", body)
+
+            # Push the final command to the caption overlay so the user sees
+            # what the system heard.
+            threading.Thread(
+                target=dispatcher.transcription,
+                args=(f"Hey Homer, {body}" if body else "Hey Homer", True),
+                daemon=True,
+            ).start()
+
+            command = parse_command(body)
             if args.dry_run:
                 log.info("[DRY RUN] would dispatch: %s", command)
             else:

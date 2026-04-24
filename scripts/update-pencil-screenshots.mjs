@@ -33,6 +33,7 @@ const pages = [
   { slug: "full-llm-response-page", nodeId: "dMUil" },
   { slug: "full-history-page", nodeId: "Tbtje" },
   { slug: "transcription-overlay", nodeId: "DeP7G" },
+  { slug: "voice-transcription-overlay", nodeId: "Jf7Tx" },
   { slug: "openclaw-ui-additions", nodeId: "ONYZi" },
 ];
 

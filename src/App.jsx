@@ -33,6 +33,7 @@ import { FamilyMemberPage } from "./components/FamilyMemberPage";
 import { WakeWordDebug } from "./components/WakeWordDebug";
 import { VoiceActivationOverlay } from "./components/VoiceActivationOverlay";
 import { LiveCaption } from "./components/LiveCaption";
+import { WakeOverlay } from "./components/WakeOverlay";
 import { ModelHealthPanel } from "./modules/model-health/ModelHealthPanel";
 import { FullModelHealthPage } from "./modules/model-health/FullModelHealthPage";
 import { computeDerivedState } from "./state/deriveState";
@@ -125,6 +126,7 @@ export default function App() {
         <TranscriptionOverlay query={llm.latestResponse?.query} visible={!!llm.latestResponse && forcePage !== "llm-response"} />
         <VoiceActivationOverlay active={hc.listening} />
         <LiveCaption text={caption.text} isWake={caption.isWake} age={caption.age} />
+        <WakeOverlay isWake={caption.isWake} age={caption.age} />
         <AlarmOverlay expiredTimers={expiredTimers} onDismissAll={dismissAll} />
         {wakeDebug.visible && <WakeWordDebug events={wakeDebug.events} connected={wakeDebug.connected} onClear={wakeDebug.clearEvents} workerUrl={settings.worker?.url} workerToken={settings.worker?.token} />}
       </>
@@ -146,6 +148,7 @@ export default function App() {
         <TranscriptionOverlay query={llm.latestResponse?.query} visible={!!llm.latestResponse && forcePage !== "llm-response"} />
         <VoiceActivationOverlay active={hc.listening} />
         <LiveCaption text={caption.text} isWake={caption.isWake} age={caption.age} />
+        <WakeOverlay isWake={caption.isWake} age={caption.age} />
         <AlarmOverlay expiredTimers={expiredTimers} onDismissAll={dismissAll} />
         {wakeDebug.visible && <WakeWordDebug events={wakeDebug.events} connected={wakeDebug.connected} onClear={wakeDebug.clearEvents} workerUrl={settings.worker?.url} workerToken={settings.worker?.token} />}
       </>
@@ -168,6 +171,7 @@ export default function App() {
         <TranscriptionOverlay query={llm.latestResponse?.query} visible={!!llm.latestResponse && forcePage !== "llm-response"} />
         <VoiceActivationOverlay active={hc.listening} />
         <LiveCaption text={caption.text} isWake={caption.isWake} age={caption.age} />
+        <WakeOverlay isWake={caption.isWake} age={caption.age} />
         <AlarmOverlay expiredTimers={expiredTimers} onDismissAll={dismissAll} />
         {wakeDebug.visible && <WakeWordDebug events={wakeDebug.events} connected={wakeDebug.connected} onClear={wakeDebug.clearEvents} workerUrl={settings.worker?.url} workerToken={settings.worker?.token} />}
       </>
@@ -185,6 +189,7 @@ export default function App() {
         />
         <VoiceActivationOverlay active={hc.listening} />
         <LiveCaption text={caption.text} isWake={caption.isWake} age={caption.age} />
+        <WakeOverlay isWake={caption.isWake} age={caption.age} />
         <AlarmOverlay expiredTimers={expiredTimers} onDismissAll={dismissAll} />
         {wakeDebug.visible && <WakeWordDebug events={wakeDebug.events} connected={wakeDebug.connected} onClear={wakeDebug.clearEvents} workerUrl={settings.worker?.url} workerToken={settings.worker?.token} />}
       </>
@@ -197,6 +202,7 @@ export default function App() {
         <FullModelHealthPage onBack={() => goTo("dashboard")} workerSettings={settings.worker} />
         <VoiceActivationOverlay active={hc.listening} />
         <LiveCaption text={caption.text} isWake={caption.isWake} age={caption.age} />
+        <WakeOverlay isWake={caption.isWake} age={caption.age} />
         <AlarmOverlay expiredTimers={expiredTimers} onDismissAll={dismissAll} />
       </>
     );
@@ -219,6 +225,7 @@ export default function App() {
         />
         <VoiceActivationOverlay active={hc.listening} />
         <LiveCaption text={caption.text} isWake={caption.isWake} age={caption.age} />
+        <WakeOverlay isWake={caption.isWake} age={caption.age} />
         <AlarmOverlay expiredTimers={expiredTimers} onDismissAll={dismissAll} />
         {wakeDebug.visible && <WakeWordDebug events={wakeDebug.events} connected={wakeDebug.connected} onClear={wakeDebug.clearEvents} workerUrl={settings.worker?.url} workerToken={settings.worker?.token} />}
       </>
