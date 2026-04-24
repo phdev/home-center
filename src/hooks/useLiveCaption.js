@@ -6,7 +6,7 @@ import { apiUrl, apiHeaders } from "../services/piLocal";
  * live Whisper output. Returns { text, isWake, ts, age } where `age` is
  * seconds since the last update (so the UI can fade captions after idle).
  */
-export function useLiveCaption(workerSettings, { pollMs = 300 } = {}) {
+export function useLiveCaption(workerSettings, { pollMs = 150 } = {}) {
   const [state, setState] = useState({ text: "", isWake: false, ts: 0 });
   const [now, setNow] = useState(() => Date.now() / 1000);
 
