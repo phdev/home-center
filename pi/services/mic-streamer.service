@@ -11,8 +11,13 @@ ExecStart=__REPO_DIR__/pi/.venv/bin/python __REPO_DIR__/pi/mic_streamer.py
 Restart=always
 RestartSec=3
 
-# Audio device access
+# Audio device access. Pi OS Bookworm runs PipeWire in the pi user's
+# systemd --user session; we point PULSE_RUNTIME_PATH at that session's
+# socket so the `pulse` ALSA PCM can connect from this system-level unit.
+# UID 1000 is the stock `pi` user — override if you've remapped.
 SupplementaryGroups=audio
+Environment=XDG_RUNTIME_DIR=/run/user/1000
+Environment=PULSE_RUNTIME_PATH=/run/user/1000/pulse
 
 # Logging
 StandardOutput=journal

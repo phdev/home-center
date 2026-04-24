@@ -960,6 +960,8 @@ class RecordingManager:
         self._debug_events: list[dict] = []
         # Navigation state
         self._navigation = {"page": "dashboard", "view": None, "timestamp": 0}
+        # Live transcription (fed by the Mac mini voice-service for on-screen captions)
+        self._transcription = {"text": "", "is_wake": False, "ts": 0.0}
         # Timers
         self._timers: list[dict] = []
         self._timer_counter = 0
@@ -1433,6 +1435,9 @@ class RecordingManager:
                 elif path == "/api/navigate":
                     with mgr._lock:
                         self._respond_json({"navigation": dict(mgr._navigation)})
+                elif path == "/api/transcription":
+                    with mgr._lock:
+                        self._respond_json(dict(mgr._transcription))
                 elif path == "/api/timers":
                     timers = mgr.get_active_timers()
                     self._respond_json({"timers": timers, "serverTime": int(time.time() * 1000)})
@@ -1611,6 +1616,15 @@ class RecordingManager:
 
                 elif self.path == "/api/chime":
                     threading.Thread(target=play_acknowledgement, daemon=True).start()
+                    self._respond_json({"ok": True})
+
+                elif self.path == "/api/transcription":
+                    with mgr._lock:
+                        mgr._transcription = {
+                            "text": str(body.get("text", ""))[:500],
+                            "is_wake": bool(body.get("is_wake", False)),
+                            "ts": float(body.get("ts", time.time())),
+                        }
                     self._respond_json({"ok": True})
 
                 else:

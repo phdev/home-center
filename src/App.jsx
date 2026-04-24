@@ -13,6 +13,7 @@ import { useHandController } from "./hooks/useHandController";
 import { useLLMQuery } from "./hooks/useLLMQuery";
 import { useWakeWordDebug } from "./hooks/useWakeWordDebug";
 import { useWakeRecord } from "./hooks/useWakeRecord";
+import { useLiveCaption } from "./hooks/useLiveCaption";
 import { Header } from "./components/Header";
 import { CalendarPanel } from "./components/CalendarPanel";
 import { WeatherPanel } from "./components/WeatherPanel";
@@ -31,6 +32,7 @@ import { SideNav } from "./components/SideNav";
 import { FamilyMemberPage } from "./components/FamilyMemberPage";
 import { WakeWordDebug } from "./components/WakeWordDebug";
 import { VoiceActivationOverlay } from "./components/VoiceActivationOverlay";
+import { LiveCaption } from "./components/LiveCaption";
 import { ModelHealthPanel } from "./modules/model-health/ModelHealthPanel";
 import { FullModelHealthPage } from "./modules/model-health/FullModelHealthPage";
 import { computeDerivedState } from "./state/deriveState";
@@ -69,6 +71,7 @@ export default function App() {
   const llm = useLLMQuery(settings.worker);
   const wakeDebug = useWakeWordDebug(settings.worker);
   const wakeRecord = useWakeRecord();
+  const caption = useLiveCaption(settings.worker);
 
   // Derived-state layer (see docs/home_center_state_model.md)
   const takeout = useTakeout(settings.worker);
@@ -121,6 +124,7 @@ export default function App() {
         />
         <TranscriptionOverlay query={llm.latestResponse?.query} visible={!!llm.latestResponse && forcePage !== "llm-response"} />
         <VoiceActivationOverlay active={hc.listening} />
+        <LiveCaption text={caption.text} isWake={caption.isWake} age={caption.age} />
         <AlarmOverlay expiredTimers={expiredTimers} onDismissAll={dismissAll} />
         {wakeDebug.visible && <WakeWordDebug events={wakeDebug.events} connected={wakeDebug.connected} onClear={wakeDebug.clearEvents} workerUrl={settings.worker?.url} workerToken={settings.worker?.token} />}
       </>
@@ -141,6 +145,7 @@ export default function App() {
         />
         <TranscriptionOverlay query={llm.latestResponse?.query} visible={!!llm.latestResponse && forcePage !== "llm-response"} />
         <VoiceActivationOverlay active={hc.listening} />
+        <LiveCaption text={caption.text} isWake={caption.isWake} age={caption.age} />
         <AlarmOverlay expiredTimers={expiredTimers} onDismissAll={dismissAll} />
         {wakeDebug.visible && <WakeWordDebug events={wakeDebug.events} connected={wakeDebug.connected} onClear={wakeDebug.clearEvents} workerUrl={settings.worker?.url} workerToken={settings.worker?.token} />}
       </>
@@ -162,6 +167,7 @@ export default function App() {
         />
         <TranscriptionOverlay query={llm.latestResponse?.query} visible={!!llm.latestResponse && forcePage !== "llm-response"} />
         <VoiceActivationOverlay active={hc.listening} />
+        <LiveCaption text={caption.text} isWake={caption.isWake} age={caption.age} />
         <AlarmOverlay expiredTimers={expiredTimers} onDismissAll={dismissAll} />
         {wakeDebug.visible && <WakeWordDebug events={wakeDebug.events} connected={wakeDebug.connected} onClear={wakeDebug.clearEvents} workerUrl={settings.worker?.url} workerToken={settings.worker?.token} />}
       </>
@@ -178,6 +184,7 @@ export default function App() {
           lastGesture={hc.lastGesture}
         />
         <VoiceActivationOverlay active={hc.listening} />
+        <LiveCaption text={caption.text} isWake={caption.isWake} age={caption.age} />
         <AlarmOverlay expiredTimers={expiredTimers} onDismissAll={dismissAll} />
         {wakeDebug.visible && <WakeWordDebug events={wakeDebug.events} connected={wakeDebug.connected} onClear={wakeDebug.clearEvents} workerUrl={settings.worker?.url} workerToken={settings.worker?.token} />}
       </>
@@ -189,6 +196,7 @@ export default function App() {
       <>
         <FullModelHealthPage onBack={() => goTo("dashboard")} workerSettings={settings.worker} />
         <VoiceActivationOverlay active={hc.listening} />
+        <LiveCaption text={caption.text} isWake={caption.isWake} age={caption.age} />
         <AlarmOverlay expiredTimers={expiredTimers} onDismissAll={dismissAll} />
       </>
     );
@@ -210,6 +218,7 @@ export default function App() {
           lastGesture={hc.lastGesture}
         />
         <VoiceActivationOverlay active={hc.listening} />
+        <LiveCaption text={caption.text} isWake={caption.isWake} age={caption.age} />
         <AlarmOverlay expiredTimers={expiredTimers} onDismissAll={dismissAll} />
         {wakeDebug.visible && <WakeWordDebug events={wakeDebug.events} connected={wakeDebug.connected} onClear={wakeDebug.clearEvents} workerUrl={settings.worker?.url} workerToken={settings.worker?.token} />}
       </>

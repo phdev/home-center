@@ -27,8 +27,15 @@ import numpy as np
 
 SAMPLE_RATE = 16000
 CHUNK_SIZE = 1280           # 80 ms @ 16 kHz — matches openWakeWord window
-IN_CHANNELS = 2             # XVF3800 exposes stereo (L = ASR, R = comms)
+IN_CHANNELS = 1             # mono via PipeWire's default source
 DEFAULT_PORT = 8766
+
+# Pi OS Bookworm runs PipeWire, which grabs the USB audio hardware — so
+# direct `hw:N,0` ALSA opens return no audio. The `pulse` PCM routes through
+# PipeWire's PulseAudio-compat bridge and Just Works as long as the XVF3800
+# is the default source (it is by default on a fresh boot; check with
+# `wpctl status`).
+DEFAULT_DEVICE = "pulse"
 
 logging.basicConfig(
     level=logging.INFO,
@@ -133,14 +140,12 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="XVF3800 PCM streamer over TCP")
     parser.add_argument("--port", type=int, default=DEFAULT_PORT)
     parser.add_argument("--device", type=str, default=None,
-                        help="ALSA device (default: auto-detect XVF3800)")
+                        help="ALSA device (default: 'pulse' via PipeWire; "
+                             "use hw:N,0 for direct access if you've stopped PipeWire)")
     args = parser.parse_args()
 
-    device = args.device or find_xvf3800_device()
-    if not device:
-        log.error("No XVF3800 or fallback mic found. Check USB connection (lsusb).")
-        sys.exit(1)
-
+    device = args.device or DEFAULT_DEVICE
+    log.info("Using ALSA device: %s", device)
     serve(args.port, device)
 
 

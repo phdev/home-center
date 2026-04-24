@@ -1,25 +1,38 @@
 #!/usr/bin/env python3
-"""Home Center voice service (Mac mini).
+"""Home Center voice service (Mac mini) — Whisper-only, streaming edition.
 
-Connects to the Pi's mic_streamer over TCP (16 kHz mono S16_LE PCM),
-runs openWakeWord for detection and faster-whisper for speech-to-text,
-parses commands, and dispatches them back to the Pi's HTTP command
-server (`:8765`) and the Cloudflare worker.
+The openWakeWord DNN was producing too many false positives; this version
+drops it entirely and lets Whisper be the sole decision-maker. A rolling
+3-second audio window is transcribed every ~700ms. The live transcript is
+POSTed to the Pi's `/api/transcription` endpoint so the dashboard can show
+on-screen captions. When the transcript matches the wake phrase
+(`hey homer` + common Whisper mis-spellings), everything after the phrase
+becomes the command — parsed and dispatched.
 
-Wake-word detection and STT used to live on the Pi; they were moved
-here because the Pi's CPU can only run a tiny Whisper model, and that
-was the main source of false positives and missed commands.
+Why Whisper-only:
+  - Whisper is ground-truth for *what was said*, not a proxy signal like a
+    DNN. If Whisper doesn't write "hey homer", we don't act. Period.
+  - The transcript we'd compute anyway also powers the caption overlay,
+    so live transcription is essentially free.
+  - No more thresholds to tune or DNNs to retrain.
 
-Why the split:
-  Pi  — mic + HDMI-CEC + dashboard state + chime playback
-  Mac — the heavy signal + ML work (big Whisper, full openWakeWord)
+Pipeline:
+  MicStream ──► rolling PCM buffer (~6s) ──┬──► Whisper worker (every ~700ms)
+                                           │         │
+                                           │         ├── POST /api/transcription
+                                           │         │
+                                           │         └── if wake phrase match:
+                                           │             extract command,
+                                           │             POST /api/chime,
+                                           │             parse_command,
+                                           │             dispatch.
+                                           │
+                                           └──► RMS gate (don't transcribe silence)
 """
 
 from __future__ import annotations
 
 import argparse
-import collections
-import json
 import logging
 import os
 import re
@@ -31,32 +44,34 @@ from pathlib import Path
 
 import numpy as np
 import requests
-from openwakeword.model import Model
 
 
 SAMPLE_RATE = 16000
-CHUNK_SIZE = 1280        # 80 ms windows — matches openWakeWord input size
-PREBUFFER_SECONDS = 2.0  # rolling buffer of raw audio for "wake word + command" phrases
-TAIL_SECONDS = 1.5       # audio captured after detection
+CHUNK_SIZE = 1280                  # 80 ms @ 16 kHz — one TCP read increment
+WINDOW_SECONDS = 3.0               # rolling window sent to Whisper
+WINDOW_SAMPLES = int(SAMPLE_RATE * WINDOW_SECONDS)
+TRANSCRIBE_INTERVAL = 0.7          # seconds between Whisper passes
+BUFFER_SECONDS = 6.0               # keep this much PCM so Whisper always has material
+BUFFER_SAMPLES = int(SAMPLE_RATE * BUFFER_SECONDS)
 
-DEFAULT_CONFIG = {
-    # Raised from 0.25 to cut the long tail of DNN false positives (ambient
-    # "homer" / "okay" / "you" in the room). Real "hey homer" scores 0.8+.
-    "detection_threshold": 0.55,
-    "cooldown_seconds": 5,
-    "min_rms_energy": 200,
-    "min_consecutive": 3,
-    "score_smooth_window": 3,
-    "post_action_mute": 3.0,
-}
+# Silence gate. Below this RMS over the window we skip Whisper to avoid
+# hallucinations on ambient noise.
+RMS_GATE = 180.0
 
-# Whisper must find one of these in its transcript for a detection to count.
-# Covers the common mis-transcriptions of "hey homer" ("homework", "home her",
-# bare "homer", etc.). Without this gate the DNN chimes on ambient speech.
-WAKE_CONFIRM_RE = re.compile(
-    r"\b(homer|homework|home her|home\s*her|comni|jarvis|jervis)\b",
+# Cooldown after a successful wake → dispatch so we don't re-fire on the
+# trailing audio of the just-processed command.
+POST_ACTION_MUTE = 4.0
+
+
+# Matches "hey homer" + common Whisper mis-transcriptions. The "hey"/"hi"/"ok"
+# prefix is required — bare "homer" no longer triggers (that was 80% of the
+# false positives on the old DNN gate).
+WAKE_PHRASE_RE = re.compile(
+    r"\b(hey|hi|hay|ok)\s+(ho(?:mer|mmer|mar|me[rl]|m'r)|homework|home her|home\s*her|"
+    r"comni|jarvis|jervis)\b[,.\s!?:-]*",
     re.IGNORECASE,
 )
+
 
 logging.basicConfig(
     level=logging.INFO,
@@ -67,51 +82,11 @@ log = logging.getLogger("voice-service")
 
 
 # ---------------------------------------------------------------------------
-# Audio preprocessing (ported from pi/wake_word_service.py)
-# ---------------------------------------------------------------------------
-
-class AudioPreprocessor:
-    """High-pass filter + slow noise-floor tracker. Kills TV bass / HVAC rumble."""
-
-    def __init__(self, cutoff_hz: float = 85, sr: int = SAMPLE_RATE,
-                 noise_adapt_rate: float = 0.02):
-        rc = 1.0 / (2.0 * np.pi * cutoff_hz)
-        dt = 1.0 / sr
-        self.hp_alpha = rc / (rc + dt)
-        self.hp_prev_raw = 0.0
-        self.hp_prev_out = 0.0
-        self.noise_floor_rms = 300.0
-        self.noise_adapt_rate = noise_adapt_rate
-
-    def process(self, audio: np.ndarray) -> np.ndarray:
-        audio_f = audio.astype(np.float64)
-        output = np.zeros_like(audio_f)
-        prev_raw = self.hp_prev_raw
-        prev_out = self.hp_prev_out
-        alpha = self.hp_alpha
-        for i in range(len(audio_f)):
-            output[i] = alpha * (prev_out + audio_f[i] - prev_raw)
-            prev_raw = audio_f[i]
-            prev_out = output[i]
-        self.hp_prev_raw = prev_raw
-        self.hp_prev_out = prev_out
-
-        chunk_rms = np.sqrt(np.mean(output ** 2))
-        if chunk_rms < self.noise_floor_rms * 1.5:
-            self.noise_floor_rms += self.noise_adapt_rate * (chunk_rms - self.noise_floor_rms)
-
-        return np.clip(output, -32768, 32767).astype(np.int16)
-
-
-# ---------------------------------------------------------------------------
 # TCP audio stream reader
 # ---------------------------------------------------------------------------
 
 class MicStream:
-    """Blocking reader for the Pi's mic_streamer TCP stream.
-
-    Reconnects on disconnect. Yields int16 mono chunks of CHUNK_SIZE samples.
-    """
+    """Reader for the Pi's mic_streamer TCP stream. Reconnects on disconnect."""
 
     def __init__(self, host: str, port: int):
         self.host = host
@@ -123,9 +98,14 @@ class MicStream:
         while True:
             try:
                 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                s.settimeout(10)
+                s.settimeout(8)  # timeout for TCP connect()
                 log.info("Connecting to mic stream %s:%d", self.host, self.port)
                 s.connect((self.host, self.port))
+                # Post-connect: long recv timeout. We rely on TCP keepalive
+                # for dead-peer detection, not this. PipeWire's pulse PCM can
+                # take a couple seconds to ramp up the first capture — 10s
+                # was too tight; 60s gives plenty of slack.
+                s.settimeout(60)
                 s.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
                 s.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
                 self.sock = s
@@ -137,7 +117,6 @@ class MicStream:
                 time.sleep(3)
 
     def read_chunk(self) -> np.ndarray:
-        """Read one CHUNK_SIZE-sample mono int16 frame from the stream."""
         need_bytes = CHUNK_SIZE * 2
         while len(self.buf) < need_bytes:
             assert self.sock is not None
@@ -173,7 +152,6 @@ class MicStream:
 # ---------------------------------------------------------------------------
 
 _whisper_model = None
-_silero_vad = None
 
 
 def get_whisper(model_name: str):
@@ -186,75 +164,35 @@ def get_whisper(model_name: str):
     return _whisper_model
 
 
-def get_silero_vad():
-    global _silero_vad
-    if _silero_vad is None:
-        import torch
-        model, utils = torch.hub.load(
-            repo_or_dir="snakers4/silero-vad", model="silero_vad",
-            trust_repo=True, verbose=False,
-        )
-        _silero_vad = (model, utils)
-        log.info("Silero VAD loaded.")
-    return _silero_vad
-
-
-def vad_trim(audio: np.ndarray, sr: int = SAMPLE_RATE, pad_ms: int = 300) -> np.ndarray:
-    import torch
-    try:
-        model, utils = get_silero_vad()
-        get_speech_timestamps = utils[0]
-        audio_f32 = torch.from_numpy(audio.astype(np.float32) / 32768.0)
-        timestamps = get_speech_timestamps(
-            audio_f32, model, sampling_rate=sr,
-            threshold=0.3, min_speech_duration_ms=100,
-        )
-        if not timestamps:
-            return audio
-        pad = int(sr * pad_ms / 1000)
-        start = max(0, timestamps[0]["start"] - pad)
-        end = min(len(audio), timestamps[-1]["end"] + pad)
-        trimmed = audio[start:end]
-        model.reset_states()
-        return trimmed
-    except Exception as e:
-        log.warning("VAD trim failed (%s). Using full audio.", e)
-        return audio
-
-
-def transcribe(audio: np.ndarray, model_name: str, initial_prompt: str) -> str:
-    audio = vad_trim(audio)
+def transcribe_window(audio: np.ndarray, model_name: str) -> str:
+    """Transcribe a raw int16 audio window. Returns empty on failure."""
     model = get_whisper(model_name)
-    audio_f32 = audio.astype(np.float32)
+    audio_f32 = audio.astype(np.float32) / 32768.0
     audio_f32 = audio_f32 - np.mean(audio_f32)
-    audio_f32 = audio_f32 / 32768.0
-    segments, _ = model.transcribe(
-        audio_f32, beam_size=3, language="en",
-        no_speech_threshold=0.95,
-        initial_prompt=initial_prompt,
-    )
-    return " ".join(seg.text.strip() for seg in segments).strip()
+    try:
+        segments, _ = model.transcribe(
+            audio_f32,
+            beam_size=1,                 # fast; we can afford to re-transcribe often
+            language="en",
+            condition_on_previous_text=False,  # each window is independent
+            no_speech_threshold=0.65,
+            vad_filter=True,             # silero built-in — cuts silence regions
+            vad_parameters={"min_silence_duration_ms": 300},
+            initial_prompt="Hey Homer",  # bias toward hearing the wake word
+        )
+        return " ".join(seg.text.strip() for seg in segments).strip()
+    except Exception as e:
+        log.exception("Whisper transcribe failed: %s", e)
+        return ""
 
 
 # ---------------------------------------------------------------------------
-# Command parsing (ported from pi/wake_word_service.py)
+# Command parsing
 # ---------------------------------------------------------------------------
-
-# Whisper's mistranscriptions of "hey homer" — "homework", "home her", etc.
-# Keep the prefix strip lenient so we don't drop the body of the command.
-_WAKE_PREFIX_RE = re.compile(
-    r"^(hey|hi|hay|he|a|the|and|in)?\s*"
-    r"(homer|homer,|homer\.|homework|home her|home\s*her|comni|jarvis|jervis)\s*[,.]?\s*",
-    re.IGNORECASE,
-)
-
 
 def parse_command(text: str) -> dict:
+    """Parse the text *after* the wake phrase into a command dict."""
     text = text.lower().strip()
-    log.info("Transcribed: %r", text)
-    text = _WAKE_PREFIX_RE.sub("", text).strip()
-    log.info("After wake-word strip: %r", text)
-
     if not text:
         return {"action": "turn_on"}
 
@@ -309,7 +247,7 @@ def parse_command(text: str) -> dict:
     ):
         return {"action": "ask", "query": text}
 
-    log.info("No command matched, ignoring: %r", text)
+    log.info("No command matched in %r, ignoring.", text)
     return {"action": "none"}
 
 
@@ -323,10 +261,10 @@ class Dispatcher:
         self.worker_url = worker_url.rstrip("/") if worker_url else None
         self.worker_token = worker_token
 
-    def _pi_post(self, path: str, payload: dict | None = None) -> None:
+    def _pi_post(self, path: str, payload: dict | None = None, timeout: float = 4.0) -> None:
         url = f"{self.pi_base}{path}"
         try:
-            r = requests.post(url, json=payload or {}, timeout=5)
+            r = requests.post(url, json=payload or {}, timeout=timeout)
             if not r.ok:
                 log.warning("Pi POST %s → %d %s", path, r.status_code, r.text[:200])
         except requests.RequestException as e:
@@ -334,7 +272,6 @@ class Dispatcher:
 
     def _worker_post(self, path: str, payload: dict | None = None) -> None:
         if not self.worker_url:
-            log.warning("Worker URL not set, skipping %s", path)
             return
         url = f"{self.worker_url}{path}"
         headers = {"Content-Type": "application/json"}
@@ -348,7 +285,14 @@ class Dispatcher:
             log.warning("Worker POST %s error: %s", path, e)
 
     def chime(self) -> None:
-        self._pi_post("/api/chime")
+        self._pi_post("/api/chime", timeout=2.0)
+
+    def transcription(self, text: str, is_wake: bool = False) -> None:
+        self._pi_post(
+            "/api/transcription",
+            {"text": text, "is_wake": is_wake, "ts": time.time()},
+            timeout=1.5,
+        )
 
     def dispatch(self, command: dict) -> None:
         action = command.get("action")
@@ -372,33 +316,11 @@ class Dispatcher:
             self._pi_post("/api/tv/on")
         elif action == "ask":
             self._worker_post("/api/ask-query", {"query": command.get("query", "")})
-        elif action == "none":
-            pass
-        else:
-            log.info("No dispatch for action: %s", action)
 
 
 # ---------------------------------------------------------------------------
-# Main detection loop
+# Main streaming loop
 # ---------------------------------------------------------------------------
-
-def load_wake_model(model_dir: Path) -> Model:
-    """Load openWakeWord with the hey_homer custom model if available."""
-    framework = "onnx"  # Apple Silicon: onnxruntime is the best-supported path
-    custom = model_dir / "hey_homer.onnx"
-    if custom.exists():
-        log.info("Loading custom wake-word model: %s", custom)
-        return Model(
-            wakeword_models=[str(custom)],
-            inference_framework=framework,
-        )
-    log.warning("Custom hey_homer.onnx not found in %s — falling back to hey_jarvis.", model_dir)
-    return Model(wakeword_models=["hey_jarvis"], inference_framework=framework)
-
-
-def cfg(key: str):
-    return DEFAULT_CONFIG[key]
-
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Home Center voice service (Mac mini)")
@@ -407,144 +329,102 @@ def main() -> None:
     parser.add_argument("--pi-base", default=os.environ.get("PI_COMMAND_URL", "http://homecenter.local:8765"))
     parser.add_argument("--worker-url", default=os.environ.get("WORKER_URL"))
     parser.add_argument("--worker-token", default=os.environ.get("WORKER_TOKEN"))
-    parser.add_argument("--model-dir", default=os.environ.get("MODEL_DIR", str(Path(__file__).parent / "models")))
     parser.add_argument("--whisper-model", default=os.environ.get("WHISPER_MODEL", "medium.en"))
     parser.add_argument("--debug", action="store_true")
     parser.add_argument("--dry-run", action="store_true",
-                        help="Print dispatches instead of POSTing them.")
+                        help="Print dispatches + transcripts instead of POSTing them.")
     args = parser.parse_args()
 
     if args.debug:
         logging.getLogger().setLevel(logging.DEBUG)
 
-    model_dir = Path(args.model_dir).expanduser().resolve()
-    log.info("Model dir: %s", model_dir)
-
-    # Pre-load Whisper + VAD (first detection should be fast)
-    try:
-        get_whisper(args.whisper_model)
-    except Exception as e:
-        log.warning("Could not pre-load Whisper: %s", e)
-    try:
-        get_silero_vad()
-    except Exception as e:
-        log.warning("Could not pre-load Silero VAD: %s", e)
-
-    model = load_wake_model(model_dir)
-    wake_words = list(model.models.keys())
-    log.info("Listening for: %s (threshold=%.2f)", wake_words, cfg("detection_threshold"))
+    get_whisper(args.whisper_model)
 
     mic = MicStream(args.mic_host, args.mic_port)
     mic.connect()
 
     dispatcher = Dispatcher(args.pi_base, args.worker_url, args.worker_token)
-    preprocessor = AudioPreprocessor(cutoff_hz=85)
 
-    # Rolling buffer of ~2s of raw audio so we capture "hey homer, open calendar"
-    # as a single phrase (the command text usually lands *after* detection fires).
-    prebuf_max = int(PREBUFFER_SECONDS * SAMPLE_RATE / CHUNK_SIZE)
-    prebuffer = collections.deque(maxlen=prebuf_max)
+    # Shared rolling buffer. Reader thread appends mic chunks; main loop
+    # reads the last WINDOW_SAMPLES for each Whisper pass.
+    buf = np.zeros(BUFFER_SAMPLES, dtype=np.int16)
+    buf_lock = threading.Lock()
+    state = {"last_action_time": 0.0, "last_posted_text": "", "buf": buf}
 
-    last_trigger = 0.0
-    last_action = 0.0
-    consecutive = {ww: 0 for ww in wake_words}
+    def reader():
+        while True:
+            chunk = mic.read_chunk()
+            with buf_lock:
+                state["buf"] = np.concatenate([state["buf"][len(chunk):], chunk])
 
-    log.info("Voice service ready.")
+    threading.Thread(target=reader, daemon=True).start()
+
+    log.info("Voice service ready. Whisper-only streaming mode.")
+    log.info("Wake phrase: %s", WAKE_PHRASE_RE.pattern)
 
     while True:
-        raw = mic.read_chunk()
-        prebuffer.append(raw.copy())
+        t0 = time.time()
 
-        # Preprocess for DNN (filtered), keep raw for Whisper
-        processed = preprocessor.process(raw)
-
-        now = time.time()
-
-        if now - last_action < cfg("post_action_mute"):
-            model.predict(processed)
+        # Post-action mute — don't let the tail of our own command audio
+        # feed back in as speech.
+        if time.time() - state["last_action_time"] < POST_ACTION_MUTE:
+            time.sleep(TRANSCRIBE_INTERVAL)
             continue
 
-        rms = float(np.sqrt(np.mean(processed.astype(np.float64) ** 2)))
-        if rms < cfg("min_rms_energy"):
-            model.predict(processed)
-            for ww in consecutive:
-                consecutive[ww] = 0
+        with buf_lock:
+            window = state["buf"][-WINDOW_SAMPLES:].copy()
+
+        # RMS gate — skip Whisper on silence. ~180 is "quiet room" on XVF3800.
+        rms = float(np.sqrt(np.mean(window.astype(np.float64) ** 2)))
+        if rms < RMS_GATE:
+            # Periodic heartbeat so "is the stream alive?" is obvious in the log.
+            if int(time.time()) % 5 == 0:
+                log.info("idle (rms=%.0f < gate=%d)", rms, RMS_GATE)
+            time.sleep(TRANSCRIBE_INTERVAL)
             continue
 
-        model.predict(processed)
+        text = transcribe_window(window, args.whisper_model)
+        if not text:
+            time.sleep(max(0.0, TRANSCRIBE_INTERVAL - (time.time() - t0)))
+            continue
 
-        for ww_name in wake_words:
-            buf = model.prediction_buffer[ww_name]
-            if len(buf) == 0:
-                continue
-            n = min(cfg("score_smooth_window"), len(buf))
-            score = float(np.mean(list(buf)[-n:]))
+        wake_hit = WAKE_PHRASE_RE.search(text)
 
-            base = cfg("detection_threshold")
-            effective = base * 0.85 if rms > cfg("min_rms_energy") * 4 else base
-
-            if args.debug and score > 0.1:
-                log.debug("%s score=%.3f rms=%.0f consec=%d",
-                          ww_name, score, rms, consecutive.get(ww_name, 0))
-
-            if score >= effective:
-                consecutive[ww_name] = consecutive.get(ww_name, 0) + 1
-                if consecutive[ww_name] < cfg("min_consecutive"):
-                    continue
-                if now - last_trigger < cfg("cooldown_seconds"):
-                    continue
-
-                log.info("Wake word '%s' DETECTED (score=%.3f, rms=%.0f)",
-                         ww_name, score, rms)
-                model.reset()
-                for ww in consecutive:
-                    consecutive[ww] = 0
-                last_trigger = now
-
-                # Capture: 2s prebuffer + 1.5s tail from stream
-                pre_audio = (
-                    np.concatenate(list(prebuffer)) if prebuffer else np.array([], dtype=np.int16)
-                )
-                tail_samples = int(TAIL_SECONDS * SAMPLE_RATE)
-                tail_chunks: list[np.ndarray] = []
-                collected = 0
-                while collected < tail_samples:
-                    c = mic.read_chunk()
-                    tail_chunks.append(c)
-                    collected += len(c)
-                tail_audio = np.concatenate(tail_chunks)[:tail_samples]
-                full_audio = np.concatenate([pre_audio, tail_audio])
-                log.info("Captured %.1fs (%.1fs pre + %.1fs tail)",
-                         len(full_audio) / SAMPLE_RATE,
-                         len(pre_audio) / SAMPLE_RATE, TAIL_SECONDS)
-
-                try:
-                    text = transcribe(full_audio, args.whisper_model, initial_prompt="Hey Homer")
-                except Exception as e:
-                    log.exception("Whisper failed: %s", e)
-                    text = ""
-
-                # Two-stage: DNN fires, but we only act if Whisper confirms the
-                # wake word in the transcript. Drops false positives silently.
-                if not WAKE_CONFIRM_RE.search(text):
-                    log.info("Whisper did not confirm wake word in %r — ignoring.", text)
-                    last_action = time.time()
-                    break
-
-                # Confirmed — chime + dispatch
-                if not args.dry_run:
-                    threading.Thread(target=dispatcher.chime, daemon=True).start()
-
-                command = parse_command(text)
-                if args.dry_run:
-                    log.info("[DRY RUN] would dispatch: %s", command)
-                else:
-                    dispatcher.dispatch(command)
-
-                last_action = time.time()
-                break
+        # Push transcript for the on-screen caption overlay (only when changed).
+        if text != state["last_posted_text"]:
+            if args.dry_run:
+                log.info("[DRY RUN] caption: %r (wake=%s)", text, bool(wake_hit))
             else:
-                consecutive[ww_name] = 0
+                threading.Thread(
+                    target=dispatcher.transcription,
+                    args=(text, bool(wake_hit)),
+                    daemon=True,
+                ).start()
+            state["last_posted_text"] = text
+            log.info("[%.0f rms] %s%s", rms, "★ " if wake_hit else "  ", text)
+
+        if wake_hit:
+            tail = text[wake_hit.end():].strip(" ,.:;!?-")
+            log.info("Wake phrase matched. Command body: %r", tail)
+
+            if not args.dry_run:
+                threading.Thread(target=dispatcher.chime, daemon=True).start()
+
+            command = parse_command(tail)
+            if args.dry_run:
+                log.info("[DRY RUN] would dispatch: %s", command)
+            else:
+                dispatcher.dispatch(command)
+
+            state["last_action_time"] = time.time()
+            # Clear the buffer so the just-heard phrase doesn't re-fire.
+            with buf_lock:
+                state["buf"] = np.zeros(BUFFER_SAMPLES, dtype=np.int16)
+            state["last_posted_text"] = ""
+            continue
+
+        elapsed = time.time() - t0
+        time.sleep(max(0.0, TRANSCRIBE_INTERVAL - elapsed))
 
 
 if __name__ == "__main__":
