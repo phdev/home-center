@@ -56,7 +56,7 @@ BUFFER_SAMPLES = int(SAMPLE_RATE * BUFFER_SECONDS)
 
 # Silence gate. Below this RMS over the window we skip Whisper to avoid
 # hallucinations on ambient noise.
-RMS_GATE = 180.0
+RMS_GATE = 350.0
 
 # Fallback capture window when the first-pass transcript doesn't already
 # contain the command body after the wake phrase. In the happy path the
@@ -183,22 +183,35 @@ def get_whisper(model_name: str):
     return _whisper_model
 
 
-def transcribe_window(audio: np.ndarray, model_name: str) -> str:
-    """Transcribe a raw int16 audio window. Returns empty on failure."""
+def transcribe_window(
+    audio: np.ndarray,
+    model_name: str,
+    *,
+    use_vad: bool = True,
+    no_speech_threshold: float = 0.65,
+) -> str:
+    """Transcribe a raw int16 audio window. Returns empty on failure.
+
+    use_vad=True is right for the rolling wake-detection window — we want to
+    filter out ambient speech. Set use_vad=False for the post-wake command
+    capture, where we KNOW the user just spoke and over-trimming loses the
+    command body.
+    """
     model = get_whisper(model_name)
     audio_f32 = audio.astype(np.float32) / 32768.0
     audio_f32 = audio_f32 - np.mean(audio_f32)
     try:
-        segments, _ = model.transcribe(
-            audio_f32,
-            beam_size=1,                 # fast; we can afford to re-transcribe often
+        kwargs = dict(
+            beam_size=1,
             language="en",
-            condition_on_previous_text=False,  # each window is independent
-            no_speech_threshold=0.65,
-            vad_filter=True,             # silero built-in — cuts silence regions
-            vad_parameters={"min_silence_duration_ms": 300},
-            initial_prompt="Hey Homer",  # bias toward hearing the wake word
+            condition_on_previous_text=False,
+            no_speech_threshold=no_speech_threshold,
+            initial_prompt="Hey Homer",
         )
+        if use_vad:
+            kwargs["vad_filter"] = True
+            kwargs["vad_parameters"] = {"min_silence_duration_ms": 300}
+        segments, _ = model.transcribe(audio_f32, **kwargs)
         return " ".join(seg.text.strip() for seg in segments).strip()
     except Exception as e:
         log.exception("Whisper transcribe failed: %s", e)
@@ -426,10 +439,10 @@ def main() -> None:
             first_pass_tail = text[wake_hit.end():].strip(" ,.:;!?-")
             log.info("Wake phrase matched. first-pass tail=%r", first_pass_tail)
 
-            if not args.dry_run:
-                threading.Thread(target=dispatcher.chime, daemon=True).start()
-
             # Mark "listening" on the dashboard immediately (parallel POST).
+            # NOTE: chime now deferred until we confirm a valid command, to
+            # prevent false-positive chimes when Whisper hallucinates "Hey
+            # Homer" from ambient audio (TV, conversation, etc.).
             threading.Thread(
                 target=dispatcher.transcription,
                 args=(text, True),
@@ -445,35 +458,67 @@ def main() -> None:
                 log.info("Fast path: first-pass tail contains command. body=%r", body)
             else:
                 # Fallback: the first window only caught "Hey Homer" — wait
-                # for more audio, then transcribe that.
+                # for more audio, then transcribe that. No VAD filter on
+                # this pass: we KNOW the user just spoke, and Silero VAD's
+                # aggression eats short commands like "open calendar".
                 time.sleep(COMMAND_CAPTURE_SECONDS)
                 need = int(COMMAND_CAPTURE_SECONDS * SAMPLE_RATE)
                 with buf_lock:
                     command_window = state["buf"][-need:].copy()
 
-                command_text = transcribe_window(command_window, args.whisper_model)
+                cmd_rms = float(np.sqrt(np.mean(command_window.astype(np.float64) ** 2)))
+                cmd_peak = int(np.max(np.abs(command_window)))
+                log.info("Command capture: rms=%.0f peak=%d (len=%.1fs)",
+                         cmd_rms, cmd_peak, len(command_window) / SAMPLE_RATE)
+
+                command_text = transcribe_window(
+                    command_window, args.whisper_model,
+                    use_vad=False,                    # keep every sample
+                    no_speech_threshold=0.3,          # much more permissive
+                )
                 log.info("Command window transcript: %r", command_text)
 
                 m = WAKE_PHRASE_RE.search(command_text)
                 body = command_text[m.end():] if m else command_text
                 body = body.strip(" ,.:;!?-")
 
-                # Last resort: if the fresh capture was empty (Whisper VAD
-                # over-trimmed), fall back to the first-pass tail.
+                # Last resort: if the fresh capture was empty, fall back to
+                # the first-pass tail.
                 if not body and first_pass_tail:
                     body = first_pass_tail
 
             log.info("Dispatch body: %r", body)
 
-            # Push the final command to the caption overlay so the user sees
-            # what the system heard.
+            command = parse_command(body)
+
+            # If we couldn't extract a real command, treat this as a false
+            # positive and silently drop it — no chime, no dispatch. Most
+            # "ambient Hey Homer" detections land here and were causing the
+            # random-chime problem.
+            if not body or command.get("action") in ("none", "turn_on"):
+                # Allow "turn_on" only when the body explicitly said so —
+                # bare empty body that resolved to turn_on is the Whisper
+                # hallucination path.
+                body_has_explicit_on = bool(body and re.search(r"\bon\b", body, re.IGNORECASE))
+                if not body_has_explicit_on:
+                    log.info("No valid command body — dropping as likely false positive.")
+                    state["last_action_time"] = time.time()
+                    with buf_lock:
+                        state["buf"] = np.zeros(BUFFER_SAMPLES, dtype=np.int16)
+                    state["last_posted_text"] = ""
+                    continue
+
+            # Confirmed valid command — chime + dispatch.
+            if not args.dry_run:
+                threading.Thread(target=dispatcher.chime, daemon=True).start()
+
+            # Push the final command to the caption overlay.
             threading.Thread(
                 target=dispatcher.transcription,
                 args=(f"Hey Homer, {body}" if body else "Hey Homer", True),
                 daemon=True,
             ).start()
 
-            command = parse_command(body)
             if args.dry_run:
                 log.info("[DRY RUN] would dispatch: %s", command)
             else:
