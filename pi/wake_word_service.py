@@ -181,26 +181,43 @@ def is_tv_on() -> bool:
 # ---------------------------------------------------------------------------
 
 def generate_chime(path: Path) -> None:
-    """Crisp, assistant-style rising swoosh — two tight frequency sweeps
-    with fast attack and a slight harmonic sparkle, total ~200ms."""
+    """Sci-fi acknowledgement — a crystalline two-note blip with ring-modulated
+    metallic halo and a fast digital-style attack. Think LCARS / Portal ack.
+    Total ~260ms."""
     path.parent.mkdir(parents=True, exist_ok=True)
     sr = 44100
 
-    def sweep(start_hz: float, end_hz: float, duration: float, amp: float = 1.0) -> np.ndarray:
+    def blip(freq: float, duration: float, amp: float = 1.0,
+             vibrato_hz: float = 7.0, vibrato_depth: float = 18.0,
+             ring_hz: float = 0.0) -> np.ndarray:
+        """One tone with subtle vibrato + optional ring modulator for the
+        metallic/crystalline quality that reads as 'sci-fi' to humans."""
         n = int(sr * duration)
         t = np.linspace(0, duration, n, endpoint=False)
-        freq = np.linspace(start_hz, end_hz, n)
-        phase = 2 * np.pi * np.cumsum(freq) / sr
-        attack = np.minimum(t / 0.004, 1.0)
-        decay = np.exp(-t / (duration * 0.55))
-        env = attack * decay * amp
-        # Sine fundamental + a soft 2x for a touch of sparkle
-        return env * (np.sin(phase) + 0.2 * np.sin(2 * phase))
+        # Modulated carrier: f(t) = freq + depth*sin(2*pi*vib*t)
+        inst_freq = freq + vibrato_depth * np.sin(2 * np.pi * vibrato_hz * t)
+        phase = 2 * np.pi * np.cumsum(inst_freq) / sr
+        carrier = np.sin(phase) + 0.35 * np.sin(2 * phase)  # + soft 2nd harmonic
+        if ring_hz > 0:
+            # Ring modulation = multiplication by a sine → sum/diff frequencies;
+            # produces a metallic, inharmonic halo that sounds electronic.
+            carrier = carrier * (0.6 + 0.4 * np.sin(2 * np.pi * ring_hz * t))
+        # Very fast attack, short exponential decay — digital "tick" feel
+        attack_n = max(1, int(sr * 0.002))
+        env = np.ones(n)
+        env[:attack_n] = np.linspace(0, 1, attack_n)
+        decay = np.exp(-t / (duration * 0.45))
+        return env * decay * carrier * amp
 
+    # Two-note descending arpeggio with a brief metallic echo on the second.
+    # The intervals (perfect fourth down, then quick echo a fifth below) give
+    # it an unresolved, "computer talking" character rather than musical.
     chime = np.concatenate([
-        sweep(750, 1400, 0.09, 0.75),
-        np.zeros(int(sr * 0.012)),
-        sweep(1400, 2000, 0.10, 1.0),
+        blip(1600, 0.09, amp=0.85, ring_hz=140),
+        np.zeros(int(sr * 0.020)),
+        blip(1200, 0.11, amp=1.0,  ring_hz=180),
+        np.zeros(int(sr * 0.025)),
+        blip(1600, 0.05, amp=0.35, ring_hz=140),   # ghost echo of note 1
     ])
     chime = (chime / np.max(np.abs(chime)) * 32700).astype(np.int16)
 
