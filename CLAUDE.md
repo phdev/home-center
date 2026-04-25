@@ -85,10 +85,49 @@ if the change produced a lesson, capture it.
 - Merge only after CI is green and the gbrain checklist is honored. Squash
   merges keep `main` history readable.
 - GitHub Pages deploys automatically from `main` via
-  `.github/workflows/deploy.yml` after merge.
+  `.github/workflows/deploy.yml` after merge. **Pages is for remote/mobile
+  access only — it does NOT update the Pi kiosk.** See "Deploying to the Pi"
+  below for the kiosk path.
 
 Never bypass the PR — the test gate is the enforcement mechanism for the
 architectural invariants described in `docs/`.
+
+## Deploying to the Pi
+
+The Pi's Chromium kiosk does **not** load from GitHub Pages. `pi/kiosk.sh`
+(run by systemd unit `home-center-kiosk`) starts a local `npx vite preview`
+on `:4173` that serves `/home/pi/home-center/dist/`, and Chromium opens
+`http://localhost:4173/home-center/`. Therefore: deploying to the Pi means
+making the Pi's `dist/` match the build you want live, then restarting the
+kiosk.
+
+**Do not** `git pull && npm run build` on the Pi — its source tree is
+intentionally diverged for service-local edits in `pi/wake_word_service.py`,
+`pi/mic_streamer.py`, `openclaw/`, and a Pi-only `pi/wake_config.json`. The
+pull will block on those untracked/modified files. Build on the Mac and
+rsync the prebuilt `dist/` instead.
+
+Standard flow (after a PR merges to main):
+
+```bash
+cd ~/home-center
+git checkout main && git pull
+npm run build
+rsync -av --delete dist/ pi@homecenter.local:/home/pi/home-center/dist/
+ssh pi@homecenter.local 'sudo systemctl restart home-center-kiosk'
+```
+
+Verify the Pi's bundle matches your build:
+
+```bash
+ssh pi@homecenter.local 'ls /home/pi/home-center/dist/assets/ | grep "^index-"'
+# must equal: ls dist/assets/ | grep "^index-"
+```
+
+Pitfalls: restarting the kiosk before rsyncing leaves the old `dist/` live;
+skipping `--delete` can leave stale hashed assets that confuse vite preview.
+
+A `deploy-pi` skill captures this flow — see `.claude/skills/deploy-pi/`.
 
 ## Project Overview
 
