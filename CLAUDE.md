@@ -113,6 +113,8 @@ architectural invariants described in `docs/`.
   - Bottom row (64% height): Notifications | Events | Birthdays+Weather | Claw Suggestions/Facts
 - **Gaps:** 14px between panels, 20px 44px 12px padding
 - **Removed cards (2026-04-17):** World Clock, Timers panel (voice-set timers still fire via AlarmOverlay), and OpenClaw Tasks (AgentTasksPanel) were removed from the dashboard for a cleaner TV layout.
+- **Left column stack (2026-04-24):** Calendar (flex 1) + HolidaysPanel (240px). HolidaysPanel reads from `src/data/holidays.js` (hardcoded US/hallmark dates) — no fetch, no derived flag. FullCalendarPage sidebar also renders Upcoming Holidays + Upcoming Birthdays sections below the events list.
+- **Wake word debug overlay (2026-04-24):** WakeWordDebug now defaults to `minimized: true` so it renders as a small chip in the bottom-left instead of a 35vh panel — click to expand.
 
 ### Typography
 

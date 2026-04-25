@@ -109,7 +109,7 @@ function ParamSlider({ def, value, onChange }) {
 
 export function WakeWordDebug({ events, connected, onClear, workerUrl, workerToken }) {
   const [expanded, setExpanded] = useState(true);
-  const [minimized, setMinimized] = useState(false);
+  const [minimized, setMinimized] = useState(true);
   const [showConfig, setShowConfig] = useState(false);
   const [config, setConfig] = useState(null);
   const [saving, setSaving] = useState(false);
