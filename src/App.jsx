@@ -20,6 +20,7 @@ import { PhotoPanel } from "./components/PhotoPanel";
 import { FactPanel } from "./components/FactPanel";
 import { EventsPanel } from "./components/EventsPanel";
 import { BirthdaysPanel } from "./components/BirthdaysPanel";
+import { HolidaysPanel } from "./components/HolidaysPanel";
 import { AlarmOverlay } from "./components/AlarmOverlay";
 import { FullCalendarPage } from "./components/FullCalendarPage";
 import { FullWeatherPage } from "./components/FullWeatherPage";
@@ -118,6 +119,7 @@ export default function App() {
           onBack={() => goTo("dashboard")}
           handControllerConnected={hc.connected}
           lastGesture={hc.lastGesture}
+          birthdays={bdays.birthdays}
         />
         <TranscriptionOverlay query={llm.latestResponse?.query} visible={!!llm.latestResponse && forcePage !== "llm-response"} />
         <VoiceActivationOverlay active={hc.listening} />
@@ -248,6 +250,7 @@ export default function App() {
               <PhotoPanel photos={photos.photos} photosLoading={photos.loading} photosError={photos.error} />
             </div>
             <BirthdaysPanel birthdays={bdays.birthdays} loading={bdays.loading} error={bdays.error} derived={derived} />
+            <HolidaysPanel now={now} />
             <EventsPanel derived={derived} />
             <ModelHealthPanel onExpand={() => goTo("model-health")} workerSettings={settings.worker} />
             <FactPanel />
@@ -259,9 +262,14 @@ export default function App() {
               <FamilyMemberPage member={activeMember} />
             ) : (
               <div style={{ display: "flex", gap: 16, flex: 1, minHeight: 0, marginLeft: 16 }}>
-                {/* Left column: Calendar */}
-                <div style={{ width: 400, flexShrink: 0, minHeight: 0 }}>
-                  <CalendarPanel events={calendar.events} loading={calendar.loading} error={calendar.error} selected={hc.selectedPanelId === "calendar"} derived={derived} />
+                {/* Left column: Calendar + Holidays */}
+                <div style={{ width: 400, flexShrink: 0, minHeight: 0, display: "flex", flexDirection: "column", gap: 16 }}>
+                  <div style={{ flex: 1, minHeight: 0 }}>
+                    <CalendarPanel events={calendar.events} loading={calendar.loading} error={calendar.error} selected={hc.selectedPanelId === "calendar"} derived={derived} />
+                  </div>
+                  <div style={{ height: 240, flexShrink: 0 }}>
+                    <HolidaysPanel now={now} selected={hc.selectedPanelId === "holidays"} max={3} />
+                  </div>
                 </div>
 
                 {/* Middle column */}

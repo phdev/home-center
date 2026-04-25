@@ -1,8 +1,9 @@
 import { useMemo } from "react";
 import { useTime } from "../hooks/useTime";
-import { ArrowLeft, CalendarCheck } from "lucide-react";
+import { ArrowLeft, CalendarCheck, PartyPopper, Cake } from "lucide-react";
 import { GlassesIndicator } from "./GlassesIndicator";
 import { GestureDebug } from "./GestureDebug";
+import { getUpcomingHolidays } from "../data/holidays";
 
 const F = "'Geist','Inter',system-ui,sans-serif";
 const M = "'JetBrains Mono',ui-monospace,monospace";
@@ -180,8 +181,16 @@ function getWeekNumber(today) {
   return Math.ceil((diff / 86400000 + start.getDay() + 1) / 7);
 }
 
-function Sidebar({ today, events, monthGrid, view }) {
+function Sidebar({ today, events, monthGrid, view, birthdays }) {
   const weekDates = useMemo(() => getWeekDates(today), [today]);
+  const upcomingHolidays = useMemo(
+    () => getUpcomingHolidays(today, { daysAhead: 60, max: 4 }),
+    [today],
+  );
+  const upcomingBirthdays = useMemo(() => {
+    const list = (birthdays || []).slice(0, 4);
+    return list;
+  }, [birthdays]);
   const todayEvents = events.filter((e) => e.start && isSameDay(new Date(e.start), today));
   const weekEvents = useMemo(() => {
     const start = weekDates[0], end = weekDates[6];
@@ -229,7 +238,7 @@ function Sidebar({ today, events, monthGrid, view }) {
       {!isWeekly && !isDaily && <MiniCalendar today={today} monthGrid={monthGrid} />}
 
       {/* Events list */}
-      <div style={{ display: "flex", flexDirection: "column", gap: 12, flex: 1, overflow: "auto" }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 12, flex: 1, minHeight: 0, overflow: "auto" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
           <CalendarCheck size={21} color="#FFF" />
           <span style={{ fontFamily: F, fontSize: 21, fontWeight: 600, color: "#FFF" }}>
@@ -262,6 +271,81 @@ function Sidebar({ today, events, monthGrid, view }) {
             </div>
           );
         })}
+      </div>
+
+      {/* Upcoming Holidays */}
+      <div style={{ display: "flex", flexDirection: "column", gap: 8, flexShrink: 0 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <PartyPopper size={20} color="#F59E0B" />
+          <span style={{ fontFamily: F, fontSize: 19, fontWeight: 600, color: "#FFF" }}>
+            Upcoming Holidays
+          </span>
+        </div>
+        {upcomingHolidays.length === 0 && (
+          <span style={{ fontFamily: F, fontSize: 14, color: "#FFFFFF40" }}>None in next 60 days</span>
+        )}
+        {upcomingHolidays.map((h) => (
+          <div key={h.date} style={{
+            display: "flex", alignItems: "center", gap: 10,
+            padding: "8px 10px", borderRadius: 5,
+            border: "1px solid #FFFFFF20",
+          }}>
+            <div style={{
+              width: 44, flexShrink: 0,
+              display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+              padding: "3px 0", borderRadius: 5,
+              background: `${h.color}20`,
+            }}>
+              <span style={{ fontFamily: M, fontSize: 10, fontWeight: 600, color: h.color, letterSpacing: 0.5 }}>
+                {h.label.split(" ")[0].toUpperCase()}
+              </span>
+              <span style={{ fontFamily: M, fontSize: 16, fontWeight: 700, color: "#FFF" }}>
+                {h.label.split(" ")[1]}
+              </span>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 1, flex: 1, minWidth: 0 }}>
+              <span style={{ fontFamily: F, fontSize: 16, fontWeight: 500, color: "#FFF" }}>{h.name}</span>
+              <span style={{ fontFamily: F, fontSize: 13, color: "#FFFFFF66" }}>
+                {h.daysUntil === 0 ? "today" : h.daysUntil === 1 ? "tomorrow" : `in ${h.daysUntil} days`}
+              </span>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Upcoming Birthdays */}
+      <div style={{ display: "flex", flexDirection: "column", gap: 8, flexShrink: 0 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <Cake size={20} color="#EC4899" />
+          <span style={{ fontFamily: F, fontSize: 19, fontWeight: 600, color: "#FFF" }}>
+            Upcoming Birthdays
+          </span>
+        </div>
+        {upcomingBirthdays.length === 0 && (
+          <span style={{ fontFamily: F, fontSize: 14, color: "#FFFFFF40" }}>No upcoming birthdays</span>
+        )}
+        {upcomingBirthdays.map((b) => (
+          <div key={b.id} style={{
+            display: "flex", alignItems: "center", gap: 10,
+            padding: "8px 10px", borderRadius: 5,
+            border: "1px solid #FFFFFF20",
+          }}>
+            <div style={{
+              width: 36, height: 36, borderRadius: "50%",
+              background: "#FFFFFF15",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              fontSize: 22, flexShrink: 0,
+            }}>
+              {b.avatar}
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 1, flex: 1, minWidth: 0 }}>
+              <span style={{ fontFamily: F, fontSize: 16, fontWeight: 500, color: "#FFF" }}>{b.name}</span>
+              <span style={{ fontFamily: F, fontSize: 13, color: "#FFFFFF66" }}>
+                {b.date} — {b.daysUntil === 0 ? "today" : b.daysUntil === 1 ? "tomorrow" : `in ${b.daysUntil} days`}
+              </span>
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -529,7 +613,7 @@ function DailyGrid({ today, events }) {
 
 // ─── Main Page ───────────────────────────────────────────────────────
 
-export function FullCalendarPage({ events, loading, view, onViewChange, onBack, handControllerConnected, lastGesture }) {
+export function FullCalendarPage({ events, loading, view, onViewChange, onBack, handControllerConnected, lastGesture, birthdays }) {
   const now = useTime();
   const today = new Date(now);
 
@@ -550,7 +634,7 @@ export function FullCalendarPage({ events, loading, view, onViewChange, onBack, 
       <div style={{
         flex: 1, display: "flex", gap: 16, padding: 16, minHeight: 0,
       }}>
-        <Sidebar today={today} events={safeEvents} monthGrid={monthGrid} view={view} />
+        <Sidebar today={today} events={safeEvents} monthGrid={monthGrid} view={view} birthdays={birthdays} />
         {view === "monthly" && <MonthlyGrid today={today} events={safeEvents} monthGrid={monthGrid} />}
         {view === "weekly" && <WeeklyGrid today={today} events={safeEvents} />}
         {view === "daily" && <DailyGrid today={today} events={safeEvents} />}
