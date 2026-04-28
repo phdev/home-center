@@ -91,10 +91,10 @@ npm run build
 # ---------- Install systemd services ----------
 log "Installing systemd services..."
 
-# Kiosk service
-sudo cp "$SCRIPT_DIR/services/home-center-kiosk.service" /etc/systemd/system/
-sudo sed -i "s|__REPO_DIR__|$REPO_DIR|g" /etc/systemd/system/home-center-kiosk.service
-sudo sed -i "s|__USER__|$USER|g" /etc/systemd/system/home-center-kiosk.service
+# Dashboard local HTTP server (no-cache, serves dist via dashboard-local/home-center/)
+sudo cp "$SCRIPT_DIR/services/dashboard-local.service" /etc/systemd/system/
+sudo sed -i "s|__REPO_DIR__|$REPO_DIR|g" /etc/systemd/system/dashboard-local.service
+sudo sed -i "s|__USER__|$USER|g" /etc/systemd/system/dashboard-local.service
 
 # Wake word service
 sudo cp "$SCRIPT_DIR/services/wake-word.service" /etc/systemd/system/
@@ -102,8 +102,12 @@ sudo sed -i "s|__REPO_DIR__|$REPO_DIR|g" /etc/systemd/system/wake-word.service
 sudo sed -i "s|__USER__|$USER|g" /etc/systemd/system/wake-word.service
 
 sudo systemctl daemon-reload
-sudo systemctl enable home-center-kiosk.service
+sudo systemctl enable dashboard-local.service
 sudo systemctl enable wake-word.service
+
+# Chromium itself is launched by ~/.config/labwc/autostart, not by a systemd
+# unit — that's the simplest way to inherit the user's Wayland session. Run
+# pi/kiosk/kiosk-setup.sh to install the autostart file.
 
 # ---------- Configure autologin to desktop ----------
 log "Configuring autologin..."
@@ -152,11 +156,12 @@ log " Setup complete!"
 log "============================================"
 log ""
 log " Services installed:"
-log "   - home-center-kiosk : Chromium kiosk showing the dashboard"
-log "   - wake-word         : Listens for 'Hey Homer' and turns on TV"
+log "   - dashboard-local : Python HTTP server (no-cache) on :8080 serving dist"
+log "   - wake-word       : Listens for 'Hey Homer' and turns on TV"
+log "   (Chromium kiosk is launched from ~/.config/labwc/autostart on session start)"
 log ""
 log " To start now (without reboot):"
-log "   sudo systemctl start home-center-kiosk"
+log "   sudo systemctl start dashboard-local"
 log "   sudo systemctl start wake-word"
 log ""
 log " To check status:"

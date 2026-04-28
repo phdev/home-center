@@ -103,7 +103,8 @@ the deploy target.
 **Things that look like the deploy target but aren't:**
 - `phdev.github.io/home-center/` (GitHub Pages auto-deploy) — for remote/mobile access only; the kiosk never hits it.
 - `/home/pi/home-center/dist/` — produced by `npm run build` on the Pi but not served to the kiosk.
-- `home-center-kiosk.service` — exists but is currently **broken** (exit code 127). The actual Chromium launcher is `~/.config/labwc/autostart`. Don't waste time `systemctl restart`-ing the kiosk service.
+
+Chromium itself is launched by `~/.config/labwc/autostart` (not by systemd), so the reload knob is `sudo systemctl restart lightdm` rather than a kiosk-service restart. The dashboard HTTP server (`dashboard-local.service`) sends `Cache-Control: no-store` via `pi/dashboard_serve.py`, so a fresh Chromium load always picks up the latest bundle without browser-cache fights.
 
 **Pi git divergence:** The Pi was reconciled to main on 2026-04-24 by
 pulling cleanly and marking Pi-local service files with
@@ -400,7 +401,8 @@ ssh pi@homecenter.local "/home/pi/home-center/pi/.venv/bin/pip install <package>
 
 | Service | Machine | Manager | Port |
 |---|---|---|---|
-| Dashboard kiosk | Pi | systemd (`home-center-kiosk`) | — |
+| Chromium kiosk | Pi | `~/.config/labwc/autostart` (not systemd) | — |
+| Dashboard HTTP server | Pi | systemd (`dashboard-local`) | 8080 |
 | Wake word | Pi | systemd (`wake-word`) | — |
 | OpenClaw bridge | Mac Mini | launchd (`com.openclaw.bridge`) | 3100 |
 | Email triage | Mac Mini | launchd (`com.homecenter.email-triage`) | — |
