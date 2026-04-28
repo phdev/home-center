@@ -221,58 +221,113 @@ Rule of thumb: a card mounts/unmounts on a flag, then fills in OpenClaw-authored
 
 ## Wake Word + Voice Service
 
-### Architecture (2026-04-21)
+### Architecture (2026-04-28)
 
-Detection and speech-to-text moved **off the Pi and onto the Mac mini**. The Pi
-was CPU-bound to Whisper-base and openWakeWord at low confidence; the Mac mini
-runs `medium.en` Whisper with comfortable headroom, which made detection
-dramatically more reliable.
+Detection and speech-to-text run **on the Mac mini**. The Pi hosts the mic and
+streams audio; the Mac mini runs Whisper, classifies wake/intent, and POSTs
+commands back to the Pi.
 
-Hardware also changed: the **ReSpeaker XVF3800 USB 4-Mic Array** replaces the
-ReSpeaker 2-Mics Pi HAT. The XVF3800 has onboard AEC / beamforming / dereverb,
-so the DNN no longer has to fight room echo and TV bleed in software. It stays
-plugged into the Pi (user preference — the Pi sits by the TV).
+The current pipeline is **Whisper-only** (no DNN wake-word). A previous
+iteration used openWakeWord on the Mac mini as a first-stage gate; it
+hallucinated false positives on ambient audio and was removed in commit
+`de0cff2`. Now Whisper transcribes a rolling 3-second window every 500 ms,
+and a regex (`WAKE_PHRASE_RE`) matches "hey homer" + common Whisper
+mis-transcriptions (`homework`, `home her`, etc.) directly in the
+transcript. The same continuous transcript also powers the on-screen live
+caption.
+
+Hardware: **ReSpeaker XVF3800 USB 4-Mic Array** (replaces the legacy
+2-Mics Pi HAT in commit `3c9cd04`). Onboard AEC / beamforming / dereverb;
+LEDs persistently disabled via `/etc/udev/rules.d/99-respeaker-xvf3800.rules`
+(see "XVF3800 LED control" below). Stays plugged into the Pi.
 
 ```
 Pi (homecenter.local)                Mac mini (peters-mac-mini.lan)
 ──────────────────────────           ─────────────────────────────────
 XVF3800 USB mic                      voice-service/voice_service.py
-  │                                    · openWakeWord (hey_homer)
-  ▼                                    · faster-whisper medium.en
-mic_streamer.py  ──TCP :8766───────▶   · parse_command → dispatch
+  │  (PipeWire `pulse` PCM —           · faster-whisper medium.en
+  │   NOT direct hw:N,0; see below)    · 3 s rolling window @ 500 ms cadence
+  ▼                                    · WAKE_PHRASE_RE on transcript
+mic_streamer.py  ──TCP :8766───────▶   · speculative dispatch on first-pass
 wake_word_service.py                 ◀─HTTP :8765──
   --no-wake-detection                    /api/chime
-  · /api/chime (play chime)              /api/tv/on, /api/tv/off
-  · /api/tv/on, /api/tv/off              /api/navigate, /api/timers
-  · /api/navigate, /api/timers
-  · /api/gesture (HandController)      (also POSTs directly to the worker's
-  · AlarmThread (timer chimes)          /api/ask-query for LLM queries)
-  · dashboard polling state
+  · /api/chime  /api/tv/{on,off}         /api/tv/on  /api/tv/off
+  · /api/navigate  /api/timers           /api/navigate  /api/timers
+  · /api/transcription (live caption)    /api/transcription (every 500 ms)
+  · /api/gesture (HandController)
+  · AlarmThread (timer chimes)         (also POSTs to worker /api/ask-query
+  · dashboard polling state             for LLM-style questions)
 ```
 
-**Commands (wake word → Whisper → parse → HTTP dispatch):**
-- "Hey Homer" → `POST pi:8765/api/tv/on` (TV on via CEC)
-- "Hey Homer, turn off" → `POST pi:8765/api/tv/off` (TV standby)
-- "Hey Homer, set a timer for X minutes for Y" → `POST pi:8765/api/timers`
-- "Hey Homer, stop" → `POST pi:8765/api/timers/dismiss-all`
-- "Hey Homer, show calendar/weather/photos" → `POST pi:8765/api/navigate`
-- "Hey Homer, go back" → navigate dashboard
-- "Hey Homer, [question]" → `POST worker/api/ask-query`
+**Critical Pi-side detail:** Pi OS Bookworm runs PipeWire in the `pi`
+user's systemd-user session. PipeWire grabs USB audio hardware, so direct
+`hw:N,0` ALSA opens return zero bytes. `mic_streamer.py` uses the `pulse`
+ALSA PCM (which routes through PipeWire's PulseAudio bridge). The systemd
+unit sets `XDG_RUNTIME_DIR=/run/user/1000` and
+`PULSE_RUNTIME_PATH=/run/user/1000/pulse` so the system-level service
+can reach the user-level PipeWire socket. The XVF3800 is the default
+PipeWire source — verify with `wpctl status` if streaming breaks.
 
-Every detection also POSTs `/api/chime` before dispatch, so the user gets
-immediate audible acknowledgement (routes through TV speakers via HDMI when
-the TV is on, else through the XVF3800's 3.5mm jack).
+### Commands
+
+- "Hey Homer, **turn on**" → `POST pi:8765/api/tv/on`
+- "Hey Homer, **turn off**" → `POST pi:8765/api/tv/off`
+- "Hey Homer, **set a timer for X minutes for Y**" → `POST pi:8765/api/timers`
+- "Hey Homer, **stop**" → `POST pi:8765/api/timers/dismiss-all`
+- "Hey Homer, **show calendar/weather/photos**" → `POST pi:8765/api/navigate`
+- "Hey Homer, **go back**" → navigate dashboard
+- "Hey Homer, **[question]**" → `POST worker/api/ask-query`
+
+> **Important:** bare "Hey Homer" with no command body **no longer turns
+> on the TV** (commit `6f96054`). That fallback was the largest false-
+> positive surface; instead the service silently drops detections whose
+> command body is empty or unparseable.
+
+### Reliability tuning
+
+- `RMS_GATE = 350.0` — Whisper only runs when the rolling window's RMS
+  exceeds this. ~80 is quiet-room background; 350 is "someone speaking
+  near the mic." Skips most ambient hallucinations.
+- `TRANSCRIBE_INTERVAL = 0.5` — Whisper pass cadence.
+- `COMMAND_CAPTURE_SECONDS = 1.8` — fallback capture window when the
+  first-pass transcript only contains the wake phrase (user paused).
+- **Speculative dispatch** (commit `bd55402`): if the first-pass
+  transcript already contains a recognizable command verb
+  (`COMMAND_KEYWORD_RE`), dispatch immediately — no second pass. Cuts
+  happy-path latency from ~5s to ~0.5–1s.
+- **No-VAD on the command-capture pass**: Silero VAD over-trims short
+  commands; we keep every sample of the post-wake window and lower
+  `no_speech_threshold` to 0.3 just for that pass.
+- **Validate before chime**: chime + dispatch only fire when the parsed
+  command is non-empty and not a hallucinated bare wake. Drops false
+  positives silently.
+
+### Dashboard wake UI
+
+Two coordinated overlays render whenever the voice-service POSTs a wake
+detection (`is_wake: true`) to `/api/transcription`:
+
+| Component | Purpose |
+|---|---|
+| `src/components/WakeOverlay.jsx` | Full-screen Siri-style rotating blue/indigo/cyan glow border. Fades 3.5 s after the wake timestamp. |
+| `src/components/LiveCaption.jsx` | Backdrop-blurred caption pill at the bottom: mic badge, wake phrase glowing blue, command body in white, action badge ("→ Calendar", "→ Timer", …) on the right, animated audio-level bars. |
+| `src/hooks/useLiveCaption.js` | Polls `/api/transcription` every 150 ms; exposes `{ text, isWake, ts, age }`. |
+
+Pencil design: frame `Jf7Tx` "Voice Transcription Overlay" in
+`~/Documents/home-center.pen`, registered in `TVPreview.jsx` and
+`scripts/update-pencil-screenshots.mjs`.
 
 ### Pi access + services
 
 - **SSH:** `ssh pi@homecenter.local`
 - **Mic streamer:** `sudo systemctl {start|stop|restart|status} mic-streamer`
-  — runs `pi/mic_streamer.py`, TCP `:8766`, auto-detects XVF3800 at `hw:3,0`
+  — runs `pi/mic_streamer.py`, TCP `:8766`, opens `pulse` PCM (PipeWire bridge)
 - **Command server:** `sudo systemctl {...} wake-word`
   — runs `pi/wake_word_service.py --no-wake-detection`, HTTP `:8765`
 - **Logs:** `sudo journalctl -u mic-streamer -f` / `-u wake-word -f`
 - **Venv:** `/home/pi/home-center/pi/.venv/`
-- **Audio device:** `card N: Array [reSpeaker XVF3800 4-Mic Array]` (USB Audio Class — no driver install needed)
+- **Audio device:** auto via PipeWire default source. Confirm:
+  `wpctl status | grep XVF3800` (should show `*` next to it).
 
 ### Mac mini access + service
 
@@ -283,33 +338,58 @@ the TV is on, else through the XVF3800's 3.5mm jack).
   `deploy/mac-mini/setup-voice-service.sh`)
 - **Logs:** `tail -f ~/home-center/voice-service/logs/voice-stderr.log`
 - **Venv:** `~/home-center/voice-service/.venv/`
-- **Whisper model:** `medium.en` (configurable via `WHISPER_MODEL` env var)
+- **Whisper model:** `medium.en` (`WHISPER_MODEL` env var). Apple Silicon
+  M-series runs medium.en at ~8–10× realtime; one window transcription
+  is ~300–500 ms.
+
+### Chime
+
+Generated programmatically by `generate_chime()` in `pi/wake_word_service.py`
+into `pi/sounds/acknowledge.wav`. Current sound (commit `363818f`): a
+sci-fi crystalline ack — two-note descending blip (1600→1200 Hz) with
+ring-modulated metallic halo and a ghost echo, ~260 ms. Plays through TV
+speakers via HDMI when the TV is on, else through the XVF3800's 3.5 mm jack.
+
+### XVF3800 LED control
+
+LEDs are off by default to avoid distracting the user during voice activity:
+
+- `/home/pi/respeaker-xvf3800/python_control/xvf_host.py` — Seeed's
+  control utility (cloned from `respeaker/reSpeaker_XVF3800_USB_4MIC_ARRAY`).
+- One-shot off: `sudo $VENV/bin/python xvf_host.py LED_EFFECT --values 0`.
+- Persisted in device flash: `xvf_host.py SAVE_CONFIGURATION --values 1`.
+- Belt-and-suspenders udev rule
+  `/etc/udev/rules.d/99-respeaker-xvf3800.rules` runs
+  `/usr/local/sbin/xvf3800-leds-off.sh` on every USB enumeration.
+- LED modes: 0=off, 1=breath, 2=rainbow, 3=single color, 4=DOA, 5=ring.
 
 ### Key Files
 
 | File | Purpose |
 |---|---|
-| `pi/mic_streamer.py` | XVF3800 ALSA → TCP streamer (Pi, always on) |
-| `pi/wake_word_service.py` | Pi command server — HTTP `:8765`, CEC, timers, chime, AlarmThread. `--no-wake-detection` skips the legacy DNN loop. |
-| `pi/services/mic-streamer.service` | systemd unit for the streamer |
+| `pi/mic_streamer.py` | PipeWire `pulse` PCM → TCP streamer (Pi, always on) |
+| `pi/wake_word_service.py` | Pi command server — HTTP `:8765`, CEC, timers, chime, AlarmThread, `/api/transcription`. `--no-wake-detection` skips the legacy on-Pi DNN loop. |
+| `pi/services/mic-streamer.service` | systemd unit for the streamer (sets `PULSE_RUNTIME_PATH`) |
 | `pi/services/wake-word.service` | systemd unit for the command server (renders with `--no-wake-detection`) |
-| `voice-service/voice_service.py` | Mac mini listener — TCP client → openWakeWord → Whisper → dispatch |
-| `voice-service/requirements.txt` | Mac mini Python deps (openwakeword, faster-whisper, torch, onnxruntime) |
+| `voice-service/voice_service.py` | Mac mini listener — TCP client → faster-whisper → wake regex + speculative dispatch |
+| `voice-service/requirements.txt` | Mac mini Python deps (faster-whisper, numpy, scipy, requests, torch — torch only needed if Silero VAD is re-enabled) |
 | `deploy/mac-mini/com.homecenter.voice.plist` | launchd plist template |
 | `deploy/mac-mini/setup-voice-service.sh` | Mac mini installer (renders plist, creates venv) |
-| `pi/train_hey_homer.py` | Training script for openWakeWord custom models (still runs on Pi — uses XVF3800 directly) |
-| `pi/models/` | ONNX/PT model files. Voice-service on Mac mini reads `hey_homer.onnx` from here. |
-| `pi/sounds/acknowledge.wav` | Two-tone chime (C5+E5) played on detection (Pi plays it) |
+| `src/components/WakeOverlay.jsx` | Full-screen Siri glow border on wake |
+| `src/components/LiveCaption.jsx` | Bottom caption pill (mic badge + wake/command split + action badge + level bars) |
+| `src/hooks/useLiveCaption.js` | Polls `/api/transcription` |
+| `pi/train_hey_homer.py` | Legacy openWakeWord training script — currently unused (kept for the future "openWakeWord on Pi" path). |
+| `pi/sounds/acknowledge.wav` | Sci-fi crystalline chime (regenerated on service start if missing) |
 
-### Current Status (as of 2026-04-21)
+### Current Status (as of 2026-04-28)
 
-Uses openWakeWord with custom ONNX models trained via `pi/train_hey_homer.py`.
-Detection + Whisper (`medium.en`, int8) now run on the **Mac mini**
-voice-service; the Pi just streams XVF3800 audio over TCP and receives HTTP
-command POSTs. See the `Wake Word + Voice Service` section above for the
-architecture. The rest of this section describes the detection pipeline
-itself — most of the code lives in `voice-service/voice_service.py` now, but
-the approach hasn't changed.
+The voice service is **Whisper-only** — no openWakeWord. Whisper is the
+sole decision-maker for both wake detection (regex on the transcript) and
+command parsing. The on-Pi openWakeWord pipeline still exists in
+`pi/wake_word_service.py` for the legacy `--debug --worker-url` mode but
+is gated off by `--no-wake-detection` in production. The rest of this
+section describes the historical openWakeWord-on-Pi pipeline, kept here
+for reference only.
 
 **Commands (via STT after wake word):**
 - "Hey Homer, set a timer for X minutes for Y" → creates timer via worker API
