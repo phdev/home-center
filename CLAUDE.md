@@ -94,18 +94,25 @@ architectural invariants described in `docs/`.
 
 ## Deploying to the Pi
 
-The Pi's Chromium kiosk does **not** load from GitHub Pages. `pi/kiosk.sh`
-(run by systemd unit `home-center-kiosk`) starts a local `npx vite preview`
-on `:4173` that serves `/home/pi/home-center/dist/`, and Chromium opens
-`http://localhost:4173/home-center/`. Therefore: deploying to the Pi means
-making the Pi's `dist/` match the build you want live, then restarting the
-kiosk.
+The Pi's Chromium kiosk loads `http://localhost:8080/home-center/`, served
+by `dashboard-local.service` (a `python3 -m http.server 8080`) out of
+`/home/pi/home-center/dashboard-local/`. So the kiosk reads
+**`/home/pi/home-center/dashboard-local/home-center/`** on disk — that is
+the deploy target.
 
-**Do not** `git pull && npm run build` on the Pi — its source tree is
-intentionally diverged for service-local edits in `pi/wake_word_service.py`,
-`pi/mic_streamer.py`, `openclaw/`, and a Pi-only `pi/wake_config.json`. The
-pull will block on those untracked/modified files. Build on the Mac and
-rsync the prebuilt `dist/` instead.
+**Things that look like the deploy target but aren't:**
+- `phdev.github.io/home-center/` (GitHub Pages auto-deploy) — for remote/mobile access only; the kiosk never hits it.
+- `/home/pi/home-center/dist/` — produced by `npm run build` on the Pi but not served to the kiosk.
+- `home-center-kiosk.service` — exists but is currently **broken** (exit code 127). The actual Chromium launcher is `~/.config/labwc/autostart`. Don't waste time `systemctl restart`-ing the kiosk service.
+
+**Pi git divergence:** The Pi was reconciled to main on 2026-04-24 by
+pulling cleanly and marking Pi-local service files with
+`git update-index --skip-worktree`:
+`pi/wake_word_service.py`,
+`openclaw/{index.js,package.json,package-lock.json,openclaw.service}`.
+Those files have intentional divergence (the Pi runs an older single-file
+OpenClaw bridge; main has the router architecture). Don't unmark
+skip-worktree without thinking — those files run live Pi services.
 
 Standard flow (after a PR merges to main):
 
@@ -113,19 +120,30 @@ Standard flow (after a PR merges to main):
 cd ~/home-center
 git checkout main && git pull
 npm run build
-rsync -av --delete dist/ pi@homecenter.local:/home/pi/home-center/dist/
-ssh pi@homecenter.local 'sudo systemctl restart home-center-kiosk'
+rsync -av --delete dist/ pi@homecenter.local:/home/pi/home-center/dashboard-local/home-center/
+ssh pi@homecenter.local 'sudo systemctl restart lightdm'
 ```
 
-Verify the Pi's bundle matches your build:
+The `lightdm` restart bounces the graphical session, which retriggers
+`~/.config/labwc/autostart` and relaunches Chromium against the new bundle.
+Expect ~10s of black screen. Trying to relaunch Chromium directly over SSH
+hangs the SSH session — `lightdm` is the reliable knob.
+
+Verify the deploy:
 
 ```bash
-ssh pi@homecenter.local 'ls /home/pi/home-center/dist/assets/ | grep "^index-"'
+ssh pi@homecenter.local 'grep -oE "index-[A-Za-z0-9_-]+\.js" /home/pi/home-center/dashboard-local/home-center/index.html'
 # must equal: ls dist/assets/ | grep "^index-"
+
+ssh pi@homecenter.local 'sudo journalctl -u dashboard-local --since "30 seconds ago" --no-pager | tail'
+# expect: GET /home-center/ ... 200 and GET /home-center/assets/index-*.js ... 200
 ```
 
-Pitfalls: restarting the kiosk before rsyncing leaves the old `dist/` live;
-skipping `--delete` can leave stale hashed assets that confuse vite preview.
+Build-on-the-Pi (over SSH) also works since reconciliation:
+
+```bash
+ssh pi@homecenter.local 'cd /home/pi/home-center && git pull --ff-only origin main && npm install && npm run build && rsync -av --delete dist/ /home/pi/home-center/dashboard-local/home-center/ && sudo systemctl restart lightdm'
+```
 
 A `deploy-pi` skill captures this flow — see `.claude/skills/deploy-pi/`.
 
