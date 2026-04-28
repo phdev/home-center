@@ -1,0 +1,14 @@
+[Unit]
+Description=Home Center Dashboard Local HTTP Server
+After=network.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/home-center/dashboard-local
+ExecStart=/usr/bin/python3 /home/pi/home-center/pi/dashboard_serve.py 8080 /home/pi/home-center/dashboard-local
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

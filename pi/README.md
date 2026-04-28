@@ -163,25 +163,29 @@ runs efficiently on the Pi.
 - Test in debug mode: `pi/.venv/bin/python pi/wake_word_service.py --debug --dry-run`
 
 ### Chromium shows a white screen
-- Check if the build exists: `ls dist/`
-- Rebuild: `npm run build`
-- Check kiosk logs: `journalctl -u home-center-kiosk -f`
+- Check the dashboard server is up: `curl -s http://localhost:8080/home-center/ | head`
+- Check the deploy target has files: `ls /home/pi/home-center/dashboard-local/home-center/`
+- Rebuild + redeploy: see CLAUDE.md "Deploying to the Pi"
+- Check server logs: `journalctl -u dashboard-local -f`
 
 ### Service management
 ```bash
 # Check status
 sudo systemctl status wake-word
-sudo systemctl status home-center-kiosk
+sudo systemctl status dashboard-local
 
 # Restart services
 sudo systemctl restart wake-word
-sudo systemctl restart home-center-kiosk
+sudo systemctl restart dashboard-local
+
+# Reload Chromium against new content (Chromium is launched by labwc autostart, not systemd)
+sudo systemctl restart lightdm
 
 # View logs
 journalctl -u wake-word -f
-journalctl -u home-center-kiosk -f
+journalctl -u dashboard-local -f
 
 # Disable auto-start
 sudo systemctl disable wake-word
-sudo systemctl disable home-center-kiosk
+sudo systemctl disable dashboard-local
 ```
