@@ -114,6 +114,7 @@
  * @property {Object.<string, LunchDecision>} lunchDecisions   date → decision
  * @property {SchoolMenuDay[]} schoolLunchMenu
  * @property {SchoolItem[]} schoolItems
+ * @property {SchoolItem[]} [schoolUpdates]
  * @property {{bedtimeDismissedUntil?: string, forceMorningChecklist?: boolean}} [settings]
  */
 
@@ -185,19 +186,28 @@
 /**
  * @typedef {Object} DerivedState
  * @property {boolean} hasMorningOverlap
+ * @property {boolean} [hasMorningConflict]
  * @property {CalendarConflict[]} conflicts
  * @property {boolean} peter0800_0900Risk
+ * @property {boolean} [hasWorkConflictForPeter]
  * @property {boolean} showMorningChecklist
  * @property {ChecklistView} checklist
+ * @property {boolean} [needsSchoolActionToday]
  * @property {boolean} hasSchoolActionItems
  * @property {boolean} hasUrgentSchoolItem
  * @property {SchoolItem[]} rankedSchoolItems
+ * @property {boolean} [hasSchoolEventUpcoming]
+ * @property {SchoolItem[]} [upcomingSchoolEvents]
  * @property {BirthdayView[]} birthdaysRanked
  * @property {boolean} birthdayGiftNeeded
+ * @property {boolean} [birthdayNeedsGift]
  * @property {boolean} bedtimeReminderActive
  * @property {BedtimeWindow|null} bedtimeWindow
  * @property {boolean} takeoutDecisionPending
+ * @property {boolean} [takeoutUndecided]
  * @property {TakeoutView} takeoutState
+ * @property {boolean} [tomorrowNeedsPrep]
+ * @property {string[]} [tomorrowPrepReasons]
  * @property {boolean} lunchDecisionNeeded
  * @property {LunchContext|null} lunchContext
  * @property {boolean} showClawSuggestions

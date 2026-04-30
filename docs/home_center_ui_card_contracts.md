@@ -4,6 +4,11 @@ Each card has a contract: what makes it show, what data it needs, what copy is
 OpenClaw-enhanced, and what actions it exposes. A card may not render anything
 the contract does not declare.
 
+Card selection is centralized in `src/core/interventions/engine.js`. The
+engine consumes derived state, emits at most three visible card objects, and
+orders them urgent > important > ambient. UI components consume those card
+objects and do not decide visibility.
+
 **TV context:** 1920×1080 logical, viewed from 6–10 ft. Default to low text
 volume, tall affordances, one primary action per card.
 

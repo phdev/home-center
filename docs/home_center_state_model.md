@@ -66,22 +66,23 @@ Full catalog lives in `src/state/types.js`.
 | Worker-vs-localStorage routing | `src/data/_storage.js` + per-adapter wrappers — the **only** place that knows about both sources |
 | Normalization + shape guarantees | `src/data/*` adapters |
 | React data wiring | `src/hooks/*` (wraps adapters, triggers refresh) |
-| **Derived state computation** | `src/state/deriveState.js` — **only place** |
+| **Derived state computation** | `src/core/derivations/` — **only place**. `src/state/deriveState.js` is a compatibility export. |
+| State store/snapshot | `src/core/state/store.js` owns `{ rawData, derivedState }` snapshots |
 | Recompute scheduling | `src/state/useDerivedState.js` — precise `setTimeout` off `nextMeaningfulTransition` + 60 s fallback interval |
-| OpenClaw enhancement | `src/ai/openclaw.js` |
-| Card visibility rules | derived state only (never components). Registered in `src/cards/registry.js` |
-| Card rendering | `src/cards/*` + existing `src/components/*` |
+| Card visibility / intervention decisions | `src/core/interventions/engine.js` — max 3 cards, urgent > important > ambient |
+| OpenClaw enhancement | `src/core/agents/clawAdapter.js` after intervention decisions, backed by `src/ai/openclaw.js` |
+| Card rendering | `src/ui/cards/*` for engine-card renderers, plus legacy `src/cards/*` + `src/components/*` wrappers during migration |
 
 ## Deterministic vs OpenClaw-enhanced logic
 
 | Concern | Who decides |
 |---|---|
-| Does a card show? | Deterministic (derived state) |
+| Does a card show? | Deterministic intervention engine over derived state |
 | When does a reminder fire? | Deterministic (clock + setting) |
 | What items are on the morning checklist? | Deterministic base + deterministic weather overrides |
 | Which emails are "school-related"? | Deterministic sender/domain heuristics **first**, then OpenClaw for ambiguous |
 | Kind classification (action/event/reminder/info) | OpenClaw with deterministic regex fallback for due dates |
-| Copy on a card header/summary | OpenClaw-enhanced (optional) with deterministic fallback string |
+| Copy on a card header/summary | OpenClaw-enhanced after card selection (optional) with deterministic fallback string |
 | Claw Suggestions ranking | Deterministic priority floor (urgent ahead of nice-to-have), OpenClaw re-ranks within tier |
 | Takeout vendor suggestion | Deterministic history rotation; OpenClaw adds flavor copy |
 | Bedtime reminder phrasing | Deterministic default; OpenClaw softens if available |

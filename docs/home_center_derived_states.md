@@ -1,8 +1,10 @@
 # Home Center — Derived States
 
-Every flag below is computed by the single pure function
-`computeDerivedState(raw, context)` in `src/state/deriveState.js`. Components
-never compute these. Adding a new card? Add its flag here first.
+Every flag below is computed by pure functions in `src/core/derivations/`,
+composed by `computeDerivedState(raw, context)`. `src/state/deriveState.js`
+re-exports that implementation for existing callers. Components never compute
+these. Adding a new card? Add its flag here first, then wire display through
+`src/core/interventions/engine.js`.
 
 `context = { now: Date, user: { isPeter } }` — all time math uses `context.now`
 so the function is fully testable.

@@ -5,6 +5,27 @@ Newest at top.
 
 ---
 
+## 2026-04-30 — Centralize derivations and intervention decisions under `src/core`
+
+**Context**
+The codebase had the right architectural documents, but state flags, card
+visibility, and OpenClaw enhancement were still partially coupled through
+legacy UI registries and components.
+
+**Decision**
+Move deterministic derivations to `src/core/derivations/`, add
+`src/core/state/store.js` for `{ rawData, derivedState }` snapshots, and make
+`src/core/interventions/engine.js` the only card-selection layer. OpenClaw now
+runs through `src/core/agents/clawAdapter.js` only after cards have been
+selected.
+
+**Consequence**
+`src/state/deriveState.js` and legacy card wrappers remain as compatibility
+surfaces during migration, but new state/card work should target `src/core`
+first and UI renderers should consume engine card objects from `src/ui/cards/`.
+
+---
+
 ## 2026-04-17 — Remove World Clock, Timers, and OpenClaw Tasks from TV dashboard
 
 **Context**

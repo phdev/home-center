@@ -20,10 +20,12 @@ import { TakeoutCard } from "./TakeoutCard";
 import { LunchCard } from "./LunchCard";
 import { BedtimeToast } from "./BedtimeToast";
 import { ClawSuggestionsCard } from "./ClawSuggestionsCard";
+import { runInterventionEngine } from "../core/interventions/engine";
 
 /**
  * @typedef {Object} CardDef
  * @property {string} id
+ * @property {string} engineType
  * @property {'contextualSlot'|'rightColumn'|'overlay'} placement
  * @property {1|2|3|4} tier
  * @property {(derived:import('../state/types').DerivedState)=>boolean} visible
@@ -40,44 +42,49 @@ import { ClawSuggestionsCard } from "./ClawSuggestionsCard";
 export const CARDS = [
   {
     id: "bedtimeToast",
+    engineType: "BedtimeToast",
     placement: "overlay",
     tier: 1,
-    visible: (d) => d.bedtimeReminderActive,
+    visible: visibleViaEngine("BedtimeToast"),
     Component: BedtimeToast,
     enhancementFeature: "bedtime",
   },
   {
     id: "lunchDecision",
+    engineType: "LunchCard",
     placement: "contextualSlot",
     tier: 2,
-    visible: (d) => d.lunchDecisionNeeded,
+    visible: visibleViaEngine("LunchCard"),
     deadlineTs: () => todayAt(22).getTime(),
     Component: LunchCard,
     enhancementFeature: "lunch",
   },
   {
     id: "takeoutDecision",
+    engineType: "TakeoutCard",
     placement: "contextualSlot",
     tier: 2,
-    visible: (d) => d.takeoutDecisionPending,
+    visible: visibleViaEngine("TakeoutCard"),
     deadlineTs: () => todayAt(20).getTime(),
     Component: TakeoutCard,
     enhancementFeature: "takeout",
   },
   {
     id: "morningChecklist",
+    engineType: "MorningChecklistCard",
     placement: "contextualSlot",
     tier: 4,
-    visible: (d) => d.showMorningChecklist,
+    visible: visibleViaEngine("MorningChecklistCard"),
     deadlineTs: () => todayAt(9).getTime(),
     Component: MorningChecklistCard,
     enhancementFeature: "morningChecklist",
   },
   {
     id: "clawSuggestions",
+    engineType: "ClawSuggestionsCard",
     placement: "rightColumn",
     tier: 3,
-    visible: (d) => d.showClawSuggestions,
+    visible: visibleViaEngine("ClawSuggestionsCard"),
     Component: ClawSuggestionsCard,
     enhancementFeature: "clawSuggestions",
   },
@@ -91,27 +98,34 @@ export const CARDS = [
  * @returns {CardDef|null}
  */
 export function pickContextualCard(derived) {
-  const candidates = CARDS.filter(
-    (c) => c.placement === "contextualSlot" && c.visible(derived),
-  );
-  if (candidates.length === 0) return null;
-  candidates.sort((a, b) => {
-    if (a.tier !== b.tier) return a.tier - b.tier;
-    const da = a.deadlineTs?.(derived) ?? Infinity;
-    const db = b.deadlineTs?.(derived) ?? Infinity;
-    return da - db;
-  });
-  return candidates[0];
+  return firstEngineCardDef(derived, "contextualSlot");
 }
 
 export function pickRightColumnCards(derived) {
-  return CARDS.filter(
-    (c) => c.placement === "rightColumn" && c.visible(derived),
-  );
+  return engineCardDefs(derived).filter((c) => c.placement === "rightColumn");
 }
 
 export function pickOverlays(derived) {
-  return CARDS.filter((c) => c.placement === "overlay" && c.visible(derived));
+  return engineCardDefs(derived).filter((c) => c.placement === "overlay");
+}
+
+function visibleViaEngine(engineType) {
+  return (derived) =>
+    runInterventionEngine(derived, registryContext()).some((card) => card.type === engineType);
+}
+
+function firstEngineCardDef(derived, placement) {
+  return engineCardDefs(derived).find((def) => def.placement === placement) ?? null;
+}
+
+function engineCardDefs(derived) {
+  return runInterventionEngine(derived, registryContext())
+    .map((engineCard) => CARDS.find((def) => def.engineType === engineCard.type))
+    .filter(Boolean);
+}
+
+function registryContext() {
+  return { now: new Date("2026-04-23T12:00:00") };
 }
 
 function todayAt(h, m = 0) {

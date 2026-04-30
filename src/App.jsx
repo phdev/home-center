@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useTime } from "./hooks/useTime";
 import { useTimers } from "./hooks/useTimers";
 import { usePreviewMode } from "./hooks/usePreviewMode";
@@ -34,7 +34,9 @@ import { WakeWordDebug } from "./components/WakeWordDebug";
 import { VoiceActivationOverlay } from "./components/VoiceActivationOverlay";
 import { ModelHealthPanel } from "./modules/model-health/ModelHealthPanel";
 import { FullModelHealthPage } from "./modules/model-health/FullModelHealthPage";
-import { computeDerivedState } from "./state/deriveState";
+import { createStateSnapshot } from "./core/state/store";
+import { runInterventionEngine } from "./core/interventions/engine";
+import { useClawAugmentedCards } from "./core/agents/clawAdapter";
 import { normalizeCalendar } from "./data/calendar";
 import { normalizeBirthdays } from "./data/birthdays";
 import { normalizeWeather } from "./data/weather";
@@ -45,7 +47,6 @@ import { useChecklistConfig } from "./data/useChecklist";
 import { useLunchDecisions } from "./data/useLunch";
 import { useSchoolLunchMenu } from "./data/useSchoolLunch";
 import { ContextualSlot, RightColumnCards, OverlayCards } from "./cards/ContextualSlot";
-import { useMemo } from "react";
 
 export default function App() {
   const now = useTime();
@@ -78,8 +79,9 @@ export default function App() {
   const lunchDecisions = useLunchDecisions(settings.worker);
   const schoolLunchMenu = useSchoolLunchMenu(settings.worker);
 
-  const rawState = useMemo(
-    () => ({
+  const rawState = useMemo(() => {
+    const schoolItems = normalizeSchoolItems(school);
+    return {
       calendar: { events: normalizeCalendar(calendar) },
       weather: { today: normalizeWeather(weather.data ?? weather) },
       birthdays: normalizeBirthdays(bdays),
@@ -88,18 +90,27 @@ export default function App() {
       takeout: { today: takeout ?? null },
       lunchDecisions: lunchDecisions ?? {},
       schoolLunchMenu: schoolLunchMenu ?? [],
-      schoolItems: normalizeSchoolItems(school),
+      schoolItems,
+      schoolUpdates: schoolItems,
       settings: {},
-    }),
-    [
-      calendar, weather, bdays, bedtimeSettings, checklist,
-      takeout, lunchDecisions, schoolLunchMenu, school,
-    ],
-  );
-  const derived = useMemo(
-    () => computeDerivedState(rawState, { now, user: { isPeter: true } }),
+    };
+  }, [
+    calendar, weather, bdays, bedtimeSettings, checklist,
+    takeout, lunchDecisions, schoolLunchMenu, school,
+  ]);
+  const stateSnapshot = useMemo(
+    () => createStateSnapshot(rawState, { now, user: { isPeter: true } }),
     [rawState, now],
   );
+  const rawData = stateSnapshot.rawData;
+  const derived = stateSnapshot.derivedState;
+  const interventionCards = useMemo(
+    () => runInterventionEngine(derived, { now }),
+    [derived, now],
+  );
+  const cards = useClawAugmentedCards(interventionCards, settings.worker);
+  const calendarConflictCard = findCard(cards, "CalendarConflictCard");
+  const schoolUpdatesCard = findCard(cards, "SchoolUpdatesCard");
 
   // Auto-navigate to LLM response page when a new response arrives
   useEffect(() => {
@@ -244,14 +255,14 @@ export default function App() {
 
         {isMobile ? (
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            <CalendarPanel events={calendar.events} loading={calendar.loading} error={calendar.error} derived={derived} />
+            <CalendarPanel events={calendar.events} loading={calendar.loading} error={calendar.error} conflictCard={calendarConflictCard} />
             <WeatherPanel weatherData={weather.data} loading={weather.loading} error={weather.error} />
             <div style={{ height: 220 }}>
               <PhotoPanel photos={photos.photos} photosLoading={photos.loading} photosError={photos.error} />
             </div>
             <BirthdaysPanel birthdays={bdays.birthdays} loading={bdays.loading} error={bdays.error} derived={derived} />
             <HolidaysPanel now={now} />
-            <EventsPanel derived={derived} />
+            <EventsPanel card={schoolUpdatesCard} />
             <ModelHealthPanel onExpand={() => goTo("model-health")} workerSettings={settings.worker} />
             <FactPanel />
           </div>
@@ -265,7 +276,7 @@ export default function App() {
                 {/* Left column: Calendar + Holidays */}
                 <div style={{ width: 400, flexShrink: 0, minHeight: 0, display: "flex", flexDirection: "column", gap: 16 }}>
                   <div style={{ flex: 1, minHeight: 0 }}>
-                    <CalendarPanel events={calendar.events} loading={calendar.loading} error={calendar.error} selected={hc.selectedPanelId === "calendar"} derived={derived} />
+                    <CalendarPanel events={calendar.events} loading={calendar.loading} error={calendar.error} selected={hc.selectedPanelId === "calendar"} conflictCard={calendarConflictCard} />
                   </div>
                   <div style={{ height: 240, flexShrink: 0 }}>
                     <HolidaysPanel now={now} selected={hc.selectedPanelId === "holidays"} max={3} />
@@ -286,7 +297,8 @@ export default function App() {
                     <div style={{ flex: 1, minHeight: 0 }}>
                       <ContextualSlot
                         derived={derived}
-                        raw={rawState}
+                        raw={rawData}
+                        cards={cards}
                         selected={hc.selectedPanelId === "photos"}
                         fallback={
                           <PhotoPanel
@@ -299,7 +311,7 @@ export default function App() {
                       />
                     </div>
                     <div style={{ width: 340, flexShrink: 0, minHeight: 0 }}>
-                      <EventsPanel derived={derived} selected={hc.selectedPanelId === "events"} />
+                      <EventsPanel card={schoolUpdatesCard} selected={hc.selectedPanelId === "events"} />
                     </div>
                   </div>
                 </div>
@@ -308,7 +320,8 @@ export default function App() {
                 <div style={{ width: 400, flexShrink: 0, display: "flex", flexDirection: "column", gap: 16, minHeight: 0 }}>
                   <RightColumnCards
                     derived={derived}
-                    raw={rawState}
+                    raw={rawData}
+                    cards={cards}
                     selected={hc.selectedPanelId === "fact"}
                     fallback={<FactPanel selected={hc.selectedPanelId === "fact"} />}
                   />
@@ -320,8 +333,12 @@ export default function App() {
       </div>
       <TranscriptionOverlay query={llm.latestResponse?.query} visible={!!llm.latestResponse && forcePage !== "llm-response"} />
       <AlarmOverlay expiredTimers={expiredTimers} onDismissAll={dismissAll} />
-      <OverlayCards derived={derived} raw={rawState} />
+      <OverlayCards derived={derived} raw={rawData} cards={cards} />
       <WakeWordDebug events={wakeDebug.events} connected={wakeDebug.connected} onClear={wakeDebug.clearEvents} workerUrl={settings.worker?.url} workerToken={settings.worker?.token} />
     </>
   );
+}
+
+function findCard(cards, type) {
+  return (cards ?? []).find((card) => card.type === type) ?? null;
 }

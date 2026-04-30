@@ -167,7 +167,7 @@ function wordSet(s) {
 }
 
 function jaccard(a, b) {
-  if (a.size === 0 && b.size === 0) return 1;
+  if (a.size === 0 && b.size === 0) return 0;
   let intersection = 0;
   for (const w of a) if (b.has(w)) intersection++;
   const union = a.size + b.size - intersection;

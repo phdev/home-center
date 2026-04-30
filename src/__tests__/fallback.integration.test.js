@@ -63,7 +63,7 @@ describe("integration — no card depends on OpenClaw for visibility", () => {
     expect(picked?.id).toBe("morningChecklist");
   });
 
-  it("claw suggestions: ranked list available without AI", () => {
+  it("claw suggestions: ranked list available without AI but redundant card is suppressed", () => {
     const raw = {
       ...emptyRawState(),
       birthdays: [{ id: "b", name: "Mom", date: "05-01", giftStatus: "unknown" }],
@@ -71,7 +71,7 @@ describe("integration — no card depends on OpenClaw for visibility", () => {
     const derived = computeDerivedState(raw, { now: at(2026, 4, 19, 10), user: { isPeter: true } });
     expect(derived.clawSuggestions.length).toBeGreaterThanOrEqual(1);
     const right = pickRightColumnCards(derived);
-    expect(right.some((c) => c.id === "clawSuggestions")).toBe(true);
+    expect(right.some((c) => c.id === "clawSuggestions")).toBe(false);
   });
 
   it("no card visibility function reads network / globals", () => {

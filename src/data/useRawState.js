@@ -30,8 +30,9 @@ export function useRawState(settings) {
   const lunchDecisions = useLunchDecisions(settings?.worker);
   const lunchMenu = useSchoolLunchMenu(settings?.worker);
 
-  return useMemo(
-    () => ({
+  return useMemo(() => {
+    const schoolItems = normalizeSchoolItems(school);
+    return {
       calendar: { events: normalizeCalendar(cal) },
       weather: { today: normalizeWeather(weather) },
       birthdays: normalizeBirthdays(birthdays),
@@ -40,9 +41,9 @@ export function useRawState(settings) {
       takeout: { today: takeout ?? null },
       lunchDecisions: lunchDecisions ?? {},
       schoolLunchMenu: lunchMenu ?? [],
-      schoolItems: normalizeSchoolItems(school),
+      schoolItems,
+      schoolUpdates: schoolItems,
       settings: {},
-    }),
-    [cal, weather, birthdays, school, takeout, bedtime, checklist, lunchDecisions, lunchMenu],
-  );
+    };
+  }, [cal, weather, birthdays, school, takeout, bedtime, checklist, lunchDecisions, lunchMenu]);
 }

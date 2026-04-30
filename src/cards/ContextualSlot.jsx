@@ -1,101 +1,70 @@
-import { useSettings } from "../hooks/useSettings";
-import { useEnhancement } from "../ai/openclaw";
-import { pickContextualCard, pickOverlays, pickRightColumnCards } from "./registry";
+import { TakeoutCard as EngineTakeoutCard } from "../ui/cards/TakeoutCard";
+import { MorningChecklistCard } from "./MorningChecklistCard";
+import { LunchCard } from "./LunchCard";
+import { BedtimeToast } from "./BedtimeToast";
+import { ClawSuggestionsCard } from "./ClawSuggestionsCard";
 
-/**
- * Mounts the current winning contextual card. If nothing wins, renders
- * `fallback` (the Photos panel in our default wiring) — caller supplies it.
- */
-export function ContextualSlot({ derived, raw, fallback, selected }) {
-  const { settings } = useSettings();
-  const picked = pickContextualCard(derived);
-
-  const enhancement = useEnhancement(
-    picked?.enhancementFeature ?? "__none__",
-    pickedState(picked, derived),
-    settings?.worker,
-    { enabled: !!picked },
-  );
-
+export function ContextualSlot({ cards = [], derived, raw, fallback, selected }) {
+  const picked = firstCardOfType(cards, ["TakeoutCard", "LunchCard", "MorningChecklistCard"]);
   if (!picked) return fallback ?? null;
-  const { Component } = picked;
-  return (
-    <Component
-      derived={derived}
-      raw={raw}
-      enhanced={enhancement.fields}
-      selected={selected}
-    />
-  );
+
+  if (picked.type === "TakeoutCard") {
+    return <EngineTakeoutCard card={picked} selected={selected} />;
+  }
+  if (picked.type === "LunchCard") {
+    return (
+      <LunchCard
+        derived={derived}
+        raw={raw}
+        enhanced={picked.enhanced ?? {}}
+        selected={selected}
+      />
+    );
+  }
+  if (picked.type === "MorningChecklistCard") {
+    return (
+      <MorningChecklistCard
+        derived={derived}
+        raw={raw}
+        enhanced={picked.enhanced ?? {}}
+        selected={selected}
+      />
+    );
+  }
+  return fallback ?? null;
 }
 
-/**
- * Right-column cards (currently: ClawSuggestionsCard) — replace Fun Fact
- * slot when visible, fall back to `fallback`.
- */
-export function RightColumnCards({ derived, raw, fallback, selected, onAction }) {
-  const { settings } = useSettings();
-  const cards = pickRightColumnCards(derived);
-  const first = cards[0];
-  const enhancement = useEnhancement(
-    first?.enhancementFeature ?? "__none__",
-    pickedState(first, derived),
-    settings?.worker,
-    { enabled: !!first },
-  );
-  if (!first) return fallback ?? null;
-  const { Component } = first;
+export function RightColumnCards({ cards = [], derived, raw, fallback, selected, onAction }) {
+  const picked = firstCardOfType(cards, ["ClawSuggestionsCard"]);
+  if (!picked) return fallback ?? null;
   return (
-    <Component
+    <ClawSuggestionsCard
       derived={derived}
       raw={raw}
-      enhanced={enhancement.fields}
+      enhanced={picked.enhanced ?? {}}
       selected={selected}
       onAction={onAction}
     />
   );
 }
 
-/**
- * Overlays (toasts) render over the whole dashboard.
- */
-export function OverlayCards({ derived, raw }) {
-  const { settings } = useSettings();
-  const overlays = pickOverlays(derived);
+export function OverlayCards({ cards = [], derived, raw }) {
   return (
     <>
-      {overlays.map((c) => (
-        <SingleOverlay key={c.id} card={c} derived={derived} raw={raw} settings={settings} />
-      ))}
+      {cards
+        .filter((card) => card.type === "BedtimeToast")
+        .map((card) => (
+          <BedtimeToast
+            key={card.id}
+            derived={derived}
+            raw={raw}
+            enhanced={card.enhanced ?? {}}
+          />
+        ))}
     </>
   );
 }
 
-function SingleOverlay({ card, derived, raw, settings }) {
-  const enhancement = useEnhancement(
-    card.enhancementFeature,
-    pickedState(card, derived),
-    settings?.worker,
-    { enabled: true },
-  );
-  const { Component } = card;
-  return <Component derived={derived} raw={raw} enhanced={enhancement.fields} />;
-}
-
-function pickedState(card, derived) {
-  if (!card) return null;
-  switch (card.enhancementFeature) {
-    case "bedtime":
-      return derived.bedtimeWindow;
-    case "takeout":
-      return derived.takeoutState;
-    case "lunch":
-      return derived.lunchContext;
-    case "morningChecklist":
-      return derived.checklist;
-    case "clawSuggestions":
-      return derived.clawSuggestions.map((s) => ({ id: s.id, tier: s.tier, title: s.title }));
-    default:
-      return null;
-  }
+function firstCardOfType(cards, types) {
+  return (cards ?? []).find((card) => types.includes(card.type)) ?? null;
 }
