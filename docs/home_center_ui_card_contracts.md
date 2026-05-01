@@ -9,6 +9,21 @@ engine consumes derived state, emits at most three visible card objects, and
 orders them urgent > important > ambient. UI components consume those card
 objects and do not decide visibility.
 
+Every emitted card must include:
+
+```json
+{
+  "reason": {
+    "triggeredBy": ["derivedStateKey"],
+    "suppressedBy": [],
+    "priorityReason": "Human-readable deterministic priority explanation."
+  }
+}
+```
+
+The reason object is part of the UI card contract and the AgentCI regression
+surface.
+
 **TV context:** 1920×1080 logical, viewed from 6–10 ft. Default to low text
 volume, tall affordances, one primary action per card.
 

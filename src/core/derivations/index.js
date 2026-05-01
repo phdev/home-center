@@ -9,7 +9,7 @@ import {
   isSameDate,
   isWeekday,
   startOfDay,
-} from "./time";
+} from "./time.js";
 
 const VENDOR_ROTATION = [
   "Mickey's Deli",

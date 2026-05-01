@@ -9,6 +9,11 @@ these. Adding a new card? Add its flag here first, then wire display through
 `context = { now: Date, user: { isPeter } }` — all time math uses `context.now`
 so the function is fully testable.
 
+Determinism requirement: derived-state functions must be pure, JSON-safe, and
+replayable from recorded AgentCI raw data plus `context.now`. They may not call
+OpenClaw, network APIs, microphone APIs, speech-recognition APIs, or read the
+live clock directly.
+
 ---
 
 ## `has_morning_overlap`

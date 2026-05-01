@@ -14,6 +14,8 @@
  * shipping JS.
  */
 
+import { captureAgentRun, inferAgentPurpose } from "../core/agentci/agentRunRecorder.js";
+
 const DEFAULT_TIMEOUT_MS = 6_000;
 
 /** @typedef {import('../state/types').EnhancementRequest} EnhancementRequest */
@@ -25,6 +27,37 @@ const DEFAULT_TIMEOUT_MS = 6_000;
  * @returns {Promise<EnhancementResponse>}
  */
 export async function enhance(req, workerSettings) {
+  return captureAgentRun(
+    {
+      purpose: req.purpose ?? inferAgentPurpose(req.feature),
+      cardId: req.cardId ?? req.inputSnapshot?.cardId ?? null,
+      input_snapshot: req.inputSnapshot ?? {
+        cardId: req.cardId ?? null,
+        feature: req.feature,
+        state: req.state,
+      },
+      model_config: {
+        provider: "openclaw",
+        endpoint: workerSettings?.url ? "/api/claw/enhance" : null,
+        workerConfigured: !!workerSettings?.url,
+        timeoutMs: req.opts?.timeoutMs ?? DEFAULT_TIMEOUT_MS,
+      },
+      trace: [
+        {
+          step: "openclaw.enhance",
+          feature: req.feature,
+        },
+      ],
+      operation: () => requestEnhancement(req, workerSettings),
+    },
+    {
+      agentRunId: req.opts?.agentRunId,
+      clock: req.opts?.agentciClock,
+    },
+  );
+}
+
+async function requestEnhancement(req, workerSettings) {
   if (!workerSettings?.url) {
     return { fields: {}, source: "fallback", error: "no-worker-url" };
   }

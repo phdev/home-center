@@ -5,6 +5,28 @@ Newest at top.
 
 ---
 
+## 2026-05-01 — Add AgentCI deterministic replay layer
+
+**Context**
+Home Center now has deterministic derivations, deterministic intervention
+selection, and optional agent enhancement. Regression testing needed to cover
+agent-facing workflows without depending on live voice/audio or LLM behavior.
+
+**Decision**
+Add AgentCI under `src/core/agentci/` plus repo-local fixtures, run snapshots,
+and reports under `agentci/`. AgentCI records raw data plus normalized
+`CommandEvent` fixtures, recomputes derived state and cards offline, diffs
+runs, explains card decisions from deterministic reason objects, and gates the
+golden School Updates Digest scenario.
+
+**Consequence**
+AgentCI starts after inputs are normalized. It does not own wakeword detection,
+speech recognition, OpenClaw calls, external agent adapters, or production
+monitoring. Any future agent integration must preserve replayable deterministic
+snapshots and reason traces.
+
+---
+
 ## 2026-04-30 — Centralize derivations and intervention decisions under `src/core`
 
 **Context**

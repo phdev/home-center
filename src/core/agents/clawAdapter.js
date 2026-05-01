@@ -13,8 +13,18 @@ export async function augmentCardWithClaw(card, workerSettings, opts = {}) {
   const response = await enhance(
     {
       feature: card.agent.feature,
+      cardId: card.id,
       state: card.agent.state,
-      opts: { timeoutMs: opts.timeoutMs ?? DEFAULT_CARD_TIMEOUT_MS },
+      inputSnapshot: {
+        cardId: card.id,
+        cardType: card.type,
+        feature: card.agent.feature,
+        state: card.agent.state,
+      },
+      opts: {
+        timeoutMs: opts.timeoutMs ?? DEFAULT_CARD_TIMEOUT_MS,
+        agentciClock: opts.agentciClock,
+      },
     },
     workerSettings,
   );

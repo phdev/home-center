@@ -8,7 +8,12 @@
     "build": "vite build",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "agentci:record": "node scripts/agentci.js record",
+    "agentci:replay": "node scripts/agentci.js replay",
+    "agentci:diff": "node scripts/agentci.js diff",
+    "agentci:explain": "node scripts/agentci.js explain",
+    "agentci:gate": "node scripts/agentci.js gate"
   },
   "dependencies": {
     "lucide-react": "^0.575.0",

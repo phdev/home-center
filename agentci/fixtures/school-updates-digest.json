@@ -1,0 +1,93 @@
+{
+  "scenarioId": "school-updates-digest",
+  "timeContext": {
+    "now": "2026-05-01T19:00:00.000Z",
+    "user": {
+      "isPeter": true,
+      "email": "peter@example.test"
+    }
+  },
+  "commandEvents": [
+    {
+      "source": "fixture",
+      "transcript": "show school updates",
+      "wakewordDetected": true,
+      "confidenceBucket": "high",
+      "locale": "en-US",
+      "deviceType": "agentci-fixture"
+    }
+  ],
+  "rawData": {
+    "calendar": {
+      "events": []
+    },
+    "weather": {
+      "today": {
+        "highTempF": 72,
+        "lowTempF": 58,
+        "precipProb": 0.1,
+        "summary": "Clear"
+      }
+    },
+    "birthdays": [],
+    "bedtime": [],
+    "checklist": {
+      "items": []
+    },
+    "takeout": {
+      "today": {
+        "date": "2026-05-01",
+        "decision": "home"
+      }
+    },
+    "lunchDecisions": {},
+    "schoolLunchMenu": [],
+    "schoolItems": [
+      {
+        "id": "school-action-permission-slip",
+        "kind": "action",
+        "title": "Return field trip permission slip",
+        "summary": "Please sign and return the museum field trip permission slip by tomorrow.",
+        "dueDate": "2026-05-02T12:00:00.000Z",
+        "eventDate": "2026-05-08",
+        "child": "Test Student",
+        "class": "Grade 3",
+        "teacher": "Ms. Example",
+        "location": "Museum",
+        "urgency": 0.82,
+        "extractionSource": "regex",
+        "rawSnippet": "Please sign and return the museum field trip permission slip by tomorrow.",
+        "sourceEmailId": "fake-email-001"
+      }
+    ],
+    "schoolUpdates": [
+      {
+        "id": "school-action-permission-slip",
+        "kind": "action",
+        "title": "Return field trip permission slip",
+        "summary": "Please sign and return the museum field trip permission slip by tomorrow.",
+        "dueDate": "2026-05-02T12:00:00.000Z",
+        "eventDate": "2026-05-08",
+        "child": "Test Student",
+        "urgency": 0.82,
+        "extractionSource": "regex",
+        "sourceEmailId": "fake-email-001"
+      }
+    ],
+    "settings": {}
+  },
+  "expected": {
+    "derivedState": {
+      "hasSchoolActionItems": true,
+      "hasUrgentSchoolItem": true,
+      "needsSchoolActionToday": true
+    },
+    "cards": [
+      {
+        "id": "school-updates",
+        "type": "SchoolUpdatesCard",
+        "priority": "urgent"
+      }
+    ]
+  }
+}

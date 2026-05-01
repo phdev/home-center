@@ -1,0 +1,224 @@
+{
+  "agentRuns": [],
+  "cards": [
+    {
+      "agent": {
+        "feature": "schoolUpdatesSummary",
+        "state": [
+          {
+            "dueDate": "2026-05-02T12:00:00.000Z",
+            "eventDate": "2026-05-08",
+            "id": "school-action-permission-slip",
+            "kind": "action",
+            "summary": "Please sign and return the museum field trip permission slip by tomorrow.",
+            "title": "Return field trip permission slip",
+            "urgency": 0.82
+          }
+        ]
+      },
+      "data": {
+        "hasAction": true,
+        "items": [
+          {
+            "child": "Test Student",
+            "class": "Grade 3",
+            "dueDate": "2026-05-02T12:00:00.000Z",
+            "eventDate": "2026-05-08",
+            "extractionSource": "regex",
+            "id": "school-action-permission-slip",
+            "kind": "action",
+            "location": "Museum",
+            "rawSnippet": "Please sign and return the museum field trip permission slip by tomorrow.",
+            "sourceEmailId": "fake-email-001",
+            "summary": "Please sign and return the museum field trip permission slip by tomorrow.",
+            "teacher": "Ms. Example",
+            "title": "Return field trip permission slip",
+            "urgency": 0.82
+          }
+        ],
+        "urgent": true
+      },
+      "id": "school-updates",
+      "placement": "main",
+      "priority": "urgent",
+      "reason": {
+        "priorityReason": "Urgent school item is due soon or high urgency.",
+        "suppressedBy": [],
+        "triggeredBy": [
+          "hasSchoolActionItems",
+          "hasUrgentSchoolItem",
+          "rankedSchoolItems"
+        ]
+      },
+      "shouldDisplay": true,
+      "timeContext": {
+        "now": "2026-05-01T19:00:00.000Z"
+      },
+      "type": "SchoolUpdatesCard"
+    }
+  ],
+  "commandEvents": [
+    {
+      "confidenceBucket": "high",
+      "deviceType": "agentci-fixture",
+      "locale": "en-US",
+      "source": "fixture",
+      "transcript": "show school updates",
+      "wakewordDetected": true
+    }
+  ],
+  "derivedState": {
+    "bedtimeReminderActive": false,
+    "bedtimeWindow": null,
+    "birthdayGiftNeeded": false,
+    "birthdayNeedsGift": false,
+    "birthdaysRanked": [],
+    "checklist": {
+      "items": [],
+      "variant": {
+        "highTempF": 72,
+        "hotDay": false,
+        "needsJacket": false,
+        "rain": false
+      }
+    },
+    "clawSuggestions": [
+      {
+        "accent": "red",
+        "actionKind": "openSchoolItem",
+        "detail": "Please sign and return the museum field trip permission slip by tomorrow.",
+        "iconName": "alert-triangle",
+        "id": "school-school-action-permission-slip",
+        "targetRef": {
+          "schoolItemId": "school-action-permission-slip"
+        },
+        "tier": 1,
+        "title": "Return field trip permission slip"
+      }
+    ],
+    "conflicts": [],
+    "hasMorningConflict": false,
+    "hasMorningOverlap": false,
+    "hasSchoolActionItems": true,
+    "hasSchoolEventUpcoming": false,
+    "hasUrgentSchoolItem": true,
+    "hasWorkConflictForPeter": false,
+    "lunchContext": {
+      "dateISO": "2026-05-02",
+      "dateLabel": "Sat, May 2",
+      "isSchoolDay": false,
+      "menu": []
+    },
+    "lunchDecisionNeeded": false,
+    "needsSchoolActionToday": true,
+    "nextMeaningfulTransition": "2026-05-01T23:30:00.000Z",
+    "peter0800_0900Events": [],
+    "peter0800_0900Risk": false,
+    "rankedSchoolItems": [
+      {
+        "child": "Test Student",
+        "class": "Grade 3",
+        "dueDate": "2026-05-02T12:00:00.000Z",
+        "eventDate": "2026-05-08",
+        "extractionSource": "regex",
+        "id": "school-action-permission-slip",
+        "kind": "action",
+        "location": "Museum",
+        "rawSnippet": "Please sign and return the museum field trip permission slip by tomorrow.",
+        "sourceEmailId": "fake-email-001",
+        "summary": "Please sign and return the museum field trip permission slip by tomorrow.",
+        "teacher": "Ms. Example",
+        "title": "Return field trip permission slip",
+        "urgency": 0.82
+      }
+    ],
+    "showClawSuggestions": true,
+    "showMorningChecklist": false,
+    "takeoutDecisionPending": false,
+    "takeoutState": {
+      "decision": "home",
+      "suggestedVendors": [
+        "Mickey's Deli",
+        "Rascals",
+        "Chipotle",
+        "In-N-Out"
+      ]
+    },
+    "takeoutUndecided": false,
+    "tomorrowNeedsPrep": false,
+    "tomorrowPrepReasons": [],
+    "upcomingSchoolEvents": []
+  },
+  "metadata": {
+    "scenarioId": "school-updates-digest",
+    "timeContext": {
+      "now": "2026-05-01T19:00:00.000Z",
+      "user": {
+        "email": "peter@example.test",
+        "isPeter": true
+      }
+    },
+    "version": "agentci.v1"
+  },
+  "rawData": {
+    "bedtime": [],
+    "birthdays": [],
+    "calendar": {
+      "events": []
+    },
+    "checklist": {
+      "items": []
+    },
+    "lunchDecisions": {},
+    "schoolItems": [
+      {
+        "child": "Test Student",
+        "class": "Grade 3",
+        "dueDate": "2026-05-02T12:00:00.000Z",
+        "eventDate": "2026-05-08",
+        "extractionSource": "regex",
+        "id": "school-action-permission-slip",
+        "kind": "action",
+        "location": "Museum",
+        "rawSnippet": "Please sign and return the museum field trip permission slip by tomorrow.",
+        "sourceEmailId": "fake-email-001",
+        "summary": "Please sign and return the museum field trip permission slip by tomorrow.",
+        "teacher": "Ms. Example",
+        "title": "Return field trip permission slip",
+        "urgency": 0.82
+      }
+    ],
+    "schoolLunchMenu": [],
+    "schoolUpdates": [
+      {
+        "child": "Test Student",
+        "dueDate": "2026-05-02T12:00:00.000Z",
+        "eventDate": "2026-05-08",
+        "extractionSource": "regex",
+        "id": "school-action-permission-slip",
+        "kind": "action",
+        "sourceEmailId": "fake-email-001",
+        "summary": "Please sign and return the museum field trip permission slip by tomorrow.",
+        "title": "Return field trip permission slip",
+        "urgency": 0.82
+      }
+    ],
+    "settings": {},
+    "takeout": {
+      "today": {
+        "date": "2026-05-01",
+        "decision": "home"
+      }
+    },
+    "weather": {
+      "today": {
+        "highTempF": 72,
+        "lowTempF": 58,
+        "precipProb": 0.1,
+        "summary": "Clear"
+      }
+    }
+  },
+  "runId": "school-updates-digest-20260501T190000000Z",
+  "timestamp": "2026-05-01T19:00:00.000Z"
+}

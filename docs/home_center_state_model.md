@@ -23,6 +23,8 @@ implementation is wrong (refactor it).
 - **Raw data** is read via typed adapters, normalized to a canonical shape.
 - **Derived state** is a single pure function of `raw + context` (time, user
   prefs) that produces boolean flags and structured view data.
+- **State must be serializable and replayable.** Raw inputs, derived state, and
+  selected cards must be JSON-safe so AgentCI can record and replay runs.
 - **UI presentation** consumes derived state and renders cards. Components
   contain zero visibility logic.
 - **OpenClaw** enhances copy, summaries, suggested actions. It runs in
@@ -117,3 +119,4 @@ Full catalog lives in `src/state/types.js`.
 - `home_center_derived_states.md` — per-flag spec
 - `home_center_ui_card_contracts.md` — per-card contract
 - `home_center_decisions_log.md` — architecture decisions log
+- `agentci_overview.md` — deterministic replay and regression gate overview

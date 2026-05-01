@@ -161,7 +161,14 @@ describe("intervention engine", () => {
           "id": "takeout",
           "placement": "contextual",
           "priority": "important",
-          "reason": "Dinner decision is still unset after the 16:30 reminder cutoff.",
+          "reason": {
+            "priorityReason": "Dinner decision is still unset after the 16:30 reminder cutoff.",
+            "suppressedBy": [],
+            "triggeredBy": [
+              "takeoutDecisionPending",
+              "takeoutState",
+            ],
+          },
           "shouldDisplay": true,
           "timeContext": {
             "deadline": "2026-04-24T03:00:00.000Z",
@@ -256,7 +263,15 @@ describe("intervention engine", () => {
           "id": "calendar-conflict",
           "placement": "calendar",
           "priority": "ambient",
-          "reason": "Morning calendar overlap or Peter 8-9 work-block risk.",
+          "reason": {
+            "priorityReason": "Morning calendar overlap or Peter 8-9 work-block risk.",
+            "suppressedBy": [],
+            "triggeredBy": [
+              "conflicts",
+              "hasMorningOverlap",
+              "peter0800_0900Risk",
+            ],
+          },
           "shouldDisplay": true,
           "timeContext": {
             "minutesUntil": null,

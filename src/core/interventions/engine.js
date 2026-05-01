@@ -46,9 +46,15 @@ function calendarConflictCard(derived, now) {
       startsAt: startsAt?.toISOString() ?? null,
       minutesUntil,
     },
-    reason: soon
-      ? "Calendar conflict starts within 15 minutes."
-      : "Morning calendar overlap or Peter 8-9 work-block risk.",
+    reason: decisionReason({
+      triggeredBy: [
+        ...(derived.hasMorningOverlap ? ["hasMorningOverlap", "conflicts"] : []),
+        ...(derived.peter0800_0900Risk ? ["peter0800_0900Risk"] : []),
+      ],
+      priorityReason: soon
+        ? "Calendar conflict starts within 15 minutes."
+        : "Morning calendar overlap or Peter 8-9 work-block risk.",
+    }),
     data: {
       conflicts: derived.conflicts ?? [],
       peter0800_0900Risk: !!derived.peter0800_0900Risk,
@@ -80,7 +86,16 @@ function schoolUpdatesCard(derived, now) {
     priority: urgent ? "urgent" : "important",
     placement: "main",
     timeContext: { now: now.toISOString() },
-    reason: urgent ? "Urgent school item is due soon or high urgency." : "Open school updates need review.",
+    reason: decisionReason({
+      triggeredBy: [
+        "rankedSchoolItems",
+        ...(derived.hasSchoolActionItems ? ["hasSchoolActionItems"] : []),
+        ...(derived.hasUrgentSchoolItem ? ["hasUrgentSchoolItem"] : []),
+      ],
+      priorityReason: urgent
+        ? "Urgent school item is due soon or high urgency."
+        : "Open school updates need review.",
+    }),
     data: {
       items: items.slice(0, 5),
       urgent,
@@ -111,7 +126,10 @@ function takeoutCard(derived, now) {
     priority: "important",
     placement: "contextual",
     timeContext: { now: now.toISOString(), deadline: setToday(now, 20).toISOString() },
-    reason: "Dinner decision is still unset after the 16:30 reminder cutoff.",
+    reason: decisionReason({
+      triggeredBy: ["takeoutDecisionPending", "takeoutState"],
+      priorityReason: "Dinner decision is still unset after the 16:30 reminder cutoff.",
+    }),
     data: {
       state: derived.takeoutState,
       suggestedVendors: derived.takeoutState?.suggestedVendors ?? [],
@@ -133,7 +151,10 @@ function lunchCard(derived, now) {
     priority: "important",
     placement: "contextual",
     timeContext: { now: now.toISOString(), deadline: setToday(now, 22).toISOString() },
-    reason: "Tomorrow is a school day and lunch is not set.",
+    reason: decisionReason({
+      triggeredBy: ["lunchDecisionNeeded", "lunchContext"],
+      priorityReason: "Tomorrow is a school day and lunch is not set.",
+    }),
     data: { context: derived.lunchContext },
     agent: {
       feature: "lunch",
@@ -152,7 +173,10 @@ function bedtimeCard(derived, now) {
     priority: "urgent",
     placement: "overlay",
     timeContext: { now: now.toISOString(), bedtimeAt: derived.bedtimeWindow?.bedtimeAt ?? null },
-    reason: "A bedtime reminder window is active.",
+    reason: decisionReason({
+      triggeredBy: ["bedtimeReminderActive", "bedtimeWindow"],
+      priorityReason: "A bedtime reminder window is active.",
+    }),
     data: { window: derived.bedtimeWindow },
     agent: {
       feature: "bedtime",
@@ -175,7 +199,10 @@ function birthdayGiftCard(derived, now) {
     priority: birthday.daysUntil <= 14 ? "important" : "ambient",
     placement: "main",
     timeContext: { now: now.toISOString(), daysUntil: birthday.daysUntil },
-    reason: `${birthday.name} has an upcoming birthday without a handled gift.`,
+    reason: decisionReason({
+      triggeredBy: ["birthdayGiftNeeded", "birthdaysRanked"],
+      priorityReason: `${birthday.name} has an upcoming birthday without a handled gift.`,
+    }),
     data: { birthday },
     agent: {
       feature: "birthdayGiftIdeas",
@@ -194,7 +221,10 @@ function morningChecklistCard(derived, now) {
     priority: "ambient",
     placement: "contextual",
     timeContext: { now: now.toISOString(), deadline: setToday(now, 9).toISOString() },
-    reason: "Weekday pre-school checklist window is active.",
+    reason: decisionReason({
+      triggeredBy: ["showMorningChecklist", "checklist"],
+      priorityReason: "Weekday pre-school checklist window is active.",
+    }),
     data: { checklist: derived.checklist },
     agent: {
       feature: "morningChecklist",
@@ -214,7 +244,11 @@ function clawSuggestionsCard(derived, now) {
     priority: suggestions.some((suggestion) => suggestion.tier === 1) ? "important" : "ambient",
     placement: "rightColumn",
     timeContext: { now: now.toISOString() },
-    reason: "Deterministic state produced cross-card suggestions.",
+    reason: decisionReason({
+      triggeredBy: ["showClawSuggestions", "clawSuggestions"],
+      suppressedBy: suggestions.map((suggestion) => suggestion.actionKind),
+      priorityReason: "Deterministic state produced cross-card suggestions.",
+    }),
     data: { suggestions },
     agent: {
       feature: "clawSuggestions",
@@ -232,9 +266,25 @@ function clawSuggestionsCard(derived, now) {
 function card(input) {
   return {
     ...input,
+    reason: decisionReason(input.reason),
     shouldDisplay: true,
     _rank: PRIORITY_RANK[input.priority] ?? PRIORITY_RANK.ambient,
     _dedupeKeys: input.dedupeKeys ?? [],
+  };
+}
+
+function decisionReason(reason) {
+  if (!reason || typeof reason === "string") {
+    return {
+      triggeredBy: [],
+      suppressedBy: [],
+      priorityReason: reason ?? "",
+    };
+  }
+  return {
+    triggeredBy: [...(reason.triggeredBy ?? [])].sort(),
+    suppressedBy: [...(reason.suppressedBy ?? [])].sort(),
+    priorityReason: reason.priorityReason ?? "",
   };
 }
 
