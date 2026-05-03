@@ -279,109 +279,135 @@ Rule of thumb: a card mounts/unmounts on a flag, then fills in OpenClaw-authored
 | `scripts/update-pencil-screenshots.mjs` | Generates static PNGs from pencil designs via MCP |
 | `public/pencil-screenshots/` | Generated PNG files served by TV Preview |
 
-## Wake Word Service (Raspberry Pi)
+## Wake Word + Voice Service
 
 ### Architecture
 
-A Python service (`pi/wake_word_service.py`) runs on a Raspberry Pi, continuously listening for voice commands via a ReSpeaker 2-Mic Pi HAT. On detection, it controls a TV via HDMI-CEC (`cec-client`).
+The production voice path is split between the Pi 5 and the Mac mini:
 
-**Commands:**
-- "Hey Homer" → Turn TV on + set Pi as active HDMI source
-- "Hey Homer, turn off" → Put TV in standby
-- "Hey Homer, turn on" → Turn TV on (explicit variant)
+1. `mic-streamer` on the Pi reads the ReSpeaker XVF3800 through the PipeWire `pulse` ALSA PCM and streams 16 kHz mono S16 PCM on TCP `:8766`.
+2. `com.homecenter.voice` on the Mac mini runs the configured local wake engine. The launchd default remains Vosk/Kaldi because it measured 0 TV false positives in the first hardware run; `WAKE_ENGINE=openwakeword` enables the purpose-built DNN path for measured trials. `WAKE_ENGINE=speech` and `WAKE_ENGINE=always-stt` are confirmed-command-only local-STT experiments, not launchd defaults.
+3. In the default Vosk path, a wake hit posts `/api/chime` to the Pi. The Pi responds before playing audio, and speaker discovery/volume setup are cached so the chime path does not block on `aplay -l`/`amixer`.
+4. In confirmed-command trials (`WAKE_CONFIRM_COMMAND=1`), wake hits are candidates only. The Mac posts a soft `/api/transcription` update with `stage=verifying`, captures local audio, runs local `faster-whisper`, and only then chimes/dispatches if `voice-service/intent.py` returns a dispatchable command. Empty/non-command candidates are cleared with no action.
+5. `faster-whisper` transcribes the rolling pre-wake buffer plus a short post-wake tail for wake-engine hits. In `WAKE_ENGINE=speech` and `WAKE_ENGINE=always-stt` trials, the RMS detector instead passes the completed speech segment plus short pre-roll to avoid pulling unrelated earlier phrases from the rolling buffer. `voice-service/intent.py` then maps text to supported intents and rejects incomplete command payloads before dispatch.
+6. The Pi `wake-word` service runs with `--no-wake-detection` and remains the local HTTP command server for CEC, timers, navigation, chime playback, gesture state, and `/api/transcription`.
+
+Bare "Hey Homer" intentionally does nothing. TV power-on requires an explicit command like "Hey Homer, turn on".
+
+### Why This Replaced Whisper Wake Detection
+
+Measured during the 2026-04-28 audit:
+
+- PR #22 Whisper wake detection produced 30 wake matches in a 30-minute TV/noise log window, with one false `ask` dispatch. That is 60 wake matches/hour and 2 false dispatches/hour in that sample.
+- The existing `hey_homer.onnx` openWakeWord model fired heavily on live XVF3800 audio: 30 hits/5 min at threshold 0.55 and 22 hits/5 min even at 0.90 on a left-channel probe; mono `pulse` still produced 5 hits/2 min at threshold 0.97.
+- Vosk full-model wake gating produced 0 final and 0 partial wake hits in a 5-minute live ambient probe while still recognizing ordinary speech fragments. A grammar-limited Vosk recognizer was rejected because it had 4 final and 9 partial hits over 5 minutes.
 
 ### Pi Access
 
 - **SSH:** `ssh pi@homecenter.local`
-- **Service:** `sudo systemctl {start|stop|restart|status} wake-word`
+- **Command server:** `sudo systemctl {start|stop|restart|status} wake-word`
+- **Mic stream:** `sudo systemctl {start|stop|restart|status} mic-streamer`
 - **Logs:** `sudo journalctl -u wake-word -f`
+- **Mic logs:** `sudo journalctl -u mic-streamer -f`
 - **Venv:** `/home/pi/home-center/pi/.venv/`
 - **Service unit:** `/etc/systemd/system/wake-word.service`
-- **Audio device:** ReSpeaker 2-Mic HAT (WM8960 codec, typically `hw:2,0`)
+- **Mic service unit:** `/etc/systemd/system/mic-streamer.service`
+- **Audio device:** ReSpeaker XVF3800 USB 4-Mic Array via PipeWire `pulse`
+
+On Raspberry Pi OS Bookworm, PipeWire owns the XVF3800. Direct `hw:N,0` ALSA opens can return zero bytes from system units. The systemd service must set `XDG_RUNTIME_DIR=/run/user/1000` and `PULSE_RUNTIME_PATH=/run/user/1000/pulse`.
+
+`mic-streamer` serves one client at a time and uses a short socket send timeout
+so dead Mac clients cannot leave the streamer stuck on an old `CLOSE-WAIT`
+connection while new dry-runs connect but receive no PCM bytes.
+
+### Mac Mini Voice Service
+
+- **SSH:** `ssh peter@peters-mac-mini.lan`
+- **Launchd label:** `com.homecenter.voice`
+- **Logs:** `tail -f ~/home-center/voice-service/logs/voice-stderr.log`
+- **Install/reload:** `bash ~/home-center/deploy/mac-mini/setup-voice-service.sh`
+- **Manual run:** see `voice-service/README.md`
+- **Vosk model:** `~/home-center/voice-service/models/vosk-model-small-en-us-0.15`
+- **Whisper model:** `base.en` via `faster-whisper`, CPU int8
+- **Wake engine switch:** set `WAKE_ENGINE=openwakeword` plus `OPENWAKEWORD_MODEL=~/home-center/pi/models/hey_homer.onnx` for DNN trials; keep `WAKE_ENGINE=vosk` as default until the DNN passes the 30-minute TV false-positive test
+- **Confirmed-command trial:** add `WAKE_CONFIRM_COMMAND=1` with `WAKE_ENGINE=openwakeword` so openWakeWord is only a candidate trigger; default capture is `CONFIRM_PRE_WAKE_SECONDS=5.0` and `CONFIRM_POST_WAKE_SECONDS=2.0`
+- **Speech candidate trial:** `WAKE_ENGINE=speech` is a local-only confirmed-command mode that uses RMS speech segment boundaries only to decide when to run local Whisper. It requires `WAKE_CONFIRM_COMMAND=1`, and the transcript must contain a wake phrase plus a dispatchable command before chime/dispatch. Speech mode transcribes the completed RMS segment plus `SPEECH_CANDIDATE_PRE_ROLL_SECONDS` instead of a generic rolling tail. Use it to measure confirmed-command behavior when the current openWakeWord model is unreliable; do not make it default without 5-phrase and ambient-TV false-dispatch validation.
+- **Brute-force local STT benchmark:** `WAKE_ENGINE=always-stt` uses the same RMS speech segment boundaries but sends every qualifying speech segment to local Whisper with no max-empty backoff. It requires `WAKE_CONFIRM_COMMAND=1`, suppresses raw verifying captions by default, and still requires a wake phrase plus a dispatchable command before chime/dispatch. Use it only to measure the ceiling for responsiveness and command capture before deciding whether to keep tuning wake models.
+- **Speech candidate noise floor:** speech mode freezes its ambient noise estimate during active speech. Do not let long loud speech/TV bursts raise the RMS gate; that regressed short commands like "stop". Active segments are capped by `SPEECH_CANDIDATE_MAX_SEGMENT_SECONDS` so long ambient speech cannot delay confirmation until the next silence. Empty max-length segments start `SPEECH_CANDIDATE_MAX_EMPTY_BACKOFF_SECONDS`, but silence-ended command segments can still confirm.
+- **Speech candidate empty backoff:** `SPEECH_CANDIDATE_EMPTY_BACKOFF_SECONDS` backs off after any empty/non-command speech confirmation. Strong speech segments can still confirm during that window when they meet `SPEECH_CANDIDATE_EMPTY_BACKOFF_STRONG_MIN_PEAK_RMS` and `SPEECH_CANDIDATE_EMPTY_BACKOFF_STRONG_MIN_ACTIVE_CHUNKS`; this is meant to reduce passive Whisper churn without blocking clear user commands.
+- **Speech candidate UI:** raw speech candidates stay internal by default and do not post `/api/transcription stage=verifying`; only confirmed commands surface to the dashboard. Set `SPEECH_CANDIDATE_EMIT_VERIFYING=1` only when debugging UI state.
+- **Multi-command validation:** confirmed-command mode dispatches one command per transcript by default. Set `CONFIRM_MULTI_COMMAND_DISPATCH=1` only for dry-run validation when rapid 5-phrase tests merge multiple wake-qualified commands into one speech segment; normal launchd behavior should keep it off until multi-command UX is deliberately validated.
+- **Current speech-mode baseline:** the 2026-05-01 5-phrase dry-run passed 5/5 with `SPEECH_CANDIDATE_MIN_ACTIVE_CHUNKS=3`, `SPEECH_CANDIDATE_PRE_ROLL_SECONDS=0.45`, `SPEECH_CANDIDATE_MAX_SEGMENT_SECONDS=6.0`, `SPEECH_CANDIDATE_MAX_EMPTY_BACKOFF_SECONDS=12.0`, `WHISPER_MODEL=base.en`, noise-floor freeze, and multi-command dry-run dispatch. Latency was about 276-298 ms once each segment ended, including `stop`. A stricter `MIN_ACTIVE_CHUNKS=8` pass missed `stop`, so stay at 3 while validating the UI-silenced path.
+- **Current passive baseline:** a 2-minute speech-mode dry-run on 2026-05-01 produced 0 dispatches and 0 command candidates. `SPEECH_CANDIDATE_MAX_EMPTY_BACKOFF_SECONDS=12.0` reduced Whisper confirmations from 18 to 6 over a comparable 2-minute ambient-speech sample; skipped segments log as `reason=max_empty_backoff`.
+- **Current brute-force baseline:** a clean `WAKE_ENGINE=always-stt` dry-run on 2026-05-01 passed the 5-phrase validation at 5/5 with median local STT/action latency around 281 ms after segment end. The matching 2-minute passive run produced 0 dispatches and 0 command candidates, but it still ran 16 internal Whisper confirmations on ambient speech/TV. Treat this as the local STT accuracy/safety ceiling, not a production default.
+- **Current production-shaped backoff baseline:** `WAKE_ENGINE=speech`, `WAKE_CONFIRM_COMMAND=1`, `CONFIRM_MULTI_COMMAND_DISPATCH=1`, `SPEECH_CANDIDATE_MAX_EMPTY_BACKOFF_SECONDS=30.0`, `SPEECH_CANDIDATE_EMPTY_BACKOFF_SECONDS=12.0`, strong override peak `1800`/active chunks `12`, `SPEECH_CANDIDATE_PRE_ROLL_SECONDS=0.45`, and `WHISPER_MODEL=base.en`. After preserving the max-empty backoff window across non-max empty candidates, the 2026-05-03 5-phrase dry-run passed 5/5 with median local STT/action latency around 285 ms after segment end and no ignored candidate wakes. The matching 2026-05-01 2-minute passive run produced 0 dispatches and 0 command candidates with 6 internal Whisper confirmations and 13 skipped candidates.
+- **Rejected speech pre-roll check:** `SPEECH_CANDIDATE_PRE_ROLL_SECONDS=0.8` regressed the post-backoff 5-phrase run to 3/5 because Whisper missed the wake phrase on `turn on` and `open calendar`. Keep the wake-required safety gate and do not broaden speech-candidate mode to accept command-only speech.
+- **Confirmed STT wake variants:** confirmed-command transcript parsing accepts narrow local Whisper wake variants like `Day Homer` and `8-homer` after a candidate trigger. These variants do not broaden the live Vosk/openWakeWord trigger.
+- **DNN tuning logs:** confirmed-command dry-runs emit `OpenWakeWord audio heartbeat ...` summaries every `OPENWAKEWORD_AUDIO_HEARTBEAT_SECONDS` even when input is quiet. Add `OPENWAKEWORD_AUDIO_LOG_MIN_RMS=180` to emit raw `OpenWakeWord audio probe ...` lines when recent RMS rises, and add `OPENWAKEWORD_SCORE_LOG_MIN=0.05` to emit `OpenWakeWord score probe ...` lines during active speech when the score stays below threshold.
+- **Confirmed-command debounce:** openWakeWord candidate confirmations are limited to one local Whisper run per active speech segment, including audio consumed during confirmation capture. Empty/non-command transcripts start `OPENWAKEWORD_EMPTY_CONFIRM_COOLDOWN_SECONDS`; skipped hits log as `Skipping openWakeWord wake ...`. Dry-run `Confirmed-command candidates=[...]` keeps leading clipped commands like `Homer, open calendar`; if the latest wake body is incomplete, dispatch falls back to the latest dispatchable candidate. The wake splitter accepts punctuated Whisper variants like `Okay, Homer, ...`.
+- **Validation summary:** `python ~/home-center/voice-service/validate_voice.py --log ~/home-center/voice-service/logs/voice-stderr.log --mark-start`, then rerun with `--offset <bytes> --expected-count 20`
 
 ### Key Files
 
 | File | Purpose |
 |---|---|
-| `pi/wake_word_service.py` | Main service — audio capture, wake word detection, CEC control, chime playback |
-| `pi/train_hey_homer.py` | Training script for openWakeWord custom models |
-| `pi/models/` | ONNX/PT model files for openWakeWord |
-| `pi/sounds/acknowledge.wav` | Two-tone chime (C5+E5) played on detection |
+| `pi/mic_streamer.py` | Pi XVF3800 PipeWire `pulse` capture streamer on TCP `:8766` |
+| `pi/wake_word_service.py` | Pi command server: CEC, timers, chime, dashboard voice state, gestures |
+| `pi/services/mic-streamer.service` | Systemd unit for Pi mic streaming |
+| `pi/services/wake-word.service` | Systemd unit for Pi command server mode |
+| `voice-service/voice_service.py` | Mac mini wake engine, local STT, command dispatch |
+| `voice-service/intent.py` | Deterministic intent parser for supported commands |
+| `voice-service/validate_voice.py` | Log-offset validation summary for latency, dispatch count, and miss rate |
+| `voice-service/README.md` | Install, debug, and manual-run notes for the Mac service |
+| `deploy/mac-mini/com.homecenter.voice.plist` | Launchd template for the Mac voice service |
+| `src/components/WakeOverlay.jsx` | Full-screen blue wake glow matching the Pencil overlay |
+| `src/components/LiveCaption.jsx` | Bottom live caption pill matching the Pencil overlay |
+| `src/hooks/useLiveCaption.js` | Polls Pi `/api/transcription` every 150 ms |
 
-### Current Status (as of 2026-03-12)
+### Supported Commands
 
-Uses openWakeWord with custom ONNX models trained via `pi/train_hey_homer.py`. After wake word detection, uses faster-whisper (tiny model, int8, local) for speech-to-text to parse voice commands.
+- "Hey Homer, set a timer for X minutes for Y" creates a local Pi timer.
+- "Hey Homer, stop" dismisses expired timers.
+- "Hey Homer, turn off" sends TV standby via HDMI-CEC.
+- "Hey Homer, turn on" powers the TV and sets the Pi as active source.
+- "Hey Homer, show calendar/weather/photos" navigates the dashboard.
+- "Hey Homer, go back" returns to the dashboard.
+- "Hey Homer, what/who/where/when/why/how ..." routes the question to the existing worker `/api/ask-query`.
 
-**Commands (via STT after wake word):**
-- "Hey Homer, set a timer for X minutes for Y" → creates timer via worker API
-- "Hey Homer, stop" → dismisses all expired timers
-- "Hey Homer, turn off" → TV standby via HDMI-CEC
-- "Hey Homer, show calendar/weather/photos" → navigates to page
-- "Hey Homer, go back" → returns to dashboard
-- "Hey Homer, [question]" → sends to LLM via worker `/api/ask-query`
-- "Hey Homer" (no command) → turns on TV
+### Design Artifact
 
-**Two-stage detection (DNN → Whisper verification):**
-1. openWakeWord DNN detects wake word candidate
-2. Rolling 2.5s audio buffer is fed to Whisper to verify "homer" was actually spoken
-3. Only if Whisper confirms → chime plays and command recording begins
-4. This eliminates false positives from ambient noise/TV audio
+Live transcription UI is specified in Pencil frame `Jf7Tx` (`Voice Transcription Overlay`) in `~/Documents/home-center.pen`. The React path is `WakeOverlay` plus `LiveCaption`; keep this frame updated before changing transcription UI. `src/TVPreview.jsx` includes the frame as `voice-transcription-overlay`.
 
-**Audio preprocessing pipeline:**
-- **High-pass filter** (85 Hz cutoff) — removes TV bass, HVAC rumble, fan noise before DNN inference
-- **Adaptive noise floor tracking** — continuously estimates ambient noise level
-- **Energy-adaptive threshold** — lowers DNN threshold to 85% when strong speech detected (4× RMS minimum)
+`scripts/update-pencil-screenshots.mjs` includes the same page entry. The active Pencil MCP renderer can preview `Jf7Tx`, but the standalone screenshot script may skip it if the saved `.pen` file does not expose that node to the CLI MCP process.
 
-**Robustness mitigations against false positives:**
-- **Whisper verification gate** — two-stage: DNN triggers → Whisper confirms "homer" in rolling buffer before acting
-- **Phonetic pattern matching** — Whisper tiny often mis-transcribes "hey homer" as "homework", "home", etc. Verification accepts these phonetic near-matches
-- **No-speech threshold raised to 0.95** — prevents Whisper from discarding short/quiet utterances as silence
-- RMS energy gate (configurable via `/api/wake-config`, default 200)
-- Consecutive frame requirement (default 3 consecutive high-scoring frames)
-- Score smoothing — averages last N prediction scores (default 3)
-- Post-action mute (default 8s) to prevent TV audio feedback loops
-- Model reset after each detection to clear prediction buffer
-- Cooldown window (default 5s) between triggers
-- High-confidence DNN bypass (≥0.8) skips Whisper verification for speed
+### Legacy Recording Mode
 
-**Training (for retraining the DNN):**
-- `python pi/train_hey_homer.py --negative-samples 2000 --positive-samples 500 --augments 6`
-- Training script includes noise, silence, music, and phonetically-similar negatives
-- Use `--clip-duration 2.0` for "hey homer"
-- **Real voice recording:** `--record 50` records samples from the ReSpeaker mic interactively
-- **Reuse recorded samples:** `--real-samples models/real_samples_positive_*.npz`
-- **Record negatives:** `--record-negative 30` for non-wake-word samples
-- **Augmentation:** time-stretching, room reverb simulation, variable SNR noise (down to 5 dB)
-- Real samples get 20× augmentation by default (`--real-augments 20`)
+The old openWakeWord recording/enrollment code is still present in `pi/wake_word_service.py` for fallback/debugging, but it is not in the production service path while `wake-word.service` runs with `--no-wake-detection`.
 
-**Voice sample recording mode (via HandController app):**
-- Worker endpoint: `POST /api/wake-record` with `{action: "toggle"|"start"|"stop"|"set_type"|"reset_totals", type: "positive"|"negative"}`
-- Status: `GET /api/wake-record` → `{active, type, count, totalPositive, totalNegative}`
-- When active, the wake word service auto-records speech clips above the noise floor
-- Clips saved to `pi/models/recorded_samples/`, merged to `.npz` on stop
-- Audio feedback: ascending chime (start), beep (each clip saved), descending tone (stop)
-- Wake word detection is paused during recording mode
-- Worker tracks cumulative `totalPositive`/`totalNegative` across sessions (goal: 50 each)
-- Dashboard shows red pulsing `RecordingIndicator` in header when active (session count + progress toward 50)
-- When idle, shows persistent totals if any samples exist (e.g. "12+ 5−")
-
-**Key UI files for recording mode:**
+**Key UI files for legacy recording mode:**
 
 | File | Purpose |
 |---|---|
 | `src/components/RecordingIndicator.jsx` | Red pulsing mic + counter in header |
 | `src/hooks/useWakeRecord.js` | Polls `/api/wake-record` every 2s |
 
-The systemd service runs with `--debug` for diagnostics. Worker URL is configured via `--worker-url`.
+Worker URL is configured on the Pi command server via `--worker-url`.
 
 ### Deploying to Pi
 
 ```bash
 # Copy a file to the Pi
 scp pi/wake_word_service.py pi@homecenter.local:/home/pi/home-center/pi/
+scp pi/mic_streamer.py pi@homecenter.local:/home/pi/home-center/pi/
 
-# Restart the service after changes
+# Restart services after changes
 ssh pi@homecenter.local "sudo systemctl restart wake-word"
+ssh pi@homecenter.local "sudo systemctl restart mic-streamer"
+
+# Reload the Mac mini voice service after changes
+rsync -av voice-service/ peter@peters-mac-mini.lan:/Users/peter/home-center/voice-service/
+rsync -av deploy/mac-mini/ peter@peters-mac-mini.lan:/Users/peter/home-center/deploy/mac-mini/
+ssh peter@peters-mac-mini.lan "bash /Users/peter/home-center/deploy/mac-mini/setup-voice-service.sh"
 
 # Install a Python package in the Pi's venv
 ssh pi@homecenter.local "/home/pi/home-center/pi/.venv/bin/pip install <package>"
@@ -393,8 +419,8 @@ ssh pi@homecenter.local "/home/pi/home-center/pi/.venv/bin/pip install <package>
 
 | Machine | Hostname | Role |
 |---|---|---|
-| **Raspberry Pi** | `homecenter.local` | Display-only: Chromium kiosk dashboard + wake word + HDMI-CEC |
-| **Mac Mini** | `macmini.local` (TBD) | Compute: OpenClaw bridge, Homer CI, email-triage, school-updates, agent spawning |
+| **Raspberry Pi** | `homecenter.local` | Chromium kiosk, XVF3800 mic stream, local command API, HDMI-CEC |
+| **Mac Mini** | `peters-mac-mini.lan` | Voice wake/STT compute, OpenClaw bridge, email-triage, school-updates, agent spawning |
 | **Laptop** | — | Development only (optional) |
 
 ### What runs where
@@ -403,7 +429,9 @@ ssh pi@homecenter.local "/home/pi/home-center/pi/.venv/bin/pip install <package>
 |---|---|---|---|
 | Chromium kiosk | Pi | `~/.config/labwc/autostart` (not systemd) | — |
 | Dashboard HTTP server | Pi | systemd (`dashboard-local`) | 8080 |
-| Wake word | Pi | systemd (`wake-word`) | — |
+| Mic streamer | Pi | systemd (`mic-streamer`) | 8766 |
+| Pi command server | Pi | systemd (`wake-word`) | 8765 |
+| Voice wake/STT | Mac Mini | launchd (`com.homecenter.voice`) | — |
 | OpenClaw bridge | Mac Mini | launchd (`com.openclaw.bridge`) | 3100 |
 | Email triage | Mac Mini | launchd (`com.homecenter.email-triage`) | — |
 | School updates | Mac Mini | launchd (`com.homecenter.school-updates`) | — |

@@ -1,6 +1,8 @@
-import { describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { computeDerivedState, emptyRawState } from "../derivations";
 import { MAX_VISIBLE_CARDS, runInterventionEngine } from "./engine";
+
+const ORIGINAL_TZ = process.env.TZ;
 
 function at(y, m, d, h, min = 0) {
   return new Date(y, m - 1, d, h, min, 0, 0);
@@ -33,6 +35,18 @@ function schoolItem(overrides = {}) {
 }
 
 const USER = { isPeter: true, email: "peter@howell.com" };
+
+beforeAll(() => {
+  process.env.TZ = "America/Los_Angeles";
+});
+
+afterAll(() => {
+  if (ORIGINAL_TZ == null) {
+    delete process.env.TZ;
+  } else {
+    process.env.TZ = ORIGINAL_TZ;
+  }
+});
 
 function derivedForEngine(now) {
   return computeDerivedState(

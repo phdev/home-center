@@ -33,19 +33,37 @@ const pages = [
   { slug: "full-llm-response-page", nodeId: "dMUil" },
   { slug: "full-history-page", nodeId: "Tbtje" },
   { slug: "transcription-overlay", nodeId: "DeP7G" },
+  { slug: "voice-transcription-overlay", nodeId: "Jf7Tx" },
   { slug: "openclaw-ui-additions", nodeId: "ONYZi" },
 ];
 
 let msgId = 0;
 const pending = new Map(); // msgId -> page
 let saved = 0;
+let failed = 0;
 
 const proc = spawn(MCP_BIN, ["--app", "desktop"], { stdio: ["pipe", "pipe", "pipe"] });
+let pageIndex = 0;
 
 function send(method, params) {
   const id = ++msgId;
   proc.stdin.write(JSON.stringify({ jsonrpc: "2.0", id, method, params }) + "\n");
   return id;
+}
+
+function requestNext() {
+  if (pageIndex >= pages.length) {
+    if (failed > 0) {
+      console.error(`Saved ${saved}/${pages.length} screenshots; ${failed} failed.`);
+      proc.kill(); process.exit(1);
+    }
+    console.log("All screenshots saved!");
+    proc.kill(); process.exit(0);
+  }
+  const p = pages[pageIndex++];
+  const id = send("tools/call", { name: "get_screenshot", arguments: { filePath: PEN_FILE, nodeId: p.nodeId } });
+  pending.set(id, p);
+  console.log(`Requested: ${p.slug} (id=${id})`);
 }
 
 const rl = readline.createInterface({ input: proc.stdout });
@@ -54,30 +72,35 @@ rl.on("line", (line) => {
   try {
     const msg = JSON.parse(line);
     if (msg.result?.capabilities) {
-      // Send all screenshot requests at once
-      for (const p of pages) {
-        const id = send("tools/call", { name: "get_screenshot", arguments: { filePath: PEN_FILE, nodeId: p.nodeId } });
-        pending.set(id, p);
-        console.log(`Requested: ${p.slug} (id=${id})`);
-      }
+      requestNext();
     } else if (msg.id && pending.has(msg.id)) {
       const page = pending.get(msg.id);
+      pending.delete(msg.id);
+      let wrote = false;
+      if (msg.error) {
+        console.error(`Failed: ${page.slug} - ${msg.error.message || JSON.stringify(msg.error)}`);
+      }
       for (const c of (msg.result?.content || [])) {
         if (c.type === "image" && c.data) {
           const outPath = `${OUT_DIR}/${page.slug}.png`;
           fs.writeFileSync(outPath, Buffer.from(c.data, "base64"));
           console.log(`Saved: ${outPath} (${Math.round(c.data.length / 1024)}KB base64)`);
           saved++;
+          wrote = true;
         }
       }
-      if (saved >= pages.length) {
-        console.log("All screenshots saved!");
-        proc.kill(); process.exit(0);
+      if (!wrote) {
+        failed++;
+        if (!msg.error) console.error(`Failed: ${page.slug} - no image returned`);
       }
+      requestNext();
     }
   } catch {}
 });
 
 proc.stderr.on("data", () => {});
 send("initialize", { protocolVersion: "2024-11-05", capabilities: {}, clientInfo: { name: "ss", version: "1" } });
-setTimeout(() => { proc.kill(); process.exit(1); }, 30000);
+setTimeout(() => {
+  console.error(`Timed out after saving ${saved}/${pages.length} screenshots.`);
+  proc.kill(); process.exit(1);
+}, 60000);

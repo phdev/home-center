@@ -1,19 +1,12 @@
 #!/usr/bin/env python3
 """
-Wake Word Detection Service for Home Center
+Home Center Pi command server and legacy wake listener.
 
-Listens for "Hey Comni" via openWakeWord, then records a short audio clip
-and transcribes it with faster-whisper to parse voice commands:
+Production XVF3800 deployments run this file with --no-wake-detection. In that
+mode it exposes the dashboard HTTP contract, chime playback, HDMI-CEC TV
+control, timers, and gesture state while the Mac mini owns wake/STT compute.
 
-  - "set a timer for X minutes for Y" → creates a timer via worker API
-  - "stop" / "dismiss" / "cancel" → dismisses all expired timers
-  - "turn off" → TV standby via HDMI-CEC
-  - "turn on" (or no command) → TV on via HDMI-CEC
-
-Also runs a background alarm thread that polls for expired timers and
-plays an alarm sound on the Pi speaker until dismissed.
-
-Hardware: ReSpeaker 2-Mics Pi HAT (or any ALSA-compatible microphone)
+The older openWakeWord listener is retained for fallback/debugging only.
 """
 
 import argparse
@@ -55,8 +48,8 @@ def _inference_framework() -> str:
 # ---------------------------------------------------------------------------
 WAKE_WORD = "hey_jarvis"
 SAMPLE_RATE = 16000
-CHUNK_SIZE = 1280  # 80ms at 16kHz — required by openWakeWord
-CHANNELS = 2  # ReSpeaker 2-Mic HAT is stereo; we downmix to mono
+CHUNK_SIZE = 1280  # 80 ms at 16 kHz; required by legacy openWakeWord mode
+CHANNELS = 2  # Legacy fallback capture is stereo; production mic-streamer is mono
 
 # Default tunable parameters (can be overridden via /api/wake-config)
 _DEFAULT_CONFIG = {
@@ -118,6 +111,10 @@ logging.basicConfig(
     datefmt="%H:%M:%S",
 )
 log = logging.getLogger("wake-word")
+
+_speaker_cache_lock = threading.Lock()
+_speaker_device_cache: dict[bool, str | None] = {}
+_speaker_volume_ready: set[str] = set()
 
 
 # ---------------------------------------------------------------------------
@@ -229,12 +226,18 @@ def generate_alarm(path: Path) -> None:
     log.info("Generated alarm sound: %s", path)
 
 
-def find_speaker_device(prefer_hat: bool = False) -> str | None:
+def find_speaker_device(prefer_hat: bool = False, refresh: bool = False) -> str | None:
     """Find audio output device.
 
     prefer_hat=False (default): HDMI first, ReSpeaker fallback.
     prefer_hat=True: ReSpeaker first, HDMI fallback.
     """
+    cache_key = bool(prefer_hat)
+    with _speaker_cache_lock:
+        if not refresh and cache_key in _speaker_device_cache:
+            return _speaker_device_cache[cache_key]
+
+    device = None
     try:
         result = subprocess.run(
             ["aplay", "-l"], capture_output=True, text=True, timeout=5,
@@ -252,17 +255,20 @@ def find_speaker_device(prefer_hat: bool = False) -> str | None:
                 respeaker_card = card_num
         if prefer_hat:
             if respeaker_card:
-                return f"plughw:{respeaker_card},0"
-            if hdmi_card:
-                return f"plughw:{hdmi_card},0"
+                device = f"plughw:{respeaker_card},0"
+            elif hdmi_card:
+                device = f"plughw:{hdmi_card},0"
         else:
             if hdmi_card:
-                return f"plughw:{hdmi_card},0"
-            if respeaker_card:
-                return f"plughw:{respeaker_card},0"
+                device = f"plughw:{hdmi_card},0"
+            elif respeaker_card:
+                device = f"plughw:{respeaker_card},0"
     except Exception:
         pass
-    return None
+
+    with _speaker_cache_lock:
+        _speaker_device_cache[cache_key] = device
+    return device
 
 
 def set_mic_gain(card: str = "2", gain: int = 60) -> None:
@@ -277,11 +283,22 @@ def set_mic_gain(card: str = "2", gain: int = 60) -> None:
         log.warning("Failed to set mic gain: %s", e)
 
 
-def set_speaker_volume() -> None:
-    device = find_speaker_device()
+def _speaker_card(device: str) -> str | None:
+    match = re.match(r"(?:plug)?hw:(\d+),", device)
+    return match.group(1) if match else None
+
+
+def set_speaker_volume(device: str | None = None) -> None:
+    device = device or find_speaker_device()
     if not device:
         return
-    card = device.split(":")[0].replace("plughw", "").replace("hw", "")
+    with _speaker_cache_lock:
+        if device in _speaker_volume_ready:
+            return
+
+    card = _speaker_card(device)
+    if not card:
+        return
     for control in ["Speaker", "Playback", "HP Playback",
                     "Line Playback", "PCM Playback", "PCM"]:
         try:
@@ -291,14 +308,16 @@ def set_speaker_volume() -> None:
             )
         except Exception:
             pass
+    with _speaker_cache_lock:
+        _speaker_volume_ready.add(device)
 
 
 def play_sound(path: Path, prefer_hat: bool = False) -> subprocess.Popen | None:
     """Play a WAV file (non-blocking). prefer_hat=True routes to ReSpeaker HAT."""
     if not path.exists():
         return None
-    set_speaker_volume()
     device = find_speaker_device(prefer_hat=prefer_hat)
+    set_speaker_volume(device)
     cmd = ["aplay", "-q"]
     if device:
         cmd.extend(["-D", device])
@@ -308,6 +327,14 @@ def play_sound(path: Path, prefer_hat: bool = False) -> subprocess.Popen | None:
     except Exception as e:
         log.warning("Failed to play %s: %s", path, e)
         return None
+
+
+def warm_audio_output() -> None:
+    """Prime speaker device discovery/volume so chime HTTP calls stay fast."""
+    for prefer_hat in (False, True):
+        device = find_speaker_device(prefer_hat=prefer_hat)
+        if device:
+            set_speaker_volume(device)
 
 
 RECORD_BEEP_PATH = SOUNDS_DIR / "record_beep.wav"
@@ -936,6 +963,8 @@ class RecordingManager:
         # Timers
         self._timers: list[dict] = []
         self._timer_counter = 0
+        # Live voice caption state from the Mac mini voice service.
+        self._transcription = {"text": "", "is_wake": False, "ts": 0}
         # Enrollment state (custom wake word recording)
         self._enroll_state = "idle"  # idle, waiting, recording, processing
         self._enroll_name = None
@@ -1027,6 +1056,23 @@ class RecordingManager:
             self._timers.append(timer)
             log.info("Timer created: %s (%ds)", name, total_seconds)
             return timer
+
+    def set_transcription(self, payload: dict) -> dict:
+        """Update live transcription state for the dashboard overlay."""
+        text = str(payload.get("text", ""))
+        state = {
+            "text": text,
+            "is_wake": bool(payload.get("is_wake", payload.get("isWake", False))),
+            "ts": float(payload.get("ts", time.time())),
+        }
+        for key in ("stage", "wakeScore", "command"):
+            if key in payload:
+                state[key] = payload[key]
+        with self._lock:
+            self._transcription = state
+            if state["is_wake"]:
+                self._listening_until = time.time() + 5.0
+            return dict(self._transcription)
 
     def dismiss_all_timers(self):
         """Dismiss all expired timers."""
@@ -1389,7 +1435,7 @@ class RecordingManager:
                 if path == "/status":
                     with mgr._lock:
                         self._respond_json(mgr._get_status())
-                elif path == "/gesture":
+                elif path == "/gesture" or path == "/api/gesture":
                     with mgr._lock:
                         self._respond_json({
                             "gesture": mgr._gesture_latest,
@@ -1403,6 +1449,9 @@ class RecordingManager:
                     with mgr._lock:
                         events = [e for e in mgr._debug_events if e["timestamp"] > since]
                     self._respond_json({"events": events})
+                elif path == "/api/transcription":
+                    with mgr._lock:
+                        self._respond_json(dict(mgr._transcription))
                 elif path == "/api/navigate":
                     with mgr._lock:
                         self._respond_json({"navigation": dict(mgr._navigation)})
@@ -1516,14 +1565,38 @@ class RecordingManager:
                     )
                     self._respond_json({"ok": True})
 
+                elif self.path == "/api/transcription":
+                    state = mgr.set_transcription(body)
+                    self._respond_json({"ok": True, **state})
+
+                elif self.path == "/api/chime":
+                    mgr.set_listening(5.0)
+                    self._respond_json({"ok": True})
+
+                    def _play_chime():
+                        try:
+                            play_acknowledgement()
+                        except Exception as e:
+                            log.warning("Background chime failed: %s", e)
+
+                    threading.Thread(target=_play_chime, daemon=True).start()
+
+                elif self.path == "/api/tv/on":
+                    turn_on_tv()
+                    self._respond_json({"ok": True})
+
+                elif self.path == "/api/tv/off":
+                    turn_off_tv()
+                    self._respond_json({"ok": True})
+
                 elif self.path == "/api/navigate":
                     mgr.navigate(body.get("page"), body.get("view"))
                     with mgr._lock:
                         self._respond_json({"ok": True, "navigation": dict(mgr._navigation)})
 
                 elif self.path == "/api/timers":
-                    name = body.get("name", "timer")
-                    seconds = body.get("totalSeconds", 60)
+                    name = body.get("name") or body.get("label") or "timer"
+                    seconds = body.get("totalSeconds", body.get("duration", 60))
                     source = body.get("source", "voice")
                     timer = mgr.add_timer(name, int(seconds), source)
                     self._respond_json({"ok": True, "timer": timer})
@@ -1786,6 +1859,8 @@ def main() -> None:
                         help="Worker API base URL (e.g., https://your-worker.workers.dev)")
     parser.add_argument("--worker-token", type=str, default=None,
                         help="Worker API auth token")
+    parser.add_argument("--no-wake-detection", action="store_true",
+                        help="Run only HTTP endpoints, chimes, timers, and gestures.")
     args = parser.parse_args()
 
     if args.debug:
@@ -1809,6 +1884,35 @@ def main() -> None:
         generate_enroll_start(ENROLL_START_PATH)
     if not ENROLL_COMPLETE_PATH.exists():
         generate_enroll_complete(ENROLL_COMPLETE_PATH)
+
+    threading.Thread(target=warm_audio_output, daemon=True).start()
+
+    if args.no_wake_detection:
+        rec_mgr = RecordingManager(args.worker_url, args.worker_token)
+        global _local_server
+        _local_server = rec_mgr
+
+        alarm_thread = AlarmThread(rec_mgr, args.dry_run)
+        alarm_thread.start()
+        log.info("Alarm thread started (local timers, every %ds)", ALARM_POLL_INTERVAL)
+
+        gesture_thread = None
+        if args.worker_url:
+            gesture_thread = GestureThread(args.worker_url, args.worker_token, args.dry_run)
+            gesture_thread.start()
+            log.info("Gesture thread started (polling worker every 2s)")
+
+        log.info("Wake detection disabled; command HTTP server is ready.")
+        try:
+            while True:
+                time.sleep(3600)
+        except KeyboardInterrupt:
+            log.info("Shutting down...")
+        finally:
+            alarm_thread.stop()
+            if gesture_thread:
+                gesture_thread.stop()
+        return
 
     # Pre-load models so first command is fast
     try:
@@ -1852,7 +1956,6 @@ def main() -> None:
     rec_mgr = RecordingManager(args.worker_url, args.worker_token)
 
     # Wire up global reference for in-process callers (debug_post, cfg)
-    global _local_server
     _local_server = rec_mgr
 
     # Start alarm thread (uses local timers via rec_mgr)

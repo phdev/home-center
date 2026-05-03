@@ -15,6 +15,7 @@ const PENCIL_PAGES = [
   { slug: "full-llm-response-page", label: "LLM Response Page Design", nodeId: "dMUil" },
   { slug: "full-history-page", label: "History Page Design", nodeId: "Tbtje" },
   { slug: "transcription-overlay", label: "Transcription Overlay Design", nodeId: "DeP7G" },
+  { slug: "voice-transcription-overlay", label: "Voice Transcription Overlay Design", nodeId: "Jf7Tx" },
   { slug: "openclaw-ui-additions", label: "OpenClaw UI Additions (8 new cards)", nodeId: "ONYZi" },
 ];
 
