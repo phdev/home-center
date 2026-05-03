@@ -6,7 +6,7 @@
 #   - Raspberry Pi OS (64-bit, Bookworm) flashed and booted
 #   - SSH access or direct terminal
 #   - Internet connection
-#   - ReSpeaker 2-Mics Pi HAT attached (or USB mic as fallback)
+#   - ReSpeaker XVF3800 USB 4-Mic Array attached
 # ==============================================================================
 set -euo pipefail
 
@@ -50,26 +50,7 @@ if [ "${NODE_VERSION:-0}" -lt 18 ]; then
   sudo apt-get install -y nodejs
 fi
 
-# ---------- ReSpeaker 2-Mics Pi HAT driver ----------
-log "Installing ReSpeaker 2-Mics Pi HAT driver..."
-# The seeed-voicecard driver for WM8960 codec
-if [ ! -d "$USER_HOME/seeed-voicecard" ]; then
-  git clone https://github.com/HinTak/seeed-voicecard.git "$USER_HOME/seeed-voicecard" || {
-    # Fallback to original repo if HinTak fork unavailable
-    git clone https://github.com/respeaker/seeed-voicecard.git "$USER_HOME/seeed-voicecard" || true
-  }
-fi
-
-if [ -d "$USER_HOME/seeed-voicecard" ]; then
-  cd "$USER_HOME/seeed-voicecard"
-  # Try to install; non-fatal if Pi 5 kernel headers differ
-  sudo ./install.sh || {
-    err "ReSpeaker driver install failed. This is common on Pi 5."
-    err "The wake word service will fall back to any available ALSA mic (USB or built-in)."
-    log "You can try a USB microphone as an alternative."
-  }
-  cd "$REPO_DIR"
-fi
+# The XVF3800 is USB Audio Class. No vendor kernel driver is required.
 
 # ---------- Python virtual environment for wake word ----------
 log "Setting up Python virtual environment..."
@@ -101,9 +82,15 @@ sudo cp "$SCRIPT_DIR/services/wake-word.service" /etc/systemd/system/
 sudo sed -i "s|__REPO_DIR__|$REPO_DIR|g" /etc/systemd/system/wake-word.service
 sudo sed -i "s|__USER__|$USER|g" /etc/systemd/system/wake-word.service
 
+# Mic streamer service
+sudo cp "$SCRIPT_DIR/services/mic-streamer.service" /etc/systemd/system/
+sudo sed -i "s|__REPO_DIR__|$REPO_DIR|g" /etc/systemd/system/mic-streamer.service
+sudo sed -i "s|__USER__|$USER|g" /etc/systemd/system/mic-streamer.service
+
 sudo systemctl daemon-reload
 sudo systemctl enable dashboard-local.service
 sudo systemctl enable wake-word.service
+sudo systemctl enable mic-streamer.service
 
 # Chromium itself is launched by ~/.config/labwc/autostart, not by a systemd
 # unit — that's the simplest way to inherit the user's Wayland session. Run
@@ -157,15 +144,18 @@ log "============================================"
 log ""
 log " Services installed:"
 log "   - dashboard-local : Python HTTP server (no-cache) on :8080 serving dist"
-log "   - wake-word       : Listens for 'Hey Homer' and turns on TV"
+log "   - mic-streamer    : XVF3800 PipeWire audio stream on :8766"
+log "   - wake-word       : Pi command server on :8765 (CEC, timers, chime)"
 log "   (Chromium kiosk is launched from ~/.config/labwc/autostart on session start)"
 log ""
 log " To start now (without reboot):"
 log "   sudo systemctl start dashboard-local"
+log "   sudo systemctl start mic-streamer"
 log "   sudo systemctl start wake-word"
 log ""
 log " To check status:"
 log "   sudo systemctl status wake-word"
+log "   sudo systemctl status mic-streamer"
 log "   journalctl -u wake-word -f"
 log ""
 log " Reboot to start everything automatically:"

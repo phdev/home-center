@@ -1,9 +1,15 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import { normalizeCommandEvent, validateCommandEvent } from "../core/commands/commandEvent";
 
-export function useVoiceInput({ onResult, onInterim }) {
+export function useVoiceInput({ onResult, onInterim, onCommandEvent }) {
   const [listening, setListening] = useState(false);
   const [supported, setSupported] = useState(false);
   const recRef = useRef(null);
+  const callbacksRef = useRef({ onResult, onInterim, onCommandEvent });
+
+  useEffect(() => {
+    callbacksRef.current = { onResult, onInterim, onCommandEvent };
+  }, [onResult, onInterim, onCommandEvent]);
 
   useEffect(() => {
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -14,15 +20,39 @@ export function useVoiceInput({ onResult, onInterim }) {
       rec.interimResults = true;
       rec.lang = "en-US";
       rec.onresult = (e) => {
+        const callbacks = callbacksRef.current;
         let interim = "";
         let final = "";
+        let finalConfidence = null;
         for (let i = e.resultIndex; i < e.results.length; i++) {
-          const tr = e.results[i][0].transcript;
-          if (e.results[i].isFinal) final += tr;
-          else interim += tr;
+          const alternative = e.results[i][0];
+          const tr = alternative.transcript;
+          if (e.results[i].isFinal) {
+            final += tr;
+            if (Number.isFinite(alternative.confidence)) {
+              finalConfidence = finalConfidence == null
+                ? alternative.confidence
+                : Math.max(finalConfidence, alternative.confidence);
+            }
+          } else {
+            interim += tr;
+          }
         }
-        if (final && onResult) onResult(final.trim());
-        if (interim && onInterim) onInterim(interim);
+        if (final) {
+          const commandEvent = normalizeCommandEvent({
+            source: "voice",
+            transcript: final,
+            wakewordDetected: false,
+            confidence: finalConfidence,
+            locale: rec.lang,
+            deviceType: "browser",
+          });
+          if (validateCommandEvent(commandEvent)) {
+            if (callbacks.onCommandEvent) callbacks.onCommandEvent(commandEvent);
+            if (callbacks.onResult) callbacks.onResult(commandEvent);
+          }
+        }
+        if (interim && callbacks.onInterim) callbacks.onInterim(interim);
       };
       rec.onend = () => setListening(false);
       rec.onerror = () => setListening(false);

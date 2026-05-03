@@ -88,9 +88,9 @@ export function SearchPanel({ t, llmSettings, workerSettings }) {
   };
 
   const voice = useVoiceInput({
-    onResult: (f) => {
+    onResult: (event) => {
       setInterim("");
-      send(f);
+      send(event.transcript);
     },
     onInterim: (txt) => setInterim(txt),
   });

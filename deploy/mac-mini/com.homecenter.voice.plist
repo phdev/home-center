@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.homecenter.voice</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>__REPO__/voice-service/.venv/bin/python3</string>
+        <string>__REPO__/voice-service/voice_service.py</string>
+    </array>
+    <key>WorkingDirectory</key>
+    <string>__REPO__/voice-service</string>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+        <key>MIC_STREAM_HOST</key>
+        <string>homecenter.local</string>
+        <key>MIC_STREAM_PORT</key>
+        <string>8766</string>
+        <key>PI_COMMAND_URL</key>
+        <string>http://homecenter.local:8765</string>
+        <key>WORKER_URL</key>
+        <string>https://home-center-api.phhowell.workers.dev</string>
+        <key>WORKER_TOKEN</key>
+        <string>__WORKER_TOKEN__</string>
+        <key>VOSK_MODEL_DIR</key>
+        <string>__REPO__/voice-service/models/vosk-model-small-en-us-0.15</string>
+        <key>WHISPER_MODEL</key>
+        <string>base.en</string>
+        <key>WAKE_ENGINE</key>
+        <string>vosk</string>
+        <key>WAKE_CONFIRM_COMMAND</key>
+        <string>0</string>
+        <key>CONFIRM_PRE_WAKE_SECONDS</key>
+        <string>5.0</string>
+        <key>CONFIRM_POST_WAKE_SECONDS</key>
+        <string>2.0</string>
+        <key>OPENWAKEWORD_MODEL</key>
+        <string>__REPO__/pi/models/hey_homer.onnx</string>
+        <key>OPENWAKEWORD_THRESHOLD</key>
+        <string>0.92</string>
+        <key>OPENWAKEWORD_MIN_CONSECUTIVE</key>
+        <string>3</string>
+        <key>OPENWAKEWORD_AUDIO_HEARTBEAT_SECONDS</key>
+        <string>2.0</string>
+        <key>OPENWAKEWORD_AUDIO_LOG_MIN_RMS</key>
+        <string>180</string>
+        <key>OPENWAKEWORD_AUDIO_LOG_INTERVAL_SECONDS</key>
+        <string>1.0</string>
+        <key>SPEECH_CANDIDATE_MIN_PEAK_RMS</key>
+        <string>450</string>
+        <key>SPEECH_CANDIDATE_END_SILENCE_SECONDS</key>
+        <string>0.65</string>
+    </dict>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>StandardOutPath</key>
+    <string>__REPO__/voice-service/logs/voice-stdout.log</string>
+    <key>StandardErrorPath</key>
+    <string>__REPO__/voice-service/logs/voice-stderr.log</string>
+</dict>
+</plist>

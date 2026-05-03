@@ -7,11 +7,10 @@ const pulseKeyframes = `
 }
 `;
 
-export function RecordingIndicator({ active, type, totalPositive, totalNegative }) {
-  const pos = totalPositive || 0;
-  const neg = totalNegative || 0;
+export function RecordingIndicator({ active, type, count }) {
+  const sessionCount = count || 0;
+  const mode = type === "negative" ? "−" : "+";
 
-  // Always show — gives visibility into wake word training progress
   return (
     <>
       <style>{pulseKeyframes}</style>
@@ -49,7 +48,7 @@ export function RecordingIndicator({ active, type, totalPositive, totalNegative 
                 whiteSpace: "nowrap",
               }}
             >
-              {type === "positive" ? "+" : "−"} Listening
+              {mode} Recording
             </span>
           </>
         ) : (
@@ -63,7 +62,7 @@ export function RecordingIndicator({ active, type, totalPositive, totalNegative 
                 whiteSpace: "nowrap",
               }}
             >
-              Idle
+              Recorder idle
             </span>
           </>
         )}
@@ -71,26 +70,17 @@ export function RecordingIndicator({ active, type, totalPositive, totalNegative 
         {/* Divider */}
         <div style={{ width: 1, height: 16, background: "#FFFFFF30" }} />
 
-        {/* Positive / Negative counts */}
+        {/* Current session count only. Legacy saved-sample totals are not shown here
+            because the production Vosk path no longer uses the old 50/50 target. */}
         <span
           style={{
             fontFamily: "'JetBrains Mono',ui-monospace,monospace",
             fontSize: 13,
-            color: pos >= 50 ? "#22C55E" : "#FFFFFF99",
+            color: active ? "#EF4444" : "#FFFFFF99",
             whiteSpace: "nowrap",
           }}
         >
-          +{pos}/50
-        </span>
-        <span
-          style={{
-            fontFamily: "'JetBrains Mono',ui-monospace,monospace",
-            fontSize: 13,
-            color: neg >= 50 ? "#22C55E" : "#FFFFFF99",
-            whiteSpace: "nowrap",
-          }}
-        >
-          −{neg}/50
+          {mode}{sessionCount}
         </span>
       </div>
     </>
