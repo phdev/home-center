@@ -1,5 +1,6 @@
 from pathlib import Path
 import sys
+from types import SimpleNamespace
 
 import numpy as np
 
@@ -7,6 +8,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from voice_service import (
     AudioActivityHeartbeat,
+    build_wake_detector,
     command_from_transcript,
     CONFIRM_WAKE_PHRASE_RE,
     confirmed_command_from_transcript,
@@ -26,10 +28,28 @@ from voice_service import (
     should_emit_verifying_transcription,
     SpeechCandidateDetector,
     SpeechSegmentDebounce,
+    transcribe,
     update_noise_floor,
     updated_speech_max_empty_backoff_until,
     validate_wake_mode_config,
 )
+
+
+def speech_detector_args(**overrides):
+    defaults = {
+        "wake_engine": "speech",
+        "speech_candidate_cooldown_seconds": 0.5,
+        "speech_candidate_end_silence_seconds": 0.65,
+        "speech_candidate_min_peak_rms": 450,
+        "speech_candidate_min_active_chunks": 3,
+        "speech_candidate_min_active_rms": 180,
+        "speech_candidate_active_rms_multiplier": 1.8,
+        "speech_candidate_min_segment_seconds": 0.3,
+        "speech_candidate_pre_roll_seconds": 0.45,
+        "speech_candidate_max_segment_seconds": 6.0,
+    }
+    defaults.update(overrides)
+    return SimpleNamespace(**defaults)
 
 
 def test_recent_speech_gate_rejects_quiet_dnn_hit():
@@ -201,6 +221,13 @@ def test_speech_candidate_detector_triggers_after_active_segment_silence():
     assert source.startswith("speech:peak=600:active=3")
 
 
+def test_speech_candidate_detector_uses_its_own_short_cooldown():
+    detector = build_wake_detector(speech_detector_args(speech_candidate_cooldown_seconds=0.4))
+
+    assert isinstance(detector, SpeechCandidateDetector)
+    assert detector.cooldown == 0.4
+
+
 def test_speech_candidate_detector_rejects_short_quiet_segments():
     detector = SpeechCandidateDetector(
         cooldown=0.0,
@@ -258,6 +285,23 @@ def test_speech_candidate_detector_exposes_segment_audio_with_preroll():
 def test_noise_floor_does_not_learn_active_speech():
     assert update_noise_floor(100.0, chunk_rms=800.0, active_gate=180.0) == 100.0
     assert update_noise_floor(100.0, chunk_rms=40.0, active_gate=180.0) < 100.0
+
+
+def test_transcribe_passes_configured_no_speech_threshold(monkeypatch):
+    captured = {}
+
+    class FakeModel:
+        def transcribe(self, _audio, **kwargs):
+            captured.update(kwargs)
+            return [SimpleNamespace(text=" Hey Homer, stop ")], {}
+
+    monkeypatch.setattr("voice_service.get_whisper", lambda _model_name: FakeModel())
+
+    text = transcribe(np.ones(1600, dtype=np.int16), "fake-model", no_speech_threshold=0.95)
+
+    assert text == "Hey Homer, stop"
+    assert captured["no_speech_threshold"] == 0.95
+    assert captured["condition_on_previous_text"] is False
 
 
 def test_speech_candidate_detector_keeps_short_command_after_loud_segment():

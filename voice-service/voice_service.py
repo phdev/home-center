@@ -62,6 +62,7 @@ OPENWAKEWORD_EMPTY_CONFIRM_COOLDOWN_SECONDS = float(
     os.environ.get("OPENWAKEWORD_EMPTY_CONFIRM_COOLDOWN_SECONDS", "4.0")
 )
 SPEECH_CANDIDATE_END_SILENCE_SECONDS = float(os.environ.get("SPEECH_CANDIDATE_END_SILENCE_SECONDS", "0.65"))
+SPEECH_CANDIDATE_COOLDOWN_SECONDS = float(os.environ.get("SPEECH_CANDIDATE_COOLDOWN_SECONDS", "0.5"))
 SPEECH_CANDIDATE_MIN_PEAK_RMS = float(os.environ.get("SPEECH_CANDIDATE_MIN_PEAK_RMS", "450"))
 SPEECH_CANDIDATE_MIN_ACTIVE_CHUNKS = int(os.environ.get("SPEECH_CANDIDATE_MIN_ACTIVE_CHUNKS", "3"))
 SPEECH_CANDIDATE_MIN_ACTIVE_RMS = float(os.environ.get("SPEECH_CANDIDATE_MIN_ACTIVE_RMS", "180"))
@@ -80,6 +81,7 @@ SPEECH_CANDIDATE_EMPTY_BACKOFF_STRONG_MIN_PEAK_RMS = float(
 SPEECH_CANDIDATE_EMPTY_BACKOFF_STRONG_MIN_ACTIVE_CHUNKS = int(
     os.environ.get("SPEECH_CANDIDATE_EMPTY_BACKOFF_STRONG_MIN_ACTIVE_CHUNKS", "12")
 )
+WHISPER_NO_SPEECH_THRESHOLD = float(os.environ.get("WHISPER_NO_SPEECH_THRESHOLD", "0.45"))
 
 logging.basicConfig(
     level=logging.INFO,
@@ -407,7 +409,7 @@ def build_wake_detector(args) -> VoskWakeDetector | OpenWakeWordWakeDetector | S
         )
     if is_local_stt_engine(args.wake_engine):
         return SpeechCandidateDetector(
-            cooldown=args.cooldown,
+            cooldown=args.speech_candidate_cooldown_seconds,
             end_silence_seconds=args.speech_candidate_end_silence_seconds,
             min_peak_rms=args.speech_candidate_min_peak_rms,
             min_active_chunks=args.speech_candidate_min_active_chunks,
@@ -439,7 +441,7 @@ def get_whisper(model_name: str):
     return _whisper_model
 
 
-def transcribe(audio: np.ndarray, model_name: str) -> str:
+def transcribe(audio: np.ndarray, model_name: str, no_speech_threshold: float = WHISPER_NO_SPEECH_THRESHOLD) -> str:
     model = get_whisper(model_name)
     if len(audio) == 0:
         return ""
@@ -451,7 +453,7 @@ def transcribe(audio: np.ndarray, model_name: str) -> str:
         beam_size=1,
         language="en",
         condition_on_previous_text=False,
-        no_speech_threshold=0.45,
+        no_speech_threshold=no_speech_threshold,
         vad_filter=False,
         initial_prompt=(
             "Hey Homer, turn on. Hey Homer, open calendar. "
@@ -1012,6 +1014,12 @@ def main() -> None:
         help="Quiet audio needed before speech candidate mode confirms a segment.",
     )
     parser.add_argument(
+        "--speech-candidate-cooldown-seconds",
+        type=float,
+        default=SPEECH_CANDIDATE_COOLDOWN_SECONDS,
+        help="Minimum seconds between speech candidate confirmations.",
+    )
+    parser.add_argument(
         "--speech-candidate-min-peak-rms",
         type=float,
         default=SPEECH_CANDIDATE_MIN_PEAK_RMS,
@@ -1126,6 +1134,12 @@ def main() -> None:
     )
     parser.add_argument("--cooldown", type=float, default=float(os.environ.get("WAKE_COOLDOWN", "3.0")))
     parser.add_argument("--whisper-model", default=os.environ.get("WHISPER_MODEL", "base.en"))
+    parser.add_argument(
+        "--whisper-no-speech-threshold",
+        type=float,
+        default=WHISPER_NO_SPEECH_THRESHOLD,
+        help="faster-whisper no_speech_threshold; higher values preserve short quiet commands.",
+    )
     parser.add_argument("--debug", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
@@ -1152,14 +1166,15 @@ def main() -> None:
     segment_debounce = SpeechSegmentDebounce(args.openwakeword_segment_end_silence_seconds)
     audio_heartbeat = AudioActivityHeartbeat(args.openwakeword_audio_heartbeat_seconds)
     log.info(
-        "Ready: wake=%s STT=%s preWake=%.1fs postWakeMax=%.1fs recentRms=%.1fs "
+        "Ready: wake=%s STT=%s whisperNoSpeech=%.2f preWake=%.1fs postWakeMax=%.1fs recentRms=%.1fs "
         "confirmCommand=%s confirmMulti=%s confirmPre=%.1fs confirmPostMax=%.1fs postActionMute=%.1fs "
         "audioHeartbeat=%.1fs audioLogMin=%.0f scoreLogMin=%.2f segmentSilence=%.1fs emptyCooldown=%.1fs "
-        "speechMinPeak=%.0f speechEndSilence=%.1fs speechPreRoll=%.1fs speechMaxSegment=%.1fs "
+        "speechMinPeak=%.0f speechEndSilence=%.1fs speechCooldown=%.1fs speechPreRoll=%.1fs speechMaxSegment=%.1fs "
         "speechMaxEmptyBackoff=%.1fs speechEmptyBackoff=%.1fs speechEmptyStrongPeak=%.0f "
         "speechEmptyStrongActive=%d speechEmitVerifying=%s",
         detector.name,
         args.whisper_model,
+        args.whisper_no_speech_threshold,
         args.pre_wake_seconds,
         COMMAND_MAX_SECONDS,
         args.openwakeword_recent_rms_seconds,
@@ -1175,6 +1190,7 @@ def main() -> None:
         args.openwakeword_empty_confirm_cooldown_seconds,
         args.speech_candidate_min_peak_rms,
         args.speech_candidate_end_silence_seconds,
+        args.speech_candidate_cooldown_seconds,
         args.speech_candidate_pre_roll_seconds,
         args.speech_candidate_max_segment_seconds,
         args.speech_candidate_max_empty_backoff_seconds,
@@ -1416,7 +1432,7 @@ def main() -> None:
                     on_chunk=on_confirm_chunk,
                 )
                 pre_log_samples = min(len(pre_audio), len(command_audio))
-            text = transcribe(command_audio, args.whisper_model)
+            text = transcribe(command_audio, args.whisper_model, args.whisper_no_speech_threshold)
             body, command, command_candidates = confirmed_command_from_transcript(
                 text,
                 fallback_text=wake_text,
@@ -1542,7 +1558,7 @@ def main() -> None:
             continue
 
         command_audio, post_seconds = capture_command(mic, rolling, noise, pre_audio)
-        text = transcribe(command_audio, args.whisper_model)
+        text = transcribe(command_audio, args.whisper_model, args.whisper_no_speech_threshold)
         body, command = command_from_transcript(text, fallback_text=wake_text)
         if command.get("action") != "none" and not is_dispatchable_command(command):
             log.info("Rejecting incomplete command body=%r command=%s", body, command)
