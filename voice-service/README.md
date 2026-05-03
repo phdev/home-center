@@ -107,10 +107,11 @@ CONFIRM_POST_WAKE_SECONDS=0.4 \
 CONFIRM_MIN_POST_WAKE_SECONDS=0.1 \
 SPEECH_CANDIDATE_MIN_PEAK_RMS=450 \
 SPEECH_CANDIDATE_END_SILENCE_SECONDS=0.65 \
+SPEECH_CANDIDATE_COOLDOWN_SECONDS=0.5 \
 SPEECH_CANDIDATE_PRE_ROLL_SECONDS=0.45 \
 SPEECH_CANDIDATE_MAX_SEGMENT_SECONDS=6.0 \
-SPEECH_CANDIDATE_MAX_EMPTY_BACKOFF_SECONDS=12.0 \
-SPEECH_CANDIDATE_EMPTY_BACKOFF_SECONDS=12.0 \
+SPEECH_CANDIDATE_MAX_EMPTY_BACKOFF_SECONDS=30.0 \
+SPEECH_CANDIDATE_EMPTY_BACKOFF_SECONDS=0 \
 SPEECH_CANDIDATE_EMPTY_BACKOFF_STRONG_MIN_PEAK_RMS=1800 \
 SPEECH_CANDIDATE_EMPTY_BACKOFF_STRONG_MIN_ACTIVE_CHUNKS=12 \
 CONFIRM_MULTI_COMMAND_DISPATCH=1 \
@@ -150,6 +151,13 @@ freezes its ambient noise estimate during active speech so a loud preamble or
 TV burst does not raise the gate and cause short commands like "stop" to be
 missed. It also caps active speech segments at
 `SPEECH_CANDIDATE_MAX_SEGMENT_SECONDS` before running local confirmation. In
+speech candidate mode, `SPEECH_CANDIDATE_COOLDOWN_SECONDS` intentionally stays
+shorter than the normal wake cooldown so rapid 5-phrase validation does not
+drop adjacent commands like `open calendar` -> `show the weather`.
+`WHISPER_NO_SPEECH_THRESHOLD` should stay at the default `0.45` unless a
+targeted short-command trial proves otherwise; `0.95` recovered one 5-phrase
+run but caused too many passive Whisper confirmations and hallucinated
+non-command transcripts. In
 `WAKE_ENGINE=speech`, if a max-length segment confirms no command, speech mode
 backs off further max-length confirmations for
 `SPEECH_CANDIDATE_MAX_EMPTY_BACKOFF_SECONDS`; shorter silence-ended command
@@ -261,6 +269,16 @@ the 2026-05-03 5-phrase dry-run passed 5/5 with median local STT/action latency
 around 285 ms after segment end and no ignored candidate wakes. The matching
 2026-05-01 2-minute passive run produced 0 dispatches and 0 command candidates
 with 6 internal Whisper confirmations and 13 skipped candidates.
+
+Current follow-up baseline: the 2026-05-03 post-merge speech dry-run initially
+reached 3/5 because speech mode inherited the generic 3s wake cooldown and
+dropped adjacent commands. With `SPEECH_CANDIDATE_COOLDOWN_SECONDS=0.5`,
+`SPEECH_CANDIDATE_EMPTY_BACKOFF_SECONDS=0`,
+`SPEECH_CANDIDATE_MAX_EMPTY_BACKOFF_SECONDS=30.0`, and the default
+`WHISPER_NO_SPEECH_THRESHOLD=0.45`, the final 5-phrase dry-run passed 5/5 with
+median wake-to-action latency around 288 ms and p95 around 335 ms. The matching
+2-minute passive run produced 0 dispatches and 0 command candidates with 4
+internal Whisper confirmations.
 
 ## Debug
 
