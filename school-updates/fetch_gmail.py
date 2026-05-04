@@ -2,135 +2,109 @@
 """
 Fetch school-related emails from Gmail and output as JSON.
 
-Used by the NanoClaw agent as a tool to read school emails.
-Outputs a JSON array of recent school-related emails to stdout.
+Uses Howie's shared `gog` Gmail auth instead of this service's old
+token.json, so there is a single read-only Gmail authorization path.
 
 Usage:
     python fetch_gmail.py [--days 7] [--max 20]
 """
 
 import argparse
-import base64
 import json
-import os
-import sys
 import logging
+import os
+import shutil
+import subprocess
 from email.utils import parseaddr
-from datetime import datetime
-
-from google.auth.transport.requests import Request
-from google.oauth2.credentials import Credentials
-from googleapiclient.discovery import build
 
 logger = logging.getLogger(__name__)
 
-SCOPES = ["https://www.googleapis.com/auth/gmail.readonly"]
-
-# Look for credentials in script directory or /workspace/extra/
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-SEARCH_PATHS = [SCRIPT_DIR, "/workspace/extra", "."]
+DEFAULT_GOG_ACCOUNT = "phhowell@gmail.com"
+GOG_PASSWORD_FILE = os.path.expanduser("~/.openclaw/credentials/gog-keyring-password")
 
 SCHOOL_QUERY = (
     "("
-    "from:school OR from:edu OR from:teacher OR from:classroom "
+    "from:rbusd.org OR from:jeffersonptarb.org OR from:parentsquare.com "
+    "OR from:school OR from:teacher OR from:classroom "
     "OR subject:homework OR subject:school OR subject:class "
     "OR subject:assignment OR subject:\"field trip\" "
     "OR subject:PTA OR subject:\"report card\" OR subject:grade "
     "OR subject:teacher OR subject:classroom OR subject:lunch "
     "OR subject:bus OR subject:dismissal OR subject:conference "
-    "OR subject:volunteer OR subject:book fair"
+    "OR subject:volunteer OR subject:\"book fair\" "
+    "OR subject:\"Weekly Update\" OR subject:DDYK"
     ")"
 )
 
 
-def find_file(filename):
-    """Find a file in known search paths."""
-    for path in SEARCH_PATHS:
-        full = os.path.join(path, filename)
-        if os.path.exists(full):
-            return full
-    return None
+def gog_env():
+    """Return an environment that can unlock Howie's gog Gmail token."""
+    env = os.environ.copy()
+    env.setdefault("GOG_ACCOUNT", DEFAULT_GOG_ACCOUNT)
+    if not env.get("GOG_KEYRING_PASSWORD") and os.path.exists(GOG_PASSWORD_FILE):
+        with open(GOG_PASSWORD_FILE, encoding="utf-8") as f:
+            env["GOG_KEYRING_PASSWORD"] = f.read().strip()
+    return env
 
 
-def get_gmail_service():
-    """Authenticate and return Gmail API service."""
-    creds_file = find_file("credentials.json")
-    token_file = find_file("token.json")
+def run_gog_search(query, max_results):
+    gog = shutil.which("gog") or "/opt/homebrew/bin/gog"
+    if not os.path.exists(gog):
+        return {"error": f"gog not found at {gog}", "emails": []}
 
-    if not creds_file:
-        print(json.dumps({"error": "credentials.json not found"}))
-        sys.exit(1)
+    account = os.environ.get("GOG_ACCOUNT", DEFAULT_GOG_ACCOUNT)
+    cmd = [
+        gog,
+        "gmail",
+        "messages",
+        "search",
+        query,
+        "--account",
+        account,
+        "--max",
+        str(max_results),
+        "--json",
+        "--include-body",
+        "--no-input",
+    ]
+    try:
+        proc = subprocess.run(
+            cmd,
+            check=False,
+            capture_output=True,
+            text=True,
+            env=gog_env(),
+            timeout=60,
+        )
+    except subprocess.TimeoutExpired:
+        return {"error": "gog Gmail query timed out", "emails": []}
+    except OSError as exc:
+        return {"error": f"gog Gmail query failed to start: {exc}", "emails": []}
 
-    creds = None
-    if token_file:
-        creds = Credentials.from_authorized_user_file(token_file, SCOPES)
+    if proc.returncode != 0:
+        detail = (proc.stderr or proc.stdout or "").strip()
+        return {"error": f"gog Gmail query failed ({proc.returncode}): {detail}", "emails": []}
 
-    if not creds or not creds.valid:
-        if creds and creds.expired and creds.refresh_token:
-            creds.refresh(Request())
-            # Save refreshed token
-            token_path = token_file or os.path.join(SCRIPT_DIR, "token.json")
-            with open(token_path, "w") as f:
-                f.write(creds.to_json())
-        else:
-            print(json.dumps({"error": "token.json missing or invalid. Run setup_gmail.py first."}))
-            sys.exit(1)
-
-    return build("gmail", "v1", credentials=creds)
-
-
-def extract_body(payload):
-    """Recursively extract text body from MIME parts."""
-    if payload.get("body", {}).get("data"):
-        return base64.urlsafe_b64decode(payload["body"]["data"]).decode("utf-8", errors="replace")
-
-    parts = payload.get("parts", [])
-    for part in parts:
-        if part.get("mimeType") == "text/plain":
-            data = part.get("body", {}).get("data", "")
-            if data:
-                return base64.urlsafe_b64decode(data).decode("utf-8", errors="replace")
-
-    for part in parts:
-        body = extract_body(part)
-        if body:
-            return body
-
-    return ""
+    try:
+        return json.loads(proc.stdout)
+    except json.JSONDecodeError as exc:
+        return {"error": f"gog Gmail query returned invalid JSON: {exc}", "emails": []}
 
 
 def fetch_school_emails(days=7, max_results=20):
     """Fetch recent school-related emails."""
-    service = get_gmail_service()
-
     query = f"newer_than:{days}d {SCHOOL_QUERY}"
+    results = run_gog_search(query, max_results)
+    if "error" in results:
+        return {"error": results["error"], "emails": []}
 
-    try:
-        results = service.users().messages().list(
-            userId="me",
-            q=query,
-            maxResults=max_results,
-        ).execute()
-    except Exception as e:
-        return {"error": f"Gmail query failed: {e}", "emails": []}
-
-    messages = results.get("messages", [])
     emails = []
-
-    for msg_info in messages:
+    for msg in results.get("messages", []) or []:
         try:
-            msg = service.users().messages().get(
-                userId="me",
-                id=msg_info["id"],
-                format="full",
-            ).execute()
-
-            headers = {h["name"].lower(): h["value"] for h in msg["payload"]["headers"]}
-            _, from_addr = parseaddr(headers.get("from", ""))
-            from_name = headers.get("from", "").split("<")[0].strip().strip('"')
-
-            body = extract_body(msg["payload"])
-            # Truncate for summarization
+            from_header = msg.get("from", "")
+            _, from_addr = parseaddr(from_header)
+            from_name = from_header.split("<")[0].strip().strip('"')
+            body = msg.get("body", "") or ""
             if len(body) > 1500:
                 body = body[:1500] + "..."
 
@@ -138,13 +112,13 @@ def fetch_school_emails(days=7, max_results=20):
                 "id": msg["id"],
                 "from": from_name or from_addr,
                 "from_addr": from_addr,
-                "subject": headers.get("subject", "(no subject)"),
+                "subject": msg.get("subject", "(no subject)"),
                 "snippet": msg.get("snippet", ""),
                 "body": body,
-                "date": headers.get("date", ""),
+                "date": msg.get("date", ""),
             })
         except Exception as e:
-            logger.warning("Failed to fetch email %s: %s", msg_info["id"], e)
+            logger.warning("Failed to normalize email %s: %s", msg.get("id"), e)
 
     return {"emails": emails, "count": len(emails), "query": query}
 

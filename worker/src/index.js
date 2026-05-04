@@ -715,7 +715,7 @@ async function handleBirthdayPatch(id, request, env) {
 //     treats any response with empty fields as "use deterministic fallback".
 
 const CLAW_ENHANCE_CACHE_TTL = 3600;              // 1 h
-const CLAW_ENHANCE_DEFAULT_MODEL = "gpt-5.4-mini";
+const CLAW_ENHANCE_DEFAULT_MODEL = "gpt-5.5";
 
 async function handleClawEnhance(request, env) {
   if (!env.OPENAI_API_KEY) {
