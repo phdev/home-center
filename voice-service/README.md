@@ -111,9 +111,9 @@ SPEECH_CANDIDATE_COOLDOWN_SECONDS=0.5 \
 SPEECH_CANDIDATE_PRE_ROLL_SECONDS=0.45 \
 SPEECH_CANDIDATE_MAX_SEGMENT_SECONDS=6.0 \
 SPEECH_CANDIDATE_MAX_EMPTY_BACKOFF_SECONDS=30.0 \
-SPEECH_CANDIDATE_EMPTY_BACKOFF_SECONDS=0 \
+SPEECH_CANDIDATE_EMPTY_BACKOFF_SECONDS=8.0 \
 SPEECH_CANDIDATE_EMPTY_BACKOFF_STRONG_MIN_PEAK_RMS=1800 \
-SPEECH_CANDIDATE_EMPTY_BACKOFF_STRONG_MIN_ACTIVE_CHUNKS=12 \
+SPEECH_CANDIDATE_EMPTY_BACKOFF_STRONG_MIN_ACTIVE_CHUNKS=8 \
 CONFIRM_MULTI_COMMAND_DISPATCH=1 \
 POST_ACTION_MUTE_SECONDS=0.5 \
 python voice_service.py --dry-run --debug
@@ -277,12 +277,15 @@ with 6 internal Whisper confirmations and 13 skipped candidates.
 Current follow-up baseline: the 2026-05-03 post-merge speech dry-run initially
 reached 3/5 because speech mode inherited the generic 3s wake cooldown and
 dropped adjacent commands. With `SPEECH_CANDIDATE_COOLDOWN_SECONDS=0.5`,
-`SPEECH_CANDIDATE_EMPTY_BACKOFF_SECONDS=0`,
 `SPEECH_CANDIDATE_MAX_EMPTY_BACKOFF_SECONDS=30.0`, and the default
 `WHISPER_NO_SPEECH_THRESHOLD=0.45`, the final 5-phrase dry-run passed 5/5 with
-median wake-to-action latency around 288 ms and p95 around 335 ms. The matching
-2-minute passive run produced 0 dispatches and 0 command candidates with 4
-internal Whisper confirmations.
+median wake-to-action latency around 288 ms and p95 around 335 ms. After the
+confirmed-command `stop` and explicit-ask guards, `SPEECH_CANDIDATE_EMPTY_BACKOFF_SECONDS=8.0`
+with strong override peak `1800`/active chunks `8` also passed the 5-phrase
+dry-run at 5/5 with median wake-to-action latency around 290 ms. The matching
+10-minute passive run produced 0 dispatches and 0 command candidates with 30
+internal Whisper confirmations and 20 `empty_backoff` skips, down from 71
+internal confirmations in the previous 10-minute passive baseline.
 
 Longer passive follow-up: the 2026-05-03 10-minute passive run produced one
 dry-run false command candidate from a local Whisper hallucination,

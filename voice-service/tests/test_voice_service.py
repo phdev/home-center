@@ -26,6 +26,10 @@ from voice_service import (
     should_log_openwakeword_audio,
     should_log_openwakeword_score,
     should_emit_verifying_transcription,
+    SPEECH_CANDIDATE_EMPTY_BACKOFF_SECONDS,
+    SPEECH_CANDIDATE_EMPTY_BACKOFF_STRONG_MIN_ACTIVE_CHUNKS,
+    SPEECH_CANDIDATE_EMPTY_BACKOFF_STRONG_MIN_PEAK_RMS,
+    SPEECH_CANDIDATE_MAX_EMPTY_BACKOFF_SECONDS,
     SpeechCandidateDetector,
     SpeechSegmentDebounce,
     transcribe,
@@ -50,6 +54,13 @@ def speech_detector_args(**overrides):
     }
     defaults.update(overrides)
     return SimpleNamespace(**defaults)
+
+
+def test_speech_candidate_defaults_match_validated_backoff_baseline():
+    assert SPEECH_CANDIDATE_MAX_EMPTY_BACKOFF_SECONDS == 30.0
+    assert SPEECH_CANDIDATE_EMPTY_BACKOFF_SECONDS == 8.0
+    assert SPEECH_CANDIDATE_EMPTY_BACKOFF_STRONG_MIN_PEAK_RMS == 1800.0
+    assert SPEECH_CANDIDATE_EMPTY_BACKOFF_STRONG_MIN_ACTIVE_CHUNKS == 8
 
 
 def test_recent_speech_gate_rejects_quiet_dnn_hit():
