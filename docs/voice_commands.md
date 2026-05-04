@@ -27,3 +27,10 @@ Browser speech input currently emits:
 
 Pi and Mac wakeword services should use the same CommandEvent boundary before
 handing recognized text to Home Center logic.
+
+For live confirmed-command capture, open-ended `ask` commands are intentionally
+explicit. Use phrases like `Hey Homer, ask what is ...`, `Hey Homer, tell me
+...`, `Hey Homer, explain ...`, or `Hey Homer, describe ...`. Bare questions
+after a wake phrase are ignored in confirmed-command mode because passive TV
+speech can cause local STT to hallucinate a wake phrase before unrelated
+questions.

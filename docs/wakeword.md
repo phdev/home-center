@@ -17,3 +17,9 @@ bucketed by `normalizeCommandEvent(event)` so replays are stable.
 
 AgentCI should replay CommandEvents from fixtures. It must not call microphone,
 wakeword, speech recognition, browser speech, or live voice services.
+
+In confirmed-command live capture, the wakeword layer treats local STT as a
+candidate source. It should only hand off dispatchable commands, and open-ended
+`ask` commands should use explicit `ask`, `tell me`, `explain`, or `describe`
+cues so passive speech plus a hallucinated wake phrase does not become a live
+action.

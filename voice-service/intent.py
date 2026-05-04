@@ -25,6 +25,20 @@ ASK_CUE_RE = re.compile(
     re.IGNORECASE,
 )
 
+EXPLICIT_ASK_RE = re.compile(
+    r"^(?:ask(?:\s+homer)?|tell\s+me|explain|describe)\s+(.+)$",
+    re.IGNORECASE,
+)
+
+STOP_COMMAND_RE = re.compile(
+    r"^(?:"
+    r"(?:stop|dismiss|cancel)"
+    r"(?:\s+(?:(?:all|the)\s+)?(?:expired\s+)?(?:timers?|alarms?|alerts?|notifications?))?"
+    r"|quiet|silence|shut\s+up"
+    r")$",
+    re.IGNORECASE,
+)
+
 _ALLOWED_NAV_PAGES = {"calendar", "weather", "photos", "dashboard"}
 _ALLOWED_NAV_VIEWS = {"monthly", "weekly", "daily"}
 _MAX_TIMER_SECONDS = 24 * 60 * 60
@@ -77,13 +91,26 @@ def _parse_amount(value: str) -> int:
     return _NUMBER_WORDS[value]
 
 
-def parse_command(text: str) -> dict:
+def _parse_ask(text: str, allow_bare_ask: bool) -> dict:
+    explicit_match = EXPLICIT_ASK_RE.match(text)
+    if explicit_match:
+        query = explicit_match.group(1).strip(" ,.:;!?-")
+        if len(query.split()) >= 2:
+            return {"action": "ask", "query": query}
+
+    if allow_bare_ask and ASK_CUE_RE.search(text) and len(text.split()) >= 2:
+        return {"action": "ask", "query": text}
+
+    return {"action": "none"}
+
+
+def parse_command(text: str, allow_bare_ask: bool = True) -> dict:
     """Parse the command body after "Hey Homer" into a stable action dict."""
     text = strip_wake_phrase(text).lower().strip()
     if not text:
         return {"action": "none"}
 
-    if re.search(r"\b(stop|dismiss|cancel|quiet|shut up|silence)\b", text):
+    if STOP_COMMAND_RE.fullmatch(text):
         return {"action": "stop"}
 
     if re.search(r"\bturn(ed|s)?\s*(it\s+)?(off|of|up|down|f)\b", text):
@@ -136,8 +163,9 @@ def parse_command(text: str) -> dict:
     if re.search(r"\bturn(ed|s)?\s*(it\s+)?on\b", text):
         return {"action": "turn_on"}
 
-    if ASK_CUE_RE.search(text) and len(text.split()) >= 2:
-        return {"action": "ask", "query": text}
+    ask_command = _parse_ask(text, allow_bare_ask)
+    if ask_command["action"] != "none":
+        return ask_command
 
     return {"action": "none"}
 

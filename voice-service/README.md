@@ -180,6 +180,10 @@ Confirmed-command transcript parsing accepts a narrow set of local Whisper wake
 variants such as `Day Homer` and `8-homer` after a candidate trigger. Those
 variants are only for confirmation parsing; they do not broaden the live Vosk
 or openWakeWord trigger itself.
+In confirmed-command mode, open-ended `ask` commands must use an explicit cue
+such as `ask`, `tell me`, `explain`, or `describe`; bare questions like `Hey
+Homer, what is ...` are ignored in that mode because passive TV speech can make
+local Whisper hallucinate a wake phrase before unrelated questions.
 
 Run the 5-phrase dry-run before any 20-command validation:
 
@@ -279,6 +283,16 @@ dropped adjacent commands. With `SPEECH_CANDIDATE_COOLDOWN_SECONDS=0.5`,
 median wake-to-action latency around 288 ms and p95 around 335 ms. The matching
 2-minute passive run produced 0 dispatches and 0 command candidates with 4
 internal Whisper confirmations.
+
+Longer passive follow-up: the 2026-05-03 10-minute passive run produced one
+dry-run false command candidate from a local Whisper hallucination,
+`Hey Homer, stop the perfect`. The intent parser now only accepts `stop`,
+`dismiss`, `cancel`, and timer-control variants when there are no arbitrary
+trailing words. The repeat passive run then exposed a second false candidate,
+`Hey Homer, what's going on? That was very enthusiastic`, which reached the
+open-ended `ask` path. Confirmed-command mode now requires explicit `ask`,
+`tell me`, `explain`, or `describe` cues for ask dispatches. Keep these guards
+before repeating the longer passive check.
 
 ## Debug
 
