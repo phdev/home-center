@@ -1,0 +1,122 @@
+{
+  "tier": "classifier",
+  "suite": "moderate",
+  "timestamp": "2026-05-03T23:14:54.041Z",
+  "total": 16,
+  "passed": 0,
+  "failed": 16,
+  "results": [
+    {
+      "id": "mod_01",
+      "query": "what should we have for dinner tonight",
+      "classification": "simple",
+      "expected_classification": "moderate",
+      "pass": false
+    },
+    {
+      "id": "mod_02",
+      "query": "summarize today's school emails",
+      "classification": "complex",
+      "expected_classification": "moderate",
+      "pass": false
+    },
+    {
+      "id": "mod_03",
+      "query": "when is the next soccer practice",
+      "classification": "simple",
+      "expected_classification": "moderate",
+      "pass": false
+    },
+    {
+      "id": "mod_04",
+      "query": "add milk and eggs to the grocery list",
+      "classification": "simple",
+      "expected_classification": "moderate",
+      "pass": false
+    },
+    {
+      "id": "mod_05",
+      "query": "what's on the calendar this weekend",
+      "classification": "simple",
+      "expected_classification": "moderate",
+      "pass": false
+    },
+    {
+      "id": "mod_06",
+      "query": "how long until Emma's birthday",
+      "classification": "simple",
+      "expected_classification": "moderate",
+      "pass": false
+    },
+    {
+      "id": "mod_07",
+      "query": "what homework does Liam have today",
+      "classification": "simple",
+      "expected_classification": "moderate",
+      "pass": false
+    },
+    {
+      "id": "mod_08",
+      "query": "read me the latest school newsletter",
+      "classification": "simple",
+      "expected_classification": "moderate",
+      "pass": false
+    },
+    {
+      "id": "mod_09",
+      "query": "when does the dentist appointment start",
+      "classification": "simple",
+      "expected_classification": "moderate",
+      "pass": false
+    },
+    {
+      "id": "mod_10",
+      "query": "what groceries do we need this week",
+      "classification": "simple",
+      "expected_classification": "moderate",
+      "pass": false
+    },
+    {
+      "id": "mod_11",
+      "query": "tell me about tomorrow's weather forecast",
+      "classification": "simple",
+      "expected_classification": "moderate",
+      "pass": false
+    },
+    {
+      "id": "mod_12",
+      "query": "what events do we have on Monday",
+      "classification": "simple",
+      "expected_classification": "moderate",
+      "pass": false
+    },
+    {
+      "id": "mod_13",
+      "query": "how many days until spring break",
+      "classification": "simple",
+      "expected_classification": "moderate",
+      "pass": false
+    },
+    {
+      "id": "mod_14",
+      "query": "remind me about the PTA meeting",
+      "classification": "simple",
+      "expected_classification": "moderate",
+      "pass": false
+    },
+    {
+      "id": "mod_15",
+      "query": "what's the lunch menu at school today",
+      "classification": "simple",
+      "expected_classification": "moderate",
+      "pass": false
+    },
+    {
+      "id": "mod_16",
+      "query": "when is the next family birthday coming up",
+      "classification": "simple",
+      "expected_classification": "moderate",
+      "pass": false
+    }
+  ]
+}

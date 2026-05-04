@@ -1,0 +1,136 @@
+{
+  "tier": "classifier",
+  "suite": "simple-intents",
+  "timestamp": "2026-05-03T23:14:54.039Z",
+  "total": 18,
+  "passed": 18,
+  "failed": 0,
+  "results": [
+    {
+      "id": "simple_01",
+      "query": "what time is it",
+      "classification": "simple",
+      "expected_classification": "simple",
+      "pass": true
+    },
+    {
+      "id": "simple_02",
+      "query": "set a timer for 10 minutes",
+      "classification": "simple",
+      "expected_classification": "simple",
+      "pass": true
+    },
+    {
+      "id": "simple_03",
+      "query": "turn off the living room lights",
+      "classification": "simple",
+      "expected_classification": "simple",
+      "pass": true
+    },
+    {
+      "id": "simple_04",
+      "query": "what's the weather",
+      "classification": "simple",
+      "expected_classification": "simple",
+      "pass": true
+    },
+    {
+      "id": "simple_05",
+      "query": "is it going to rain tomorrow",
+      "classification": "simple",
+      "expected_classification": "simple",
+      "pass": true
+    },
+    {
+      "id": "simple_06",
+      "query": "how cold is it outside",
+      "classification": "simple",
+      "expected_classification": "simple",
+      "pass": true
+    },
+    {
+      "id": "simple_07",
+      "query": "turn on the kitchen lights",
+      "classification": "simple",
+      "expected_classification": "simple",
+      "pass": true
+    },
+    {
+      "id": "simple_08",
+      "query": "set a timer for 5 minutes for eggs",
+      "classification": "simple",
+      "expected_classification": "simple",
+      "pass": true
+    },
+    {
+      "id": "simple_09",
+      "query": "stop",
+      "classification": "simple",
+      "expected_classification": "simple",
+      "pass": true
+    },
+    {
+      "id": "simple_10",
+      "query": "show calendar",
+      "classification": "simple",
+      "expected_classification": "simple",
+      "pass": true
+    },
+    {
+      "id": "simple_11",
+      "query": "show weather",
+      "classification": "simple",
+      "expected_classification": "simple",
+      "pass": true
+    },
+    {
+      "id": "simple_12",
+      "query": "good morning",
+      "classification": "simple",
+      "expected_classification": "simple",
+      "pass": true
+    },
+    {
+      "id": "simple_13",
+      "query": "what's the temperature",
+      "classification": "simple",
+      "expected_classification": "simple",
+      "pass": true
+    },
+    {
+      "id": "simple_14",
+      "query": "go back",
+      "classification": "simple",
+      "expected_classification": "simple",
+      "pass": true
+    },
+    {
+      "id": "simple_15",
+      "query": "play music",
+      "classification": "simple",
+      "expected_classification": "simple",
+      "pass": true
+    },
+    {
+      "id": "simple_16",
+      "query": "will it snow today",
+      "classification": "simple",
+      "expected_classification": "simple",
+      "pass": true
+    },
+    {
+      "id": "simple_17",
+      "query": "lights off",
+      "classification": "simple",
+      "expected_classification": "simple",
+      "pass": true
+    },
+    {
+      "id": "simple_18",
+      "query": "volume up",
+      "classification": "simple",
+      "expected_classification": "simple",
+      "pass": true
+    }
+  ]
+}

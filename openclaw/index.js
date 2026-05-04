@@ -32,6 +32,7 @@ const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 // without Authorization. If the worker rejects, read the 401 in the
 // bridge log and set this on the launchd plist.
 const WORKER_AUTH_TOKEN = process.env.WORKER_AUTH_TOKEN || "";
+const TELEGRAM_POLLING = process.env.TELEGRAM_POLLING !== "false";
 
 if (!BOT_TOKEN) {
   console.error("ERROR: TELEGRAM_BOT_TOKEN env var is required.");
@@ -41,7 +42,7 @@ if (!BOT_TOKEN) {
 
 // --- Telegram Client ---
 
-const bot = new TelegramBot(BOT_TOKEN, { polling: true });
+const bot = new TelegramBot(BOT_TOKEN, { polling: TELEGRAM_POLLING });
 
 let ready = false;
 let botInfo = null;
@@ -62,9 +63,11 @@ bot.getMe()
     process.exit(1);
   });
 
-bot.on("polling_error", (err) => {
-  console.error("Telegram polling error:", err.message);
-});
+if (TELEGRAM_POLLING) {
+  bot.on("polling_error", (err) => {
+    console.error("Telegram polling error:", err.message);
+  });
+}
 
 // --- Incoming message handler ---
 // Direct chats: queue for Homer CI + reply via LLM (OpenClaw family bot)
@@ -142,6 +145,7 @@ app.get("/status", (_req, res) => {
     ready,
     user: botInfo?.id ?? null,
     name: botInfo?.username ?? null,
+    polling: TELEGRAM_POLLING,
   });
 });
 
@@ -189,5 +193,5 @@ app.post("/messages/ack", (req, res) => {
 
 app.listen(PORT, () => {
   console.log(`OpenClaw API listening on http://localhost:${PORT}`);
-  console.log("Connecting to Telegram...");
+  console.log(`Connecting to Telegram (${TELEGRAM_POLLING ? "polling" : "send-only"})...`);
 });
