@@ -1,0 +1,39 @@
+# Design Claw — 2026-05-04 — birthdays
+
+**Topic.** passive gift planning — birthdays compound into a calm lead-time signal, not a prompt  
+**Topic id.** `passive-gift-planning`
+
+## Concept — Dinner-First Birthday Lead Rail
+
+### Layout idea
+Use a deterministic priority resolver: because takeoutDecisionPending is true, the contextualSlot becomes the single primary Dinner Tonight card and moves to the upper-left/top position with direct decision controls. birthdayGiftNeeded stays visible only as a compact secondary Birthdays lead-time card after dinner, grouped with upcoming birthday context and passive varied gift ideas; it does not interrupt or ask for an immediate decision. Calendar remains on the left in the secondary area, weather and schoolUpdates stay lower priority, and clawSuggestions is not rendered as its own competing card while dinner is active.
+
+### Why it fits
+The snapshot has two active family signals: takeoutDecisionPending and birthdayGiftNeeded. Memory says prioritize dinner first, place urgent items upper-left, and use passive gift planning, so dinner becomes the primary actionable prompt while birthdays become a calm lead-time signal instead of a prompt. This also respects max_visible_cards: Dinner Tonight, Calendar, Birthdays, Weather, and School Updates can fit without a separate clawSuggestions card.
+
+### Tradeoff
+Birthday gift planning becomes less prominent when dinner is pending, so a gift lead-time warning could be missed until the dinner decision is resolved; this is worse on days when the birthday is very soon and dinner is low-stakes.
+
+### Implementation hint
+- Add a priority function where takeoutDecisionPending outranks birthdayGiftNeeded and showClawSuggestions for the primary slot.
+- Render contextualSlot as the first card when takeoutDecisionPending is true, with the existing Dinner Tonight voting UI directly inside it.
+- Render birthdayGiftNeeded as a compact secondary Birthdays card with deterministic visibility; include gift ideas only inside that card, never as a separate foreground suggestion card.
+
+### Prototype first
+Build the dashboard state where takeoutDecisionPending and birthdayGiftNeeded are both true and verify that Dinner Tonight is first while Birthdays appears only as a secondary passive lead-time card.
+
+### Memory alignment
+**Reinforces.**
+- Prioritize dinner first.
+- One primary thing, clearly, before any secondary things.
+- A prompt that produces a decision beats pure information.
+- Use passive gift planning.
+- Place urgent items in the upper-left of the screen.
+- Card visibility is driven by deterministic derived-state flags, never by LLM output.
+
+**Avoids rejected.**
+- Do not place other content before dinner.
+- Rendering secondary items alongside a primary prompt (they compete for attention and dilute the decision).
+- Information-dense screens that trade clarity for coverage.
+- Do not present dinner voting UI as a suggested action.
+- Too much text.

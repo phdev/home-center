@@ -1,6 +1,6 @@
 # David Design Memory
 
-Generated: 2026-05-03T20:33:01-07:00
+Generated: 2026-05-04T10:33:05-07:00
 
 This file is generated from David's structured design memory.
 Do not edit it by hand; run `python scripts/sync_design_memory_pack.py` from `/Users/peter/home-center`.
@@ -85,6 +85,17 @@ Do not edit it by hand; run `python scripts/sync_design_memory_pack.py` from `/U
 
 ## Recent Design Artifacts
 
+### 2026-05-04 - Dinner-First Birthday Lead Rail
+
+- Context: birthdays - passive gift planning — birthdays compound into a calm lead-time signal, not a prompt
+- Layout idea: Use a deterministic priority resolver: because takeoutDecisionPending is true, the contextualSlot becomes the single primary Dinner Tonight card and moves to the upper-left/top position with direct decision controls. birthdayGiftNeeded stays visible only as a compact secondary Birthdays lead-time card after dinner, grouped with upcoming birthday context and passive varied gift ideas; it does not interrupt or ask for...
+- Why it fits: The snapshot has two active family signals: takeoutDecisionPending and birthdayGiftNeeded. Memory says prioritize dinner first, place urgent items upper-left, and use passive gift planning, so dinner becomes the primary actionable prompt while birthdays become a calm lead-time signal instead of a prompt. This also respects max_visible_cards: Dinner Tonight, Calendar, Birthdays, Weather, and School Updates can fit wi...
+- Tradeoff: Birthday gift planning becomes less prominent when dinner is pending, so a gift lead-time warning could be missed until the dinner decision is resolved; this is worse on days when the birthday is very soon and dinner is low-stakes.
+  - Markdown: `/Users/peter/home-center/design_outputs/daily/2026-05-04-birthdays.md`
+  - JSON: `/Users/peter/home-center/design_outputs/daily/2026-05-04-birthdays.json`
+  - Structural PNG: `/Users/peter/home-center/design_outputs/daily/2026-05-04-birthdays.png`
+  - Polish PNG: `/Users/peter/home-center/design_outputs/daily/2026-05-04-birthdays-polish.png`
+
 ### 2026-05-03 - Earliest School Deadline Hero
 
 - Context: school_updates - school updates as a deadline-first layout — earliest due date drives the hero slot
@@ -161,17 +172,6 @@ Do not edit it by hand; run `python scripts/sync_design_memory_pack.py` from `/U
   - JSON: `/Users/peter/home-center/design_outputs/daily/2026-04-27-birthdays.json`
   - Structural PNG: `/Users/peter/home-center/design_outputs/daily/2026-04-27-birthdays.png`
   - Polish PNG: `/Users/peter/home-center/design_outputs/daily/2026-04-27-birthdays-polish.png`
-
-### 2026-04-26 - Deadline Ladder with Single Hero Slot
-
-- Context: school_updates - school updates as a deadline-first layout — earliest due date drives the hero slot
-- Layout idea: Use a two-tier stack with one dominant hero card pinned in the upper-left and a narrow supporting column beneath/adjacent it. The hero slot is always occupied by the earliest-due school update when `school_updates` is the theme, so the school item with the nearest deadline becomes the one primary thing. If multiple school deadlines are active, they collapse into a short ranked list inside that same hero card, ordere...
-- Why it fits: This matches the theme directly: `deadline-first-school` says the earliest due date drives the hero slot, and the snapshot already has a dedicated `schoolUpdates` card plus a `contextualSlot` that can be deterministically swapped. It also fits the TV constraint by keeping one primary signal readable in under 2 seconds and using the upper-left placement the memory prefers for urgent items. Because `takeoutDecisionPen...
-- Tradeoff: This is worse when the family has several equally urgent concerns outside school, because the design intentionally suppresses secondary context to preserve a single scan path. It can feel sparse if the school update is only mildly urgent, since lower-priority items may disappear entirely until the hero is resolved.
-  - Markdown: `/Users/peter/home-center/design_outputs/daily/2026-04-26-school_updates.md`
-  - JSON: `/Users/peter/home-center/design_outputs/daily/2026-04-26-school_updates.json`
-  - Structural PNG: `/Users/peter/home-center/design_outputs/daily/2026-04-26-school_updates.png`
-  - Polish PNG: `/Users/peter/home-center/design_outputs/daily/2026-04-26-school_updates-polish.png`
 
 ## Implementation Note
 

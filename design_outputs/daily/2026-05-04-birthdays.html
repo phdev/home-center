@@ -1,0 +1,459 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=1920, height=1080, initial-scale=1">
+  <title>The Howell Hub</title>
+  <style>
+    * { box-sizing: border-box; }
+    html, body {
+      width: 1920px;
+      height: 1080px;
+      margin: 0;
+      overflow: hidden;
+      background: #0A0A0A;
+      color: #FFFFFF;
+      font-family: "Geist", "Inter", system-ui, sans-serif;
+    }
+    body { padding: 44px 54px 48px; }
+    .mono { font-family: "JetBrains Mono", ui-monospace, monospace; }
+    .topbar {
+      height: 76px;
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      margin-bottom: 20px;
+    }
+    .hub {
+      font-size: 24px;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      color: #FFFFFF;
+      padding-top: 12px;
+    }
+    .clock {
+      font-size: 52px;
+      line-height: 1;
+      font-weight: 500;
+      color: #FFFFFF;
+      letter-spacing: -0.04em;
+    }
+    .dashboard {
+      height: 892px;
+      display: grid;
+      grid-template-columns: repeat(12, 1fr);
+      grid-template-rows: 392px 1fr;
+      gap: 18px;
+    }
+    .card {
+      border: 1px solid #FFFFFF30;
+      border-radius: 8px;
+      padding: 18px;
+      background: transparent;
+      min-width: 0;
+      min-height: 0;
+    }
+    .primary-card {
+      grid-column: 1 / span 7;
+      grid-row: 1;
+      padding: 22px;
+      border-color: #60A5FA50;
+      background: #60A5FA08;
+    }
+    .birthdays { grid-column: 8 / span 5; grid-row: 1; }
+    .calendar { grid-column: 1 / span 5; grid-row: 2; }
+    .weather { grid-column: 6 / span 3; grid-row: 2; }
+    .school { grid-column: 9 / span 4; grid-row: 2; }
+    .eyebrow {
+      font-size: 13px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: #FFFFFF66;
+      font-weight: 600;
+      margin-bottom: 12px;
+    }
+    .card-title {
+      font-size: 24px;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      margin: 0 0 14px;
+    }
+    .hero-title {
+      font-size: 32px;
+      line-height: 1.08;
+      font-weight: 600;
+      letter-spacing: -0.03em;
+      margin: 0;
+    }
+    .muted { color: #FFFFFFAA; }
+    .tertiary { color: #FFFFFF66; }
+    .row {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 13px 0;
+      border-top: 1px solid #FFFFFF18;
+    }
+    .row:first-of-type { border-top: 0; }
+    .time {
+      width: 72px;
+      font-size: 20px;
+      color: #FFFFFF;
+      flex: 0 0 auto;
+    }
+    .row-title {
+      font-size: 19px;
+      font-weight: 500;
+      line-height: 1.2;
+    }
+    .sub {
+      margin-top: 4px;
+      font-size: 15px;
+      color: #FFFFFF88;
+      line-height: 1.25;
+    }
+    .choice-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 14px;
+      margin-top: 22px;
+    }
+    .choice {
+      min-height: 150px;
+      border: 1px solid #FFFFFF30;
+      border-radius: 12px;
+      padding: 16px;
+      background: #FFFFFF06;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+    .choice.suggested {
+      border-color: #4ADE8050;
+      background: #4ADE8010;
+    }
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: fit-content;
+      border: 1px solid #FFFFFF30;
+      border-radius: 999px;
+      padding: 4px 10px;
+      font-size: 13px;
+      color: #FFFFFFAA;
+      white-space: nowrap;
+    }
+    .pill.green {
+      border-color: #4ADE8050;
+      color: #4ADE80;
+      background: #4ADE8010;
+    }
+    .vendor {
+      font-size: 22px;
+      font-weight: 600;
+      margin-top: 12px;
+    }
+    .vendor-sub {
+      font-size: 15px;
+      color: #FFFFFF88;
+      margin-top: 6px;
+      line-height: 1.3;
+    }
+    .votes {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      margin-top: 12px;
+    }
+    .avatar {
+      width: 28px;
+      height: 28px;
+      border-radius: 999px;
+      display: grid;
+      place-items: center;
+      font-size: 12px;
+      font-weight: 700;
+      background: #FFFFFF14;
+      color: #FFFFFFCC;
+      border: 1px solid #FFFFFF22;
+    }
+    .decision-row {
+      margin-top: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding-top: 18px;
+      border-top: 1px solid #FFFFFF18;
+    }
+    .decision-copy {
+      font-size: 16px;
+      color: #FFFFFFAA;
+      line-height: 1.35;
+    }
+    .actions { display: flex; gap: 10px; }
+    .btn {
+      border-radius: 999px;
+      padding: 11px 18px;
+      font-size: 16px;
+      font-weight: 600;
+      border: 1px solid #FFFFFF30;
+      color: #FFFFFF;
+      background: transparent;
+    }
+    .btn.primary {
+      background: #60A5FA;
+      border-color: #60A5FA;
+      color: #06101F;
+    }
+    .birthday-row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 12px;
+      align-items: center;
+      padding: 14px 0;
+      border-top: 1px solid #FFFFFF18;
+    }
+    .birthday-row:first-of-type { border-top: 0; }
+    .gift-strip {
+      margin-top: 14px;
+      padding: 14px;
+      border: 1px solid #F59E0B50;
+      border-radius: 12px;
+      background: #F59E0B10;
+    }
+    .gift-title {
+      color: #F59E0B;
+      font-size: 13px;
+      letter-spacing: 1.6px;
+      text-transform: uppercase;
+      font-weight: 700;
+      margin-bottom: 9px;
+    }
+    .gift-ideas {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .weather-temp {
+      font-size: 70px;
+      line-height: .95;
+      font-weight: 600;
+      letter-spacing: -0.06em;
+      margin: 6px 0 8px;
+    }
+    .weather-main {
+      font-size: 22px;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+    .weather-lines {
+      margin-top: 22px;
+      display: grid;
+      gap: 12px;
+    }
+    .weather-line {
+      display: flex;
+      justify-content: space-between;
+      border-top: 1px solid #FFFFFF18;
+      padding-top: 12px;
+      font-size: 16px;
+      color: #FFFFFFAA;
+    }
+    .school-item {
+      padding: 15px;
+      border: 1px solid #FFFFFF24;
+      border-radius: 12px;
+      background: #FFFFFF04;
+      margin-top: 12px;
+    }
+    .school-due {
+      color: #F59E0B;
+      font-size: 12px;
+      letter-spacing: 1.7px;
+      text-transform: uppercase;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+    .school-title {
+      font-size: 20px;
+      font-weight: 600;
+      line-height: 1.18;
+    }
+    .hint {
+      position: absolute;
+      left: 54px;
+      bottom: 18px;
+      font-size: 14px;
+      color: #FFFFFF44;
+    }
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <div class="hub">The Howell Hub</div>
+    <div class="clock mono">05:42 PM</div>
+  </div>
+
+  <main class="dashboard">
+    <section class="card primary-card">
+      <div class="eyebrow">Dinner Tonight</div>
+      <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:24px;">
+        <div>
+          <h1 class="hero-title">What should we order?</h1>
+          <div class="sub" style="font-size:17px; margin-top:8px;">Decision pending · order window closes in <span class="mono" style="color:#FFFFFF;">33 min</span></div>
+        </div>
+        <div class="pill" style="font-size:14px;">Family vote</div>
+      </div>
+
+      <div class="choice-grid">
+        <div class="choice suggested">
+          <div>
+            <span class="pill green">suggested</span>
+            <div class="vendor">Thai Garden</div>
+            <div class="vendor-sub">Pad see ew, dumplings, mango rice. Ready around <span class="mono">6:25</span>.</div>
+          </div>
+          <div class="votes">
+            <div class="avatar">S</div><div class="avatar">A</div><div class="avatar">L</div>
+          </div>
+        </div>
+        <div class="choice">
+          <div>
+            <span class="pill">fastest</span>
+            <div class="vendor">Mario’s Pizza</div>
+            <div class="vendor-sub">Large cheese, salad, garlic knots. Pickup in <span class="mono">22</span> min.</div>
+          </div>
+          <div class="votes">
+            <div class="avatar">I</div><div class="avatar">P</div>
+          </div>
+        </div>
+        <div class="choice">
+          <div>
+            <span class="pill">lighter</span>
+            <div class="vendor">Sunny Sushi</div>
+            <div class="vendor-sub">California rolls, miso, edamame. Delivery by <span class="mono">6:45</span>.</div>
+          </div>
+          <div class="votes">
+            <div class="avatar">+</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="decision-row">
+        <div class="decision-copy">Homer can lock the favorite now, or ask one more time in the kitchen.</div>
+        <div class="actions">
+          <button class="btn">Ask everyone</button>
+          <button class="btn primary">Choose Thai Garden</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="card birthdays">
+      <div class="eyebrow">Birthdays</div>
+      <h2 class="card-title">Gift lead time</h2>
+
+      <div class="birthday-row">
+        <div>
+          <div class="row-title">Lucy</div>
+          <div class="sub">Apr 26 — 5 days</div>
+        </div>
+        <div class="pill">Find ideas</div>
+      </div>
+      <div class="birthday-row">
+        <div>
+          <div class="row-title">Peter</div>
+          <div class="sub">May 04 — 2 weeks</div>
+        </div>
+        <div class="pill">Find ideas</div>
+      </div>
+      <div class="birthday-row">
+        <div>
+          <div class="row-title">Sarah</div>
+          <div class="sub">May 12 — 3 weeks</div>
+        </div>
+        <div class="pill">Find ideas</div>
+      </div>
+
+      <div class="gift-strip">
+        <div class="gift-title">Passive ideas</div>
+        <div class="gift-ideas">
+          <span class="pill">art kit</span>
+          <span class="pill">soccer hoodie</span>
+          <span class="pill">bookstore card</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="card calendar">
+      <div class="eyebrow">Today</div>
+      <h2 class="card-title">Calendar</h2>
+      <div class="row">
+        <div class="time mono">07:45</div>
+        <div>
+          <div class="row-title">Drop Lucy at school</div>
+          <div class="sub">Andrew · car line</div>
+        </div>
+      </div>
+      <div class="row">
+        <div class="time mono">10:30</div>
+        <div>
+          <div class="row-title">Dr. Shaw</div>
+          <div class="sub">Sarah · annual checkup</div>
+        </div>
+      </div>
+      <div class="row">
+        <div class="time mono">14:15</div>
+        <div>
+          <div class="row-title">Ivy piano lesson</div>
+          <div class="sub">Bring music folder</div>
+        </div>
+      </div>
+      <div class="row">
+        <div class="time mono">18:30</div>
+        <div>
+          <div class="row-title">Peter soccer practice</div>
+          <div class="sub">Field 3 · water bottle</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card weather">
+      <div class="eyebrow">Weather</div>
+      <div class="weather-temp mono">54°F</div>
+      <div class="weather-main">Partly Cloudy</div>
+      <div class="sub">Feels like 50°F</div>
+      <div class="weather-lines">
+        <div class="weather-line"><span>Wind</span><span class="mono">12 mph NW</span></div>
+        <div class="weather-line"><span>Humidity</span><span class="mono">71%</span></div>
+        <div class="weather-line"><span>Today</span><span class="mono">H: 68° / L: 54°</span></div>
+      </div>
+    </section>
+
+    <section class="card school">
+      <div class="eyebrow">School Updates</div>
+      <h2 class="card-title">Coming up</h2>
+
+      <div class="school-item">
+        <div class="school-due">Due in 5 days · Tuesday</div>
+        <div class="school-title">Science Fair Project — Ivy</div>
+        <div class="sub">signed yes · display board needed</div>
+      </div>
+
+      <div class="school-item">
+        <div class="school-due">Tomorrow · 08:00</div>
+        <div class="school-title">Library books — Lucy</div>
+        <div class="sub">2 books to return · backpack pocket</div>
+      </div>
+
+      <div class="school-item">
+        <div class="school-due">Friday</div>
+        <div class="school-title">Soccer photo form — Peter</div>
+        <div class="sub">payment complete · bring jersey</div>
+      </div>
+    </section>
+  </main>
+
+  <div class="hint">Say “Hey Homer, decide dinner” to finish the vote.</div>
+</body>
+</html>
