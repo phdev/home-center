@@ -1,0 +1,36 @@
+# Design Claw — 2026-04-26 — school_updates
+
+**Topic.** school updates as a deadline-first layout — earliest due date drives the hero slot  
+**Topic id.** `deadline-first-school`
+
+## Concept — Deadline Ladder with Single Hero Slot
+
+### Layout idea
+Use a two-tier stack with one dominant hero card pinned in the upper-left and a narrow supporting column beneath/adjacent it. The hero slot is always occupied by the earliest-due school update when `school_updates` is the theme, so the school item with the nearest deadline becomes the one primary thing. If multiple school deadlines are active, they collapse into a short ranked list inside that same hero card, ordered by due date, with the soonest due date first and the rest secondary within the same card. The existing `contextualSlot` becomes a deterministic swap target: when the school deadline theme is active, it replaces dinner/lunch/morning content in the hero region instead of competing alongside it. Secondary items like birthdays, weather, and claw suggestions remain smaller background cards in the lower row only if they do not outrank the school deadline; otherwise they are deferred off-screen to keep the scan path singular.
+
+### Why it fits
+This matches the theme directly: `deadline-first-school` says the earliest due date drives the hero slot, and the snapshot already has a dedicated `schoolUpdates` card plus a `contextualSlot` that can be deterministically swapped. It also fits the TV constraint by keeping one primary signal readable in under 2 seconds and using the upper-left placement the memory prefers for urgent items. Because `takeoutDecisionPending` and `birthdayGiftNeeded` are true, the layout must avoid rendering those as equal competitors; the hero slot prevents that. `showClawSuggestions: true` can still be honored as a secondary helper, but not as a rival to the school deadline. The existing `stacked_cards` structure is preserved, but simplified so the school deadline outranks `calendar`, `birthdays`, and `weather` instead of sitting among them.
+
+### Tradeoff
+This is worse when the family has several equally urgent concerns outside school, because the design intentionally suppresses secondary context to preserve a single scan path. It can feel sparse if the school update is only mildly urgent, since lower-priority items may disappear entirely until the hero is resolved.
+
+### Implementation hint
+- Compute a sorted school-deadline array from derived state and render only the earliest-due item in the hero slot; if there are multiple school updates, show the next ones as a compact ranked list inside the same card, not as separate cards.
+- Keep `contextualSlot` as a single deterministic region that swaps content by active flags; when `school_updates` is active, it must override dinner/lunch/morning content rather than coexist with it.
+- Render at most one secondary row of small cards, and hide any card whose priority is lower than the active school deadline hero so the screen never exceeds one primary focus.
+
+### Prototype first
+Build the hero slot so it can display one school deadline card sorted by earliest due date, with every other card temporarily hidden.
+
+### Memory alignment
+**Reinforces.**
+- one primary thing, clearly, before any secondary things
+- primary signal readable in under 2 seconds from across a room
+- Priority should map to visual position in the upper-left
+- A single contextual slot that swaps its card based on the highest-tier active flag
+
+**Avoids rejected.**
+- Rendering secondary items alongside a primary prompt (they compete for attention and dilute the decision)
+- Dense multi-column dashboards that trade glanceability for information density
+- Information-dense screens that trade clarity for coverage
+- Rendering family items as a checkable to-do list

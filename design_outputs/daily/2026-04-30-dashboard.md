@@ -1,0 +1,39 @@
+# Design Claw — 2026-04-30 — dashboard
+
+**Topic.** prioritization when 3+ derived flags are simultaneously true — which one owns the hero slot  
+**Topic id.** `multi-flag-prioritization`
+
+## Concept — Deterministic Dinner-First Hero
+
+### Layout idea
+Replace the current equal-weight stacked_cards structure with one pinned upper-left hero region plus a compact secondary row. A deterministic hero resolver chooses exactly one owner: interruptive tonight reminders first, then immediate household decisions, then schedule risk, then passive relationship planning, then general suggestions. In this snapshot, takeoutDecisionPending owns the hero slot and renders Dinner Tonight with direct voting/choice controls; birthdayGiftNeeded becomes a smaller passive planning card in the secondary row; showClawSuggestions is allowed only as a small secondary suggestions card and never competes with the hero. Calendar, birthdays, weather, and schoolUpdates remain background cards only if they fit under max_visible_cards, ordered after the active flagged items.
+
+### Why it fits
+The snapshot has three true flags at once: takeoutDecisionPending, birthdayGiftNeeded, and showClawSuggestions. The current structure gives both clawSuggestions and contextualSlot priority 1 in different regions, which creates two competing primaries. This concept resolves that conflict by making the actionable dinner decision the single hero because the memory says a prompt that produces a decision beats pure information and the preference says to show dinner voting UI directly. Birthday gift remains visible but passive, matching accepted passive gift planning, while Claw suggestions are demoted because they are informational support, not the thing the family must decide right now.
+
+### Tradeoff
+This is worse when the family expects broad situational awareness from the TV, because weather, calendar, or school updates may be pushed down or hidden while a decision flag is active. It also makes the priority resolver more opinionated: a birthday gift may feel underplayed if the family considers it urgent, but the design intentionally favors the decision that can be completed immediately.
+
+### Implementation hint
+- Create a pure getHeroCard(derived_state) function with a fixed ordered list: bedtimeReminderActive, takeoutDecisionPending, lunchDecisionNeeded, hasMorningOverlap/showMorningChecklist, birthdayGiftNeeded, showClawSuggestions.
+- Render the selected hero in a single upper-left HeroSlot; remove priority 1 from clawSuggestions when contextualSlot is active so only one primary exists.
+- Build secondaryCards from remaining true flags plus calendar/birthdays/weather/schoolUpdates, capped so total visible cards never exceeds 6.
+
+### Prototype first
+Prototype only the resolver plus the dashboard state where takeoutDecisionPending, birthdayGiftNeeded, and showClawSuggestions are all true, verifying that Dinner Tonight alone owns the hero slot.
+
+### Memory alignment
+**Reinforces.**
+- One primary thing, clearly, before any secondary things.
+- A prompt that produces a decision beats pure information.
+- Card visibility is driven by deterministic derived-state flags, never by LLM output.
+- Priority should map to visual position in the upper-left.
+- Show dinner voting UI directly.
+- Use passive gift planning.
+
+**Avoids rejected.**
+- Rendering secondary items alongside a primary prompt (they compete for attention and dilute the decision).
+- Information-dense screens that trade clarity for coverage.
+- Dense multi-column dashboards that trade glanceability for information density.
+- Do not present dinner voting UI as a suggested action.
+- Too much text.

@@ -249,6 +249,14 @@ def main() -> int:
                     file=sys.stderr,
                 )
 
+    try:
+        from sync_design_memory_pack import write_shared_design_memory_pack
+
+        written = write_shared_design_memory_pack()
+        print(f"synced: {written[0]}")
+    except Exception as exc:
+        print(f"warning: design memory pack sync failed ({type(exc).__name__}): {exc}", file=sys.stderr)
+
     print()
     print(f"concept: {concept.get('concept_name', '(unnamed)')}")
     return 0

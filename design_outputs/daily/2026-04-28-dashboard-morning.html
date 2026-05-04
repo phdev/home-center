@@ -1,0 +1,604 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=1920, height=1080, initial-scale=1">
+  <title>The Howell Hub — Morning Runway</title>
+  <style>
+    :root {
+      --bg: #0A0A0A;
+      --primary: #FFFFFF;
+      --secondary: #FFFFFFAA;
+      --tertiary: #FFFFFF66;
+      --tertiary-strong: #FFFFFF88;
+      --border: #FFFFFF30;
+      --blue: #60A5FA;
+      --blue-border: #60A5FA50;
+      --blue-bg: #60A5FA10;
+      --amber: #F59E0B;
+      --amber-border: #F59E0B50;
+      --amber-bg: #F59E0B10;
+      --green: #4ADE80;
+      --green-border: #4ADE8050;
+      --green-bg: #4ADE8010;
+      --red: #EF4444;
+      --red-border: #EF444450;
+      --red-bg: #EF444410;
+      --font-ui: "Geist", "Inter", system-ui, sans-serif;
+      --font-data: "JetBrains Mono", ui-monospace, monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      margin: 0;
+      width: 1920px;
+      height: 1080px;
+      overflow: hidden;
+      background: var(--bg);
+      color: var(--primary);
+      font-family: var(--font-ui);
+    }
+
+    body {
+      position: relative;
+      background:
+        radial-gradient(circle at 18% 10%, rgba(96, 165, 250, 0.08), transparent 30%),
+        radial-gradient(circle at 78% 18%, rgba(245, 158, 11, 0.045), transparent 26%),
+        #0A0A0A;
+    }
+
+    .screen {
+      width: 100%;
+      height: 100%;
+      padding: 34px 48px 44px;
+      position: relative;
+    }
+
+    .topbar {
+      height: 64px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .hub-title {
+      font-size: 24px;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      color: var(--primary);
+    }
+
+    .morning-pill {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 14px;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      color: var(--secondary);
+      font-size: 14px;
+      letter-spacing: 0.01em;
+    }
+
+    .pill-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 999px;
+      background: var(--green);
+      box-shadow: 0 0 18px rgba(74, 222, 128, 0.5);
+    }
+
+    .main {
+      position: absolute;
+      left: 48px;
+      right: 48px;
+      top: 118px;
+      bottom: 44px;
+      display: grid;
+      grid-template-columns: 1fr 610px;
+      gap: 28px;
+    }
+
+    .card {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.012);
+      backdrop-filter: blur(1px);
+    }
+
+    .runway-card {
+      padding: 28px 32px 30px;
+      min-height: 100%;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .secondary-stack {
+      display: grid;
+      grid-template-rows: 1fr 1fr;
+      gap: 28px;
+      min-height: 100%;
+    }
+
+    .secondary-card {
+      padding: 20px;
+      overflow: hidden;
+    }
+
+    .eyebrow {
+      font-size: 13px;
+      line-height: 1;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      color: var(--tertiary);
+    }
+
+    .eyebrow.amber {
+      color: var(--amber);
+    }
+
+    .runway-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 24px;
+      margin-bottom: 26px;
+    }
+
+    .runway-title-block {
+      max-width: 720px;
+    }
+
+    .runway-title {
+      margin-top: 14px;
+      font-size: 32px;
+      line-height: 1.05;
+      font-weight: 600;
+      letter-spacing: -0.03em;
+    }
+
+    .runway-subtitle {
+      margin-top: 10px;
+      font-size: 17px;
+      line-height: 1.35;
+      color: var(--secondary);
+    }
+
+    .leave-chip {
+      min-width: 228px;
+      padding: 18px 20px;
+      border: 1px solid var(--blue-border);
+      background: var(--blue-bg);
+      border-radius: 12px;
+      text-align: right;
+    }
+
+    .leave-chip .label {
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--tertiary);
+    }
+
+    .leave-chip .time {
+      margin-top: 6px;
+      font-family: var(--font-data);
+      font-size: 40px;
+      line-height: 1;
+      font-weight: 600;
+      color: var(--primary);
+      letter-spacing: -0.05em;
+    }
+
+    .runway-list {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      margin-top: 6px;
+    }
+
+    .runway-row {
+      display: grid;
+      grid-template-columns: 96px 1fr auto;
+      align-items: center;
+      gap: 18px;
+      padding: 20px 22px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.026);
+    }
+
+    .runway-time {
+      font-family: var(--font-data);
+      font-size: 24px;
+      line-height: 1;
+      font-weight: 600;
+      color: var(--primary);
+      letter-spacing: -0.04em;
+    }
+
+    .runway-main {
+      min-width: 0;
+    }
+
+    .runway-item-title {
+      font-size: 24px;
+      line-height: 1.12;
+      font-weight: 560;
+      color: var(--primary);
+      letter-spacing: -0.015em;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .runway-item-sub {
+      margin-top: 5px;
+      font-size: 15px;
+      line-height: 1.25;
+      color: var(--tertiary-strong);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .runway-person {
+      padding: 6px 12px;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      color: var(--secondary);
+      font-size: 14px;
+      white-space: nowrap;
+    }
+
+    .risk-line {
+      margin-top: 24px;
+      padding: 18px 20px;
+      border: 1px solid var(--amber-border);
+      background: var(--amber-bg);
+      border-radius: 12px;
+      display: grid;
+      grid-template-columns: 190px 1fr;
+      gap: 18px;
+      align-items: center;
+    }
+
+    .risk-badge {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: var(--amber);
+      font-family: var(--font-data);
+      font-size: 16px;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      white-space: nowrap;
+    }
+
+    .risk-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+      background: var(--amber);
+      box-shadow: 0 0 18px rgba(245, 158, 11, 0.52);
+    }
+
+    .risk-copy {
+      font-size: 18px;
+      line-height: 1.35;
+      color: var(--secondary);
+    }
+
+    .risk-copy strong {
+      color: var(--primary);
+      font-weight: 600;
+    }
+
+    .card-title-row {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 18px;
+    }
+
+    .card-title {
+      font-size: 24px;
+      line-height: 1.05;
+      font-weight: 600;
+      letter-spacing: -0.025em;
+      color: var(--primary);
+    }
+
+    .quiet-note {
+      font-size: 13px;
+      color: var(--tertiary);
+    }
+
+    .calendar-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .calendar-row {
+      display: grid;
+      grid-template-columns: 78px 1fr;
+      gap: 14px;
+      padding: 13px 14px;
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.025);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .cal-time {
+      font-family: var(--font-data);
+      font-size: 20px;
+      line-height: 1.1;
+      font-weight: 600;
+      letter-spacing: -0.05em;
+      color: var(--primary);
+    }
+
+    .cal-title {
+      font-size: 18px;
+      line-height: 1.18;
+      font-weight: 520;
+      color: var(--primary);
+    }
+
+    .cal-sub {
+      margin-top: 3px;
+      font-size: 14px;
+      line-height: 1.25;
+      color: var(--tertiary-strong);
+    }
+
+    .school-list {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .school-item {
+      padding: 16px 16px 15px;
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.025);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .school-meta-top {
+      margin-bottom: 9px;
+      font-size: 12px;
+      font-weight: 650;
+      letter-spacing: 1.8px;
+      text-transform: uppercase;
+      color: var(--amber);
+    }
+
+    .school-title {
+      font-size: 20px;
+      line-height: 1.15;
+      font-weight: 560;
+      color: var(--primary);
+      letter-spacing: -0.015em;
+    }
+
+    .school-meta {
+      margin-top: 7px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: var(--tertiary-strong);
+      font-size: 14px;
+      line-height: 1.25;
+    }
+
+    .status-pill {
+      padding: 3px 8px;
+      border-radius: 999px;
+      border: 1px solid var(--green-border);
+      background: var(--green-bg);
+      color: var(--green);
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .status-pill.warning {
+      border-color: var(--amber-border);
+      background: var(--amber-bg);
+      color: var(--amber);
+    }
+
+    .footer-line {
+      position: absolute;
+      left: 48px;
+      bottom: 20px;
+      color: rgba(255, 255, 255, 0.28);
+      font-size: 13px;
+      letter-spacing: 0.02em;
+    }
+  </style>
+</head>
+<body>
+  <div class="screen">
+    <header class="topbar">
+      <div class="hub-title">The Howell Hub</div>
+      <div class="morning-pill">
+        <span class="pill-dot"></span>
+        Morning runway · ambient
+      </div>
+    </header>
+
+    <main class="main">
+      <section class="card runway-card" aria-label="Morning Runway">
+        <div>
+          <div class="runway-header">
+            <div class="runway-title-block">
+              <div class="eyebrow">Morning runway</div>
+              <div class="runway-title">Clear these before the house leaves.</div>
+              <div class="runway-subtitle">No checklist mode — just the next few things that matter between now and school drop-off.</div>
+            </div>
+
+            <div class="leave-chip">
+              <div class="label">Target out</div>
+              <div class="time">08:10</div>
+            </div>
+          </div>
+
+          <div class="runway-list">
+            <div class="runway-row">
+              <div class="runway-time">07:35</div>
+              <div class="runway-main">
+                <div class="runway-item-title">Lunches into backpacks</div>
+                <div class="runway-item-sub">Lucy gets the blue lunchbox · Ivy gets the thermos</div>
+              </div>
+              <div class="runway-person">Lucy · Ivy</div>
+            </div>
+
+            <div class="runway-row">
+              <div class="runway-time">07:45</div>
+              <div class="runway-main">
+                <div class="runway-item-title">Shoes, jackets, water bottles</div>
+                <div class="runway-item-sub">Front hall only — keep the kitchen clear for breakfast</div>
+              </div>
+              <div class="runway-person">Everyone</div>
+            </div>
+
+            <div class="runway-row">
+              <div class="runway-time">07:55</div>
+              <div class="runway-main">
+                <div class="runway-item-title">Ivy piano folder in backpack</div>
+                <div class="runway-item-sub">Lesson book is on the bench by the door</div>
+              </div>
+              <div class="runway-person">Ivy</div>
+            </div>
+
+            <div class="runway-row">
+              <div class="runway-time">08:05</div>
+              <div class="runway-main">
+                <div class="runway-item-title">Quick handoff before Peter’s focus block</div>
+                <div class="runway-item-sub">Confirm drop-off plan and who has Sarah’s keys</div>
+              </div>
+              <div class="runway-person">Peter · Sarah</div>
+            </div>
+
+            <div class="runway-row">
+              <div class="runway-time">08:10</div>
+              <div class="runway-main">
+                <div class="runway-item-title">Out the door for school</div>
+                <div class="runway-item-sub">Lucy drop-off first, then Ivy piano folder stays packed</div>
+              </div>
+              <div class="runway-person">Go</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="risk-line">
+          <div class="risk-badge">
+            <span class="risk-dot"></span>
+            08:00–09:00
+          </div>
+          <div class="risk-copy">
+            <strong>Peter has a protected work block.</strong> Settle the drop-off handoff by 07:55 so the morning does not spill into his call.
+          </div>
+        </div>
+      </section>
+
+      <aside class="secondary-stack">
+        <section class="card secondary-card" aria-label="Calendar">
+          <div class="card-title-row">
+            <div>
+              <div class="eyebrow">Today</div>
+              <div class="card-title" style="margin-top: 10px;">Calendar</div>
+            </div>
+            <div class="quiet-note">Next up</div>
+          </div>
+
+          <div class="calendar-list">
+            <div class="calendar-row">
+              <div class="cal-time">07:45</div>
+              <div>
+                <div class="cal-title">Drop Lucy at school</div>
+                <div class="cal-sub">Sarah · front loop</div>
+              </div>
+            </div>
+
+            <div class="calendar-row">
+              <div class="cal-time">08:30</div>
+              <div>
+                <div class="cal-title">Peter product review</div>
+                <div class="cal-sub">Office · keep hallway quiet</div>
+              </div>
+            </div>
+
+            <div class="calendar-row">
+              <div class="cal-time">10:30</div>
+              <div>
+                <div class="cal-title">Dr. Shaw appointment</div>
+                <div class="cal-sub">Andrew · bring insurance card</div>
+              </div>
+            </div>
+
+            <div class="calendar-row">
+              <div class="cal-time">14:15</div>
+              <div>
+                <div class="cal-title">Ivy piano lesson</div>
+                <div class="cal-sub">Folder already packed</div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="card secondary-card" aria-label="School Updates">
+          <div class="card-title-row">
+            <div>
+              <div class="eyebrow">School</div>
+              <div class="card-title" style="margin-top: 10px;">Updates</div>
+            </div>
+            <div class="quiet-note">Actionable only</div>
+          </div>
+
+          <div class="school-list">
+            <div class="school-item">
+              <div class="school-meta-top">Today · signature</div>
+              <div class="school-title">Field trip form — Lucy</div>
+              <div class="school-meta">
+                <span>Due today · folder by the door</span>
+                <span class="status-pill warning">sign</span>
+              </div>
+            </div>
+
+            <div class="school-item">
+              <div class="school-meta-top">In 5 days · project</div>
+              <div class="school-title">Science Fair Project — Ivy</div>
+              <div class="school-meta">
+                <span>Poster board packed · signed yes</span>
+                <span class="status-pill">ok</span>
+              </div>
+            </div>
+
+            <div class="school-item">
+              <div class="school-meta-top">Tomorrow · library</div>
+              <div class="school-title">Return reader packet — Lucy</div>
+              <div class="school-meta">
+                <span>On the mudroom shelf</span>
+                <span class="status-pill">ready</span>
+              </div>
+            </div>
+          </div>
+        </section>
+      </aside>
+    </main>
+
+    <div class="footer-line">Voice fallback available for timers only.</div>
+  </div>
+</body>
+</html>

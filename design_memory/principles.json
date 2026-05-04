@@ -41,6 +41,42 @@
       "text": "Avoid patterns that make the interface feel like a checklist app rather than a home.",
       "added": "2026-04-21",
       "source": "feedback"
+    },
+    {
+      "id": "p-keep-the-screen-visually-concise",
+      "text": "Keep the screen visually concise.",
+      "added": "2026-04-22",
+      "source": "telegram"
+    },
+    {
+      "id": "p-prioritize-wind-down-items-for-tonight-o",
+      "text": "Prioritize wind-down items for tonight only.",
+      "added": "2026-04-22",
+      "source": "telegram"
+    },
+    {
+      "id": "p-priority-should-map-to-visual-position-i",
+      "text": "Priority should map to visual position in the upper-left.",
+      "added": "2026-04-25",
+      "source": "telegram"
+    },
+    {
+      "id": "p-avoid-excessive-internal-whitespace-in-c",
+      "text": "Avoid excessive internal whitespace in card layouts.",
+      "added": "2026-04-25",
+      "source": "telegram"
+    },
+    {
+      "id": "p-prioritized-cards-should-be-space-effici",
+      "text": "Prioritized cards should be space-efficient.",
+      "added": "2026-04-26",
+      "source": "telegram"
+    },
+    {
+      "id": "p-prioritize-dinner-first",
+      "text": "Prioritize dinner first.",
+      "added": "2026-05-03",
+      "source": "telegram"
     }
   ]
 }

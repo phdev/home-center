@@ -1,0 +1,338 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=1920, height=1080, initial-scale=1">
+  <title>The Howell Hub — Bedtime Gate</title>
+  <style>
+    :root {
+      --bg: #0A0A0A;
+      --primary: #FFFFFF;
+      --secondary: #FFFFFFAA;
+      --tertiary: #FFFFFF66;
+      --tertiary-strong: #FFFFFF88;
+      --accent: #60A5FA;
+      --warning: #F59E0B;
+      --warning-border: #F59E0B60;
+      --warning-bg: #F59E0B15;
+      --card-border: #FFFFFF30;
+      --ui: "Geist", "Inter", system-ui, sans-serif;
+      --mono: "JetBrains Mono", ui-monospace, monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      width: 1920px;
+      height: 1080px;
+      margin: 0;
+      overflow: hidden;
+      background: var(--bg);
+      color: var(--primary);
+      font-family: var(--ui);
+    }
+
+    body {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      background:
+        radial-gradient(circle at 50% 42%, rgba(245, 158, 11, 0.08) 0%, rgba(245, 158, 11, 0.025) 28%, transparent 52%),
+        radial-gradient(circle at 20% 12%, rgba(96, 165, 250, 0.035) 0%, transparent 34%),
+        linear-gradient(180deg, #0D0D0D 0%, #090909 55%, #070707 100%);
+    }
+
+    .topbar {
+      height: 132px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 42px 64px 28px 64px;
+      flex: 0 0 auto;
+    }
+
+    .hub-title {
+      font-size: 24px;
+      line-height: 1;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+      color: var(--primary);
+    }
+
+    .clock {
+      font-family: var(--mono);
+      font-size: 52px;
+      line-height: 1;
+      font-weight: 500;
+      letter-spacing: -0.04em;
+      color: var(--primary);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .stage {
+      position: relative;
+      flex: 1 1 auto;
+      display: grid;
+      place-items: center;
+      padding: 0 64px 72px 64px;
+    }
+
+    .ambient-shell {
+      position: absolute;
+      inset: 132px 64px 72px 64px;
+      border: 1px solid rgba(255, 255, 255, 0.035);
+      border-radius: 12px;
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.018), rgba(255, 255, 255, 0.006)),
+        rgba(255, 255, 255, 0.006);
+      opacity: 0.28;
+      filter: blur(0px);
+    }
+
+    .gate-vignette {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background:
+        radial-gradient(circle at 50% 47%, transparent 0%, transparent 22%, rgba(0, 0, 0, 0.18) 52%, rgba(0, 0, 0, 0.46) 100%);
+    }
+
+    .bedtime-card {
+      position: relative;
+      width: 860px;
+      min-height: 348px;
+      border: 1px solid var(--warning-border);
+      border-radius: 8px;
+      background:
+        linear-gradient(180deg, rgba(245, 158, 11, 0.11), rgba(245, 158, 11, 0.065)),
+        var(--warning-bg);
+      box-shadow:
+        0 28px 90px rgba(0, 0, 0, 0.62),
+        0 0 0 1px rgba(245, 158, 11, 0.08) inset,
+        0 0 70px rgba(245, 158, 11, 0.06);
+      padding: 28px 32px 26px 32px;
+    }
+
+    .eyebrow {
+      font-size: 13px;
+      line-height: 1;
+      font-weight: 600;
+      letter-spacing: 2.2px;
+      color: rgba(245, 158, 11, 0.95);
+      text-transform: uppercase;
+    }
+
+    .card-main {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 40px;
+      margin-top: 22px;
+    }
+
+    .message {
+      min-width: 0;
+      flex: 1 1 auto;
+    }
+
+    .title {
+      font-size: 34px;
+      line-height: 1.12;
+      font-weight: 600;
+      letter-spacing: -0.03em;
+      color: var(--primary);
+      margin: 0;
+    }
+
+    .subtitle {
+      margin-top: 12px;
+      font-size: 20px;
+      line-height: 1.35;
+      font-weight: 400;
+      color: var(--secondary);
+    }
+
+    .countdown {
+      flex: 0 0 auto;
+      width: 198px;
+      height: 156px;
+      border: 1px solid rgba(245, 158, 11, 0.35);
+      border-radius: 12px;
+      background: rgba(10, 10, 10, 0.32);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.035) inset;
+    }
+
+    .count-number {
+      font-family: var(--mono);
+      font-size: 72px;
+      line-height: 0.9;
+      font-weight: 600;
+      letter-spacing: -0.07em;
+      color: var(--primary);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .count-label {
+      margin-top: 12px;
+      font-family: var(--mono);
+      font-size: 15px;
+      line-height: 1;
+      color: var(--tertiary-strong);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .divider {
+      height: 1px;
+      background: rgba(255, 255, 255, 0.12);
+      margin: 26px 0 18px 0;
+    }
+
+    .bedtime-steps {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 12px;
+    }
+
+    .step {
+      min-height: 66px;
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.035);
+      padding: 12px 14px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .step-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+      background: var(--warning);
+      box-shadow: 0 0 18px rgba(245, 158, 11, 0.38);
+      flex: 0 0 auto;
+    }
+
+    .step-dot.dim {
+      background: rgba(255, 255, 255, 0.34);
+      box-shadow: none;
+    }
+
+    .step-text {
+      min-width: 0;
+    }
+
+    .step-title {
+      font-size: 18px;
+      line-height: 1.15;
+      font-weight: 500;
+      color: var(--primary);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .step-sub {
+      margin-top: 4px;
+      font-family: var(--mono);
+      font-size: 13px;
+      line-height: 1;
+      color: var(--tertiary);
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+    }
+
+    .dismiss-row {
+      margin-top: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+    }
+
+    .queue-note {
+      font-size: 15px;
+      line-height: 1.35;
+      color: var(--tertiary);
+    }
+
+    .tap-pill {
+      border: 1px solid rgba(255, 255, 255, 0.22);
+      border-radius: 999px;
+      padding: 8px 14px;
+      color: var(--secondary);
+      font-size: 14px;
+      line-height: 1;
+      white-space: nowrap;
+      background: rgba(0, 0, 0, 0.18);
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="hub-title">The Howell Hub</div>
+    <div class="clock">08:45 PM</div>
+  </header>
+
+  <main class="stage" aria-label="Evening wind-down dashboard">
+    <div class="ambient-shell" aria-hidden="true"></div>
+    <div class="gate-vignette" aria-hidden="true"></div>
+
+    <section class="bedtime-card" aria-label="Bedtime reminder">
+      <div class="eyebrow">BEDTIME</div>
+
+      <div class="card-main">
+        <div class="message">
+          <h1 class="title">Wind down — 15 min to lights out</h1>
+          <div class="subtitle">Lucy and Ivy are next. Keep the house quiet and start the last routine now.</div>
+        </div>
+
+        <div class="countdown">
+          <div class="count-number">15</div>
+          <div class="count-label">MIN LEFT</div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="bedtime-steps">
+        <div class="step">
+          <div class="step-dot"></div>
+          <div class="step-text">
+            <div class="step-title">Pajamas</div>
+            <div class="step-sub">Lucy · now</div>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-dot dim"></div>
+          <div class="step-text">
+            <div class="step-title">Brush teeth</div>
+            <div class="step-sub">Ivy · 08:50</div>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-dot dim"></div>
+          <div class="step-text">
+            <div class="step-title">One short story</div>
+            <div class="step-sub">lights out · 09:00</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="dismiss-row">
+        <div class="queue-note">Tomorrow’s lunch choice is queued after bedtime is acknowledged.</div>
+        <div class="tap-pill">Tap once to dismiss</div>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

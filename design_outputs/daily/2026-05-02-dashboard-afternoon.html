@@ -1,0 +1,549 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=1920, height=1080, initial-scale=1">
+  <title>The Howell Hub — Dinner Decision</title>
+  <style>
+    :root {
+      --bg: #0A0A0A;
+      --primary: #FFFFFF;
+      --secondary: #FFFFFFAA;
+      --tertiary: #FFFFFF66;
+      --tertiary2: #FFFFFF88;
+      --accent: #60A5FA;
+      --selected: #3B82F6;
+      --warning: #F59E0B;
+      --danger: #EF4444;
+      --success: #4ADE80;
+      --border: #FFFFFF30;
+      --font-ui: "Geist", "Inter", system-ui, sans-serif;
+      --font-data: "JetBrains Mono", ui-monospace, monospace;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      width: 1920px;
+      height: 1080px;
+      margin: 0;
+      overflow: hidden;
+      background: var(--bg);
+      color: var(--primary);
+      font-family: var(--font-ui);
+    }
+
+    body {
+      padding: 38px 48px 46px;
+      background:
+        radial-gradient(circle at 18% 8%, #1E3A8A22 0, transparent 360px),
+        radial-gradient(circle at 78% 18%, #F59E0B10 0, transparent 430px),
+        #0A0A0A;
+    }
+
+    .topbar {
+      height: 64px;
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      margin-bottom: 26px;
+    }
+
+    .hub-title {
+      font-size: 24px;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      color: var(--primary);
+      padding-top: 10px;
+    }
+
+    .clock {
+      font-family: var(--font-data);
+      font-size: 52px;
+      line-height: 1;
+      font-weight: 500;
+      color: var(--primary);
+      letter-spacing: -0.04em;
+    }
+
+    .dashboard {
+      height: 906px;
+      display: grid;
+      grid-template-rows: 535px 1fr;
+      gap: 24px;
+    }
+
+    .card {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: transparent;
+      padding: 18px;
+      overflow: hidden;
+    }
+
+    .primary-card {
+      border: 5px solid var(--selected);
+      padding: 28px 30px 30px;
+      display: grid;
+      grid-template-columns: 430px 1fr;
+      gap: 34px;
+      position: relative;
+      box-shadow: 0 0 0 1px #00000080 inset;
+    }
+
+    .eyebrow {
+      font-size: 13px;
+      line-height: 1;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      color: var(--tertiary);
+      margin-bottom: 14px;
+    }
+
+    .primary-left {
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+    }
+
+    .hero-title {
+      font-size: 32px;
+      line-height: 1.08;
+      font-weight: 600;
+      letter-spacing: -0.03em;
+      margin: 0 0 16px;
+    }
+
+    .hero-copy {
+      font-size: 18px;
+      line-height: 1.38;
+      color: var(--secondary);
+      margin: 0 0 30px;
+      max-width: 395px;
+    }
+
+    .decision-meta {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-top: auto;
+    }
+
+    .meta-box {
+      border: 1px solid #FFFFFF24;
+      border-radius: 12px;
+      padding: 14px 16px;
+      background: #FFFFFF05;
+    }
+
+    .meta-label {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 1.8px;
+      color: var(--tertiary);
+      margin-bottom: 7px;
+    }
+
+    .meta-value {
+      font-family: var(--font-data);
+      font-size: 24px;
+      font-weight: 500;
+      letter-spacing: -0.04em;
+      color: var(--primary);
+    }
+
+    .vendor-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 18px;
+      align-content: stretch;
+    }
+
+    .vendor {
+      border: 1px solid #FFFFFF30;
+      border-radius: 12px;
+      padding: 22px;
+      background: #FFFFFF06;
+      display: flex;
+      flex-direction: column;
+      min-height: 460px;
+      position: relative;
+    }
+
+    .vendor.suggested {
+      border-color: #4ADE8050;
+      background: #4ADE8010;
+    }
+
+    .vendor.top-pick {
+      border-color: #60A5FA70;
+      background: #60A5FA10;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      width: fit-content;
+      border-radius: 999px;
+      padding: 5px 11px;
+      font-size: 12px;
+      line-height: 1;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 1.3px;
+      border: 1px solid #FFFFFF30;
+      color: var(--secondary);
+    }
+
+    .pill.green {
+      color: var(--success);
+      border-color: #4ADE8050;
+      background: #4ADE8010;
+    }
+
+    .pill.blue {
+      color: var(--accent);
+      border-color: #60A5FA50;
+      background: #60A5FA10;
+    }
+
+    .vendor-name {
+      font-size: 31px;
+      line-height: 1.08;
+      font-weight: 600;
+      letter-spacing: -0.03em;
+      margin: 24px 0 12px;
+    }
+
+    .vendor-sub {
+      font-size: 17px;
+      line-height: 1.35;
+      color: var(--secondary);
+      min-height: 48px;
+    }
+
+    .vendor-stats {
+      margin-top: 28px;
+      display: grid;
+      gap: 13px;
+    }
+
+    .stat-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 18px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid #FFFFFF18;
+      color: var(--secondary);
+      font-size: 15px;
+    }
+
+    .stat-row strong {
+      font-family: var(--font-data);
+      color: var(--primary);
+      font-size: 18px;
+      font-weight: 500;
+      letter-spacing: -0.03em;
+    }
+
+    .choose {
+      margin-top: auto;
+      height: 58px;
+      border-radius: 999px;
+      border: 1px solid #FFFFFF35;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 19px;
+      font-weight: 600;
+      color: var(--primary);
+      background: #FFFFFF08;
+    }
+
+    .top-pick .choose {
+      background: #60A5FA;
+      color: #07111F;
+      border-color: #60A5FA;
+    }
+
+    .secondary-row {
+      display: grid;
+      grid-template-columns: 1fr 1.35fr 1.05fr;
+      gap: 24px;
+      min-height: 0;
+    }
+
+    .card-title {
+      font-size: 23px;
+      line-height: 1.15;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      margin: 0 0 18px;
+    }
+
+    .birthday-list, .calendar-list, .school-list {
+      display: grid;
+      gap: 14px;
+    }
+
+    .birthday-row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 12px;
+      align-items: center;
+      padding: 12px 0;
+      border-bottom: 1px solid #FFFFFF18;
+    }
+
+    .birthday-row:last-child { border-bottom: 0; }
+
+    .row-name {
+      font-size: 19px;
+      font-weight: 500;
+      color: var(--primary);
+      margin-bottom: 4px;
+    }
+
+    .row-sub {
+      font-size: 14px;
+      color: var(--tertiary2);
+    }
+
+    .find-pill {
+      border: 1px solid #FFFFFF30;
+      border-radius: 999px;
+      padding: 5px 10px;
+      color: var(--secondary);
+      font-size: 13px;
+      white-space: nowrap;
+    }
+
+    .calendar-row {
+      display: grid;
+      grid-template-columns: 98px 1fr;
+      gap: 14px;
+      padding: 11px 0;
+      border-bottom: 1px solid #FFFFFF18;
+    }
+
+    .calendar-row:last-child { border-bottom: 0; }
+
+    .time {
+      font-family: var(--font-data);
+      font-size: 19px;
+      line-height: 1.2;
+      color: var(--primary);
+      letter-spacing: -0.04em;
+    }
+
+    .event-title {
+      font-size: 18px;
+      font-weight: 500;
+      color: var(--primary);
+      margin-bottom: 4px;
+    }
+
+    .event-sub {
+      font-size: 14px;
+      color: var(--tertiary2);
+    }
+
+    .school-card {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .school-item {
+      border: 1px solid #FFFFFF20;
+      border-radius: 12px;
+      padding: 15px 16px;
+      background: #FFFFFF04;
+    }
+
+    .school-item + .school-item { margin-top: 12px; }
+
+    .due {
+      color: var(--warning);
+      font-size: 12px;
+      line-height: 1;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1.8px;
+      margin-bottom: 11px;
+    }
+
+    .school-title {
+      font-size: 20px;
+      line-height: 1.18;
+      font-weight: 600;
+      margin-bottom: 9px;
+      color: var(--primary);
+    }
+
+    .school-meta {
+      font-size: 14px;
+      color: var(--tertiary2);
+    }
+
+    .muted-note {
+      margin-top: auto;
+      padding-top: 14px;
+      font-size: 13px;
+      line-height: 1.35;
+      color: var(--tertiary);
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="hub-title">The Howell Hub</div>
+    <div class="clock">04:30 PM</div>
+  </header>
+
+  <main class="dashboard">
+    <section class="card primary-card" aria-label="Dinner tonight">
+      <div class="primary-left">
+        <div class="eyebrow">Dinner decision</div>
+        <h1 class="hero-title">Choose takeout now</h1>
+        <p class="hero-copy">One tap locks dinner before the evening gets busy. Pickup or delivery windows are still open.</p>
+
+        <div class="decision-meta">
+          <div class="meta-box">
+            <div class="meta-label">Decide by</div>
+            <div class="meta-value">05:15 PM</div>
+          </div>
+          <div class="meta-box">
+            <div class="meta-label">Dinner target</div>
+            <div class="meta-value">06:30 PM</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="vendor-grid">
+        <div class="vendor top-pick">
+          <span class="pill blue">Best fit</span>
+          <div class="vendor-name">Corner Pizza</div>
+          <div class="vendor-sub">Large cheese, veggie pie, Caesar salad, and garlic knots.</div>
+          <div class="vendor-stats">
+            <div class="stat-row"><span>Ready</span><strong>35 min</strong></div>
+            <div class="stat-row"><span>Family match</span><strong>5/5</strong></div>
+            <div class="stat-row"><span>Est. total</span><strong>$42</strong></div>
+          </div>
+          <div class="choose">Choose Corner Pizza</div>
+        </div>
+
+        <div class="vendor suggested">
+          <span class="pill green">Suggested</span>
+          <div class="vendor-name">Saffron Thai</div>
+          <div class="vendor-sub">Pad see ew, chicken satay, mild curry, and jasmine rice.</div>
+          <div class="vendor-stats">
+            <div class="stat-row"><span>Delivery</span><strong>45 min</strong></div>
+            <div class="stat-row"><span>Family match</span><strong>4/5</strong></div>
+            <div class="stat-row"><span>Est. total</span><strong>$58</strong></div>
+          </div>
+          <div class="choose">Choose Saffron Thai</div>
+        </div>
+
+        <div class="vendor">
+          <span class="pill">Easy pickup</span>
+          <div class="vendor-name">Pho House</div>
+          <div class="vendor-sub">Pho ga, tofu spring rolls, banh mi, and mango tea.</div>
+          <div class="vendor-stats">
+            <div class="stat-row"><span>Ready</span><strong>28 min</strong></div>
+            <div class="stat-row"><span>Family match</span><strong>3/5</strong></div>
+            <div class="stat-row"><span>Est. total</span><strong>$49</strong></div>
+          </div>
+          <div class="choose">Choose Pho House</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="secondary-row">
+      <article class="card">
+        <div class="eyebrow">Birthdays</div>
+        <h2 class="card-title">Gifts to handle</h2>
+        <div class="birthday-list">
+          <div class="birthday-row">
+            <div>
+              <div class="row-name">Andrew</div>
+              <div class="row-sub">Apr 26 — 5 days</div>
+            </div>
+            <div class="find-pill">Find ideas</div>
+          </div>
+          <div class="birthday-row">
+            <div>
+              <div class="row-name">Sarah</div>
+              <div class="row-sub">May 02 — 11 days</div>
+            </div>
+            <div class="find-pill">Find ideas</div>
+          </div>
+          <div class="birthday-row">
+            <div>
+              <div class="row-name">Peter</div>
+              <div class="row-sub">May 09 — 18 days</div>
+            </div>
+            <div class="find-pill">Find ideas</div>
+          </div>
+        </div>
+      </article>
+
+      <article class="card">
+        <div class="eyebrow">Today</div>
+        <h2 class="card-title">Evening calendar</h2>
+        <div class="calendar-list">
+          <div class="calendar-row">
+            <div class="time">04:45 PM</div>
+            <div>
+              <div class="event-title">Lucy soccer pickup</div>
+              <div class="event-sub">North field · Andrew</div>
+            </div>
+          </div>
+          <div class="calendar-row">
+            <div class="time">05:20 PM</div>
+            <div>
+              <div class="event-title">Ivy piano lesson</div>
+              <div class="event-sub">Bring blue folder</div>
+            </div>
+          </div>
+          <div class="calendar-row">
+            <div class="time">06:30 PM</div>
+            <div>
+              <div class="event-title">Dinner window</div>
+              <div class="event-sub">Takeout fits before homework</div>
+            </div>
+          </div>
+          <div class="calendar-row">
+            <div class="time">08:15 PM</div>
+            <div>
+              <div class="event-title">Peter call with Sarah</div>
+              <div class="event-sub">Trip details</div>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <article class="card school-card">
+        <div class="eyebrow">School updates</div>
+        <h2 class="card-title">Needs a glance</h2>
+
+        <div class="school-list">
+          <div class="school-item">
+            <div class="due">Sep · Tuesday</div>
+            <div class="school-title">Science Fair Project — Lucy</div>
+            <div class="school-meta">Due in 5 days · signed yes</div>
+          </div>
+          <div class="school-item">
+            <div class="due">Tomorrow</div>
+            <div class="school-title">Library books — Ivy</div>
+            <div class="school-meta">Return bag packed · reminder set</div>
+          </div>
+        </div>
+
+        <div class="muted-note">Claw Suggestions hidden while dinner is pending.</div>
+      </article>
+    </section>
+  </main>
+</body>
+</html>

@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>The Howell Hub</title>
+  <style>
+    :root{
+      --bg:#0A0A0A;
+      --card:rgba(255,255,255,.03);
+      --chrome:rgba(255,255,255,.19);
+      --chrome2:rgba(255,255,255,.10);
+      --text:#fff;
+      --sec:rgba(255,255,255,.67);
+      --ter:rgba(255,255,255,.42);
+      --blue:#60A5FA;
+      --amber:#F59E0B;
+      --amberbg:#F59E0B15;
+      --amberchrome:#F59E0B60;
+      --green:#4ADE80;
+    }
+    *{box-sizing:border-box}
+    html,body{width:100%;height:100%;margin:0;overflow:hidden;background:var(--bg);color:var(--text);font-family:Inter,Geist,system-ui,sans-serif}
+    .screen{position:relative;width:1920px;height:1080px;background:radial-gradient(1200px 700px at 50% 15%, rgba(255,255,255,.04), transparent 55%), var(--bg); overflow:hidden}
+    .topbar{position:absolute;left:44px;right:44px;top:30px;display:flex;align-items:flex-start;justify-content:space-between;z-index:1}
+    .brand{font-size:24px;font-weight:600;letter-spacing:-.02em;color:#fff}
+    .clock{font-family:"JetBrains Mono",ui-monospace,monospace;font-size:52px;font-weight:600;line-height:1;color:#fff;opacity:.96}
+    .subclock{position:absolute;right:48px;top:90px;font-size:13px;letter-spacing:2px;text-transform:uppercase;color:rgba(255,255,255,.45)}
+    .content{position:absolute;left:44px;right:44px;top:118px;bottom:36px;display:flex;flex-direction:column;gap:20px}
+    .strip{flex:0 0 182px;border:1px solid var(--chrome2);border-radius:10px;background:rgba(255,255,255,.02);padding:18px 20px;display:flex;align-items:stretch;gap:18px;position:relative}
+    .strip:before{content:"";position:absolute;inset:0;border-radius:10px;pointer-events:none;box-shadow:inset 0 0 0 1px rgba(255,255,255,.05)}
+    .tomorrow{flex:1;border:1px solid rgba(255,255,255,.18);border-radius:10px;background:linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.02));padding:18px 20px;display:flex;flex-direction:column;justify-content:space-between}
+    .eyebrow{font-size:12px;letter-spacing:2px;text-transform:uppercase;color:rgba(255,255,255,.48);font-weight:600}
+    .title{font-size:24px;font-weight:600;line-height:1.15;margin-top:8px}
+    .meta{display:flex;gap:18px;align-items:center;color:rgba(255,255,255,.62);font-size:15px}
+    .mono{font-family:"JetBrains Mono",ui-monospace,monospace}
+    .slotrow{display:flex;gap:16px;align-items:stretch;margin-top:auto}
+    .slotcard{flex:1;min-width:0;border-radius:8px;border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.025);padding:14px 14px 12px;display:flex;flex-direction:column;gap:8px}
+    .slothead{display:flex;align-items:center;justify-content:space-between;gap:12px}
+    .slotname{font-size:19px;font-weight:600}
+    .pill{font-size:12px;line-height:1;border-radius:999px;padding:5px 10px;border:1px solid rgba(74,222,128,.45);color:#BFF7CF;background:rgba(74,222,128,.10);white-space:nowrap}
+    .slotdesc{font-size:14px;color:rgba(255,255,255,.66);line-height:1.35}
+    .slotfoot{display:flex;justify-content:space-between;align-items:center;margin-top:auto;color:rgba(255,255,255,.72);font-size:14px}
+    .slotfoot .mono{font-size:18px;color:#fff}
+    .badge{padding:4px 10px;border-radius:999px;border:1px solid rgba(255,255,255,.20);background:rgba(255,255,255,.03);font-size:12px;color:rgba(255,255,255,.72)}
+    .overlayWrap{flex:1;display:flex;align-items:center;justify-content:center;position:relative}
+    .toast{width:min(840px,100%);border-radius:12px;border:1px solid var(--amberchrome);background:linear-gradient(180deg, rgba(245,158,11,.13), rgba(245,158,11,.08));box-shadow:0 18px 60px rgba(0,0,0,.55), inset 0 0 0 1px rgba(245,158,11,.08);padding:24px 26px 22px;position:relative}
+    .toastTop{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+    .toast .eyebrow{color:rgba(245,158,11,.95)}
+    .dismiss{font-size:13px;color:rgba(255,255,255,.86);border:1px solid rgba(255,255,255,.22);border-radius:999px;padding:7px 14px;background:rgba(255,255,255,.03)}
+    .toastTitle{font-size:32px;font-weight:600;line-height:1.15;margin:6px 0 10px}
+    .toastBody{font-size:18px;color:rgba(255,255,255,.74);line-height:1.45;max-width:700px}
+    .toastGrid{display:grid;grid-template-columns:1.1fr .9fr;gap:14px;margin-top:18px}
+    .mini{border-radius:10px;border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.03);padding:14px 16px}
+    .miniLabel{font-size:12px;letter-spacing:2px;text-transform:uppercase;color:rgba(255,255,255,.46);margin-bottom:10px}
+    .miniRow{display:flex;justify-content:space-between;align-items:center;font-size:15px;color:rgba(255,255,255,.78);padding:6px 0}
+    .miniRow + .miniRow{border-top:1px solid rgba(255,255,255,.08)}
+    .miniRow .mono{font-size:17px;color:#fff}
+    .dim{opacity:.18;filter:saturate(.7) blur(.2px)}
+  </style>
+</head>
+<body>
+  <div class="screen">
+    <div class="topbar">
+      <div class="brand">The Howell Hub</div>
+      <div class="clock mono">08:45 PM</div>
+    </div>
+    <div class="subclock">evening wind-down</div>
+
+    <div class="content">
+      <div class="strip dim">
+        <div class="tomorrow">
+          <div>
+            <div class="eyebrow">Tomorrow · Lunch setup</div>
+            <div class="title">What should we pack for the kids?</div>
+          </div>
+          <div class="slotrow">
+            <div class="slotcard">
+              <div class="slothead">
+                <div class="slotname">Turkey wraps + apple slices</div>
+                <div class="pill">suggested</div>
+              </div>
+              <div class="slotdesc">Easy to prep tonight, holds up well in lunch boxes, and uses what’s already in the fridge.</div>
+              <div class="slotfoot">
+                <span>Pack by <span class="mono">07:15</span></span>
+                <span class="badge">Ivy + Lucy</span>
+              </div>
+            </div>
+            <div class="slotcard">
+              <div class="slothead">
+                <div class="slotname">Mac salad + berries</div>
+                <div class="pill">suggested</div>
+              </div>
+              <div class="slotdesc">Cooler-friendly and fast for a school night; add crackers if they want something extra.</div>
+              <div class="slotfoot">
+                <span>Pack by <span class="mono">07:15</span></span>
+                <span class="badge">Peter + Andrew</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="overlayWrap">
+        <div class="toast">
+          <div class="toastTop">
+            <div class="eyebrow">Bedtime</div>
+            <div class="dismiss">Tap to dismiss</div>
+          </div>
+          <div class="toastTitle">Wind down — 15 min to lights out</div>
+          <div class="toastBody">Brush teeth, pick out tomorrow’s clothes, and get the bedroom lights low so the house can settle into sleep.</div>
+          <div class="toastGrid">
+            <div class="mini">
+              <div class="miniLabel">Tonight</div>
+              <div class="miniRow"><span>Lucy in pajamas</span><span class="mono">8:50 PM</span></div>
+              <div class="miniRow"><span>Ivy story time</span><span class="mono">8:55 PM</span></div>
+              <div class="miniRow"><span>Lights out</span><span class="mono">9:00 PM</span></div>
+            </div>
+            <div class="mini">
+              <div class="miniLabel">Tomorrow morning</div>
+              <div class="miniRow"><span>School bags by the door</span><span class="mono">06:45 AM</span></div>
+              <div class="miniRow"><span>Lunches from fridge</span><span class="mono">07:15 AM</span></div>
+              <div class="miniRow"><span>Drop Lucy at school</span><span class="mono">07:45 AM</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

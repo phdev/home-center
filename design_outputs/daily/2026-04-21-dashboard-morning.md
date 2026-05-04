@@ -6,33 +6,35 @@
 ## Concept — Single Runway Morning Card
 
 ### Layout idea
-Use one full-width primary card in the middle of the TV for the morning runway: since showMorningChecklist is true and peter0800_0900Risk is true, the checklist card becomes the single dominant region, with a short inline risk line attached at the bottom of that same card for the 8:00–9:00 conflict. Everything else in current_structure moves out of view in Morning mode: calendar, birthdays, weather, and schoolUpdates are suppressed rather than stacked, because the screen’s job from 7am–9am is to clear the runway, not summarize the day. If a secondary item must remain, it appears only as a tiny, non-competing footer note beneath the main card, never as a second card.
+Use one full-width, dominant morning runway card in the center of the screen as the only primary region while everything else collapses away when morning mode is active. Because derived_state.showMorningChecklist is true and the theme is 7am–9am overload reduction, the current_structure.mid.morningChecklist becomes the single visible anchor, and top-row cards (calendar, weather, birthdays) are removed from the main scan path unless they are directly required by a higher-priority flag. Inside that one card, show a short, non-checklist family runway: the morning checklist as a plain sequence of essentials, plus one inline risk line for the specific active issue, peter0800_0900Risk, so the family sees the only time-sensitive conflict without extra noise. schoolUpdates can appear only as a secondary, compact line at the bottom of the same card if there is room, but no separate second card should compete with the runway. If multiple morning flags become true later, the layout still keeps one card by folding the highest-priority flag into the same contextual slot and relegating the rest to a hidden overflow state.
 
 ### Why it fits
-This matches the snapshot’s goal to help the family clear the morning runway without adding noise, and it respects the 4K shared TV constraint by keeping the primary signal readable from across the kitchen in under 2 seconds. The derived_state says showMorningChecklist is true and peter0800_0900Risk is true, while all other urgency flags are false; that makes the morning checklist the one thing that must be shown, with the Peter risk line as the only secondary callout. The current_structure already places morningChecklist in the mid region and notes it renders via ContextualSlot, which supports the accepted pattern of a single contextual slot that swaps based on the highest-tier active flag. Hiding calendar, birthdays, weather, and schoolUpdates avoids the rejected dense multi-column / information-dense pattern and avoids rendering secondary items alongside the primary prompt.
+This fits the snapshot because the device is a shared 4K TV viewed from across the kitchen, so the primary signal must be readable in under 2 seconds and cannot be split across multiple cards. The state already says showMorningChecklist is true and morningChecklist is priority 1, which makes it the obvious single anchor. The only active complication is peter0800_0900Risk, so the concept surfaces that as an inline risk line instead of adding calendar, weather, or birthdays, which are present in current_structure but would dilute the morning runway. The theme explicitly says reduce morning overload and show only what the family must see between 7am–9am, so removing current_structure.top.calendar, birthdays, and weather from the main view is the right fit. This also honors the accepted pattern of a single contextual slot that swaps based on the highest-tier active flag, while keeping the dashboard from feeling like a checklist app by avoiding a checkable to-do presentation.
 
 ### Tradeoff
-This concept gives up visibility into the rest of the day, so it is worse when the family needs a fuller situational overview or when multiple non-morning decisions are active; it intentionally chooses omission over coverage.
+The cost is that the screen can feel sparse and may hide useful context like weather or calendar at exactly the time some families want it. If there are several truly important morning events, this concept forces strict prioritization and may leave secondary family updates out of sight until the runway is cleared.
 
 ### Implementation hint
-- Render one full-width ContextualSlot card for Morning mode, selecting morningChecklist whenever showMorningChecklist is true, and suppress sibling cards in the same viewport.
-- Inside that card, reserve a single inline risk strip for peter0800_0900Risk so the conflict is visible without becoming a second card.
-- If any other flags become true later, do not add more visible cards in Morning mode; keep a single primary card plus at most one secondary inline note.
+- Render a single full-width morning card only when derived_state.showMorningChecklist is true; mount it in the existing ContextualSlot and do not render separate calendar/weather/birthdays cards in morning mode.
+- Inside that card, place the morning checklist as a simple ordered list of essentials and append one compact inline risk row only when derived_state.peter0800_0900Risk is true.
+- If derived_state.schoolUpdates is true, show it as a one-line secondary footer within the same card, not as a separate card or column.
 
 ### Prototype first
-Build a single full-width morningChecklist card with an attached Peter 8–9 risk line and hide all other dashboard cards.
+Build the one-card morning runway state with the inline peter0800_0900Risk line and verify it is readable from across the kitchen in under two seconds.
 
 ### Memory alignment
 **Reinforces.**
 - show only the essential information at this moment
-- One primary thing, clearly, before secondary things
-- Card visibility is driven by deterministic derived-state flags, never by LLM output
+- one primary thing, clearly, before any secondary things
+- actionable beats informational
+- clarity beats completeness
 - accepted_patterns: A single contextual slot that swaps its card based on the highest-tier active flag
 - accepted_patterns: Keep the Single Runway Card direction (morning dashboard = one full-width checklist card + inline risk line)
+- accepted_patterns: In Morning mode, hide the clock in the header
 
 **Avoids rejected.**
-- rejected_patterns: Information-dense screens that trade clarity for coverage
-- rejected_patterns: Rendering secondary items alongside a primary prompt (they compete for attention and dilute the decision)
-- rejected_patterns: Rendering family items as a checkable to-do list
-- rejected_patterns: Dense multi-column dashboards that trade glanceability for information density
-- rejected_patterns: Progress bars on the dashboard (they signal a productivity app, not a home)
+- Information-dense screens that trade clarity for coverage
+- Rendering secondary items alongside a primary prompt (they compete for attention and dilute the decision)
+- Rendering family items as a checkable to-do list
+- Dense multi-column dashboards that trade glanceability for information density
+- Progress bars on the dashboard

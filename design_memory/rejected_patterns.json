@@ -29,6 +29,54 @@
       "text": "Progress bars on the dashboard (they signal a productivity app, not a home).",
       "added": "2026-04-21",
       "source": "feedback"
+    },
+    {
+      "id": "rp-too-much-text",
+      "text": "Too much text.",
+      "added": "2026-04-22",
+      "source": "telegram"
+    },
+    {
+      "id": "rp-show-smaller-cards-in-the-foreground",
+      "text": "Show smaller cards in the foreground.",
+      "added": "2026-04-22",
+      "source": "telegram"
+    },
+    {
+      "id": "rp-show-tomorrow-items-in-the-night-wind-do",
+      "text": "Show tomorrow items in the night wind-down view.",
+      "added": "2026-04-22",
+      "source": "telegram"
+    },
+    {
+      "id": "rp-do-not-present-dinner-voting-ui-as-a-sug",
+      "text": "Do not present dinner voting UI as a suggested action.",
+      "added": "2026-04-23",
+      "source": "telegram"
+    },
+    {
+      "id": "rp-use-overly-spacious-cards-for-prioritize",
+      "text": "Use overly spacious cards for prioritized items.",
+      "added": "2026-04-26",
+      "source": "telegram"
+    },
+    {
+      "id": "rp-leave-lots-of-empty-space-inside-priorit",
+      "text": "Leave lots of empty space inside prioritized cards.",
+      "added": "2026-04-26",
+      "source": "telegram"
+    },
+    {
+      "id": "rp-avoid-unnecessary-text",
+      "text": "Avoid unnecessary text.",
+      "added": "2026-04-28",
+      "source": "telegram"
+    },
+    {
+      "id": "rp-do-not-place-other-content-before-dinner",
+      "text": "Do not place other content before dinner.",
+      "added": "2026-05-03",
+      "source": "telegram"
     }
   ]
 }

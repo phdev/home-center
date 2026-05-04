@@ -1,0 +1,35 @@
+{
+  "date": "2026-05-01",
+  "topic": {
+    "id": "weekend-vs-weekday",
+    "screen": "dashboard",
+    "theme": "weekend vs weekday dashboards \u2014 which cards disappear, which expand"
+  },
+  "concept": {
+    "concept_name": "Weekend Dinner Runway",
+    "layout_idea": "Use one upper-left primary runway card for the highest active weekend action. In this snapshot, `takeoutDecisionPending: true` makes the contextual slot expand into a large `Dinner Tonight` decision card and move ahead of the existing `clawSuggestions` card, even though `showClawSuggestions: true`. Secondary cards become a tight supporting row after the primary: `birthdays` appears as passive gift planning because `birthdayGiftNeeded: true`, while `calendar` and `weather` stay small ambient cards only if there is room under the 6-card limit. `showMorningChecklist: false`, `lunchDecisionNeeded: false`, `bedtimeReminderActive: false`, and `hasMorningOverlap: false` mean weekday/morning cards disappear entirely. The scan path is: dinner decision first, then birthday reminder, then ambient context.",
+    "why_it_fits": "The snapshot has two active actionable/prompt-like states: `takeoutDecisionPending: true` and `birthdayGiftNeeded: true`, plus `showClawSuggestions: true`. For the weekend-vs-weekday theme, the concept makes the weekend dashboard drop inactive weekday structure such as Morning Checklist, Lunch, morning overlap, and school-first emphasis, while expanding the weekend dinner decision. It also corrects the current structure where `clawSuggestions` has priority 1 in the top row and could steal attention from the actual decision in `contextualSlot`. Dinner voting is shown directly as the primary card, not buried as a suggestion.",
+    "tradeoff": "This is worse when the family expects a broad overview of calendar, weather, school updates, and suggestions all at once; the design intentionally suppresses or shrinks secondary information whenever a weekend decision is pending, so completeness is sacrificed for a faster shared decision.",
+    "implementation_hint": "- Add a deterministic `primaryDashboardMode` selector: if `takeoutDecisionPending` then `dinnerDecision`, else if `bedtimeReminderActive` then `bedtime`, else if `showMorningChecklist` then `morning`, else fallback to ambient.\n- When `primaryDashboardMode === 'dinnerDecision'`, render `contextualSlot` as the first upper-left expanded card and render the dinner voting UI directly inside it; do not render `clawSuggestions` in the foreground even if `showClawSuggestions` is true.\n- Build the secondary row from deterministic flags: include `birthdays` when `birthdayGiftNeeded`, include `calendar` and `weather` as compact ambient cards, and omit inactive `Morning Checklist`, `Lunch`, and overlap cards from this snapshot.",
+    "prototype_first": "Build the `takeoutDecisionPending: true` state with one expanded Dinner Tonight card first, then a compact birthday gift card and two ambient cards underneath.",
+    "memory_alignment": {
+      "reinforces": [
+        "One primary thing, clearly, before any secondary things.",
+        "A prompt that produces a decision beats pure information.",
+        "Card visibility is driven by deterministic derived-state flags, never by LLM output.",
+        "A single contextual slot that swaps its card based on the highest-tier active flag.",
+        "Show dinner voting UI directly.",
+        "Use passive gift planning."
+      ],
+      "avoids_rejected": [
+        "Rendering secondary items alongside a primary prompt (they compete for attention and dilute the decision).",
+        "Do not present dinner voting UI as a suggested action.",
+        "Information-dense screens that trade clarity for coverage.",
+        "Dense multi-column dashboards that trade glanceability for information density.",
+        "Rendering family items as a checkable to-do list.",
+        "Too much text."
+      ]
+    }
+  },
+  "snapshot_path": "/Users/peter/home-center/design_inputs/dashboard.json"
+}

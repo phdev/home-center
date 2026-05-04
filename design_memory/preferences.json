@@ -11,6 +11,24 @@
       "text": "The dashboard should not feel like a productivity app (no todo lists, progress bars, streaks).",
       "added": "2026-04-20",
       "source": "seed"
+    },
+    {
+      "id": "pref-use-smaller-cards-in-the-background",
+      "text": "Use smaller cards in the background.",
+      "added": "2026-04-22",
+      "source": "telegram"
+    },
+    {
+      "id": "pref-show-dinner-voting-ui-directly",
+      "text": "Show dinner voting UI directly.",
+      "added": "2026-04-23",
+      "source": "telegram"
+    },
+    {
+      "id": "pref-this-direction-is-liked",
+      "text": "This direction is liked.",
+      "added": "2026-05-01",
+      "source": "telegram"
     }
   ]
 }

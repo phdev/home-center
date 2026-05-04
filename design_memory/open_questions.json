@@ -5,6 +5,54 @@
       "text": "How should the dashboard behave when 3+ primary flags are simultaneously true?",
       "raised": "2026-04-20",
       "source": "seed"
+    },
+    {
+      "id": "oq-whether-to-send-a-design-daily",
+      "text": "Whether to send a design daily.",
+      "raised": "2026-04-21",
+      "source": "telegram"
+    },
+    {
+      "id": "oq-need-the-design-regenerated-with-the-pro",
+      "text": "Need the design regenerated with the provided feedback incorporated.",
+      "raised": "2026-04-23",
+      "source": "telegram"
+    },
+    {
+      "id": "oq-whether-those-designs-were-accepted",
+      "text": "Whether those designs were accepted.",
+      "raised": "2026-04-25",
+      "source": "telegram"
+    },
+    {
+      "id": "oq-respond-to-user-questions",
+      "text": "Respond to user questions.",
+      "raised": "2026-04-25",
+      "source": "telegram"
+    },
+    {
+      "id": "oq-clarify-whether-those-designs-were-accep",
+      "text": "Clarify whether those designs were accepted.",
+      "raised": "2026-04-25",
+      "source": "telegram"
+    },
+    {
+      "id": "oq-clarify-what-this-refers-to",
+      "text": "Clarify what \u201cthis\u201d refers to.",
+      "raised": "2026-04-28",
+      "source": "telegram"
+    },
+    {
+      "id": "oq-clarify-which-specific-pattern-in-this-d",
+      "text": "Clarify which specific pattern in this design should be preserved.",
+      "raised": "2026-04-29",
+      "source": "telegram"
+    },
+    {
+      "id": "oq-what-specific-pattern-does-this-refer-to",
+      "text": "What specific pattern does \"this\" refer to?",
+      "raised": "2026-04-30",
+      "source": "telegram"
     }
   ]
 }

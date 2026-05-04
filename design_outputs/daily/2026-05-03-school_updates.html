@@ -1,0 +1,616 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=1920, height=1080, initial-scale=1" />
+  <title>The Howell Hub</title>
+  <style>
+    :root {
+      --bg: #0A0A0A;
+      --primary: #FFFFFF;
+      --secondary: #FFFFFFAA;
+      --tertiary: #FFFFFF66;
+      --tertiary-strong: #FFFFFF88;
+      --accent: #60A5FA;
+      --accent-border: #3B82F6;
+      --warning: #F59E0B;
+      --danger: #EF4444;
+      --success: #4ADE80;
+      --card-border: #FFFFFF30;
+      --amber-bg: #F59E0B15;
+      --amber-border: #F59E0B60;
+      --blue-bg: #60A5FA10;
+      --green-bg: #4ADE8010;
+      --red-bg: #EF444410;
+      --font-ui: "Geist", "Inter", system-ui, sans-serif;
+      --font-data: "JetBrains Mono", ui-monospace, monospace;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      width: 1920px;
+      height: 1080px;
+      margin: 0;
+      overflow: hidden;
+      background: var(--bg);
+      color: var(--primary);
+      font-family: var(--font-ui);
+    }
+
+    body {
+      padding: 34px 44px 42px;
+    }
+
+    .topbar {
+      height: 72px;
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      margin-bottom: 22px;
+    }
+
+    .hub-title {
+      font-size: 24px;
+      line-height: 1;
+      font-weight: 600;
+      letter-spacing: -0.2px;
+      color: var(--primary);
+      padding-top: 8px;
+    }
+
+    .clock {
+      font-family: var(--font-data);
+      font-size: 52px;
+      line-height: 1;
+      font-weight: 500;
+      letter-spacing: -1.5px;
+      color: var(--primary);
+    }
+
+    .dashboard {
+      height: 910px;
+      display: grid;
+      grid-template-columns: 640px 1fr;
+      grid-template-rows: 1fr;
+      gap: 22px;
+    }
+
+    .left-rail {
+      display: grid;
+      grid-template-rows: 530px 1fr;
+      gap: 22px;
+      min-height: 0;
+    }
+
+    .right-grid {
+      display: grid;
+      grid-template-columns: 1fr 420px;
+      grid-template-rows: 430px 1fr;
+      gap: 22px;
+      min-height: 0;
+    }
+
+    .card {
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 18px;
+      background: transparent;
+      min-width: 0;
+      min-height: 0;
+    }
+
+    .hero {
+      border: 5px solid var(--accent-border);
+      padding: 22px;
+      position: relative;
+      background:
+        radial-gradient(circle at 88% 12%, #60A5FA18 0, transparent 34%),
+        linear-gradient(180deg, #60A5FA08, transparent 55%);
+    }
+
+    .eyebrow {
+      font-size: 13px;
+      line-height: 1;
+      font-weight: 600;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--tertiary);
+      margin-bottom: 14px;
+    }
+
+    .eyebrow.warning { color: var(--warning); }
+
+    .hero-title {
+      font-size: 32px;
+      line-height: 1.12;
+      font-weight: 650;
+      letter-spacing: -0.6px;
+      margin: 0 0 18px;
+      max-width: 540px;
+    }
+
+    .due-row {
+      display: flex;
+      align-items: baseline;
+      gap: 14px;
+      margin-bottom: 34px;
+    }
+
+    .due-time {
+      font-family: var(--font-data);
+      font-size: 64px;
+      line-height: 1;
+      font-weight: 600;
+      letter-spacing: -2px;
+      color: var(--primary);
+    }
+
+    .due-label {
+      font-size: 20px;
+      color: var(--secondary);
+      line-height: 1.25;
+    }
+
+    .action-box {
+      border: 1px solid #F59E0B50;
+      background: var(--amber-bg);
+      border-radius: 12px;
+      padding: 18px;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      align-items: center;
+      gap: 18px;
+      margin-top: 8px;
+    }
+
+    .action-label {
+      font-size: 12px;
+      font-weight: 650;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--warning);
+      margin-bottom: 7px;
+    }
+
+    .action-title {
+      font-size: 24px;
+      line-height: 1.2;
+      font-weight: 600;
+      color: var(--primary);
+    }
+
+    .action-sub {
+      font-size: 15px;
+      line-height: 1.35;
+      color: var(--secondary);
+      margin-top: 5px;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid var(--card-border);
+      border-radius: 999px;
+      padding: 5px 11px;
+      font-size: 13px;
+      color: var(--secondary);
+      white-space: nowrap;
+    }
+
+    .pill.blue {
+      border-color: #60A5FA60;
+      background: #60A5FA18;
+      color: #BFDBFE;
+      font-weight: 600;
+      padding: 9px 16px;
+      font-size: 15px;
+    }
+
+    .pill.green {
+      border-color: #4ADE8050;
+      background: var(--green-bg);
+      color: var(--success);
+      font-weight: 650;
+      font-size: 12px;
+      letter-spacing: .4px;
+      text-transform: uppercase;
+    }
+
+    .card-title {
+      font-size: 24px;
+      line-height: 1.15;
+      font-weight: 650;
+      letter-spacing: -0.3px;
+      margin: 0;
+    }
+
+    .calendar-card {
+      padding: 20px;
+    }
+
+    .cal-list {
+      display: grid;
+      gap: 17px;
+      margin-top: 4px;
+    }
+
+    .cal-row {
+      display: grid;
+      grid-template-columns: 98px 1fr;
+      gap: 16px;
+      align-items: start;
+      padding-bottom: 15px;
+      border-bottom: 1px solid #FFFFFF18;
+    }
+
+    .cal-row:last-child {
+      border-bottom: 0;
+      padding-bottom: 0;
+    }
+
+    .cal-time {
+      font-family: var(--font-data);
+      font-size: 19px;
+      line-height: 1.2;
+      color: var(--primary);
+      letter-spacing: -0.4px;
+    }
+
+    .row-title {
+      font-size: 19px;
+      line-height: 1.2;
+      font-weight: 550;
+      color: var(--primary);
+    }
+
+    .row-sub {
+      font-size: 15px;
+      line-height: 1.35;
+      color: var(--tertiary-strong);
+      margin-top: 4px;
+    }
+
+    .dinner-card {
+      grid-column: 1 / 3;
+      padding: 22px;
+    }
+
+    .dinner-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 18px;
+    }
+
+    .dinner-sub {
+      font-size: 16px;
+      color: var(--secondary);
+      margin-top: 8px;
+    }
+
+    .choice-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      height: 278px;
+    }
+
+    .choice {
+      border: 1px solid #FFFFFF24;
+      border-radius: 12px;
+      padding: 17px;
+      background: #FFFFFF05;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .choice.top {
+      border-color: #4ADE8050;
+      background: #4ADE800D;
+    }
+
+    .vendor {
+      font-size: 22px;
+      font-weight: 650;
+      line-height: 1.15;
+      margin-bottom: 8px;
+    }
+
+    .vendor-meta {
+      font-family: var(--font-data);
+      font-size: 16px;
+      color: var(--secondary);
+      line-height: 1.45;
+    }
+
+    .vendor-note {
+      font-size: 15px;
+      color: var(--tertiary-strong);
+      line-height: 1.35;
+      margin-top: 12px;
+    }
+
+    .birthdays-card {
+      padding: 20px;
+    }
+
+    .birthday-list {
+      display: grid;
+      gap: 14px;
+      margin-top: 18px;
+    }
+
+    .birthday-row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      align-items: center;
+      gap: 12px;
+      padding: 13px 0;
+      border-bottom: 1px solid #FFFFFF18;
+    }
+
+    .birthday-row:last-child {
+      border-bottom: 0;
+    }
+
+    .name {
+      font-size: 19px;
+      font-weight: 550;
+      line-height: 1.2;
+    }
+
+    .date-sub {
+      font-size: 14px;
+      color: var(--tertiary-strong);
+      margin-top: 4px;
+    }
+
+    .claw-card {
+      padding: 20px;
+    }
+
+    .suggestions {
+      display: grid;
+      gap: 13px;
+      margin-top: 17px;
+    }
+
+    .suggest-row {
+      display: grid;
+      grid-template-columns: 28px 1fr auto;
+      gap: 12px;
+      align-items: center;
+      padding: 13px;
+      border: 1px solid #FFFFFF18;
+      border-radius: 12px;
+      background: #FFFFFF04;
+    }
+
+    .tile {
+      width: 28px;
+      height: 28px;
+      border-radius: 8px;
+    }
+
+    .tile.blue { background: var(--accent); }
+    .tile.amber { background: var(--warning); }
+    .tile.red { background: var(--danger); }
+
+    .suggest-title {
+      font-size: 18px;
+      line-height: 1.18;
+      font-weight: 650;
+    }
+
+    .suggest-sub {
+      font-size: 14px;
+      line-height: 1.3;
+      color: var(--secondary);
+      margin-top: 3px;
+    }
+
+    .chev {
+      font-size: 34px;
+      line-height: 1;
+      color: var(--tertiary-strong);
+      padding-left: 4px;
+    }
+
+    .quiet-footer {
+      position: absolute;
+      left: 26px;
+      bottom: 20px;
+      font-size: 14px;
+      color: var(--tertiary);
+    }
+
+    .hero .quiet-footer {
+      left: 26px;
+      bottom: 18px;
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="hub-title">The Howell Hub</div>
+    <div class="clock">05:42 PM</div>
+  </header>
+
+  <main class="dashboard">
+    <section class="left-rail">
+      <article class="card hero">
+        <div class="eyebrow warning">School deadline · due tonight</div>
+        <h1 class="hero-title">Science Fair Project — Ivy</h1>
+
+        <div class="due-row">
+          <div class="due-time">8:00 PM</div>
+          <div class="due-label">final photos and reflection<br />must be submitted today</div>
+        </div>
+
+        <div class="action-box">
+          <div>
+            <div class="action-label">Single next action</div>
+            <div class="action-title">Upload the board photos</div>
+            <div class="action-sub">Peter has the rubric open. Ivy needs 3 photos and the last sentence checked.</div>
+          </div>
+          <div class="pill blue">Start now</div>
+        </div>
+
+        <div class="quiet-footer">Earliest actionable deadline is pinned here.</div>
+      </article>
+
+      <article class="card calendar-card">
+        <div class="eyebrow">Today</div>
+        <div class="cal-list">
+          <div class="cal-row">
+            <div class="cal-time">07:45 AM</div>
+            <div>
+              <div class="row-title">Drop Lucy at school</div>
+              <div class="row-sub">Andrew · west entrance</div>
+            </div>
+          </div>
+          <div class="cal-row">
+            <div class="cal-time">10:30 AM</div>
+            <div>
+              <div class="row-title">Dr. Shaw</div>
+              <div class="row-sub">Sarah · annual checkup</div>
+            </div>
+          </div>
+          <div class="cal-row">
+            <div class="cal-time">02:15 PM</div>
+            <div>
+              <div class="row-title">Ivy piano lesson</div>
+              <div class="row-sub">Bring recital folder</div>
+            </div>
+          </div>
+          <div class="cal-row">
+            <div class="cal-time">06:10 PM</div>
+            <div>
+              <div class="row-title">Pick up soccer cleats</div>
+              <div class="row-sub">Peter · before dinner</div>
+            </div>
+          </div>
+          <div class="cal-row">
+            <div class="cal-time">08:00 PM</div>
+            <div>
+              <div class="row-title">Science fair upload due</div>
+              <div class="row-sub">Ivy · classroom portal</div>
+            </div>
+          </div>
+        </div>
+      </article>
+    </section>
+
+    <section class="right-grid">
+      <article class="card dinner-card">
+        <div class="dinner-head">
+          <div>
+            <div class="eyebrow">Dinner tonight</div>
+            <h2 class="card-title">Pick takeout before practice ends?</h2>
+            <div class="dinner-sub">Three nearby options still fit the 6:45–7:10 window.</div>
+          </div>
+          <div class="pill blue">Voice: “Hey Homer, pick dinner”</div>
+        </div>
+
+        <div class="choice-grid">
+          <div class="choice top">
+            <div>
+              <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:12px;">
+                <div class="vendor">Miso House</div>
+                <div class="pill green">suggested</div>
+              </div>
+              <div class="vendor-meta">25–35 min<br />$42 est.</div>
+              <div class="vendor-note">Lucy likes the chicken katsu. Easy pickup on the way back.</div>
+            </div>
+            <div class="pill">Choose</div>
+          </div>
+
+          <div class="choice">
+            <div>
+              <div class="vendor">Oak Street Pizza</div>
+              <div class="vendor-meta">30–40 min<br />$38 est.</div>
+              <div class="vendor-note">Fastest family default, but Sarah had pizza at lunch.</div>
+            </div>
+            <div class="pill">Choose</div>
+          </div>
+
+          <div class="choice">
+            <div>
+              <div class="vendor">Taco Verde</div>
+              <div class="vendor-meta">20–30 min<br />$34 est.</div>
+              <div class="vendor-note">Good timing, but Ivy asked for something warm after piano.</div>
+            </div>
+            <div class="pill">Choose</div>
+          </div>
+        </div>
+      </article>
+
+      <article class="card birthdays-card">
+        <div class="eyebrow">Birthdays</div>
+        <h2 class="card-title">Gift planning</h2>
+
+        <div class="birthday-list">
+          <div class="birthday-row">
+            <div>
+              <div class="name">Andrew</div>
+              <div class="date-sub">in 5 days</div>
+            </div>
+            <div class="pill">Find ideas</div>
+          </div>
+          <div class="birthday-row">
+            <div>
+              <div class="name">Lucy</div>
+              <div class="date-sub">in 11 days</div>
+            </div>
+            <div class="pill">Find ideas</div>
+          </div>
+          <div class="birthday-row">
+            <div>
+              <div class="name">Sarah</div>
+              <div class="date-sub">in 3 weeks</div>
+            </div>
+            <div class="pill">Find ideas</div>
+          </div>
+        </div>
+      </article>
+
+      <article class="card claw-card">
+        <div class="eyebrow">Claw suggestions</div>
+        <h2 class="card-title">Small assists</h2>
+
+        <div class="suggestions">
+          <div class="suggest-row">
+            <div class="tile amber"></div>
+            <div>
+              <div class="suggest-title">Set dinner now</div>
+              <div class="suggest-sub">Pick a takeout spot and lock dinner in early.</div>
+            </div>
+            <div class="chev">›</div>
+          </div>
+
+          <div class="suggest-row">
+            <div class="tile blue"></div>
+            <div>
+              <div class="suggest-title">Open school portal</div>
+              <div class="suggest-sub">Jump straight to Ivy’s assignment upload.</div>
+            </div>
+            <div class="chev">›</div>
+          </div>
+
+          <div class="suggest-row">
+            <div class="tile red"></div>
+            <div>
+              <div class="suggest-title">Remind at 7:30</div>
+              <div class="suggest-sub">Ping the TV if the science upload is not done.</div>
+            </div>
+            <div class="chev">›</div>
+          </div>
+        </div>
+      </article>
+    </section>
+  </main>
+</body>
+</html>

@@ -1,0 +1,671 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=1920, height=1080, initial-scale=1">
+  <title>Home Center Dashboard Mockup</title>
+  <style>
+    * { box-sizing: border-box; }
+    html, body {
+      width: 1920px;
+      height: 1080px;
+      margin: 0;
+      overflow: hidden;
+      background: #0A0A0A;
+      color: #FFFFFF;
+      font-family: "Geist", "Inter", system-ui, sans-serif;
+    }
+    body {
+      position: relative;
+      padding: 34px 48px 42px 48px;
+    }
+    .mono {
+      font-family: "JetBrains Mono", ui-monospace, monospace;
+      font-variant-numeric: tabular-nums;
+    }
+    .topbar {
+      height: 64px;
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      margin-bottom: 20px;
+    }
+    .hub-title {
+      font-size: 24px;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      color: #FFFFFF;
+      padding-top: 10px;
+    }
+    .clock {
+      font-size: 52px;
+      line-height: 1;
+      font-weight: 500;
+      color: #FFFFFF;
+      letter-spacing: -0.06em;
+    }
+    .dashboard {
+      width: 100%;
+      height: 900px;
+      display: grid;
+      grid-template-columns: 1132px 674px;
+      grid-template-rows: 548px 334px;
+      gap: 18px;
+    }
+    .card {
+      border: 1px solid #FFFFFF30;
+      border-radius: 8px;
+      background: transparent;
+      padding: 18px;
+      overflow: hidden;
+    }
+    .hero {
+      border: 5px solid #3B82F6;
+      padding: 26px;
+      position: relative;
+    }
+    .right-stack {
+      display: grid;
+      grid-template-rows: 1fr 1fr;
+      gap: 18px;
+      min-height: 0;
+    }
+    .bottom-row {
+      grid-column: 1 / 3;
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 18px;
+      min-height: 0;
+    }
+    .eyebrow {
+      font-size: 13px;
+      line-height: 1;
+      font-weight: 600;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: #FFFFFF66;
+    }
+    .eyebrow-blue { color: #60A5FA; }
+    .eyebrow-amber { color: #F59E0B; }
+    .title-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+    }
+    .card-title {
+      font-size: 24px;
+      line-height: 1.12;
+      font-weight: 600;
+      letter-spacing: -0.03em;
+      margin: 0;
+    }
+    .hero-title {
+      font-size: 32px;
+      line-height: 1.08;
+      font-weight: 600;
+      letter-spacing: -0.04em;
+      margin: 16px 0 8px 0;
+    }
+    .hero-subtitle {
+      color: #FFFFFFAA;
+      font-size: 17px;
+      line-height: 1.35;
+      margin: 0 0 24px 0;
+      max-width: 760px;
+    }
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 999px;
+      border: 1px solid #FFFFFF30;
+      padding: 4px 10px;
+      color: #FFFFFFAA;
+      font-size: 13px;
+      line-height: 1.15;
+      white-space: nowrap;
+    }
+    .pill-blue {
+      border-color: #60A5FA50;
+      color: #60A5FA;
+      background: #60A5FA10;
+    }
+    .pill-green {
+      border-color: #4ADE8050;
+      color: #4ADE80;
+      background: #4ADE8010;
+    }
+    .pill-amber {
+      border-color: #F59E0B50;
+      color: #F59E0B;
+      background: #F59E0B10;
+    }
+    .dinner-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 14px;
+      margin-top: 4px;
+    }
+    .choice {
+      min-height: 218px;
+      border-radius: 12px;
+      border: 1px solid #FFFFFF30;
+      padding: 16px;
+      background: #FFFFFF05;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+    .choice.suggested {
+      border-color: #4ADE8050;
+      background: #4ADE8010;
+    }
+    .choice-top {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+    .choice-name {
+      font-size: 22px;
+      line-height: 1.12;
+      font-weight: 600;
+      letter-spacing: -0.03em;
+      color: #FFFFFF;
+    }
+    .choice-meta {
+      margin-top: 8px;
+      color: #FFFFFFAA;
+      font-size: 15px;
+      line-height: 1.35;
+    }
+    .vote-line {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 7px;
+      margin-top: 14px;
+    }
+    .vote-chip {
+      border-radius: 999px;
+      padding: 5px 9px;
+      border: 1px solid #FFFFFF30;
+      color: #FFFFFFAA;
+      font-size: 13px;
+      line-height: 1;
+    }
+    .vote-chip.yes {
+      border-color: #4ADE8050;
+      color: #4ADE80;
+      background: #4ADE8010;
+    }
+    .vote-chip.waiting {
+      border-color: #F59E0B50;
+      color: #F59E0B;
+      background: #F59E0B10;
+    }
+    .choice-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      color: #FFFFFF88;
+      font-size: 14px;
+      margin-top: 14px;
+    }
+    .eta {
+      color: #FFFFFF;
+      font-size: 18px;
+      font-weight: 500;
+    }
+    .hero-actions {
+      position: absolute;
+      left: 26px;
+      right: 26px;
+      bottom: 22px;
+      height: 58px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+      border-top: 1px solid #FFFFFF20;
+      padding-top: 18px;
+    }
+    .voice-hint {
+      color: #FFFFFF88;
+      font-size: 15px;
+    }
+    .primary-action {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      height: 40px;
+      border-radius: 999px;
+      background: #60A5FA;
+      color: #0A0A0A;
+      font-size: 15px;
+      font-weight: 700;
+      padding: 0 18px;
+    }
+    .passive-list {
+      margin-top: 14px;
+      display: grid;
+      gap: 10px;
+    }
+    .birthday-row {
+      min-height: 42px;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 12px;
+      align-items: center;
+      padding: 9px 0;
+      border-top: 1px solid #FFFFFF14;
+    }
+    .birthday-row:first-child { border-top: 0; }
+    .person {
+      font-size: 19px;
+      line-height: 1.15;
+      font-weight: 500;
+      color: #FFFFFF;
+    }
+    .sub {
+      font-size: 14px;
+      line-height: 1.25;
+      color: #FFFFFF66;
+      margin-top: 3px;
+    }
+    .suggestion-list {
+      margin-top: 14px;
+      display: grid;
+      gap: 10px;
+    }
+    .suggestion-row {
+      display: grid;
+      grid-template-columns: 28px 1fr auto;
+      gap: 12px;
+      align-items: center;
+      padding: 10px 0;
+      border-top: 1px solid #FFFFFF14;
+    }
+    .suggestion-row:first-child { border-top: 0; }
+    .icon-tile {
+      width: 28px;
+      height: 28px;
+      border-radius: 7px;
+    }
+    .tile-blue { background: #60A5FA; }
+    .tile-amber { background: #F59E0B; }
+    .tile-red { background: #EF4444; }
+    .suggestion-title {
+      font-size: 18px;
+      line-height: 1.12;
+      font-weight: 600;
+      color: #FFFFFF;
+    }
+    .suggestion-sub {
+      margin-top: 4px;
+      font-size: 14px;
+      line-height: 1.25;
+      color: #FFFFFFAA;
+    }
+    .chev {
+      font-size: 34px;
+      line-height: 1;
+      color: #FFFFFF88;
+      padding-bottom: 4px;
+    }
+    .calendar-list {
+      margin-top: 16px;
+      display: grid;
+      gap: 14px;
+    }
+    .calendar-row {
+      display: grid;
+      grid-template-columns: 86px 1fr;
+      gap: 16px;
+      align-items: start;
+    }
+    .cal-time {
+      font-size: 20px;
+      line-height: 1.1;
+      font-weight: 500;
+      color: #FFFFFF;
+      letter-spacing: -0.04em;
+    }
+    .row-title {
+      font-size: 19px;
+      line-height: 1.15;
+      font-weight: 500;
+      color: #FFFFFF;
+    }
+    .row-sub {
+      margin-top: 3px;
+      font-size: 14px;
+      line-height: 1.25;
+      color: #FFFFFF66;
+    }
+    .weather-main {
+      display: grid;
+      grid-template-columns: 180px 1fr;
+      gap: 18px;
+      align-items: center;
+      margin-top: 18px;
+    }
+    .temp {
+      font-size: 68px;
+      line-height: .95;
+      font-weight: 600;
+      color: #FFFFFF;
+      letter-spacing: -0.08em;
+    }
+    .weather-condition {
+      font-size: 22px;
+      line-height: 1.15;
+      font-weight: 600;
+      color: #FFFFFF;
+    }
+    .weather-feels {
+      margin-top: 7px;
+      font-size: 16px;
+      color: #FFFFFFAA;
+    }
+    .weather-rows {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 10px;
+      margin-top: 22px;
+    }
+    .weather-stat {
+      border-radius: 12px;
+      border: 1px solid #FFFFFF20;
+      padding: 12px;
+      min-height: 68px;
+    }
+    .stat-value {
+      font-size: 19px;
+      line-height: 1.1;
+      color: #FFFFFF;
+      font-weight: 500;
+    }
+    .stat-label {
+      margin-top: 7px;
+      font-size: 12px;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: #FFFFFF66;
+    }
+    .school-list {
+      display: grid;
+      gap: 12px;
+      margin-top: 16px;
+    }
+    .school-item {
+      border-radius: 12px;
+      border: 1px solid #FFFFFF20;
+      padding: 14px;
+      background: #FFFFFF04;
+    }
+    .school-title {
+      margin-top: 8px;
+      font-size: 21px;
+      line-height: 1.15;
+      font-weight: 600;
+      letter-spacing: -0.03em;
+      color: #FFFFFF;
+    }
+    .school-meta {
+      margin-top: 8px;
+      font-size: 14px;
+      line-height: 1.2;
+      color: #FFFFFF66;
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="hub-title">The Howell Hub</div>
+    <div class="clock mono">05:42 PM</div>
+  </header>
+
+  <main class="dashboard">
+    <section class="card hero">
+      <div class="title-row">
+        <div class="eyebrow eyebrow-blue">Decision needed · tonight</div>
+        <div class="pill pill-blue">Hero owner: Dinner</div>
+      </div>
+
+      <h1 class="hero-title">Dinner Tonight</h1>
+      <p class="hero-subtitle">Takeout is still undecided. Pick one order now so everyone can eat before activities start.</p>
+
+      <div class="dinner-grid">
+        <div class="choice suggested">
+          <div>
+            <div class="choice-top">
+              <div>
+                <div class="choice-name">Sushi House</div>
+                <div class="choice-meta">Salmon rolls, chicken teriyaki, edamame</div>
+              </div>
+              <div class="pill pill-green">suggested</div>
+            </div>
+            <div class="vote-line">
+              <div class="vote-chip yes">Andrew ✓</div>
+              <div class="vote-chip yes">Lucy ✓</div>
+              <div class="vote-chip waiting">Ivy ?</div>
+            </div>
+          </div>
+          <div class="choice-footer">
+            <span class="eta mono">32 min</span>
+            <span>$48 est.</span>
+          </div>
+        </div>
+
+        <div class="choice">
+          <div>
+            <div class="choice-top">
+              <div>
+                <div class="choice-name">Thai Garden</div>
+                <div class="choice-meta">Pad see ew, green curry, jasmine rice</div>
+              </div>
+            </div>
+            <div class="vote-line">
+              <div class="vote-chip">Sarah likes</div>
+              <div class="vote-chip">Peter maybe</div>
+            </div>
+          </div>
+          <div class="choice-footer">
+            <span class="eta mono">41 min</span>
+            <span>$54 est.</span>
+          </div>
+        </div>
+
+        <div class="choice">
+          <div>
+            <div class="choice-top">
+              <div>
+                <div class="choice-name">Pizzeria Roma</div>
+                <div class="choice-meta">Cheese pizza, Caesar salad, garlic knots</div>
+              </div>
+            </div>
+            <div class="vote-line">
+              <div class="vote-chip yes">Ivy ✓</div>
+              <div class="vote-chip">Lucy no olives</div>
+            </div>
+          </div>
+          <div class="choice-footer">
+            <span class="eta mono">28 min</span>
+            <span>$39 est.</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="hero-actions">
+        <div class="voice-hint">Say <span class="mono">“Hey Homer, vote Sushi”</span> or point at a card to choose.</div>
+        <div class="primary-action">Lock in Sushi House</div>
+      </div>
+    </section>
+
+    <aside class="right-stack">
+      <section class="card">
+        <div class="title-row">
+          <div>
+            <div class="eyebrow">Passive planning</div>
+            <h2 class="card-title" style="margin-top:10px;">Birthday gifts</h2>
+          </div>
+          <div class="pill pill-amber">gift needed</div>
+        </div>
+        <div class="passive-list">
+          <div class="birthday-row">
+            <div>
+              <div class="person">Peter</div>
+              <div class="sub">Apr 26 — 5 days</div>
+            </div>
+            <div class="pill">Find ideas</div>
+          </div>
+          <div class="birthday-row">
+            <div>
+              <div class="person">Sarah</div>
+              <div class="sub">May 03 — 12 days</div>
+            </div>
+            <div class="pill">Find ideas</div>
+          </div>
+          <div class="birthday-row">
+            <div>
+              <div class="person">Andrew</div>
+              <div class="sub">May 18 — in 4 weeks</div>
+            </div>
+            <div class="pill">Find ideas</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="title-row">
+          <div>
+            <div class="eyebrow">Claw suggestions</div>
+            <h2 class="card-title" style="margin-top:10px;">Helpful next steps</h2>
+          </div>
+        </div>
+        <div class="suggestion-list">
+          <div class="suggestion-row">
+            <div class="icon-tile tile-blue"></div>
+            <div>
+              <div class="suggestion-title">Set dinner now</div>
+              <div class="suggestion-sub">Pick a takeout spot and lock dinner in early.</div>
+            </div>
+            <div class="chev">›</div>
+          </div>
+          <div class="suggestion-row">
+            <div class="icon-tile tile-amber"></div>
+            <div>
+              <div class="suggestion-title">Bundle errands</div>
+              <div class="suggestion-sub">Pharmacy and gift pickup are near piano.</div>
+            </div>
+            <div class="chev">›</div>
+          </div>
+          <div class="suggestion-row">
+            <div class="icon-tile tile-red"></div>
+            <div>
+              <div class="suggestion-title">Confirm pickup</div>
+              <div class="suggestion-sub">Andrew has not replied for Ivy’s ride.</div>
+            </div>
+            <div class="chev">›</div>
+          </div>
+        </div>
+      </section>
+    </aside>
+
+    <section class="bottom-row">
+      <section class="card">
+        <div class="title-row">
+          <div>
+            <div class="eyebrow">Today</div>
+            <h2 class="card-title" style="margin-top:10px;">Calendar</h2>
+          </div>
+        </div>
+        <div class="calendar-list">
+          <div class="calendar-row">
+            <div class="cal-time mono">07:45</div>
+            <div>
+              <div class="row-title">Drop Lucy at school</div>
+              <div class="row-sub">Sarah · front loop</div>
+            </div>
+          </div>
+          <div class="calendar-row">
+            <div class="cal-time mono">10:30</div>
+            <div>
+              <div class="row-title">Dr. Shaw</div>
+              <div class="row-sub">Peter · bring insurance card</div>
+            </div>
+          </div>
+          <div class="calendar-row">
+            <div class="cal-time mono">14:15</div>
+            <div>
+              <div class="row-title">Ivy piano lesson</div>
+              <div class="row-sub">Studio B · music folder</div>
+            </div>
+          </div>
+          <div class="calendar-row">
+            <div class="cal-time mono">18:30</div>
+            <div>
+              <div class="row-title">Lucy soccer practice</div>
+              <div class="row-sub">Cleats and water bottle</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="title-row">
+          <div>
+            <div class="eyebrow">Outside</div>
+            <h2 class="card-title" style="margin-top:10px;">Weather</h2>
+          </div>
+        </div>
+        <div class="weather-main">
+          <div class="temp mono">54°F</div>
+          <div>
+            <div class="weather-condition">Partly Cloudy</div>
+            <div class="weather-feels">Feels like 50°F</div>
+          </div>
+        </div>
+        <div class="weather-rows">
+          <div class="weather-stat">
+            <div class="stat-value mono">12 mph NW</div>
+            <div class="stat-label">Wind</div>
+          </div>
+          <div class="weather-stat">
+            <div class="stat-value mono">71%</div>
+            <div class="stat-label">Humidity</div>
+          </div>
+          <div class="weather-stat">
+            <div class="stat-value mono">68° / 54°</div>
+            <div class="stat-label">High / Low</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="title-row">
+          <div>
+            <div class="eyebrow">School updates</div>
+            <h2 class="card-title" style="margin-top:10px;">Due soon</h2>
+          </div>
+        </div>
+        <div class="school-list">
+          <div class="school-item">
+            <div class="eyebrow eyebrow-amber">Fri · in 5 days</div>
+            <div class="school-title">Science Fair Project — Ivy</div>
+            <div class="school-meta">Due in 5 days · signed yes</div>
+          </div>
+          <div class="school-item">
+            <div class="eyebrow eyebrow-amber">Tomorrow</div>
+            <div class="school-title">Field trip form — Lucy</div>
+            <div class="school-meta">Permission slip ready · payment sent</div>
+          </div>
+        </div>
+      </section>
+    </section>
+  </main>
+</body>
+</html>
