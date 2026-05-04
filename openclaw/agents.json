@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "agents": [
+    {
+      "id": "devon",
+      "name": "Devon",
+      "role": "Home Center development and project-management claw",
+      "model": "openai-codex/gpt-5.5",
+      "fallback": "none",
+      "agentRuntime": {
+        "id": "codex"
+      },
+      "familyFacing": false,
+      "isDefault": false,
+      "isDefaultFamilyFacingAgent": false,
+      "instructions": "docs/devon.md",
+      "projectIndex": "docs/status/devon-project-index.md",
+      "morningBriefTemplate": "docs/templates/devon-morning-brief.md",
+      "approvalRules": {
+        "requiresExplicitApprovalToMergeMain": true,
+        "requiresExplicitApprovalToImplementDavidDesigns": true,
+        "requiresSafetyCalloutForFamilyFacingBehavior": true
+      }
+    }
+  ]
+}

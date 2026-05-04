@@ -37,27 +37,50 @@ pi/sounds/
 src/design/
 
 # School updates agent
+school-updates/.venv/
 school-updates/credentials.json
 school-updates/token.json
 school-updates/data/
 school-updates/config.yaml
 school-updates/seen.json
+school-updates/logs/
 
 # OpenClaw router
 openclaw/cache/*.db
 openclaw/logs/*.json
 
 # Email triage — local config with secrets + chat IDs
+email-triage/.venv/
 email-triage/config.yaml
 email-triage/credentials.json
 email-triage/token.json
 email-triage/email_triage.db
 email-triage/email_triage.log
+email-triage/logs/
+
+# Voice service — local runtime artifacts
+voice-service/.venv/
+voice-service/logs/
+voice-service/models/
 
 # Design Claw — runtime-only state (see docs/design_claw.md)
+design_outputs/*.log
 design_outputs/.last_daily.json
 design_outputs/.last_telegram_update.json
 design_outputs/.launchd.stdout.log
 design_outputs/.launchd.stderr.log
 design_outputs/.launchd-listener.stdout.log
 design_outputs/.launchd-listener.stderr.log
+
+# Devon status artifacts are tracked markdown; launchd logs are runtime-only.
+docs/status/*.log
+
+# OpenClaw isolated-agent workspace scaffolding. Devon's durable project
+# instructions live in docs/devon.md; these root files are local runtime context.
+/AGENTS.md
+/HEARTBEAT.md
+/IDENTITY.md
+/SOUL.md
+/TOOLS.md
+/USER.md
+/memory/
