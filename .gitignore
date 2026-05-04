@@ -2,6 +2,7 @@ node_modules
 dist
 .DS_Store
 *.local
+.pytest_cache/
 
 # Claude Code scratchpad — never a product artifact
 .claude/
@@ -44,6 +45,7 @@ school-updates/data/
 school-updates/config.yaml
 school-updates/seen.json
 school-updates/logs/
+school-updates/*.pre-*
 
 # OpenClaw router
 openclaw/cache/*.db
@@ -54,7 +56,9 @@ email-triage/.venv/
 email-triage/config.yaml
 email-triage/credentials.json
 email-triage/token.json
+email-triage/token.json.*
 email-triage/email_triage.db
+email-triage/email_triage.db.*
 email-triage/email_triage.log
 email-triage/logs/
 
@@ -62,6 +66,7 @@ email-triage/logs/
 voice-service/.venv/
 voice-service/logs/
 voice-service/models/
+voice-service/.pytest_cache/
 
 # Design Claw — runtime-only state (see docs/design_claw.md)
 design_outputs/*.log
@@ -74,6 +79,9 @@ design_outputs/.launchd-listener.stderr.log
 
 # Devon status artifacts are tracked markdown; launchd logs are runtime-only.
 docs/status/*.log
+
+# Local backup snapshots created before one-off migrations.
+scripts/*.pre-*
 
 # OpenClaw isolated-agent workspace scaffolding. Devon's durable project
 # instructions live in docs/devon.md; these root files are local runtime context.
