@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import subprocess
 import sys
 import time
 from datetime import datetime, timezone
@@ -20,6 +21,10 @@ from openai import OpenAI
 T = TypeVar("T")
 
 MODEL = os.environ.get("DESIGN_CLAW_MODEL", "gpt-5.4-mini")
+TEXT_BACKEND = os.environ.get("DESIGN_CLAW_TEXT_BACKEND", "openai").strip().lower()
+OPENCLAW_MODEL = os.environ.get("DESIGN_CLAW_OPENCLAW_MODEL", "openai-codex/gpt-5.5")
+OPENCLAW_BIN = os.environ.get("DESIGN_CLAW_OPENCLAW_BIN", "/opt/homebrew/bin/openclaw")
+OPENCLAW_TIMEOUT_SECONDS = int(os.environ.get("DESIGN_CLAW_OPENCLAW_TIMEOUT", "150"))
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 CLAWS = REPO_ROOT / "claws"
@@ -28,7 +33,10 @@ DESIGN_OUTPUTS = REPO_ROOT / "design_outputs"
 DESIGN_OUTPUTS_DAILY = DESIGN_OUTPUTS / "daily"
 DESIGN_OUTPUTS_WEEKLY = DESIGN_OUTPUTS / "weekly"
 DESIGN_MEMORY = REPO_ROOT / "design_memory"
+DESIGN_AGENT = REPO_ROOT / "design_agent"
 LAST_DAILY_STATE = DESIGN_OUTPUTS / ".last_daily.json"
+
+AGENT_PROFILE_FILES = ("SOUL.md", "USER.md", "AGENTS.md")
 
 MEMORY_FILES: dict[str, str] = {
     "principles": "principles.json",
@@ -184,15 +192,88 @@ def with_retries(fn: Callable[[], T], attempts: int = 3, backoff: tuple[int, ...
     raise last
 
 
+def agent_profile_for_prompt() -> str:
+    """Optional David-specific constitution.
+
+    If design_agent/SOUL.md, USER.md, or AGENTS.md exist, include them before
+    the task prompt. Missing files are ignored so this is backward-compatible.
+    """
+    sections: list[str] = []
+    for fname in AGENT_PROFILE_FILES:
+        path = DESIGN_AGENT / fname
+        if path.exists():
+            content = read_text(path).strip()
+            if content:
+                sections.append(f"## {fname}\n{content}")
+    return "\n\n".join(sections)
+
+
+def use_openclaw_text_backend() -> bool:
+    return TEXT_BACKEND in {"openclaw", "codex", "openai-codex"}
+
+
+def _run_openclaw_model(input_text: str) -> str:
+    env = os.environ.copy()
+    env["PATH"] = ":".join(
+        [
+            "/opt/homebrew/bin",
+            "/usr/local/bin",
+            "/usr/bin",
+            "/bin",
+            "/opt/homebrew/sbin",
+            env.get("PATH", ""),
+        ]
+    )
+    result = subprocess.run(
+        [
+            OPENCLAW_BIN,
+            "infer",
+            "model",
+            "run",
+            "--gateway",
+            "--model",
+            OPENCLAW_MODEL,
+            "--prompt",
+            input_text,
+            "--json",
+        ],
+        capture_output=True,
+        env=env,
+        text=True,
+        timeout=OPENCLAW_TIMEOUT_SECONDS,
+    )
+    if result.returncode != 0:
+        detail = (result.stderr or result.stdout).strip()[-4000:]
+        raise RuntimeError(f"OpenClaw model run failed ({result.returncode}): {detail}")
+    try:
+        data = json.loads(result.stdout)
+    except json.JSONDecodeError as exc:
+        preview = result.stdout.strip()[:4000]
+        raise RuntimeError(f"OpenClaw model run returned non-JSON output: {preview}") from exc
+    outputs = data.get("outputs") if isinstance(data, dict) else None
+    if not outputs:
+        raise RuntimeError(f"OpenClaw model run returned no outputs: {data}")
+    text = outputs[0].get("text") if isinstance(outputs[0], dict) else None
+    if not isinstance(text, str) or not text.strip():
+        raise RuntimeError(f"OpenClaw model run returned no text: {data}")
+    return text.strip()
+
+
 def call_responses(client: OpenAI, prompt: str, payload_blocks: list[tuple[str, str]]) -> str:
     """Run the Responses API with the prompt + an ordered list of labeled
     input blocks (e.g. the snapshot, memory, topic). Returns raw text."""
-    parts = [prompt.strip(), ""]
+    profile = agent_profile_for_prompt()
+    parts = []
+    if profile:
+        parts.extend(["# Agent Profile", profile, ""])
+    parts.extend([prompt.strip(), ""])
     for label, content in payload_blocks:
         parts.append(f"## {label}")
         parts.append(content)
         parts.append("")
     input_text = "\n".join(parts)
+    if use_openclaw_text_backend():
+        return _run_openclaw_model(input_text)
     response = with_retries(lambda: client.responses.create(model=MODEL, input=input_text))
     return extract_output_text(response)
 

@@ -1,0 +1,456 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=1920, height=1080, initial-scale=1" />
+  <title>The Howell Hub</title>
+  <style>
+    :root{
+      --bg:#0A0A0A;
+      --card:#ffffff08;
+      --line:#FFFFFF30;
+      --line2:#FFFFFF22;
+      --text:#FFFFFF;
+      --sub:#FFFFFFAA;
+      --ter:#FFFFFF66;
+      --ter2:#FFFFFF88;
+      --blue:#60A5FA;
+      --amber:#F59E0B;
+      --amberbg:#F59E0B15;
+      --amberline:#F59E0B60;
+      --green:#4ADE80;
+      --red:#EF4444;
+      --radius:8px;
+      --font-ui: "Geist","Inter",system-ui,sans-serif;
+      --font-data: "JetBrains Mono","ui-monospace",monospace;
+    }
+    *{box-sizing:border-box}
+    html,body{width:100%;height:100%;margin:0;overflow:hidden;background:var(--bg);color:var(--text);font-family:var(--font-ui)}
+    .screen{
+      width:1920px;height:1080px;position:relative;overflow:hidden;
+      background:
+        radial-gradient(1200px 700px at 50% 35%, rgba(96,165,250,.08), transparent 60%),
+        linear-gradient(180deg, #0A0A0A 0%, #090909 100%);
+      padding:28px 34px 30px;
+    }
+    .topbar{
+      display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:22px;
+    }
+    .brand{
+      font-size:24px;font-weight:600;letter-spacing:-0.02em;color:#fff;line-height:1;
+      margin-top:4px;
+    }
+    .clock{
+      font-family:var(--font-data);font-size:52px;font-weight:600;letter-spacing:-0.04em;color:#fff;line-height:1;
+    }
+    .subline{
+      position:absolute;left:36px;top:72px;font-size:12px;letter-spacing:2px;text-transform:uppercase;color:var(--ter);
+    }
+    .main{
+      display:grid;
+      grid-template-columns: 1.15fr .62fr;
+      grid-template-rows: 1fr 190px;
+      gap:18px;
+      height:968px;
+    }
+    .runway{
+      grid-column:1/3;
+      height:520px;
+      border:1px solid var(--line);
+      border-radius:16px;
+      background:linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.02));
+      padding:20px;
+      position:relative;
+      overflow:hidden;
+    }
+    .runway:before{
+      content:"";
+      position:absolute;inset:-1px;
+      background:radial-gradient(900px 360px at 50% 12%, rgba(96,165,250,.11), transparent 62%);
+      pointer-events:none;
+    }
+    .runway-inner{
+      position:relative;height:100%;
+      display:grid;grid-template-columns: 1.08fr .92fr;gap:18px;
+    }
+    .card{
+      border:1px solid var(--line);
+      border-radius:var(--radius);
+      background:rgba(255,255,255,.02);
+      padding:18px;
+      overflow:hidden;
+    }
+    .selected{border:5px solid #3B82F6;padding:14px}
+    .eyebrow{
+      font-size:13px;letter-spacing:2px;text-transform:uppercase;color:var(--ter);
+      margin-bottom:10px;
+    }
+    .title{
+      font-size:24px;font-weight:600;line-height:1.08;margin:0 0 10px 0;
+    }
+    .muted{color:var(--sub)}
+    .data{font-family:var(--font-data)}
+    .hero-time{font-size:66px;font-weight:600;letter-spacing:-0.05em;line-height:1;color:#fff}
+    .hero-sub{font-size:18px;color:var(--sub);margin-top:8px}
+    .meta-row{display:flex;gap:16px;margin-top:16px;color:var(--ter2);font-size:15px;flex-wrap:wrap}
+    .pill{
+      display:inline-flex;align-items:center;gap:6px;
+      border:1px solid var(--line);
+      border-radius:999px;
+      padding:4px 10px;
+      font-size:12px;
+      color:#fff;
+      background:rgba(255,255,255,.03);
+      line-height:1;
+      white-space:nowrap;
+    }
+    .pill.green{border-color:rgba(74,222,128,.55);background:rgba(74,222,128,.12);color:#dfffe8}
+    .pill.amber{border-color:var(--amberline);background:var(--amberbg);color:#ffe3b0}
+    .choices{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;height:100%}
+    .choice{
+      border:1px solid var(--line);
+      border-radius:12px;
+      padding:14px;
+      background:linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.01));
+      display:flex;flex-direction:column;justify-content:space-between;min-height:0;
+    }
+    .choice.best{border-color:rgba(74,222,128,.45);background:rgba(74,222,128,.08)}
+    .vendor{font-size:20px;font-weight:600;margin-bottom:8px}
+    .choice .small{font-size:14px;color:var(--sub);line-height:1.35}
+    .price{margin-top:12px;font-family:var(--font-data);font-size:22px;font-weight:600;color:#fff}
+    .bottom{
+      display:grid;grid-template-columns: 1.2fr .8fr;gap:18px;height:190px;
+    }
+    .support{
+      display:grid;grid-template-columns:1fr 1fr;gap:18px;
+    }
+    .mini{
+      height:190px;
+      display:flex;flex-direction:column;
+    }
+    .mini .head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+    .mini .row{display:flex;justify-content:space-between;align-items:flex-start;padding:10px 0;border-top:1px solid var(--line2)}
+    .mini .row:first-of-type{border-top:none;padding-top:0}
+    .mini .left{min-width:0}
+    .mini .name{font-size:18px;font-weight:600;line-height:1.15}
+    .mini .sub{font-size:14px;color:var(--sub);margin-top:4px;line-height:1.2}
+    .mini .right{font-family:var(--font-data);font-size:15px;color:var(--ter2)}
+    .list-card{
+      height:190px;
+      display:flex;flex-direction:column;
+    }
+    .list-item{
+      display:flex;align-items:flex-start;gap:12px;padding:10px 0;border-top:1px solid var(--line2)
+    }
+    .list-item:first-child{border-top:none;padding-top:0}
+    .checkbox{
+      width:16px;height:16px;border:1px solid var(--line);border-radius:3px;flex:0 0 auto;margin-top:5px;
+      background:rgba(255,255,255,.015)
+    }
+    .dot{width:8px;height:8px;border-radius:50%;background:var(--amber);margin-top:8px;flex:0 0 auto}
+    .item-title{font-size:22px;font-weight:500;line-height:1.12}
+    .item-sub{font-size:14px;color:var(--ter2);margin-top:4px}
+    .grid-right{
+      display:grid;grid-template-rows: 1fr 1fr;gap:18px;
+    }
+    .weather{
+      height:258px;
+    }
+    .temp{font-family:var(--font-data);font-size:70px;font-weight:600;line-height:1;margin-top:4px}
+    .weather-sub{font-size:20px;color:#fff;margin-top:10px}
+    .weather-meta{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:18px}
+    .wm{border:1px solid var(--line2);border-radius:10px;padding:12px 10px;background:rgba(255,255,255,.015)}
+    .wm .k{font-size:12px;letter-spacing:2px;text-transform:uppercase;color:var(--ter)}
+    .wm .v{font-family:var(--font-data);font-size:22px;margin-top:6px}
+    .birthday{
+      height:260px;
+    }
+    .birth-row{
+      display:flex;justify-content:space-between;align-items:center;padding:13px 0;border-top:1px solid var(--line2)
+    }
+    .birth-row:first-of-type{border-top:none;padding-top:0}
+    .birth-left{min-width:0}
+    .birth-name{font-size:19px;font-weight:600}
+    .birth-sub{font-size:14px;color:var(--sub);margin-top:4px}
+    .btn{
+      border:1px solid var(--line);border-radius:999px;padding:4px 10px;font-size:12px;color:#fff;background:rgba(255,255,255,.03)
+    }
+    .chip-strip{
+      position:absolute;left:34px;right:34px;bottom:24px;height:74px;
+      display:flex;gap:14px;align-items:stretch;
+    }
+    .chip{
+      flex:0 0 auto;min-width:290px;
+      border:1px solid var(--line);
+      border-radius:14px;
+      padding:14px 16px;
+      background:rgba(255,255,255,.02);
+      display:flex;align-items:center;gap:12px;
+    }
+    .chip-ico{
+      width:28px;height:28px;border-radius:8px;background:rgba(96,165,250,.18);border:1px solid rgba(96,165,250,.35)
+    }
+    .chip.red .chip-ico{background:rgba(239,68,68,.18);border-color:rgba(239,68,68,.45)}
+    .chip.amber .chip-ico{background:rgba(245,158,11,.18);border-color:rgba(245,158,11,.45)}
+    .chip .t1{font-size:15px;font-weight:600}
+    .chip .t2{font-size:13px;color:var(--sub);margin-top:2px}
+    .chip .stack{min-width:0}
+    .chip .mini-pill{margin-left:auto}
+    .chip .mini-pill .pill{padding:3px 9px}
+    .photos{
+      grid-column:1/2;
+      height:190px;
+      border:1px solid var(--line);
+      border-radius:var(--radius);
+      padding:14px;
+      background:rgba(255,255,255,.02);
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      grid-template-rows:1fr 1fr;
+      gap:10px;
+      position:relative;
+    }
+    .photo{
+      border-radius:10px;
+      background:linear-gradient(45deg,#1F1F1F,#3A3A3A);
+      border:1px solid rgba(255,255,255,.08);
+      position:relative;
+      overflow:hidden;
+    }
+    .photo:nth-child(2){background:linear-gradient(45deg,#202020,#454545)}
+    .photo:nth-child(3){background:linear-gradient(45deg,#1D1D1D,#373737)}
+    .photo:nth-child(4){background:linear-gradient(45deg,#232323,#4A4A4A)}
+    .caption{
+      position:absolute;left:14px;right:14px;bottom:14px;
+      height:34px;border-radius:8px;background:rgba(10,10,10,.55);
+      border:1px solid rgba(255,255,255,.12);
+      display:flex;align-items:center;justify-content:space-between;
+      padding:0 12px;font-size:14px;color:#fff
+    }
+    .caption .csub{color:var(--ter2)}
+    .small-note{font-size:13px;color:var(--ter2);margin-top:6px}
+    .chev{font-size:26px;color:var(--ter2);line-height:1;margin-left:10px}
+  </style>
+</head>
+<body>
+  <div class="screen">
+    <div class="topbar">
+      <div class="brand">The Howell Hub</div>
+      <div class="clock">07:45 AM</div>
+    </div>
+    <div class="subline">Weekend mode · primary decision first</div>
+
+    <div class="main">
+      <section class="runway card selected">
+        <div class="runway-inner">
+          <div class="card" style="border:none;background:transparent;padding:0;">
+            <div class="eyebrow">Dinner Tonight</div>
+            <div class="title">What should we do for dinner?</div>
+            <div class="hero-time data">Takeout decision pending</div>
+            <div class="hero-sub">Pick one, lock it in, and keep the evening moving.</div>
+            <div class="meta-row">
+              <span class="pill green">suggested: Pizza Ranch</span>
+              <span class="pill">Lucy wants noodles</span>
+              <span class="pill amber">birthday gift needed</span>
+            </div>
+            <div class="small-note">Claw suggestions are ready, but the dinner choice stays in the runway.</div>
+          </div>
+
+          <div class="choices">
+            <div class="choice best">
+              <div>
+                <div class="vendor">Mellow Slice</div>
+                <div class="small">Thin crust, one pepperoni and one veggie, ready in about 25 min.</div>
+              </div>
+              <div>
+                <div class="price data">$38</div>
+                <div class="pill green" style="margin-top:10px;width:max-content;">suggested</div>
+              </div>
+            </div>
+            <div class="choice">
+              <div>
+                <div class="vendor">Bamboo Bowl</div>
+                <div class="small">Orange chicken, fried rice, and extra dumplings for Andrew.</div>
+              </div>
+              <div>
+                <div class="price data">$44</div>
+                <div class="pill" style="margin-top:10px;width:max-content;">25–35 min</div>
+              </div>
+            </div>
+            <div class="choice">
+              <div>
+                <div class="vendor">Corner Tacos</div>
+                <div class="small">Family pack with mild salsa on the side and chips for everyone.</div>
+              </div>
+              <div>
+                <div class="price data">$41</div>
+                <div class="pill" style="margin-top:10px;width:max-content;">fast pickup</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="weather card">
+        <div class="eyebrow">Weather</div>
+        <div class="temp data">54°F</div>
+        <div class="weather-sub">Partly Cloudy</div>
+        <div class="small-note">Feels like 50°F</div>
+        <div class="weather-meta">
+          <div class="wm">
+            <div class="k">Wind</div>
+            <div class="v data">12 mph NW</div>
+          </div>
+          <div class="wm">
+            <div class="k">Humidity</div>
+            <div class="v data">71%</div>
+          </div>
+          <div class="wm">
+            <div class="k">Range</div>
+            <div class="v data">H: 68° / L: 54°</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="birthday card">
+        <div class="eyebrow">Birthdays</div>
+        <div class="birth-row">
+          <div class="birth-left">
+            <div class="birth-name">Ivy</div>
+            <div class="birth-sub">Apr 26 — 5 days</div>
+          </div>
+          <div class="btn">Find ideas</div>
+        </div>
+        <div class="birth-row">
+          <div class="birth-left">
+            <div class="birth-name">Peter</div>
+            <div class="birth-sub">Apr 30 — 9 days</div>
+          </div>
+          <div class="btn">Find ideas</div>
+        </div>
+        <div class="birth-row">
+          <div class="birth-left">
+            <div class="birth-name">Sarah</div>
+            <div class="birth-sub">May 3 — 12 days</div>
+          </div>
+          <div class="btn">Find ideas</div>
+        </div>
+      </section>
+
+      <section class="list-card card">
+        <div class="eyebrow">TODAY</div>
+        <div class="list-item">
+          <div class="checkbox"></div>
+          <div style="min-width:0">
+            <div class="item-title">09:10  Drop Lucy at soccer</div>
+            <div class="item-sub">North Field · shin guards packed</div>
+          </div>
+        </div>
+        <div class="list-item">
+          <div class="checkbox"></div>
+          <div style="min-width:0">
+            <div class="item-title">10:30  Dr. Shaw</div>
+            <div class="item-sub">Sarah · annual checkup downtown</div>
+          </div>
+        </div>
+        <div class="list-item">
+          <div class="checkbox"></div>
+          <div style="min-width:0">
+            <div class="item-title">02:15  Ivy piano lesson</div>
+            <div class="item-sub">Studio A · book return after class</div>
+          </div>
+        </div>
+        <div class="list-item">
+          <div class="checkbox"></div>
+          <div style="min-width:0">
+            <div class="item-title">04:45  Grocery pickup</div>
+            <div class="item-sub">Andrew · eggs, fruit, and sandwich bread</div>
+          </div>
+        </div>
+      </section>
+
+      <div class="bottom">
+        <section class="photos">
+          <div class="photo"></div>
+          <div class="photo"></div>
+          <div class="photo"></div>
+          <div class="photo"></div>
+          <div class="caption">
+            <div>Saturday at the park</div>
+            <div class="csub">4 new photos</div>
+          </div>
+        </section>
+
+        <div class="grid-right">
+          <section class="mini card">
+            <div class="eyebrow">Claw Suggestions</div>
+            <div class="row">
+              <div class="left" style="display:flex;gap:12px;align-items:flex-start;">
+                <div class="chip-ico" style="background:rgba(96,165,250,.18);border-color:rgba(96,165,250,.35)"></div>
+                <div>
+                  <div class="name">Set dinner now</div>
+                  <div class="sub">Pick a takeout spot and lock dinner in early.</div>
+                </div>
+              </div>
+              <div class="right chev">›</div>
+            </div>
+            <div class="row">
+              <div class="left" style="display:flex;gap:12px;align-items:flex-start;">
+                <div class="chip-ico" style="background:rgba(245,158,11,.18);border-color:rgba(245,158,11,.35)"></div>
+                <div>
+                  <div class="name">Wrap the birthday gift</div>
+                  <div class="sub">Ivy's gift is due soon — grab paper and tape.</div>
+                </div>
+              </div>
+              <div class="right chev">›</div>
+            </div>
+          </section>
+
+          <section class="mini card">
+            <div class="eyebrow">School updates</div>
+            <div class="head">
+              <div>
+                <div class="name">Science Fair Project — Emma</div>
+                <div class="sub">Due in 5 days · signed yes</div>
+              </div>
+              <div class="pill amber">SEP · TUESDAY</div>
+            </div>
+            <div class="row" style="margin-top:8px;">
+              <div class="left">
+                <div class="name" style="font-size:17px;">Reading log check</div>
+                <div class="sub">Finished pages logged for today</div>
+              </div>
+              <div class="right">OK</div>
+            </div>
+            <div class="row">
+              <div class="left">
+                <div class="name" style="font-size:17px;">Field trip form</div>
+                <div class="sub">Return with signature by tomorrow</div>
+              </div>
+              <div class="right">2 pages</div>
+            </div>
+          </section>
+        </div>
+      </div>
+    </div>
+
+    <div class="chip-strip">
+      <div class="chip amber">
+        <div class="chip-ico"></div>
+        <div class="stack">
+          <div class="t1">Birthday gift needed</div>
+          <div class="t2">Ivy's birthday is coming up soon.</div>
+        </div>
+        <div class="mini-pill"><span class="pill amber">reminder</span></div>
+      </div>
+      <div class="chip">
+        <div class="chip-ico"></div>
+        <div class="stack">
+          <div class="t1">Weather looks good for errands</div>
+          <div class="t2">Dry afternoon with light northwest wind.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

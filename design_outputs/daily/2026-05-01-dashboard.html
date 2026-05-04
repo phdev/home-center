@@ -1,0 +1,667 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=1920, height=1080, initial-scale=1">
+  <title>Weekend Dinner Runway</title>
+  <style>
+    * { box-sizing: border-box; }
+    html, body {
+      width: 1920px;
+      height: 1080px;
+      margin: 0;
+      overflow: hidden;
+      background: #0A0A0A;
+      color: #FFFFFF;
+      font-family: "Geist", "Inter", system-ui, sans-serif;
+    }
+    .screen {
+      width: 1920px;
+      height: 1080px;
+      padding: 38px 48px 44px;
+      background:
+        radial-gradient(circle at 22% 12%, #1D4ED812 0, transparent 420px),
+        radial-gradient(circle at 88% 90%, #F59E0B0B 0, transparent 520px),
+        #0A0A0A;
+    }
+    .topbar {
+      height: 70px;
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+    }
+    .hub {
+      font-size: 24px;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      color: #FFFFFF;
+      padding-top: 8px;
+    }
+    .clock {
+      font-family: "JetBrains Mono", ui-monospace, monospace;
+      font-size: 52px;
+      font-weight: 500;
+      line-height: 1;
+      color: #FFFFFF;
+      letter-spacing: -0.06em;
+    }
+    .main {
+      height: 928px;
+      display: grid;
+      grid-template-rows: 560px 328px;
+      gap: 28px;
+    }
+    .card {
+      border: 1px solid #FFFFFF30;
+      border-radius: 8px;
+      background: transparent;
+      padding: 20px;
+      overflow: hidden;
+    }
+    .dinner-card {
+      width: 100%;
+      display: grid;
+      grid-template-columns: 1.03fr 0.97fr;
+      gap: 28px;
+      padding: 28px;
+      position: relative;
+    }
+    .dinner-card:before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      border-radius: 8px;
+      background: linear-gradient(135deg, #60A5FA0B 0%, transparent 44%, #F59E0B08 100%);
+      pointer-events: none;
+    }
+    .content {
+      position: relative;
+      z-index: 1;
+    }
+    .eyebrow {
+      font-size: 13px;
+      line-height: 1;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: #FFFFFF66;
+      font-weight: 600;
+    }
+    .eyebrow.warning { color: #F59E0B; }
+    .hero-title {
+      margin-top: 18px;
+      font-size: 32px;
+      line-height: 1.06;
+      letter-spacing: -0.035em;
+      font-weight: 600;
+    }
+    .hero-subtitle {
+      margin-top: 12px;
+      font-size: 18px;
+      line-height: 1.35;
+      color: #FFFFFFAA;
+      max-width: 650px;
+    }
+    .status-row {
+      margin-top: 24px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .pill {
+      border-radius: 999px;
+      border: 1px solid #FFFFFF30;
+      padding: 6px 12px;
+      font-size: 14px;
+      line-height: 1;
+      color: #FFFFFFAA;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      white-space: nowrap;
+    }
+    .pill.blue {
+      color: #60A5FA;
+      border-color: #60A5FA50;
+      background: #60A5FA10;
+    }
+    .pill.green {
+      color: #4ADE80;
+      border-color: #4ADE8050;
+      background: #4ADE8010;
+      font-weight: 600;
+    }
+    .pill.amber {
+      color: #F59E0B;
+      border-color: #F59E0B50;
+      background: #F59E0B10;
+      font-weight: 600;
+    }
+    .mono { font-family: "JetBrains Mono", ui-monospace, monospace; }
+    .countdown {
+      margin-top: 30px;
+      display: grid;
+      grid-template-columns: 190px 1fr;
+      gap: 18px;
+      align-items: stretch;
+    }
+    .time-box {
+      border: 1px solid #F59E0B50;
+      background: #F59E0B10;
+      border-radius: 12px;
+      padding: 18px;
+    }
+    .time-label {
+      font-size: 13px;
+      color: #FFFFFF88;
+      text-transform: uppercase;
+      letter-spacing: 1.6px;
+      font-weight: 600;
+    }
+    .time-number {
+      margin-top: 12px;
+      font-family: "JetBrains Mono", ui-monospace, monospace;
+      font-size: 58px;
+      line-height: 0.98;
+      font-weight: 600;
+      letter-spacing: -0.08em;
+      color: #FFFFFF;
+    }
+    .time-caption {
+      margin-top: 10px;
+      color: #FFFFFF88;
+      font-size: 15px;
+    }
+    .decision-note {
+      border: 1px solid #FFFFFF20;
+      border-radius: 12px;
+      padding: 18px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      min-height: 148px;
+    }
+    .note-title {
+      font-size: 20px;
+      line-height: 1.2;
+      font-weight: 600;
+      color: #FFFFFF;
+    }
+    .note-body {
+      margin-top: 8px;
+      color: #FFFFFFAA;
+      font-size: 16px;
+      line-height: 1.42;
+    }
+    .voice-line {
+      margin-top: 18px;
+      color: #FFFFFF66;
+      font-size: 15px;
+    }
+    .options {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      height: 100%;
+      align-content: stretch;
+    }
+    .option {
+      border: 1px solid #FFFFFF30;
+      border-radius: 12px;
+      padding: 18px;
+      min-height: 424px;
+      display: flex;
+      flex-direction: column;
+      background: #FFFFFF03;
+      position: relative;
+    }
+    .option.suggested {
+      border-color: #4ADE8050;
+      background: linear-gradient(180deg, #4ADE8010 0%, #FFFFFF03 40%, #FFFFFF02 100%);
+    }
+    .option.top-pick {
+      border: 2px solid #60A5FA80;
+      background: linear-gradient(180deg, #60A5FA12 0%, #FFFFFF03 45%, #FFFFFF02 100%);
+    }
+    .option-header {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: flex-start;
+    }
+    .vendor {
+      font-size: 24px;
+      line-height: 1.08;
+      font-weight: 600;
+      letter-spacing: -0.03em;
+      color: #FFFFFF;
+    }
+    .cuisine {
+      margin-top: 8px;
+      font-size: 15px;
+      color: #FFFFFF88;
+    }
+    .food-meta {
+      margin-top: 26px;
+      display: grid;
+      gap: 12px;
+    }
+    .meta-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      font-size: 16px;
+      color: #FFFFFFAA;
+      padding-bottom: 12px;
+      border-bottom: 1px solid #FFFFFF16;
+    }
+    .meta-row span:last-child {
+      color: #FFFFFF;
+      font-family: "JetBrains Mono", ui-monospace, monospace;
+      letter-spacing: -0.04em;
+      white-space: nowrap;
+    }
+    .votes {
+      margin-top: auto;
+      padding-top: 24px;
+    }
+    .votes-label {
+      font-size: 13px;
+      color: #FFFFFF66;
+      text-transform: uppercase;
+      letter-spacing: 1.8px;
+      font-weight: 600;
+    }
+    .avatars {
+      margin-top: 12px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .avatar {
+      width: 42px;
+      height: 42px;
+      border-radius: 999px;
+      border: 1px solid #FFFFFF30;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 15px;
+      font-weight: 600;
+      color: #FFFFFFAA;
+      background: #1F1F1F;
+    }
+    .avatar.active {
+      color: #0A0A0A;
+      background: #4ADE80;
+      border-color: #4ADE80;
+    }
+    .choose {
+      margin-top: 18px;
+      border-radius: 999px;
+      border: 1px solid #FFFFFF30;
+      color: #FFFFFF;
+      padding: 10px 14px;
+      font-size: 15px;
+      text-align: center;
+      font-weight: 600;
+    }
+    .choose.primary {
+      border-color: #60A5FA80;
+      background: #60A5FA18;
+      color: #60A5FA;
+    }
+    .support-row {
+      display: grid;
+      grid-template-columns: 1.02fr 1.42fr 0.86fr;
+      gap: 28px;
+      min-height: 0;
+    }
+    .card-title {
+      font-size: 23px;
+      line-height: 1.1;
+      font-weight: 600;
+      letter-spacing: -0.025em;
+      color: #FFFFFF;
+      margin-top: 12px;
+      margin-bottom: 18px;
+    }
+    .birthday-list {
+      display: grid;
+      gap: 13px;
+    }
+    .birthday-row {
+      border: 1px solid #FFFFFF18;
+      border-radius: 12px;
+      padding: 13px 14px;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 12px;
+      align-items: center;
+      background: #FFFFFF02;
+    }
+    .person {
+      font-size: 19px;
+      line-height: 1.15;
+      font-weight: 500;
+      color: #FFFFFF;
+    }
+    .sub {
+      margin-top: 5px;
+      font-size: 14px;
+      color: #FFFFFF66;
+    }
+    .small-button {
+      border: 1px solid #FFFFFF30;
+      border-radius: 999px;
+      padding: 6px 11px;
+      color: #FFFFFFAA;
+      font-size: 14px;
+      white-space: nowrap;
+    }
+    .calendar-card {
+      display: grid;
+      grid-template-columns: 1fr;
+    }
+    .calendar-list {
+      display: grid;
+      gap: 10px;
+      margin-top: 2px;
+    }
+    .cal-row {
+      display: grid;
+      grid-template-columns: 82px 1fr;
+      gap: 14px;
+      padding: 11px 12px;
+      border-radius: 12px;
+      border: 1px solid #FFFFFF16;
+      background: #FFFFFF02;
+      align-items: start;
+    }
+    .cal-time {
+      font-family: "JetBrains Mono", ui-monospace, monospace;
+      font-size: 19px;
+      line-height: 1.1;
+      letter-spacing: -0.06em;
+      color: #FFFFFF;
+      padding-top: 1px;
+    }
+    .cal-title {
+      font-size: 18px;
+      line-height: 1.15;
+      font-weight: 500;
+      color: #FFFFFF;
+    }
+    .cal-sub {
+      margin-top: 4px;
+      font-size: 14px;
+      color: #FFFFFF66;
+    }
+    .weather-card {
+      position: relative;
+    }
+    .weather-main {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 14px;
+      margin-top: 8px;
+    }
+    .temp {
+      font-family: "JetBrains Mono", ui-monospace, monospace;
+      font-size: 68px;
+      line-height: 0.95;
+      font-weight: 600;
+      letter-spacing: -0.09em;
+      color: #FFFFFF;
+    }
+    .weather-icon {
+      width: 82px;
+      height: 82px;
+      border-radius: 999px;
+      background:
+        radial-gradient(circle at 42% 42%, #F59E0B 0 18px, transparent 19px),
+        radial-gradient(circle at 62% 61%, #FFFFFFAA 0 18px, transparent 19px),
+        radial-gradient(circle at 40% 66%, #FFFFFF88 0 15px, transparent 16px),
+        #60A5FA12;
+      border: 1px solid #FFFFFF20;
+    }
+    .condition {
+      margin-top: 12px;
+      font-size: 22px;
+      font-weight: 600;
+      color: #FFFFFF;
+      letter-spacing: -0.02em;
+    }
+    .feels {
+      margin-top: 6px;
+      font-size: 16px;
+      color: #FFFFFFAA;
+    }
+    .weather-rows {
+      margin-top: 22px;
+      display: grid;
+      gap: 10px;
+    }
+    .weather-row {
+      display: flex;
+      justify-content: space-between;
+      border-top: 1px solid #FFFFFF16;
+      padding-top: 10px;
+      color: #FFFFFFAA;
+      font-size: 15px;
+    }
+    .weather-row span:last-child {
+      font-family: "JetBrains Mono", ui-monospace, monospace;
+      color: #FFFFFF;
+      letter-spacing: -0.04em;
+    }
+  </style>
+</head>
+<body>
+  <div class="screen">
+    <header class="topbar">
+      <div class="hub">The Howell Hub</div>
+      <div class="clock">05:42 PM</div>
+    </header>
+
+    <main class="main">
+      <section class="card dinner-card">
+        <div class="content">
+          <div class="eyebrow warning">Weekend runway · decision pending</div>
+          <div class="hero-title">Dinner Tonight</div>
+          <div class="hero-subtitle">Pick takeout before the dinner rush. Homer can place the order once the family lands on a favorite.</div>
+
+          <div class="status-row">
+            <div class="pill blue">3 choices ready</div>
+            <div class="pill amber"><span class="mono">33 min</span> until best order window</div>
+            <div class="pill">Andrew and Sarah have not voted</div>
+          </div>
+
+          <div class="countdown">
+            <div class="time-box">
+              <div class="time-label">Order by</div>
+              <div class="time-number">6:15</div>
+              <div class="time-caption">for dinner around <span class="mono">6:55 PM</span></div>
+            </div>
+
+            <div class="decision-note">
+              <div class="note-title">Shared decision first, suggestions later.</div>
+              <div class="note-body">Weekend cards are quiet until dinner is decided. Birthdays, calendar, and weather stay below as ambient context.</div>
+              <div class="voice-line">Try: “Hey Homer, vote for Thai Garden.”</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="content options">
+          <article class="option top-pick">
+            <div class="option-header">
+              <div>
+                <div class="vendor">Thai Garden</div>
+                <div class="cuisine">Noodles · curry · family combo</div>
+              </div>
+              <div class="pill green">suggested</div>
+            </div>
+
+            <div class="food-meta">
+              <div class="meta-row"><span>Ready in</span><span>35–45m</span></div>
+              <div class="meta-row"><span>Drive</span><span>9 min</span></div>
+              <div class="meta-row"><span>Usual order</span><span>$54</span></div>
+              <div class="meta-row"><span>Last had</span><span>2 wks</span></div>
+            </div>
+
+            <div class="votes">
+              <div class="votes-label">Votes</div>
+              <div class="avatars">
+                <div class="avatar active">L</div>
+                <div class="avatar active">I</div>
+                <div class="avatar">P</div>
+                <div class="avatar">A</div>
+                <div class="avatar">S</div>
+              </div>
+              <div class="choose primary">Leading choice</div>
+            </div>
+          </article>
+
+          <article class="option suggested">
+            <div class="option-header">
+              <div>
+                <div class="vendor">Riverside Pizza</div>
+                <div class="cuisine">Pizza · salad · garlic knots</div>
+              </div>
+              <div class="pill green">suggested</div>
+            </div>
+
+            <div class="food-meta">
+              <div class="meta-row"><span>Ready in</span><span>25–30m</span></div>
+              <div class="meta-row"><span>Drive</span><span>6 min</span></div>
+              <div class="meta-row"><span>Usual order</span><span>$42</span></div>
+              <div class="meta-row"><span>Last had</span><span>5 days</span></div>
+            </div>
+
+            <div class="votes">
+              <div class="votes-label">Votes</div>
+              <div class="avatars">
+                <div class="avatar">L</div>
+                <div class="avatar">I</div>
+                <div class="avatar active">P</div>
+                <div class="avatar">A</div>
+                <div class="avatar">S</div>
+              </div>
+              <div class="choose">Vote pizza</div>
+            </div>
+          </article>
+
+          <article class="option">
+            <div class="option-header">
+              <div>
+                <div class="vendor">Cedar Bowl</div>
+                <div class="cuisine">Rice bowls · dumplings · soup</div>
+              </div>
+            </div>
+
+            <div class="food-meta">
+              <div class="meta-row"><span>Ready in</span><span>40–50m</span></div>
+              <div class="meta-row"><span>Drive</span><span>12 min</span></div>
+              <div class="meta-row"><span>Usual order</span><span>$49</span></div>
+              <div class="meta-row"><span>Last had</span><span>1 mo</span></div>
+            </div>
+
+            <div class="votes">
+              <div class="votes-label">Votes</div>
+              <div class="avatars">
+                <div class="avatar">L</div>
+                <div class="avatar">I</div>
+                <div class="avatar">P</div>
+                <div class="avatar">A</div>
+                <div class="avatar">S</div>
+              </div>
+              <div class="choose">Vote bowls</div>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section class="support-row">
+        <article class="card">
+          <div class="eyebrow warning">Gift planning</div>
+          <div class="card-title">Birthdays coming up</div>
+          <div class="birthday-list">
+            <div class="birthday-row">
+              <div>
+                <div class="person">Lucy</div>
+                <div class="sub">Apr 26 — 5 days</div>
+              </div>
+              <div class="small-button">Find ideas</div>
+            </div>
+            <div class="birthday-row">
+              <div>
+                <div class="person">Peter</div>
+                <div class="sub">May 03 — in 12 days</div>
+              </div>
+              <div class="small-button">Find ideas</div>
+            </div>
+            <div class="birthday-row">
+              <div>
+                <div class="person">Sarah</div>
+                <div class="sub">May 18 — in 4 weeks</div>
+              </div>
+              <div class="small-button">Find ideas</div>
+            </div>
+          </div>
+        </article>
+
+        <article class="card calendar-card">
+          <div class="eyebrow">Today</div>
+          <div class="card-title">Family calendar</div>
+          <div class="calendar-list">
+            <div class="cal-row">
+              <div class="cal-time">09:30</div>
+              <div>
+                <div class="cal-title">Ivy soccer game</div>
+                <div class="cal-sub">North field · bring blue jersey</div>
+              </div>
+            </div>
+            <div class="cal-row">
+              <div class="cal-time">11:45</div>
+              <div>
+                <div class="cal-title">Andrew hardware pickup</div>
+                <div class="cal-sub">Curbside window ends at noon</div>
+              </div>
+            </div>
+            <div class="cal-row">
+              <div class="cal-time">02:15</div>
+              <div>
+                <div class="cal-title">Lucy library with Peter</div>
+                <div class="cal-sub">Return chapter books</div>
+              </div>
+            </div>
+            <div class="cal-row">
+              <div class="cal-time">04:30</div>
+              <div>
+                <div class="cal-title">Sarah call with Grandma</div>
+                <div class="cal-sub">Quick check-in before dinner</div>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <article class="card weather-card">
+          <div class="eyebrow">Weather</div>
+          <div class="weather-main">
+            <div class="temp">54°F</div>
+            <div class="weather-icon"></div>
+          </div>
+          <div class="condition">Partly Cloudy</div>
+          <div class="feels">Feels like 50°F</div>
+          <div class="weather-rows">
+            <div class="weather-row"><span>Wind</span><span>12 mph NW</span></div>
+            <div class="weather-row"><span>Humidity</span><span>71%</span></div>
+            <div class="weather-row"><span>High / Low</span><span>68° / 54°</span></div>
+          </div>
+        </article>
+      </section>
+    </main>
+  </div>
+</body>
+</html>

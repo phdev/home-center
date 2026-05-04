@@ -1,0 +1,37 @@
+{
+  "date": "2026-04-28",
+  "topic": {
+    "id": "reduce-morning-overload",
+    "screen": "dashboard-morning",
+    "theme": "reduce morning overload \u2014 show only what the family must see between 7am\u20139am"
+  },
+  "concept": {
+    "concept_name": "Morning Runway With Peter Risk Line",
+    "layout_idea": "Use a single upper-left primary Runway card as the first and largest region: because showMorningChecklist is true at 07:30, it replaces the current stacked mid-row placement and becomes the screen\u2019s main scan target. Inside that card, show the morning checklist as a short non-checkable family runway list, with peter0800_0900Risk rendered as one inline risk line at the top or bottom of the same card rather than as a separate card. Below or to the side, allow only two compact secondary cards: Calendar and School Updates, because they are the current actionable morning context; hide Birthdays and Weather in this 7am\u20139am mode unless a deterministic flag promotes them. If an interruptive flag ever appears, it uses the single overlay pattern; otherwise the screen stays ambient with no required interaction, and voice remains only a fallback for timers.",
+    "why_it_fits": "The snapshot is explicitly a 07:30 morning dashboard whose goal is to clear the morning runway without noise, and the true flags are showMorningChecklist and peter0800_0900Risk. The current structure buries morningChecklist in the mid region while Calendar, Birthdays, and Weather occupy the top row; this concept moves the active primary morning flag to the upper-left and folds Peter\u2019s 08:00\u201309:00 risk into that same primary surface. Because hasMorningOverlap, lunchDecisionNeeded, birthdayGiftNeeded, bedtimeReminderActive, and showClawSuggestions are false, those items do not earn screen space. It also respects max_visible_cards: 4 by showing at most one primary card plus two secondary cards.",
+    "tradeoff": "This is worse when the family expects the TV to be a broad ambient information board, because Weather and Birthdays disappear even though they exist in the current top row. It favors morning actionability over completeness, so low-urgency information may feel absent between 7am and 9am.",
+    "implementation_hint": "- Add a MorningMode layout branch for dashboard-morning when time_of_day is between 07:00 and 09:00 and showMorningChecklist is true.\n- Render one primary RunwayCard from morningChecklist data, and inject peter0800_0900Risk as an inline RiskLine when that flag is true instead of creating another card.\n- Build a deterministic secondaryCards array from current_structure, allowing Calendar and School Updates first, excluding Birthdays when birthdayGiftNeeded is false and Weather unless a morning-critical weather flag exists.",
+    "prototype_first": "Build the 07:30 state with one full-width Morning Runway card containing the Peter 08:00\u201309:00 risk line, plus compact Calendar and School Updates cards, and remove Birthdays and Weather.",
+    "memory_alignment": {
+      "reinforces": [
+        "Show only the essential information at this moment. Every element on screen must justify its presence.",
+        "One primary thing, clearly, before any secondary things.",
+        "The primary signal must be readable in under two seconds from across a room.",
+        "Card visibility is driven by deterministic derived-state flags, never by LLM output.",
+        "Keep the Single Runway Card direction (morning dashboard = one full-width checklist card + inline risk line).",
+        "In Morning mode, hide the clock in the header \u2014 the kitchen already has one.",
+        "Place urgent items in the upper-left of the screen."
+      ],
+      "avoids_rejected": [
+        "Information-dense screens that trade clarity for coverage.",
+        "Rendering secondary items alongside a primary prompt (they compete for attention and dilute the decision).",
+        "Rendering family items as a checkable to-do list.",
+        "Dense multi-column dashboards that trade glanceability for information density.",
+        "Progress bars on the dashboard (they signal a productivity app, not a home).",
+        "Too much text.",
+        "Avoid unnecessary text."
+      ]
+    }
+  },
+  "snapshot_path": "/Users/peter/home-center/design_inputs/dashboard-morning.json"
+}

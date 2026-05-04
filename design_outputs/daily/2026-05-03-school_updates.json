@@ -1,0 +1,32 @@
+{
+  "date": "2026-05-03",
+  "topic": {
+    "id": "deadline-first-school",
+    "screen": "school_updates",
+    "theme": "school updates as a deadline-first layout \u2014 earliest due date drives the hero slot"
+  },
+  "concept": {
+    "concept_name": "Earliest School Deadline Hero",
+    "layout_idea": "Replace the current stacked priority order with one upper-left hero card for schoolUpdates whenever it contains the earliest actionable due date today or tomorrow; the hero shows only that one school deadline and its single next action. The existing contextualSlot remains secondary when takeoutDecisionPending is true, birthdays becomes a small background card because birthdayGiftNeeded is true, and clawSuggestions is shown only as a small supporting card because showClawSuggestions is true. Calendar stays left-side support, weather is omitted if the six-card limit is pressured.",
+    "why_it_fits": "Today\u2019s theme is deadline-first school updates, but the snapshot currently places schoolUpdates in the mid row at priority 3 while clawSuggestions and contextualSlot both have priority 1. This concept makes the earliest school due date the primary scan target, instead of burying it below top-row cards. It still respects the active snapshot flags: takeoutDecisionPending remains actionable but secondary, birthdayGiftNeeded remains passive planning, and showMorningChecklist/lunchDecisionNeeded/bedtimeReminderActive stay hidden because their flags are false.",
+    "tradeoff": "This is worse when dinner really needs an immediate family decision before any school deadline; promoting schoolUpdates can delay the takeout prompt even though takeoutDecisionPending is true.",
+    "implementation_hint": "- Add a deterministic `primaryHero` selector that compares `schoolUpdates.items[].dueAt` against active actionable flags and returns `schoolDeadline` only when it is the earliest due item in the configured window.\n- Render exactly one large hero region first; do not render clawSuggestions or contextualSlot as competing primary cards when the school deadline wins.\n- Keep secondary cards to a tight list: contextualSlot for Dinner Tonight, birthdays, calendar, and optional clawSuggestions, capped by `max_visible_cards`.",
+    "prototype_first": "Build a dashboard state where schoolUpdates has one assignment due tonight and verify it replaces the mid-row school card with a single upper-left hero while Dinner Tonight becomes secondary.",
+    "memory_alignment": {
+      "reinforces": [
+        "One primary thing, clearly, before any secondary things.",
+        "Priority should map to visual position in the upper-left.",
+        "Card visibility is driven by deterministic derived-state flags, never by LLM output.",
+        "A prompt that produces a decision beats pure information.",
+        "Place the calendar on the left."
+      ],
+      "avoids_rejected": [
+        "Rendering secondary items alongside a primary prompt (they compete for attention and dilute the decision).",
+        "Information-dense screens that trade clarity for coverage.",
+        "Dense multi-column dashboards that trade glanceability for information density.",
+        "Too much text."
+      ]
+    }
+  },
+  "snapshot_path": "/Users/peter/home-center/design_inputs/dashboard.json"
+}

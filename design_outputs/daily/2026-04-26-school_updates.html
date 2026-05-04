@@ -1,0 +1,285 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=1920, height=1080, initial-scale=1" />
+  <title>The Howell Hub</title>
+  <style>
+    :root{
+      --bg:#0A0A0A;
+      --panel:rgba(255,255,255,.02);
+      --border:rgba(255,255,255,.19);
+      --text:#fff;
+      --secondary:rgba(255,255,255,.67);
+      --tertiary:rgba(255,255,255,.42);
+      --blue:#60A5FA;
+      --blue-bg:rgba(96,165,250,.10);
+      --blue-border:rgba(96,165,250,.32);
+      --amber:#F59E0B;
+      --amber-bg:rgba(245,158,11,.10);
+      --amber-border:rgba(245,158,11,.31);
+      --amber-toast-bg:rgba(245,158,11,.08);
+      --amber-toast-border:rgba(245,158,11,.38);
+      --green:#4ADE80;
+      --green-bg:rgba(74,222,128,.10);
+      --green-border:rgba(74,222,128,.30);
+      --red:#EF4444;
+      --red-bg:rgba(239,68,68,.10);
+      --red-border:rgba(239,68,68,.30);
+      --radius:8px;
+      --radius-inner:11px;
+    }
+    *{box-sizing:border-box}
+    html,body{width:100%;height:100%;margin:0;overflow:hidden;background:var(--bg);color:var(--text);font-family:Geist,Inter,system-ui,sans-serif}
+    .screen{
+      width:1920px;height:1080px;position:relative;background:
+      radial-gradient(1200px 700px at 18% 20%, rgba(96,165,250,.07), transparent 58%),
+      radial-gradient(900px 600px at 84% 15%, rgba(245,158,11,.05), transparent 55%),
+      #0A0A0A;
+      padding:34px 34px 28px;
+    }
+    .topbar{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:24px}
+    .hub{font-size:24px;font-weight:600;letter-spacing:.2px}
+    .clock{font-family:"JetBrains Mono",ui-monospace,monospace;font-size:54px;font-weight:600;line-height:1;letter-spacing:-1px}
+    .grid{display:grid;grid-template-columns: 1.45fr 1fr;grid-template-rows:auto 1fr;gap:18px;height:968px}
+    .hero{
+      grid-column:1;grid-row:1 / span 2;min-height:0;
+      border:5px solid #3B82F6;background:rgba(59,130,246,.08);border-radius:12px;padding:18px;display:flex;flex-direction:column;gap:14px;
+      box-shadow:0 0 0 1px rgba(255,255,255,.04) inset, 0 18px 50px rgba(0,0,0,.35);
+    }
+    .eyebrow{font-size:13px;letter-spacing:2px;text-transform:uppercase;color:var(--amber);font-weight:700}
+    .hero-title{font-size:31px;font-weight:600;line-height:1.1;margin-top:2px}
+    .hero-sub{font-size:15px;color:var(--secondary);line-height:1.45}
+    .deadline-list{display:flex;flex-direction:column;gap:12px;margin-top:4px}
+    .deadline-item{
+      display:grid;grid-template-columns:88px 1fr auto;gap:14px;align-items:start;padding:14px 14px;border-radius:12px;
+      background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.14)
+    }
+    .due{
+      font-family:"JetBrains Mono",ui-monospace,monospace;font-size:22px;font-weight:600;line-height:1;color:#fff;
+    }
+    .dtitle{font-size:19px;font-weight:600;line-height:1.15}
+    .dmeta{margin-top:4px;font-size:14px;color:var(--tertiary);line-height:1.35}
+    .tag{align-self:center;font-size:12px;letter-spacing:1.8px;text-transform:uppercase;color:rgba(255,255,255,.72);padding:5px 9px;border-radius:999px;border:1px solid rgba(255,255,255,.14)}
+    .subcards{
+      grid-column:2;grid-row:1 / span 2;display:flex;flex-direction:column;gap:18px;min-height:0;
+    }
+    .card{
+      border:1px solid var(--border);background:var(--panel);border-radius:12px;padding:18px;backdrop-filter:blur(8px);
+      box-shadow:0 0 0 1px rgba(255,255,255,.03) inset;
+    }
+    .card h3{margin:0 0 10px;font-size:23px;line-height:1.1;font-weight:600}
+    .calendar .row{display:grid;grid-template-columns:82px 1fr;gap:14px;padding:10px 0;border-top:1px solid rgba(255,255,255,.08)}
+    .calendar .row:first-of-type{border-top:0;padding-top:0}
+    .time{font-family:"JetBrains Mono",ui-monospace,monospace;font-size:21px;font-weight:600}
+    .event{font-size:18px;font-weight:500;line-height:1.15}
+    .event span{display:block;color:var(--tertiary);font-size:14px;margin-top:4px;font-weight:400}
+    .birth .row{display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-top:1px solid rgba(255,255,255,.08)}
+    .birth .row:first-of-type{border-top:0;padding-top:0}
+    .name{font-size:19px;font-weight:600}
+    .sub{color:var(--tertiary);font-size:14px;margin-top:5px}
+    .pill{font-size:13px;color:#fff;border:1px solid rgba(255,255,255,.19);border-radius:999px;padding:4px 10px;background:rgba(255,255,255,.03)}
+    .weather{display:grid;grid-template-columns:1fr;gap:8px}
+    .temp{font-family:"JetBrains Mono",ui-monospace,monospace;font-size:72px;font-weight:600;line-height:.95;letter-spacing:-2px}
+    .wsub{font-size:18px;color:var(--secondary)}
+    .wrow{display:flex;justify-content:space-between;gap:10px;padding-top:8px}
+    .metric{font-family:"JetBrains Mono",ui-monospace,monospace;font-size:18px;color:var(--secondary)}
+    .claw .row{
+      display:grid;grid-template-columns:34px 1fr 22px;gap:12px;align-items:center;padding:13px 0;border-top:1px solid rgba(255,255,255,.08)
+    }
+    .claw .row:first-of-type{border-top:0;padding-top:0}
+    .tile{width:28px;height:28px;border-radius:8px}
+    .blue{background:var(--blue-bg);border:1px solid var(--blue-border)}
+    .amber{background:var(--amber-bg);border:1px solid var(--amber-border)}
+    .red{background:var(--red-bg);border:1px solid var(--red-border)}
+    .ctitle{font-size:19px;font-weight:600}
+    .csub{font-size:14px;color:var(--secondary);margin-top:4px;line-height:1.35}
+    .chev{font-size:28px;color:rgba(255,255,255,.55);line-height:1}
+    .school{border-color:rgba(245,158,11,.33);background:rgba(245,158,11,.08)}
+    .school .eyebrow{color:var(--amber)}
+    .school .cardtitle{font-size:24px;font-weight:600;margin:10px 0 8px}
+    .school .meta{font-size:14px;color:var(--tertiary)}
+    .school .rank{
+      margin-top:14px;display:flex;flex-direction:column;gap:10px
+    }
+    .school .mini{
+      display:grid;grid-template-columns:18px 1fr auto;gap:10px;align-items:center;padding:11px 12px;border-radius:10px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.10)
+    }
+    .dot{width:9px;height:9px;border-radius:50%;background:var(--amber)}
+    .mini .mtitle{font-size:17px;font-weight:600}
+    .mini .mmeta{font-size:13px;color:var(--tertiary);margin-top:3px}
+    .small-note{margin-top:auto;color:rgba(255,255,255,.45);font-size:13px;line-height:1.4}
+    .photoGrid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    .photo{
+      height:108px;border-radius:10px;position:relative;overflow:hidden;border:1px solid rgba(255,255,255,.10);
+      background:linear-gradient(45deg,#1F1F1F,#3A3A3A);
+    }
+    .photo:nth-child(2){background:linear-gradient(45deg,#222,#434343)}
+    .photo:nth-child(3){background:linear-gradient(45deg,#1B1B1B,#373737)}
+    .photo:nth-child(4){background:linear-gradient(45deg,#242424,#454545)}
+    .caption{
+      margin-top:10px;font-size:14px;color:var(--secondary);display:flex;justify-content:space-between;align-items:center
+    }
+    .overlay{
+      position:absolute;right:34px;bottom:34px;width:414px;border-radius:12px;padding:16px 18px;border:1px solid var(--amber-toast-border);
+      background:var(--amber-toast-bg);box-shadow:0 18px 50px rgba(0,0,0,.35)
+    }
+    .overlay .eyebrow{color:var(--amber)}
+    .overlay .body{font-size:22px;font-weight:600;margin-top:6px;line-height:1.2}
+  </style>
+</head>
+<body>
+  <div class="screen">
+    <div class="topbar">
+      <div class="hub">The Howell Hub</div>
+      <div class="clock">07:45 AM</div>
+    </div>
+
+    <div class="grid">
+      <section class="hero school">
+        <div class="eyebrow">SEP · TUESDAY</div>
+        <div class="hero-title">Earliest deadline first</div>
+        <div class="hero-sub">Emma’s science fair project is the main thing today. The family view collapses other school items into this ranked card so the next step is obvious at a glance.</div>
+
+        <div class="cardtitle">Science Fair Project — Emma</div>
+        <div class="meta">Due in 5 days · signed yes</div>
+
+        <div class="rank">
+          <div class="mini">
+            <div class="dot"></div>
+            <div>
+              <div class="mtitle">Finish poster board layout</div>
+              <div class="mmeta">Due tomorrow · review with Emma after dinner</div>
+            </div>
+            <div class="tag">Priority 1</div>
+          </div>
+          <div class="mini">
+            <div class="dot" style="background:#F59E0B"></div>
+            <div>
+              <div class="mtitle">Print experiment photos</div>
+              <div class="mmeta">Due in 3 days · 4 images still needed</div>
+            </div>
+            <div class="tag">Next</div>
+          </div>
+          <div class="mini">
+            <div class="dot" style="background:#60A5FA"></div>
+            <div>
+              <div class="mtitle">Write 3-sentence summary</div>
+              <div class="mmeta">Due in 5 days · draft already started</div>
+            </div>
+            <div class="tag">Later</div>
+          </div>
+        </div>
+
+        <div class="small-note">School deadlines outrank birthdays, weather, and dinner tonight on this layout so the scan path stays singular from across the room.</div>
+      </section>
+
+      <div class="subcards">
+        <section class="card calendar">
+          <h3>Today</h3>
+          <div class="row">
+            <div class="time">07:45</div>
+            <div><div class="event">Drop Lucy at school <span>Carline opens at 7:40 · backpack ready by the door</span></div></div>
+          </div>
+          <div class="row">
+            <div class="time">10:30</div>
+            <div><div class="event">Dr. Shaw <span>Andrew’s checkup · bring insurance card</span></div></div>
+          </div>
+          <div class="row">
+            <div class="time">14:15</div>
+            <div><div class="event">Ivy piano lesson <span>Studio off Maple · ends at 3:00 PM</span></div></div>
+          </div>
+          <div class="row">
+            <div class="time">18:00</div>
+            <div><div class="event">Dinner with Sarah <span>Early table at Olive & Oak · takeout decision pending</span></div></div>
+          </div>
+        </section>
+
+        <section class="card birth">
+          <h3>Birthdays</h3>
+          <div class="row">
+            <div>
+              <div class="name">Peter</div>
+              <div class="sub">Apr 26 — 5 days</div>
+            </div>
+            <div class="pill">Find ideas</div>
+          </div>
+          <div class="row">
+            <div>
+              <div class="name">Lucy</div>
+              <div class="sub">Apr 27 — 6 days</div>
+            </div>
+            <div class="pill">Find ideas</div>
+          </div>
+          <div class="row">
+            <div>
+              <div class="name">Sarah</div>
+              <div class="sub">Apr 30 — 9 days</div>
+            </div>
+            <div class="pill">Find ideas</div>
+          </div>
+        </section>
+
+        <section class="card weather">
+          <h3>Weather</h3>
+          <div class="temp">54°F</div>
+          <div class="wsub">Partly Cloudy</div>
+          <div class="wsub">Feels like 50°F</div>
+          <div class="wrow">
+            <div class="metric">12 mph NW</div>
+            <div class="metric">71% humidity</div>
+            <div class="metric">H: 68° / L: 54°</div>
+          </div>
+        </section>
+
+        <section class="card claw">
+          <h3>Claw Suggestions</h3>
+          <div class="row">
+            <div class="tile blue"></div>
+            <div>
+              <div class="ctitle">Set dinner now</div>
+              <div class="csub">Pick a takeout spot and lock dinner in early.</div>
+            </div>
+            <div class="chev">›</div>
+          </div>
+          <div class="row">
+            <div class="tile amber"></div>
+            <div>
+              <div class="ctitle">Pack science fair supplies</div>
+              <div class="csub">Poster board, glue sticks, and the printed photos.</div>
+            </div>
+            <div class="chev">›</div>
+          </div>
+          <div class="row">
+            <div class="tile red"></div>
+            <div>
+              <div class="ctitle">Return library book</div>
+              <div class="csub">It’s due today and still sitting by the couch.</div>
+            </div>
+            <div class="chev">›</div>
+          </div>
+        </section>
+
+        <section class="card">
+          <h3>Photos</h3>
+          <div class="photoGrid">
+            <div class="photo"></div>
+            <div class="photo"></div>
+            <div class="photo"></div>
+            <div class="photo"></div>
+          </div>
+          <div class="caption">
+            <div>Weekend at the lake</div>
+            <div style="color:rgba(255,255,255,.5);font-family:'JetBrains Mono',ui-monospace,monospace;">4 new</div>
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <div class="overlay">
+      <div class="eyebrow">Bedtime</div>
+      <div class="body">Wind down — 15 min to lights out</div>
+    </div>
+  </div>
+</body>
+</html>

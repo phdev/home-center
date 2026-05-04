@@ -117,6 +117,12 @@ def apply_update(
         feedback=feedback,
         added=added,
     )
+    try:
+        from sync_design_memory_pack import write_shared_design_memory_pack
+
+        write_shared_design_memory_pack()
+    except Exception as exc:
+        print(f"warning: design memory pack sync failed ({type(exc).__name__}): {exc}", file=sys.stderr)
     return added
 
 

@@ -1,0 +1,37 @@
+# Design Claw — 2026-04-21 — dashboard-afternoon
+
+**Topic.** afternoon takeout decision — surface the choice early enough to act without cluttering the screen  
+**Topic id.** `afternoon-takeout-lead-time`
+
+## Concept — Single Decision Runway
+
+### Layout idea
+Use one full-width primary slot in the center of the TV for the active decision, and keep everything else out of the main scan path. Here, `takeoutDecisionPending: true` wins the contextual slot, so the screen shows one large takeout-choice card as the primary element with the only actionable control being a one-tap vendor choose action. The `birthdayGiftNeeded: true` state and the lower-priority `calendar`, `weather`, `schoolUpdates`, and `clawSuggestions` stay out of the visible stack unless the primary flag clears; they should not compete in a second row. The state flow is deterministic: highest-priority active flag claims the single slot, and the card swaps only when that flag changes or clears.
+
+### Why it fits
+This matches the afternoon theme because the family still has one decision to make before dinner, and the snapshot explicitly shows `takeoutDecisionPending: true` with `showClawSuggestions: true` plus a low-priority `birthdayGiftNeeded: true`. The current structure already marks `takeoutDecision` as priority 1 and notes it should render via `ContextualSlot` and displace Photos, which supports making it the only visible card. Since the device is a shared 4K TV viewed from across the room and the goal is readable in under 2 seconds after school pickup, a single dominant decision card is more defensible than a stacked dashboard. This also fits the memory’s accepted `single contextual slot` pattern and the principle that actionable beats informational.
+
+### Tradeoff
+This is worse when the family wants a quick overview of multiple non-urgent items at once, because birthdays, weather, and school updates are deliberately hidden behind the primary decision. If the takeout choice is unresolved for a long time, the screen can feel repetitive rather than broad.
+
+### Implementation hint
+- Build a `getActivePrimaryFlag(derived_state)` selector that returns the highest-tier true state and feeds exactly one contextual card into the slot.
+- Render the primary card as the only prominent region; if `takeoutDecisionPending` is true, show vendor choices and a single tap target per vendor, with no sibling cards in the same row.
+- Keep secondary items (`birthdayGiftNeeded`, `calendar`, `weather`, `schoolUpdates`, `clawSuggestions`) in the data model but not in the visible layout while the primary slot is occupied.
+
+### Prototype first
+Prototype only the contextual takeout slot with one tap-to-choose vendor card and verify it is readable from across the room in under two seconds.
+
+### Memory alignment
+**Reinforces.**
+- Show only the essential information at this moment.
+- Clarity beats completeness — prefer leaving something out to crowding the primary signal.
+- One primary thing, clearly, before any secondary things.
+- Card visibility is driven by deterministic derived-state flags, never by LLM output.
+- accepted_patterns: A single contextual slot that swaps its card based on the highest-tier active flag.
+
+**Avoids rejected.**
+- Information-dense screens that trade clarity for coverage.
+- Rendering secondary items alongside a primary prompt (they compete for attention and dilute the decision).
+- Dense multi-column dashboards that trade glanceability for information density.
+- Rendering family items as a checkable to-do list.

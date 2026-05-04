@@ -1,0 +1,274 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=1920, initial-scale=1" />
+  <title>The Howell Hub</title>
+  <style>
+    :root{
+      --bg:#0A0A0A;
+      --card:#ffffff00;
+      --border:#ffffff30;
+      --text:#fff;
+      --secondary:#ffffffaa;
+      --tertiary:#ffffff66;
+      --tertiary2:#ffffff88;
+      --blue:#60A5FA;
+      --amber:#F59E0B;
+      --danger:#EF4444;
+      --green:#4ADE80;
+      --radius:8px;
+    }
+    *{box-sizing:border-box}
+    html,body{width:100%;height:100%;margin:0;overflow:hidden;background:var(--bg);color:var(--text);font-family:Inter,Geist,system-ui,sans-serif}
+    .screen{
+      width:1920px;height:1080px;position:relative;overflow:hidden;
+      background:
+        radial-gradient(1200px 700px at 50% 0%, rgba(96,165,250,.08), transparent 50%),
+        linear-gradient(180deg, #0A0A0A 0%, #090909 100%);
+      padding:34px 38px 36px;
+    }
+    .topbar{
+      display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:22px;
+    }
+    .brand{font-size:24px;line-height:1.1;font-weight:600;letter-spacing:-.01em}
+    .clock{font-family:"JetBrains Mono",ui-monospace,monospace;font-size:52px;line-height:1;font-weight:600;letter-spacing:-.03em;color:#fff}
+    .hero{
+      width:100%;height:300px;border:5px solid var(--blue);border-radius:10px;
+      background:linear-gradient(180deg, rgba(96,165,250,.10), rgba(96,165,250,.04));
+      box-shadow:0 0 0 1px rgba(255,255,255,.08) inset;
+      padding:20px 22px 18px;display:flex;flex-direction:column;justify-content:space-between;
+    }
+    .eyebrow{font-size:13px;letter-spacing:2px;text-transform:uppercase;color:var(--tertiary);font-weight:600}
+    .heroTitle{font-size:32px;line-height:1.05;font-weight:600;letter-spacing:-.02em;margin-top:8px}
+    .heroBody{display:flex;gap:18px;align-items:flex-end;justify-content:space-between}
+    .heroCopy{max-width:980px}
+    .heroDesc{font-size:17px;line-height:1.45;color:var(--secondary);margin-top:10px;max-width:900px}
+    .heroAction{
+      min-width:360px;align-self:flex-end;border:1px solid rgba(96,165,250,.55);background:rgba(96,165,250,.10);
+      border-radius:999px;padding:16px 18px;display:flex;align-items:center;justify-content:space-between;gap:14px
+    }
+    .actionLeft{display:flex;flex-direction:column;gap:3px}
+    .actionLabel{font-size:12px;letter-spacing:2px;text-transform:uppercase;color:#ffffff88}
+    .actionTitle{font-size:22px;line-height:1.1;font-weight:600}
+    .actionSub{font-size:15px;color:var(--secondary)}
+    .actionPill{
+      font-size:13px;font-weight:600;color:#0A0A0A;background:var(--green);border-radius:999px;padding:8px 12px;white-space:nowrap
+    }
+    .content{
+      margin-top:20px;display:grid;grid-template-columns:1.55fr .95fr .95fr;grid-template-rows:repeat(2, 1fr);
+      gap:18px;height:660px;
+    }
+    .card{
+      border:1px solid var(--border);border-radius:var(--radius);background:var(--card);
+      padding:18px 18px 16px;overflow:hidden;box-shadow:0 0 0 1px rgba(255,255,255,.03) inset;
+    }
+    .cardTitle{font-size:24px;line-height:1.1;font-weight:600;letter-spacing:-.02em}
+    .subtle{color:var(--secondary)}
+    .calendar{grid-column:1;grid-row:1 / span 2}
+    .weather{grid-column:2;grid-row:1}
+    .birthdays{grid-column:3;grid-row:1}
+    .school{grid-column:2 / span 2;grid-row:2}
+    .claw{grid-column:1;grid-row:2}
+    .slot{grid-column:1;grid-row:1 / span 2;display:flex;flex-direction:column}
+    .calendar .rows{margin-top:18px;display:flex;flex-direction:column;gap:16px}
+    .event{display:grid;grid-template-columns:86px 1fr;gap:14px;align-items:start}
+    .time{font-family:"JetBrains Mono",ui-monospace,monospace;font-size:22px;line-height:1.1;font-weight:600;color:#fff}
+    .eventTitle{font-size:18px;line-height:1.25;font-weight:500}
+    .eventSub{font-size:14px;line-height:1.2;color:var(--tertiary2);margin-top:4px}
+    .weatherMain{display:flex;align-items:flex-end;gap:18px;margin-top:14px}
+    .temp{font-family:"JetBrains Mono",ui-monospace,monospace;font-size:70px;line-height:.92;font-weight:600;letter-spacing:-.04em}
+    .weatherCopy{display:flex;flex-direction:column;gap:4px;padding-bottom:4px}
+    .weatherRows{display:flex;gap:16px;margin-top:18px;flex-wrap:wrap}
+    .metric{font-family:"JetBrains Mono",ui-monospace,monospace;font-size:18px;color:#fff;padding:10px 12px;border:1px solid rgba(255,255,255,.12);border-radius:12px;background:rgba(255,255,255,.02)}
+    .birthdayRows{margin-top:16px;display:flex;flex-direction:column;gap:14px}
+    .birthdayRow{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:10px 0;border-top:1px solid rgba(255,255,255,.08)}
+    .birthdayRow:first-child{border-top:0;padding-top:0}
+    .bLeft{display:flex;flex-direction:column;gap:4px}
+    .name{font-size:19px;line-height:1.15;font-weight:500}
+    .pill{font-size:13px;color:#fff;border:1px solid rgba(255,255,255,.18);border-radius:999px;padding:4px 10px;white-space:nowrap}
+    .smallCardList{margin-top:16px;display:flex;flex-direction:column;gap:12px}
+    .mini{display:flex;gap:14px;align-items:flex-start;border:1px solid rgba(255,255,255,.10);border-radius:12px;padding:14px;background:rgba(255,255,255,.02)}
+    .tile{width:28px;height:28px;border-radius:8px;flex:0 0 auto}
+    .blue{background:rgba(96,165,250,.22);border:1px solid rgba(96,165,250,.55)}
+    .amber{background:rgba(245,158,11,.20);border:1px solid rgba(245,158,11,.50)}
+    .red{background:rgba(239,68,68,.18);border:1px solid rgba(239,68,68,.50)}
+    .miniTitle{font-size:18px;font-weight:600;line-height:1.2}
+    .miniSub{font-size:14px;color:var(--secondary);line-height:1.35;margin-top:4px}
+    .chev{margin-left:auto;font-size:28px;line-height:1;color:#ffffff88;padding-left:10px}
+    .schoolHead{display:flex;align-items:center;justify-content:space-between}
+    .due{font-size:13px;letter-spacing:2px;text-transform:uppercase;color:var(--amber);font-weight:700}
+    .schoolTitle{margin-top:12px;font-size:28px;line-height:1.1;font-weight:600}
+    .meta{margin-top:10px;font-size:15px;color:var(--tertiary2)}
+    .queueRow{display:flex;gap:14px;margin-top:18px}
+    .choice{
+      flex:1;border:1px solid rgba(255,255,255,.14);border-radius:14px;padding:14px 14px 12px;
+      background:linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.01));
+      min-height:126px;display:flex;flex-direction:column;justify-content:space-between
+    }
+    .choiceTop{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+    .vendor{font-size:20px;font-weight:600;line-height:1.15}
+    .tag{font-size:12px;font-weight:700;color:#0A0A0A;background:var(--green);border-radius:999px;padding:6px 10px;white-space:nowrap}
+    .choiceSub{font-size:14px;color:var(--secondary);line-height:1.4;margin-top:10px}
+    .footerNote{margin-top:auto;font-size:13px;color:var(--tertiary);padding-top:12px}
+    .focusTag{display:inline-flex;align-items:center;gap:8px;font-size:13px;color:#fff;background:rgba(96,165,250,.12);border:1px solid rgba(96,165,250,.40);border-radius:999px;padding:7px 10px}
+    .dot{width:8px;height:8px;border-radius:50%;background:var(--amber);display:inline-block;margin-right:8px;vertical-align:middle}
+  </style>
+</head>
+<body>
+  <div class="screen">
+    <div class="topbar">
+      <div class="brand">The Howell Hub</div>
+      <div class="clock">07:45 AM</div>
+    </div>
+
+    <section class="hero">
+      <div>
+        <div class="eyebrow">TAKEOUT DECISION PENDING</div>
+        <div class="heroTitle">Dinner tonight needs a call.</div>
+      </div>
+      <div class="heroBody">
+        <div class="heroCopy">
+          <div class="heroDesc">The family vote is waiting, and the quickest path is to pick one place now before the kids get too hungry. Birthday planning stays queued, but dinner owns the screen right now.</div>
+          <div style="margin-top:16px" class="focusTag"><span class="dot"></span>Priority 1 of 3 active flags</div>
+        </div>
+        <div class="heroAction">
+          <div class="actionLeft">
+            <div class="actionLabel">Action</div>
+            <div class="actionTitle">Choose takeout</div>
+            <div class="actionSub">Lock one order in under 2 minutes</div>
+          </div>
+          <div class="actionPill">Suggested</div>
+        </div>
+      </div>
+    </section>
+
+    <div class="content">
+      <section class="card calendar">
+        <div class="eyebrow">TODAY</div>
+        <div class="cardTitle" style="margin-top:8px">Calendar</div>
+        <div class="rows">
+          <div class="event">
+            <div class="time">07:45</div>
+            <div>
+              <div class="eventTitle">Drop Lucy at school</div>
+              <div class="eventSub">Carpool lane · Andrew driving</div>
+            </div>
+          </div>
+          <div class="event">
+            <div class="time">10:30</div>
+            <div>
+              <div class="eventTitle">Dentist checkup</div>
+              <div class="eventSub">Sarah · Southside Family Dental</div>
+            </div>
+          </div>
+          <div class="event">
+            <div class="time">14:15</div>
+            <div>
+              <div class="eventTitle">Ivy piano lesson</div>
+              <div class="eventSub">Studio A · bring recital binder</div>
+            </div>
+          </div>
+          <div class="event">
+            <div class="time">18:00</div>
+            <div>
+              <div class="eventTitle">Peter soccer practice</div>
+              <div class="eventSub">Field 2 · water bottle packed</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="card weather">
+        <div class="eyebrow">CURRENT WEATHER</div>
+        <div class="weatherMain">
+          <div class="temp">54°F</div>
+          <div class="weatherCopy">
+            <div class="cardTitle" style="font-size:22px">Partly Cloudy</div>
+            <div class="subtle" style="font-size:15px">Feels like 50°F</div>
+          </div>
+        </div>
+        <div class="weatherRows">
+          <div class="metric">12 mph NW</div>
+          <div class="metric">71% humidity</div>
+          <div class="metric">H: 68° / L: 54°</div>
+        </div>
+      </section>
+
+      <section class="card birthdays">
+        <div class="eyebrow">UPCOMING BIRTHDAYS</div>
+        <div class="cardTitle" style="margin-top:8px">Gift ideas</div>
+        <div class="birthdayRows">
+          <div class="birthdayRow">
+            <div class="bLeft">
+              <div class="name">Lucy</div>
+              <div class="subtle">Apr 26 — 5 days</div>
+            </div>
+            <div class="pill">Find ideas</div>
+          </div>
+          <div class="birthdayRow">
+            <div class="bLeft">
+              <div class="name">Ivy</div>
+              <div class="subtle">Apr 29 — 8 days</div>
+            </div>
+            <div class="pill">Find ideas</div>
+          </div>
+          <div class="birthdayRow">
+            <div class="bLeft">
+              <div class="name">Andrew</div>
+              <div class="subtle">May 03 — 12 days</div>
+            </div>
+            <div class="pill">Find ideas</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="card claw">
+        <div class="eyebrow">CLAW SUGGESTIONS</div>
+        <div class="cardTitle" style="margin-top:8px">Quick wins</div>
+        <div class="smallCardList">
+          <div class="mini">
+            <div class="tile blue"></div>
+            <div>
+              <div class="miniTitle">Set dinner now</div>
+              <div class="miniSub">Pick a takeout spot and lock dinner in early.</div>
+            </div>
+            <div class="chev">›</div>
+          </div>
+          <div class="mini">
+            <div class="tile amber"></div>
+            <div>
+              <div class="miniTitle">Order extra drinks</div>
+              <div class="miniSub">Add a sparkling water pack so nobody asks again.</div>
+            </div>
+            <div class="chev">›</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="card school">
+        <div class="schoolHead">
+          <div class="due">SEP · TUESDAY</div>
+          <div class="subtle" style="font-size:13px;letter-spacing:2px;text-transform:uppercase">School updates</div>
+        </div>
+        <div class="schoolTitle">Science Fair Project — Emma</div>
+        <div class="meta">Due in 5 days · signed yes</div>
+        <div style="margin-top:16px;display:grid;grid-template-columns:1.2fr .8fr .8fr;gap:12px">
+          <div style="border:1px solid rgba(255,255,255,.10);border-radius:12px;padding:14px 12px;background:rgba(255,255,255,.02)">
+            <div class="subtle" style="font-size:12px;letter-spacing:2px;text-transform:uppercase">Status</div>
+            <div class="name" style="margin-top:6px">Materials ready</div>
+          </div>
+          <div style="border:1px solid rgba(255,255,255,.10);border-radius:12px;padding:14px 12px;background:rgba(255,255,255,.02)">
+            <div class="subtle" style="font-size:12px;letter-spacing:2px;text-transform:uppercase">Teacher note</div>
+            <div class="name" style="margin-top:6px">Poster board needed</div>
+          </div>
+          <div style="border:1px solid rgba(255,255,255,.10);border-radius:12px;padding:14px 12px;background:rgba(255,255,255,.02)">
+            <div class="subtle" style="font-size:12px;letter-spacing:2px;text-transform:uppercase">Reminder</div>
+            <div class="name" style="margin-top:6px">Practice pitch tonight</div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+</body>
+</html>

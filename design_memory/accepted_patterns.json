@@ -20,9 +20,39 @@
     },
     {
       "id": "ap-hide-header-clock-morning",
-      "text": "In Morning mode, hide the clock in the header — the kitchen already has one.",
+      "text": "In Morning mode, hide the clock in the header \u2014 the kitchen already has one.",
       "added": "2026-04-21",
       "source": "feedback"
+    },
+    {
+      "id": "ap-place-urgent-items-in-the-upper-left-of-",
+      "text": "Place urgent items in the upper-left of the screen.",
+      "added": "2026-04-25",
+      "source": "telegram"
+    },
+    {
+      "id": "ap-keep-cards-tight-with-minimal-empty-spac",
+      "text": "Keep cards tight with minimal empty space.",
+      "added": "2026-04-25",
+      "source": "telegram"
+    },
+    {
+      "id": "ap-use-passive-gift-planning",
+      "text": "Use passive gift planning.",
+      "added": "2026-04-28",
+      "source": "telegram"
+    },
+    {
+      "id": "ap-present-varied-gift-ideas",
+      "text": "Present varied gift ideas.",
+      "added": "2026-04-28",
+      "source": "telegram"
+    },
+    {
+      "id": "ap-place-the-calendar-on-the-left",
+      "text": "Place the calendar on the left.",
+      "added": "2026-05-02",
+      "source": "telegram"
     }
   ]
 }

@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>The Howell Hub</title>
+  <style>
+    :root{
+      --bg:#0A0A0A;
+      --white:#fff;
+      --p:#FFFFFF;
+      --s:#FFFFFFAA;
+      --t:#FFFFFF66;
+      --u:#FFFFFF88;
+      --blue:#60A5FA;
+      --amber:#F59E0B;
+      --danger:#EF4444;
+      --success:#4ADE80;
+      --card:#FFFFFF10;
+      --border:#FFFFFF30;
+      --mono:"JetBrains Mono", ui-monospace, monospace;
+      --ui:"Geist","Inter",system-ui,sans-serif;
+    }
+    *{box-sizing:border-box}
+    html,body{width:100%;height:100%;margin:0;overflow:hidden;background:var(--bg);color:var(--p);font-family:var(--ui)}
+    .screen{
+      width:1920px;height:1080px;position:relative;overflow:hidden;
+      background:
+        radial-gradient(1200px 700px at 50% 55%, rgba(96,165,250,.08), transparent 60%),
+        radial-gradient(900px 500px at 20% 10%, rgba(255,255,255,.03), transparent 55%),
+        linear-gradient(180deg, #0A0A0A 0%, #090909 100%);
+    }
+    .topbar{
+      position:absolute;left:36px;right:36px;top:28px;height:64px;display:flex;align-items:flex-start;justify-content:space-between;
+    }
+    .brand{font-size:24px;font-weight:600;letter-spacing:-0.02em}
+    .clock{font-family:var(--mono);font-size:52px;font-weight:600;line-height:1;color:#fff}
+    .center-wrap{
+      position:absolute;left:0;right:0;top:150px;bottom:64px;display:flex;align-items:center;justify-content:center;
+    }
+    .runway{
+      width:1600px; min-height:560px;
+      border:1px solid var(--border);
+      border-radius:8px;
+      background:rgba(255,255,255,.03);
+      box-shadow:0 24px 80px rgba(0,0,0,.55), inset 0 1px 0 rgba(255,255,255,.04);
+      padding:28px 30px 26px;
+      position:relative;
+    }
+    .eyebrow{
+      font-size:13px;letter-spacing:2px;text-transform:uppercase;color:var(--t);font-weight:500;
+    }
+    .headline{
+      display:flex;align-items:flex-start;justify-content:space-between;gap:24px;margin-top:10px;
+    }
+    .title{
+      font-size:32px;font-weight:600;line-height:1.05;letter-spacing:-0.03em;
+    }
+    .subhead{
+      margin-top:10px;color:var(--s);font-size:16px;line-height:1.4;max-width:980px
+    }
+    .status-pill{
+      padding:10px 14px;border-radius:999px;border:1px solid #60A5FA55;background:#60A5FA14;color:#DCEEFF;
+      font-size:13px;letter-spacing:.02em;font-weight:600;white-space:nowrap;height:fit-content
+    }
+    .content{
+      margin-top:26px;display:grid;grid-template-columns:1.5fr .92fr;gap:22px;align-items:start;
+    }
+    .panel{
+      border-radius:8px;border:1px solid var(--border);background:rgba(255,255,255,.02);padding:18px 18px 16px;
+    }
+    .panel h3{
+      margin:0 0 14px 0;font-size:22px;font-weight:600;letter-spacing:-0.02em
+    }
+    .checklist{
+      display:flex;flex-direction:column;gap:14px
+    }
+    .item{
+      display:flex;gap:14px;align-items:flex-start;padding:14px 14px;border-radius:12px;background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.05)
+    }
+    .box{
+      width:16px;height:16px;border-radius:4px;border:1px solid var(--border);margin-top:4px;flex:0 0 auto;background:transparent
+    }
+    .item-main{flex:1}
+    .item-title{
+      font-size:22px;font-weight:500;line-height:1.15
+    }
+    .item-sub{
+      margin-top:4px;font-size:14px;color:var(--t);line-height:1.3
+    }
+    .dot{
+      width:8px;height:8px;border-radius:999px;background:var(--amber);display:inline-block;margin-right:8px;vertical-align:middle
+    }
+    .risk{
+      margin-top:18px;padding:14px 16px;border-radius:12px;border:1px solid #F59E0B50;background:#F59E0B12;display:flex;gap:12px;align-items:flex-start
+    }
+    .risk-tag{
+      font-size:12px;letter-spacing:2px;text-transform:uppercase;color:#FCD38B;font-weight:600
+    }
+    .risk-text{
+      font-size:18px;line-height:1.35;color:#FFF4E2
+    }
+    .footer-line{
+      margin-top:16px;padding-top:14px;border-top:1px solid rgba(255,255,255,.08);display:flex;justify-content:space-between;gap:18px;align-items:flex-end
+    }
+    .footer-meta{color:var(--u);font-size:14px;line-height:1.35}
+    .footer-meta strong{color:#fff;font-weight:600}
+    .mini-card{
+      border-radius:8px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.03);padding:16px 16px 14px
+    }
+    .mini-title{font-size:18px;font-weight:600;margin:0 0 10px}
+    .mini-list{display:flex;flex-direction:column;gap:12px}
+    .mini-row{display:flex;justify-content:space-between;gap:16px;align-items:flex-start}
+    .mini-label{color:var(--s);font-size:14px;line-height:1.35}
+    .mini-value{font-family:var(--mono);font-size:18px;font-weight:600;color:#fff}
+    .compact-update{
+      margin-top:16px;padding:14px 16px;border-radius:12px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.02)
+    }
+    .update-eyebrow{font-size:12px;letter-spacing:2px;text-transform:uppercase;color:#F59E0B;font-weight:600}
+    .update-title{margin-top:8px;font-size:20px;font-weight:600}
+    .update-meta{margin-top:6px;color:var(--t);font-size:14px}
+  </style>
+</head>
+<body>
+  <div class="screen">
+    <div class="topbar">
+      <div class="brand">The Howell Hub</div>
+      <div class="clock">07:30 AM</div>
+    </div>
+
+    <div class="center-wrap">
+      <div class="runway">
+        <div class="eyebrow">Morning runway</div>
+        <div class="headline">
+          <div>
+            <div class="title">Clear the next hour, then breathe.</div>
+            <div class="subhead">Just the essentials for 7am–9am: what the family needs to do now, plus one time-sensitive conflict so nobody gets surprised at the door.</div>
+          </div>
+          <div class="status-pill">showMorningChecklist · active</div>
+        </div>
+
+        <div class="content">
+          <div class="panel">
+            <h3>Today’s essentials</h3>
+            <div class="checklist">
+              <div class="item">
+                <div class="box"></div>
+                <div class="item-main">
+                  <div class="item-title">Pack Lucy’s lunch and water bottle</div>
+                  <div class="item-sub">Lucy · 07:40</div>
+                </div>
+              </div>
+              <div class="item">
+                <div class="box"></div>
+                <div class="item-main">
+                  <div class="item-title">Sign Peter’s reading log</div>
+                  <div class="item-sub">Peter · 07:50</div>
+                </div>
+              </div>
+              <div class="item">
+                <div class="box"></div>
+                <div class="item-main">
+                  <div class="item-title">Backpack by the door</div>
+                  <div class="item-sub">Ivy · 08:00</div>
+                </div>
+              </div>
+              <div class="item">
+                <div class="box"></div>
+                <div class="item-main">
+                  <div class="item-title"><span class="dot"></span>Set out Andrew’s work badge and keys</div>
+                  <div class="item-sub">Andrew · before leaving</div>
+                </div>
+              </div>
+              <div class="item">
+                <div class="box"></div>
+                <div class="item-main">
+                  <div class="item-title">Shoes on, bags loaded, lights off</div>
+                  <div class="item-sub">Family sweep · 08:10</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="risk">
+              <div>
+                <div class="risk-tag">Risk</div>
+              </div>
+              <div class="risk-text">Peter has a tight <span style="font-family:var(--mono);font-weight:600">08:00–09:00</span> window — leave by <span style="font-family:var(--mono);font-weight:600">07:52</span> to avoid a rushed drop-off.</div>
+            </div>
+
+            <div class="footer-line">
+              <div class="footer-meta">
+                <strong>School update:</strong> Science Fair Project — Emma<br/>
+                Due in 5 days · signed yes
+              </div>
+              <div class="footer-meta" style="text-align:right">
+                Quiet morning mode<br/>
+                Secondary cards hidden until later
+              </div>
+            </div>
+          </div>
+
+          <div class="mini-card">
+            <h3 class="mini-title">Quick glance</h3>
+            <div class="mini-list">
+              <div class="mini-row">
+                <div class="mini-label">Household pace</div>
+                <div class="mini-value">steady</div>
+              </div>
+              <div class="mini-row">
+                <div class="mini-label">Focus</div>
+                <div class="mini-value">leaving</div>
+              </div>
+              <div class="mini-row">
+                <div class="mini-label">Next checkpoint</div>
+                <div class="mini-value">08:00</div>
+              </div>
+            </div>
+
+            <div class="compact-update">
+              <div class="update-eyebrow">SEP · TUESDAY</div>
+              <div class="update-title">Science Fair Project — Emma</div>
+              <div class="update-meta">Due in 5 days · signed yes</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
