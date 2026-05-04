@@ -63,7 +63,7 @@ write_major_dirs() {
     | sed 's#^\./##' \
     | grep -v '^\.$' \
     | sort \
-    | head -80 \
+    | awk 'NR <= 80' \
     | sed 's#^#- #'
 }
 
@@ -120,7 +120,7 @@ write_david_artifacts() {
       ! -name '*.log' \
       ! -name '.launchd*' \
       | sort
-  done | head -80 | sed 's#^#- #'
+  done | awk 'NR <= 80' | sed 's#^#- #'
 }
 
 write_generated_artifacts() {
@@ -130,7 +130,7 @@ write_generated_artifacts() {
     find "$dir" -maxdepth 2 -type f \
       ! -name '*.log' \
       | sort \
-      | head -20 \
+      | awk 'NR <= 20' \
       | sed 's#^#  - #'
   done
 }
