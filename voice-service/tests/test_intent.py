@@ -19,6 +19,15 @@ def test_turn_off_variants():
     assert parse_command("turn it down") == {"action": "turn_off"}
 
 
+def test_stop_intent_rejects_trailing_hallucinated_words():
+    assert parse_command("stop") == {"action": "stop"}
+    assert parse_command("dismiss all timers") == {"action": "stop"}
+    assert parse_command("cancel the timer") == {"action": "stop"}
+    assert parse_command("quiet") == {"action": "stop"}
+    assert parse_command("Hey Homer, stop the perfect") == {"action": "none"}
+    assert parse_command("Hey Homer, stop the conversation keeps going") == {"action": "none"}
+
+
 def test_timer_digits_and_words():
     assert parse_command("set a timer for 5 minutes for pasta") == {
         "action": "set_timer",
@@ -53,6 +62,21 @@ def test_ask_intent():
         "query": "do we have school tomorrow",
     }
     assert parse_command("random television conversation keeps going") == {"action": "none"}
+
+
+def test_confirmed_mode_ask_intent_requires_explicit_cue():
+    assert parse_command("what is a platypus", allow_bare_ask=False) == {"action": "none"}
+    assert parse_command("Hey Homer, what's going on? That was very enthusiastic", allow_bare_ask=False) == {
+        "action": "none"
+    }
+    assert parse_command("ask what is a platypus", allow_bare_ask=False) == {
+        "action": "ask",
+        "query": "what is a platypus",
+    }
+    assert parse_command("tell me what is a platypus", allow_bare_ask=False) == {
+        "action": "ask",
+        "query": "what is a platypus",
+    }
 
 
 def test_dispatchable_command_requires_complete_payload():

@@ -645,6 +645,30 @@ def test_confirmed_command_wake_required_does_not_dispatch_unrelated_prefix():
     ) == ("open", {"action": "none"}, [])
 
 
+def test_confirmed_command_rejects_hallucinated_stop_with_trailing_words():
+    assert confirmed_command_from_transcript(
+        "Hey Homer, stop the perfect.",
+        require_wake_phrase=True,
+    ) == ("stop the perfect", {"action": "none"}, [])
+
+
+def test_confirmed_command_can_reject_bare_ask_after_hallucinated_wake():
+    assert confirmed_command_from_transcript(
+        "Hey Homer, what's going on? That was very enthusiastic.",
+        require_wake_phrase=True,
+        allow_bare_ask=False,
+    ) == ("what's going on? That was very enthusiastic", {"action": "none"}, [])
+    assert confirmed_command_from_transcript(
+        "Hey Homer, ask what's going on.",
+        require_wake_phrase=True,
+        allow_bare_ask=False,
+    ) == (
+        "ask what's going on",
+        {"action": "ask", "query": "what's going on"},
+        [{"body": "ask what's going on", "command": {"action": "ask", "query": "what's going on"}}],
+    )
+
+
 def test_command_from_transcript_allows_command_only_stt_after_candidate_wake():
     assert command_from_transcript("set a timer for ten seconds", fallback_text="Hey Homer") == (
         "set a timer for ten seconds",

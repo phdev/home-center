@@ -701,7 +701,11 @@ def command_body_from_transcript(text: str, prefer_last_wake: bool = False, wake
     return text.strip(" ,.:;!?-")
 
 
-def command_from_transcript(text: str, fallback_text: str = "") -> tuple[str, dict]:
+def command_from_transcript(
+    text: str,
+    fallback_text: str = "",
+    allow_bare_ask: bool = True,
+) -> tuple[str, dict]:
     """Extract a command-shaped payload from local STT text."""
     body = command_body_from_transcript(text, prefer_last_wake=True)
     if not body and fallback_text and COMMAND_KEYWORD_RE.search(fallback_text):
@@ -709,7 +713,7 @@ def command_from_transcript(text: str, fallback_text: str = "") -> tuple[str, di
     if not body and text and COMMAND_KEYWORD_RE.search(text):
         body = text.strip(" ,.:;!?-")
 
-    return body, parse_command(body)
+    return body, parse_command(body, allow_bare_ask=allow_bare_ask)
 
 
 def dispatchable_commands_from_transcript(
@@ -717,12 +721,13 @@ def dispatchable_commands_from_transcript(
     fallback_text: str = "",
     require_wake_phrase: bool = False,
     wake_re=WAKE_PHRASE_RE,
+    allow_bare_ask: bool = True,
 ) -> list[dict]:
     """Return all dispatchable command bodies heard in one STT transcript."""
     candidates: list[dict] = []
 
     def add_candidate(body: str) -> None:
-        command = parse_command(body)
+        command = parse_command(body, allow_bare_ask=allow_bare_ask)
         if is_dispatchable_command(command):
             candidates.append({"body": body, "command": command})
 
@@ -739,7 +744,11 @@ def dispatchable_commands_from_transcript(
     else:
         if require_wake_phrase:
             return []
-        body, command = command_from_transcript(text, fallback_text=fallback_text)
+        body, command = command_from_transcript(
+            text,
+            fallback_text=fallback_text,
+            allow_bare_ask=allow_bare_ask,
+        )
         if is_dispatchable_command(command):
             candidates.append({"body": body, "command": command})
 
@@ -751,6 +760,7 @@ def confirmed_command_from_transcript(
     fallback_text: str = "",
     require_wake_phrase: bool = False,
     wake_re=WAKE_PHRASE_RE,
+    allow_bare_ask: bool = True,
 ) -> tuple[str, dict, list[dict]]:
     """Select the command to dispatch after local STT confirms a candidate wake."""
     candidates = dispatchable_commands_from_transcript(
@@ -758,6 +768,7 @@ def confirmed_command_from_transcript(
         fallback_text=fallback_text,
         require_wake_phrase=require_wake_phrase,
         wake_re=wake_re,
+        allow_bare_ask=allow_bare_ask,
     )
     if require_wake_phrase and not wake_re.search(text):
         return "", {"action": "none"}, candidates
@@ -766,7 +777,7 @@ def confirmed_command_from_transcript(
         body = command_body_from_transcript(fallback_text, prefer_last_wake=True)
     if not body and text and COMMAND_KEYWORD_RE.search(text) and not require_wake_phrase:
         body = text.strip(" ,.:;!?-")
-    command = parse_command(body)
+    command = parse_command(body, allow_bare_ask=allow_bare_ask)
     if is_dispatchable_command(command):
         return body, command, candidates
     if candidates:
@@ -1438,6 +1449,7 @@ def main() -> None:
                 fallback_text=wake_text,
                 require_wake_phrase=is_local_stt_engine(args.wake_engine),
                 wake_re=CONFIRM_WAKE_PHRASE_RE,
+                allow_bare_ask=False,
             )
             if args.dry_run:
                 log.info("Confirmed-command candidates=%s", command_candidates)
