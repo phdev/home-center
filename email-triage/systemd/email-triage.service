@@ -1,0 +1,20 @@
+[Unit]
+Description=Email Triage Service (NanoClaw)
+After=network-online.target llama-server.service
+Wants=network-online.target
+Requires=llama-server.service
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/home-center/email-triage
+ExecStart=/usr/bin/python3 -m email_triage.main --config config.yaml
+Restart=on-failure
+RestartSec=30
+Environment=PYTHONUNBUFFERED=1
+# Set API keys here or in config.yaml
+# Environment=OPENAI_API_KEY=sk-...
+# Environment=ANTHROPIC_API_KEY=sk-ant-...
+
+[Install]
+WantedBy=multi-user.target

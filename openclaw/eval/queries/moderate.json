@@ -1,0 +1,152 @@
+[
+  {
+    "id": "mod_01",
+    "query": "good morning",
+    "context_fixture": "morning-runway",
+    "expected_classification": "moderate",
+    "expected_classification_v2": "local",
+    "criterion": "contains_list",
+    "requires_action": false,
+    "requires_context": true
+  },
+  {
+    "id": "mod_02",
+    "query": "what is on the morning checklist?",
+    "context_fixture": "morning-runway",
+    "expected_classification": "moderate",
+    "expected_classification_v2": "local",
+    "criterion": "contains_list",
+    "requires_action": false,
+    "requires_context": true
+  },
+  {
+    "id": "mod_03",
+    "query": "do we need sunscreen this morning?",
+    "context_fixture": "morning-runway",
+    "expected_classification": "moderate",
+    "expected_classification_v2": "local",
+    "criterion": "contains_weather",
+    "requires_action": false,
+    "requires_context": true
+  },
+  {
+    "id": "mod_04",
+    "query": "what should be first this morning?",
+    "context_fixture": "morning-school-priority",
+    "expected_classification": "moderate",
+    "expected_classification_v2": "local",
+    "criterion": "contains_recommendation",
+    "requires_action": false,
+    "requires_context": true
+  },
+  {
+    "id": "mod_05",
+    "query": "what school item is urgent today?",
+    "context_fixture": "morning-school-priority",
+    "expected_classification": "moderate",
+    "expected_classification_v2": "local",
+    "criterion": "contains_summary",
+    "requires_action": false,
+    "requires_context": true
+  },
+  {
+    "id": "mod_06",
+    "query": "what needs a parent signature today?",
+    "context_fixture": "morning-school-priority",
+    "expected_classification": "moderate",
+    "expected_classification_v2": "local",
+    "criterion": "contains_summary",
+    "requires_action": false,
+    "requires_context": true
+  },
+  {
+    "id": "mod_07",
+    "query": "show school updates",
+    "context_fixture": "school-updates-digest",
+    "expected_classification": "moderate",
+    "expected_classification_v2": "local",
+    "criterion": "contains_summary",
+    "requires_action": false,
+    "requires_context": true
+  },
+  {
+    "id": "mod_08",
+    "query": "what is due by tomorrow for school?",
+    "context_fixture": "school-updates-digest",
+    "expected_classification": "moderate",
+    "expected_classification_v2": "local",
+    "criterion": "contains_time_or_date",
+    "requires_action": false,
+    "requires_context": true
+  },
+  {
+    "id": "mod_09",
+    "query": "where is the field trip?",
+    "context_fixture": "school-updates-digest",
+    "expected_classification": "moderate",
+    "expected_classification_v2": "local",
+    "criterion": "contains_events",
+    "requires_action": false,
+    "requires_context": true
+  },
+  {
+    "id": "mod_10",
+    "query": "summarize the school updates card",
+    "context_fixture": "school-updates-digest-with-agent",
+    "expected_classification": "moderate",
+    "expected_classification_v2": "local",
+    "criterion": "contains_summary",
+    "requires_action": false,
+    "requires_context": true
+  },
+  {
+    "id": "mod_11",
+    "query": "what school action is most important?",
+    "context_fixture": "school-updates-digest-with-agent",
+    "expected_classification": "moderate",
+    "expected_classification_v2": "local",
+    "criterion": "contains_recommendation",
+    "requires_action": false,
+    "requires_context": true
+  },
+  {
+    "id": "mod_12",
+    "query": "evening wind down",
+    "context_fixture": "evening-bedtime-gate",
+    "expected_classification": "moderate",
+    "expected_classification_v2": "local",
+    "criterion": "contains_reminder",
+    "requires_action": false,
+    "requires_context": true
+  },
+  {
+    "id": "mod_13",
+    "query": "what bedtime reminder is active?",
+    "context_fixture": "evening-bedtime-gate",
+    "expected_classification": "moderate",
+    "expected_classification_v2": "local",
+    "criterion": "contains_time",
+    "requires_action": false,
+    "requires_context": true
+  },
+  {
+    "id": "mod_14",
+    "query": "bedtime dismissed",
+    "context_fixture": "evening-lunch-setup-after-bedtime-dismissed",
+    "expected_classification": "moderate",
+    "expected_classification_v2": "local",
+    "criterion": "contains_food",
+    "requires_action": false,
+    "requires_context": true
+  },
+  {
+    "id": "mod_15",
+    "query": "what is tomorrow's school lunch?",
+    "context_fixture": "evening-lunch-setup-after-bedtime-dismissed",
+    "expected_classification": "moderate",
+    "expected_classification_v2": "local",
+    "criterion": "contains_food",
+    "requires_action": false,
+    "requires_context": true
+  }
+]

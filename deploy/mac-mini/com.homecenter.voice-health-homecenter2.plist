@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.homecenter.voice-health.homecenter2</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>__REPO__/voice-service/.venv/bin/python3</string>
+        <string>__REPO__/voice-service/health_check.py</string>
+    </array>
+    <key>WorkingDirectory</key>
+    <string>__REPO__/voice-service</string>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+        <key>VOICE_LAUNCHD_LABEL</key>
+        <string>com.homecenter.voice.homecenter2</string>
+        <key>PI_COMMAND_URL</key>
+        <string>http://homecenter2.local:8765</string>
+        <key>VOICE_RELIABILITY_LOG</key>
+        <string>__REPO__/voice-service/logs/voice-reliability-homecenter2.jsonl</string>
+        <key>VOICE_HEALTH_STATUS_PATH</key>
+        <string>__REPO__/voice-service/logs/voice-health-status-homecenter2.json</string>
+        <key>VOICE_HEALTH_MAX_LOG_AGE_SECONDS</key>
+        <string>3600</string>
+    </dict>
+    <key>StartCalendarInterval</key>
+    <array>
+        <dict><key>Minute</key><integer>5</integer></dict>
+        <dict><key>Minute</key><integer>20</integer></dict>
+        <dict><key>Minute</key><integer>35</integer></dict>
+        <dict><key>Minute</key><integer>50</integer></dict>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>StandardOutPath</key>
+    <string>__REPO__/voice-service/logs/voice-health-homecenter2.log</string>
+    <key>StandardErrorPath</key>
+    <string>__REPO__/voice-service/logs/voice-health-homecenter2.err.log</string>
+</dict>
+</plist>

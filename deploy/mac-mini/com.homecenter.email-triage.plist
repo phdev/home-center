@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Template: email-triage service launchd agent.
+
+  Substitute __REPO_DIR__ with the absolute path of the home-center clone.
+  Requires: email-triage/config.yaml (see email-triage/config.example.yaml)
+  and email-triage/credentials.json + token.json for Gmail OAuth.
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.homecenter.email-triage</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>__REPO_DIR__/email-triage/.venv/bin/python3</string>
+        <string>-m</string>
+        <string>email_triage.main</string>
+        <string>--config</string>
+        <string>config.yaml</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>__REPO_DIR__/email-triage</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PYTHONUNBUFFERED</key>
+        <string>1</string>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+    </dict>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>KeepAlive</key>
+    <true/>
+
+    <key>StandardOutPath</key>
+    <string>__REPO_DIR__/email-triage/logs/stdout.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>__REPO_DIR__/email-triage/logs/stderr.log</string>
+</dict>
+</plist>

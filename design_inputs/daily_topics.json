@@ -1,0 +1,40 @@
+{
+  "note": "Rotating list of daily design themes. The runner picks one per run — by default, day-of-year modulo list length, so the rotation is deterministic. Order matters. Index 6 is the first pick on 2026-04-21.",
+  "topics": [
+    {
+      "id": "evening-wind-down",
+      "screen": "dashboard-evening",
+      "theme": "evening wind-down — strip the screen to kids' bedtime + tomorrow's setup only"
+    },
+    {
+      "id": "multi-flag-prioritization",
+      "screen": "dashboard",
+      "theme": "prioritization when 3+ derived flags are simultaneously true — which one owns the hero slot"
+    },
+    {
+      "id": "weekend-vs-weekday",
+      "screen": "dashboard",
+      "theme": "weekend vs weekday dashboards — which cards disappear, which expand"
+    },
+    {
+      "id": "afternoon-takeout-lead-time",
+      "screen": "dashboard-afternoon",
+      "theme": "afternoon takeout decision — surface the choice early enough to act without cluttering the screen"
+    },
+    {
+      "id": "deadline-first-school",
+      "screen": "school_updates",
+      "theme": "school updates as a deadline-first layout — earliest due date drives the hero slot"
+    },
+    {
+      "id": "passive-gift-planning",
+      "screen": "birthdays",
+      "theme": "passive gift planning — birthdays compound into a calm lead-time signal, not a prompt"
+    },
+    {
+      "id": "reduce-morning-overload",
+      "screen": "dashboard-morning",
+      "theme": "reduce morning overload — show only what the family must see between 7am–9am"
+    }
+  ]
+}

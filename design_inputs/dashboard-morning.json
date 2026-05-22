@@ -1,0 +1,47 @@
+{
+  "screen": "dashboard-morning",
+  "time_of_day": "07:30",
+  "goal": "help the family clear the morning runway without adding noise",
+  "constraints": {
+    "device": "shared 4K TV, viewed from across the kitchen",
+    "interaction": "ambient primary; voice fallback for timers",
+    "glanceability": "primary signal readable in under 2 seconds while making coffee",
+    "max_visible_cards": 4
+  },
+  "design_principles": [
+    "show only the essential information at this moment",
+    "one primary thing, clearly, before secondary things",
+    "actionable beats informational",
+    "clarity beats completeness"
+  ],
+  "derived_state": {
+    "showMorningChecklist": true,
+    "hasMorningOverlap": false,
+    "peter0800_0900Risk": true,
+    "takeoutDecisionPending": false,
+    "lunchDecisionNeeded": false,
+    "birthdayGiftNeeded": false,
+    "bedtimeReminderActive": false,
+    "showClawSuggestions": false
+  },
+  "current_structure": {
+    "layout": "stacked_cards",
+    "rows": [
+      {
+        "region": "top",
+        "cards": [
+          { "id": "calendar",   "priority": 2 },
+          { "id": "birthdays",  "priority": 4 },
+          { "id": "weather",    "priority": 3 }
+        ]
+      },
+      {
+        "region": "mid",
+        "cards": [
+          { "id": "morningChecklist", "priority": 1, "note": "renders via ContextualSlot — displaces Photos" },
+          { "id": "schoolUpdates",    "priority": 2 }
+        ]
+      }
+    ]
+  }
+}

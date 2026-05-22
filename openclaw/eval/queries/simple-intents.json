@@ -1,0 +1,110 @@
+[
+  {
+    "id": "simple_01",
+    "query": "Hey Homer, turn on the TV",
+    "expected_classification": "simple",
+    "expected_classification_v2": "local",
+    "criterion": ["acknowledges_action", "appropriate_refusal"],
+    "requires_action": true,
+    "requires_context": false
+  },
+  {
+    "id": "simple_02",
+    "query": "Hey Homer, turn off",
+    "expected_classification": "simple",
+    "expected_classification_v2": "local",
+    "criterion": ["acknowledges_action", "appropriate_refusal"],
+    "requires_action": true,
+    "requires_context": false
+  },
+  {
+    "id": "simple_03",
+    "query": "Hey Homer, show calendar",
+    "expected_classification": "simple",
+    "expected_classification_v2": "local",
+    "criterion": ["acknowledges_action", "appropriate_refusal"],
+    "requires_action": true,
+    "requires_context": false
+  },
+  {
+    "id": "simple_04",
+    "query": "Hey Homer, show weather",
+    "expected_classification": "simple",
+    "expected_classification_v2": "local",
+    "criterion": ["acknowledges_action", "appropriate_refusal"],
+    "requires_action": true,
+    "requires_context": false
+  },
+  {
+    "id": "simple_05",
+    "query": "Hey Homer, show photos",
+    "expected_classification": "simple",
+    "expected_classification_v2": "local",
+    "criterion": ["acknowledges_action", "appropriate_refusal"],
+    "requires_action": true,
+    "requires_context": false
+  },
+  {
+    "id": "simple_06",
+    "query": "Hey Homer, open calendar",
+    "expected_classification": "simple",
+    "expected_classification_v2": "local",
+    "criterion": ["acknowledges_action", "appropriate_refusal"],
+    "requires_action": true,
+    "requires_context": false
+  },
+  {
+    "id": "simple_07",
+    "query": "Hey Homer, set a timer for 5 minutes",
+    "expected_classification": "simple",
+    "expected_classification_v2": "local",
+    "criterion": ["acknowledges_timer", "appropriate_refusal"],
+    "requires_action": true,
+    "requires_context": false
+  },
+  {
+    "id": "simple_08",
+    "query": "Hey Homer, set a timer for ten seconds",
+    "expected_classification": "simple",
+    "expected_classification_v2": "local",
+    "criterion": ["acknowledges_timer", "appropriate_refusal"],
+    "requires_action": true,
+    "requires_context": false
+  },
+  {
+    "id": "simple_09",
+    "query": "Hey Homer, I like this design",
+    "expected_classification": "simple",
+    "expected_classification_v2": "local",
+    "criterion": "acknowledges_feedback",
+    "requires_action": true,
+    "requires_context": false
+  },
+  {
+    "id": "simple_10",
+    "query": "Hey Homer, I don't like this design",
+    "expected_classification": "simple",
+    "expected_classification_v2": "local",
+    "criterion": "acknowledges_feedback",
+    "requires_action": true,
+    "requires_context": false
+  },
+  {
+    "id": "simple_11",
+    "query": "good morning",
+    "expected_classification": "simple",
+    "expected_classification_v2": "local",
+    "criterion": "contains_greeting",
+    "requires_action": false,
+    "requires_context": false
+  },
+  {
+    "id": "simple_12",
+    "query": "hello Homer",
+    "expected_classification": "simple",
+    "expected_classification_v2": "local",
+    "criterion": "contains_greeting",
+    "requires_action": false,
+    "requires_context": false
+  }
+]

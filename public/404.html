@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Home Center</title>
+    <script>
+      // GitHub Pages SPA redirect: preserves path for client-side routing
+      var base = "/home-center/";
+      var path = location.pathname.slice(base.length);
+      if (path) {
+        location.replace(base + "?route=" + encodeURIComponent(path) + location.hash);
+      }
+    </script>
+  </head>
+  <body></body>
+</html>

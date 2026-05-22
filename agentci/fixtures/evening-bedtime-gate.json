@@ -1,0 +1,99 @@
+{
+  "scenarioId": "evening-bedtime-gate",
+  "timeContext": {
+    "now": "2026-05-07T03:45:00.000Z",
+    "user": {
+      "isPeter": true,
+      "email": "peter@example.test"
+    }
+  },
+  "commandEvents": [
+    {
+      "source": "fixture",
+      "transcript": "evening wind down",
+      "wakewordDetected": true,
+      "confidenceBucket": "high",
+      "locale": "en-US",
+      "deviceType": "agentci-fixture"
+    }
+  ],
+  "rawData": {
+    "calendar": {
+      "events": [
+        {
+          "id": "tomorrow-school-dropoff",
+          "title": "School dropoff",
+          "start": "2026-05-07T15:00:00.000Z",
+          "end": "2026-05-07T15:20:00.000Z",
+          "calendarOwner": "howell-family",
+          "attendees": [],
+          "status": "confirmed"
+        }
+      ]
+    },
+    "weather": {
+      "today": {
+        "highTempF": 70,
+        "lowTempF": 58,
+        "precipProb": 0.1,
+        "summary": "Clear evening"
+      }
+    },
+    "birthdays": [],
+    "bedtime": [
+      {
+        "childId": "kid-a",
+        "childName": "Kid A",
+        "weekday": "21:00",
+        "weekend": "21:30",
+        "reminderLeadMin": 30
+      },
+      {
+        "childId": "kid-b",
+        "childName": "Kid B",
+        "weekday": "21:00",
+        "weekend": "21:30",
+        "reminderLeadMin": 30
+      }
+    ],
+    "checklist": {
+      "items": []
+    },
+    "takeout": {
+      "today": {
+        "date": "2026-05-06",
+        "decision": "home"
+      }
+    },
+    "lunchDecisions": {},
+    "schoolLunchMenu": [
+      {
+        "date": "2026-05-07",
+        "items": ["Pasta", "Fruit"]
+      }
+    ],
+    "schoolItems": [],
+    "schoolUpdates": [],
+    "settings": {}
+  },
+  "expected": {
+    "derivedState": {
+      "bedtimeReminderActive": true,
+      "lunchDecisionNeeded": true,
+      "showMorningChecklist": false,
+      "takeoutDecisionPending": false,
+      "birthdayGiftNeeded": false
+    },
+    "cardCount": 1,
+    "absentCards": ["lunch", "takeout", "morning-checklist", "claw-suggestions"],
+    "cards": [
+      {
+        "id": "bedtime",
+        "type": "BedtimeToast",
+        "priority": "urgent",
+        "placement": "overlay",
+        "index": 0
+      }
+    ]
+  }
+}

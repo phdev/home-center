@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "id": "devon-morning-brief",
+  "agentId": "devon",
+  "enabled": true,
+  "agentRuntime": {
+    "id": "codex"
+  },
+  "allowCodeChanges": false,
+  "writesCode": false,
+  "schedule": {
+    "type": "cron",
+    "cron": "15 8 * * *",
+    "timezone": "America/Los_Angeles",
+    "description": "Every day at 8:15 AM Pacific Time"
+  },
+  "projectIndexCommand": "bash scripts/devon_index_project.sh",
+  "outputTemplate": "docs/templates/devon-morning-brief.md",
+  "prompt": "Devon, index the current state of the Home Center project, validate and report Codex harness status, check David's latest design outputs for build-worthy ideas, review current repo status/tests/docs/TODOs, and suggest the next 3-5 development steps. Do not make code changes. Return a concise PM-style morning brief with Codex harness status, David design review, risks, blockers, and the single best next action."
+}

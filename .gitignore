@@ -1,0 +1,115 @@
+node_modules
+dist
+.DS_Store
+.env
+*.local
+.pytest_cache/
+
+# Claude Code scratchpad — never a product artifact
+.claude/
+
+# Clawpatch audit runtime state. Keep the repo-specific config tracked, but
+# leave generated maps, findings, reports, locks, and patch attempts local.
+.clawpatch/*
+!.clawpatch/config.json
+
+# Pencil workflow residue (user-local, machine-specific paths)
+.pencil-queue.json
+.pencil-watcher.sh
+
+# Homer CI / personal dev-orchestrator workspace (see
+# docs/home_center_decisions_log.md — "Repo boundary cleanup").
+# Relocated out of this repo — belt-and-braces ignore in case anyone
+# ever recreates the dir locally.
+.openclaw/
+
+# Python bytecode — catches school-updates/__pycache__ etc.
+**/__pycache__/
+
+# Pi wake word
+pi/__pycache__/
+pi/.venv/
+pi/.env
+# Training artifacts — large, machine-specific, regenerable
+pi/models/*.tflite
+pi/models/*.onnx
+pi/models/*.ppn
+pi/models/*.pt
+pi/models/*.npz
+pi/models/*.npy
+pi/models/recorded_samples/
+pi/sounds/
+
+# Unreferenced local design scaffolding
+src/design/
+
+# School updates agent
+school-updates/.venv/
+school-updates/credentials.json
+school-updates/token.json
+school-updates/data/
+school-updates/config.yaml
+school-updates/seen.json
+school-updates/logs/
+school-updates/*.pre-*
+
+# OpenClaw router
+openclaw/.env
+openclaw/cache/*.db
+openclaw/eval/.judge-cache.json
+openclaw/logs/*.json
+openclaw/logs/*.jsonl
+
+# Email triage — local config with secrets + chat IDs
+email-triage/.venv/
+email-triage/config.yaml
+email-triage/credentials.json
+email-triage/token.json
+email-triage/token.json.*
+email-triage/email_triage.db
+email-triage/email_triage.db.*
+email-triage/email_triage.log
+email-triage/logs/
+
+# Voice service — local runtime artifacts
+voice-service/.venv/
+voice-service/logs/
+voice-service/models/
+voice-service/.pytest_cache/
+voice-service/benchmark_outputs/
+
+# Design Claw — runtime-only state (see docs/design_claw.md)
+design_outputs/*.log
+design_outputs/.last_daily.json
+design_outputs/.last_telegram_update.json
+design_outputs/.launchd.stdout.log
+design_outputs/.launchd.stderr.log
+design_outputs/.launchd-listener.stdout.log
+design_outputs/.launchd-listener.stderr.log
+
+# Devon status artifacts are tracked markdown; launchd logs are runtime-only.
+docs/status/*.log
+
+# Local backup snapshots created before one-off migrations.
+scripts/*.pre-*
+
+# OpenClaw isolated-agent workspace scaffolding. Devon's durable project
+# instructions live in docs/devon.md; these root files are local runtime context.
+/AGENTS.md
+/HEARTBEAT.md
+/IDENTITY.md
+/SOUL.md
+/TOOLS.md
+/USER.md
+/memory/*
+!/memory/household/
+/memory/household/*
+!/memory/household/README.md
+!/memory/household/corrections.jsonl
+!/memory/household/facts.json
+!/memory/household/people.json
+!/memory/household/places.json
+!/memory/household/preferences.json
+!/memory/household/routines.json
+!/memory/household/school.json
+!/memory/household/sources.jsonl

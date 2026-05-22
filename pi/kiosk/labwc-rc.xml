@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+<openbox_config>
+  <windowRules>
+    <windowRule identifier="chromium" serverDecoration="no">
+      <action name="MoveTo" x="0" y="0" />
+      <action name="Maximize" />
+    </windowRule>
+    <windowRule identifier="chromium-browser" serverDecoration="no">
+      <action name="MoveTo" x="0" y="0" />
+      <action name="Maximize" />
+    </windowRule>
+    <windowRule title="*Home Center*" serverDecoration="no">
+      <action name="MoveTo" x="0" y="0" />
+      <action name="Maximize" />
+    </windowRule>
+  </windowRules>
+</openbox_config>

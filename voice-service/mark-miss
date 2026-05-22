@@ -1,0 +1,8 @@
+#!/usr/bin/env sh
+set -eu
+
+cd "$(dirname "$0")"
+if [ -n "${VOICE_RELIABILITY_LOG:-}" ]; then
+  exec ./.venv/bin/python ./analyze_reliability.py --log "$VOICE_RELIABILITY_LOG" --mark-miss "$*"
+fi
+exec ./.venv/bin/python ./analyze_reliability.py --mark-miss "$*"

@@ -1,0 +1,16 @@
+[Unit]
+Description=School Updates Agent — Gmail summarizer for family dashboard
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/home-center/school-updates
+ExecStart=/home/pi/home-center/school-updates/.venv/bin/python3 agent.py --interval 900
+Restart=on-failure
+RestartSec=30
+Environment=WORKER_URL=https://home-center-api.phhowell.workers.dev
+
+[Install]
+WantedBy=multi-user.target

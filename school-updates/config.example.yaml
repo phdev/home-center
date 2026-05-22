@@ -1,0 +1,24 @@
+# school-updates/config.yaml — copy to config.yaml and fill in values.
+#
+# Do NOT commit the real config.yaml (gitignored).
+
+# Worker base URL (Cloudflare Worker). No trailing slash.
+worker_url: https://home-center-api.phhowell.workers.dev
+
+# AUTH_TOKEN set on the worker via `wrangler secret put AUTH_TOKEN`.
+auth_token: "REPLACE_ME_WITH_WORKER_AUTH_TOKEN"
+
+# Numeric Telegram chat ID to notify for actionable school items.
+# Personal: positive integer. Family group: negative (e.g. -100…).
+# Leave as null to disable Telegram pings (items still go to the TV card).
+telegram_target_chat: null
+
+# URL of the OpenClaw bridge (Telegram bot) running locally on the Mac Mini.
+openclaw_url: "http://localhost:3100"
+
+# Seconds between fetches. 30 min by default.
+poll_interval_seconds: 1800
+
+gmail:
+  days: 7        # how far back to look each cycle
+  max_results: 25

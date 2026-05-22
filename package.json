@@ -1,0 +1,39 @@
+{
+  "name": "home-center",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "agentci:record": "node scripts/agentci.js record",
+    "agentci:replay": "node scripts/agentci.js replay",
+    "agentci:diff": "node scripts/agentci.js diff",
+    "agentci:explain": "node scripts/agentci.js explain",
+    "eval:env": "node openclaw/eval/check-environment.js",
+    "eval:score": "node openclaw/eval/runner.js --tier all --suite all",
+    "eval:compare": "node openclaw/eval/runner.js --mode compare --suite all",
+    "eval:report": "node openclaw/eval/report.js",
+    "agentci:gate": "node scripts/agentci.js gate",
+    "audit:clawpatch": "bash scripts/clawpatch-audit.sh"
+  },
+  "dependencies": {
+    "lucide-react": "^0.575.0",
+    "qrcode.react": "^4.2.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@testing-library/react": "^16.3.2",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.4",
+    "dotenv": "^17.4.2",
+    "jsdom": "^25.0.1",
+    "vite": "^6.0.5",
+    "vitest": "^2.1.9"
+  }
+}

@@ -1,0 +1,2410 @@
+#!/usr/bin/env python3
+"""
+Home Center Pi command server and legacy wake listener.
+
+Production XVF3800 deployments run this file with --no-wake-detection. In that
+mode it exposes the dashboard HTTP contract, chime playback, HDMI-CEC TV
+control, timers, and gesture state while the Mac mini owns wake/STT compute.
+
+The older openWakeWord listener is retained for fallback/debugging only.
+"""
+
+from __future__ import annotations
+
+import argparse
+import collections
+import io
+import json
+import logging
+import re
+import subprocess
+import sys
+import tempfile
+import threading
+import time
+import wave
+from pathlib import Path
+
+import alsaaudio
+import numpy as np
+from openwakeword.model import Model
+
+
+def _inference_framework() -> str:
+    """Return the best available inference framework for openWakeWord."""
+    try:
+        import tflite_runtime  # noqa: F401
+        return "tflite"
+    except ImportError:
+        pass
+    try:
+        import onnxruntime  # noqa: F401
+        return "onnx"
+    except ImportError:
+        pass
+    return "tflite"
+
+
+# ---------------------------------------------------------------------------
+# Configuration
+# ---------------------------------------------------------------------------
+WAKE_WORD = "hey_jarvis"
+SAMPLE_RATE = 16000
+CHUNK_SIZE = 1280  # 80 ms at 16 kHz; required by legacy openWakeWord mode
+CHANNELS = 2  # Legacy fallback capture is stereo; production mic-streamer is mono
+
+# Default tunable parameters (can be overridden via /api/wake-config)
+_DEFAULT_CONFIG = {
+    "detection_threshold": 0.25,
+    "cooldown_seconds": 5,
+    "min_rms_energy": 200,
+    "min_consecutive": 3,
+    "score_smooth_window": 3,
+    "post_action_mute": 3.0,
+    "high_confidence_bypass": 0.8,
+    "record_seconds": 3.5,
+}
+
+# Mutable runtime config — updated by ConfigPoller thread
+_live_config = dict(_DEFAULT_CONFIG)
+_config_lock = threading.Lock()
+
+
+def cfg(key: str):
+    """Read a live config value — from local server if available."""
+    if _local_server:
+        return _local_server.get_config(key)
+    with _config_lock:
+        return _live_config.get(key, _DEFAULT_CONFIG.get(key))
+
+
+# Legacy constants for code that doesn't use cfg() yet
+DETECTION_THRESHOLD = _DEFAULT_CONFIG["detection_threshold"]
+COOLDOWN_SECONDS = _DEFAULT_CONFIG["cooldown_seconds"]
+MIN_RMS_ENERGY = _DEFAULT_CONFIG["min_rms_energy"]
+MIN_CONSECUTIVE = _DEFAULT_CONFIG["min_consecutive"]
+SCORE_SMOOTH_WINDOW = _DEFAULT_CONFIG["score_smooth_window"]
+POST_ACTION_MUTE = _DEFAULT_CONFIG["post_action_mute"]
+HIGH_CONFIDENCE_BYPASS = _DEFAULT_CONFIG["high_confidence_bypass"]
+RECORD_SECONDS = _DEFAULT_CONFIG["record_seconds"]
+
+# Enrollment constants (custom wake words via embedding similarity)
+ENROLLMENTS_DIR = Path(__file__).parent / "models" / "enrollments"
+ENROLL_SILENCE_TIMEOUT = 1.5   # seconds of silence after speech to auto-stop
+ENROLL_MAX_DURATION = 10.0     # max enrollment recording duration
+ENROLL_N_AUGMENTS = 20         # augmented variants per single sample
+ENROLL_SIMILARITY_THRESHOLD = 0.85  # cosine similarity threshold for matching
+ENROLL_MIN_CONSECUTIVE = 3     # consecutive 80ms windows needed to trigger
+
+# Alarm polling
+ALARM_POLL_INTERVAL = 5  # Seconds between timer checks
+
+SOUNDS_DIR = Path(__file__).parent / "sounds"
+CHIME_PATH = SOUNDS_DIR / "acknowledge.wav"
+ALARM_PATH = SOUNDS_DIR / "alarm.wav"
+
+CEC_DEVICE = "0"
+CEC_ON_CMD = "on {dev}"
+CEC_ACTIVE_CMD = "as"
+CEC_SOURCE_SETTLE_SECONDS = 1
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    datefmt="%H:%M:%S",
+)
+log = logging.getLogger("wake-word")
+
+_speaker_cache_lock = threading.Lock()
+_speaker_device_cache: dict[bool, str | None] = {}
+_speaker_volume_ready: set[str] = set()
+
+
+# ---------------------------------------------------------------------------
+# HDMI-CEC helpers
+# ---------------------------------------------------------------------------
+
+def cec_send(command: str) -> bool:
+    try:
+        proc = subprocess.run(
+            ["cec-client", "-s", "-d", "1"],
+            input=command + "\n",
+            capture_output=True, text=True, timeout=10,
+        )
+        log.debug("CEC response: %s", proc.stdout.strip())
+        if proc.returncode != 0:
+            detail = (proc.stderr or proc.stdout).strip()[:400]
+            log.warning("CEC command %r failed with exit %d: %s", command, proc.returncode, detail)
+            return False
+        return True
+    except FileNotFoundError:
+        log.error("cec-client not found. Install with: sudo apt install cec-utils")
+        return False
+    except subprocess.TimeoutExpired:
+        log.warning("CEC command timed out")
+        return False
+
+
+def tv_power_status() -> str:
+    """Return the HDMI-CEC TV power status: on, standby, unknown, or error."""
+    try:
+        proc = subprocess.run(
+            ["cec-client", "-s", "-d", "1"],
+            input=f"pow {CEC_DEVICE}\n",
+            capture_output=True, text=True, timeout=5,
+        )
+    except Exception as exc:
+        log.warning("CEC power-status query failed: %s", exc)
+        return "error"
+    output = proc.stdout.lower()
+    if "power status: on" in output:
+        return "on"
+    if "power status: standby" in output:
+        return "standby"
+    if "power status: unknown" in output:
+        return "unknown"
+    return "error"
+
+
+def turn_on_tv() -> bool:
+    """Power on the TV and select the Home Center Pi as the active HDMI source."""
+    log.info("Turning TV ON via HDMI-CEC...")
+    ok = cec_send(CEC_ON_CMD.format(dev=CEC_DEVICE))
+    time.sleep(CEC_SOURCE_SETTLE_SECONDS)
+    log.info("Selecting Home Center HDMI source via HDMI-CEC...")
+    ok = cec_send(CEC_ACTIVE_CMD) and ok
+    status = tv_power_status()
+    if status == "on":
+        log.info("TV is on and should be showing this Pi's HDMI output.")
+        return True
+    log.warning("TV on command did not verify via HDMI-CEC (status=%s).", status)
+    return ok and status != "unknown"
+
+
+def turn_off_tv() -> bool:
+    log.info("Turning TV OFF via HDMI-CEC...")
+    ok = cec_send(f"standby {CEC_DEVICE}")
+    time.sleep(1)
+    status = tv_power_status()
+    if status == "standby":
+        log.info("TV is now in standby.")
+        return True
+    log.warning("TV off command did not verify via HDMI-CEC (status=%s).", status)
+    return ok and status != "unknown"
+
+
+def is_tv_on() -> bool:
+    """Check if TV is powered on via CEC. Returns False if off/standby/unknown."""
+    return tv_power_status() == "on"
+
+
+# ---------------------------------------------------------------------------
+# Audio helpers
+# ---------------------------------------------------------------------------
+
+def generate_chime(path: Path) -> None:
+    """Generate a bright three-tone rising arpeggio chime (ding-ding-DING)."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    sr = 44100  # Higher sample rate for clarity on TV speakers
+
+    def tone(freq: float, duration: float, amp: float = 1.0) -> np.ndarray:
+        t = np.linspace(0, duration, int(sr * duration), endpoint=False)
+        attack = np.minimum(t / 0.008, 1.0)
+        decay = np.exp(-t / (duration * 0.8))
+        env = attack * decay * amp
+        # Rich harmonics for TV speaker presence
+        signal = env * (np.sin(2 * np.pi * freq * t)
+                        + 0.4 * np.sin(4 * np.pi * freq * t)
+                        + 0.15 * np.sin(6 * np.pi * freq * t))
+        return signal
+
+    chime = np.concatenate([
+        tone(659.25, 0.12, 0.7),    # E5 — soft lead-in
+        np.zeros(int(sr * 0.04)),
+        tone(783.99, 0.12, 0.85),   # G5 — middle
+        np.zeros(int(sr * 0.04)),
+        tone(1046.50, 0.25, 1.0),   # C6 — bright resolve
+    ])
+    chime = (chime / np.max(np.abs(chime)) * 32700).astype(np.int16)
+
+    with wave.open(str(path), "w") as wf:
+        wf.setnchannels(1)
+        wf.setsampwidth(2)
+        wf.setframerate(sr)
+        wf.writeframes(chime.tobytes())
+    log.info("Generated acknowledgement chime: %s", path)
+
+
+def generate_alarm(path: Path) -> None:
+    """Generate an alarm WAV file (alternating tones, ~1.2s)."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    sr = 22050
+    duration_per_tone = 0.3
+    tones = [880, 660, 880, 660]
+    samples = []
+    for freq in tones:
+        t = np.linspace(0, duration_per_tone, int(sr * duration_per_tone), endpoint=False)
+        env = np.minimum(t / 0.01, 1.0) * np.maximum(1.0 - t / (duration_per_tone * 1.1), 0.0)
+        # Square-ish wave
+        signal = env * np.sign(np.sin(2 * np.pi * freq * t)) * 0.5
+        samples.append(signal)
+    alarm = np.concatenate(samples)
+    alarm = (alarm / np.max(np.abs(alarm)) * 28000).astype(np.int16)
+
+    with wave.open(str(path), "w") as wf:
+        wf.setnchannels(1)
+        wf.setsampwidth(2)
+        wf.setframerate(sr)
+        wf.writeframes(alarm.tobytes())
+    log.info("Generated alarm sound: %s", path)
+
+
+def find_speaker_device(prefer_hat: bool = False, refresh: bool = False) -> str | None:
+    """Find audio output device.
+
+    prefer_hat=False (default): HDMI first, ReSpeaker fallback.
+    prefer_hat=True: ReSpeaker first, HDMI fallback.
+    """
+    cache_key = bool(prefer_hat)
+    with _speaker_cache_lock:
+        if not refresh and cache_key in _speaker_device_cache:
+            return _speaker_device_cache[cache_key]
+
+    device = None
+    try:
+        result = subprocess.run(
+            ["aplay", "-l"], capture_output=True, text=True, timeout=5,
+        )
+        hdmi_card = None
+        respeaker_card = None
+        for line in result.stdout.splitlines():
+            lower = line.lower()
+            if not lower.startswith("card"):
+                continue
+            card_num = lower.split(":")[0].replace("card", "").strip()
+            if "hdmi-0" in lower or "vc4hdmi0" in lower:
+                hdmi_card = card_num
+            elif any(kw in lower for kw in ("respeaker", "seeed", "wm8960")):
+                respeaker_card = card_num
+        if prefer_hat:
+            if respeaker_card:
+                device = f"plughw:{respeaker_card},0"
+            elif hdmi_card:
+                device = f"plughw:{hdmi_card},0"
+        else:
+            if hdmi_card:
+                device = f"plughw:{hdmi_card},0"
+            elif respeaker_card:
+                device = f"plughw:{respeaker_card},0"
+    except Exception:
+        pass
+
+    with _speaker_cache_lock:
+        _speaker_device_cache[cache_key] = device
+    return device
+
+
+def set_mic_gain(card: str = "2", gain: int = 60) -> None:
+    """Set ReSpeaker PGA capture gain (0-119, ~0.5dB steps). Default 32 is too low."""
+    try:
+        subprocess.run(
+            ["amixer", "-c", card, "-q", "cset", "numid=34", f"{gain},{gain}"],
+            capture_output=True, timeout=5,
+        )
+        log.info("Mic PGA capture gain set to %d/119 on card %s", gain, card)
+    except Exception as e:
+        log.warning("Failed to set mic gain: %s", e)
+
+
+def _speaker_card(device: str) -> str | None:
+    match = re.match(r"(?:plug)?hw:(\d+),", device)
+    return match.group(1) if match else None
+
+
+def set_speaker_volume(device: str | None = None) -> None:
+    device = device or find_speaker_device()
+    if not device:
+        return
+    with _speaker_cache_lock:
+        if device in _speaker_volume_ready:
+            return
+
+    card = _speaker_card(device)
+    if not card:
+        return
+    for control in ["Speaker", "Playback", "HP Playback",
+                    "Line Playback", "PCM Playback", "PCM"]:
+        try:
+            subprocess.run(
+                ["amixer", "-c", card, "-q", "sset", control, "100%"],
+                capture_output=True, timeout=5,
+            )
+        except Exception:
+            pass
+    with _speaker_cache_lock:
+        _speaker_volume_ready.add(device)
+
+
+def play_sound(path: Path, prefer_hat: bool = False) -> subprocess.Popen | None:
+    """Play a WAV file (non-blocking). prefer_hat=True routes to ReSpeaker HAT."""
+    if not path.exists():
+        return None
+    device = find_speaker_device(prefer_hat=prefer_hat)
+    set_speaker_volume(device)
+    cmd = ["aplay", "-q"]
+    if device:
+        cmd.extend(["-D", device])
+    cmd.append(str(path))
+    try:
+        return subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    except Exception as e:
+        log.warning("Failed to play %s: %s", path, e)
+        return None
+
+
+def warm_audio_output() -> None:
+    """Prime speaker device discovery/volume so chime HTTP calls stay fast."""
+    for prefer_hat in (False, True):
+        device = find_speaker_device(prefer_hat=prefer_hat)
+        if device:
+            set_speaker_volume(device)
+
+
+RECORD_BEEP_PATH = SOUNDS_DIR / "record_beep.wav"
+RECORD_START_PATH = SOUNDS_DIR / "record_start.wav"
+RECORD_STOP_PATH = SOUNDS_DIR / "record_stop.wav"
+ENROLL_START_PATH = SOUNDS_DIR / "enroll_start.wav"
+ENROLL_COMPLETE_PATH = SOUNDS_DIR / "enroll_complete.wav"
+
+
+def generate_record_beep(path: Path) -> None:
+    """Short high beep to confirm a sample was saved."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    sr = 22050
+    t = np.linspace(0, 0.08, int(sr * 0.08), endpoint=False)
+    env = np.minimum(t / 0.005, 1.0) * np.maximum(1.0 - t / 0.08, 0.0)
+    signal = env * np.sin(2 * np.pi * 880 * t)
+    signal = (signal / np.max(np.abs(signal)) * 32700).astype(np.int16)
+    with wave.open(str(path), "w") as wf:
+        wf.setnchannels(1)
+        wf.setsampwidth(2)
+        wf.setframerate(sr)
+        wf.writeframes(signal.tobytes())
+
+
+def generate_record_start(path: Path) -> None:
+    """Ascending three-tone to indicate recording mode started."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    sr = 22050
+    tones = []
+    for freq in [440, 554, 659]:
+        t = np.linspace(0, 0.1, int(sr * 0.1), endpoint=False)
+        env = np.minimum(t / 0.005, 1.0) * np.maximum(1.0 - t / 0.12, 0.0)
+        tones.append(env * np.sin(2 * np.pi * freq * t))
+        tones.append(np.zeros(int(sr * 0.02)))
+    signal = np.concatenate(tones)
+    signal = (signal / np.max(np.abs(signal)) * 32700).astype(np.int16)
+    with wave.open(str(path), "w") as wf:
+        wf.setnchannels(1)
+        wf.setsampwidth(2)
+        wf.setframerate(sr)
+        wf.writeframes(signal.tobytes())
+
+
+def generate_record_stop(path: Path) -> None:
+    """Descending two-tone to indicate recording mode stopped."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    sr = 22050
+    tones = []
+    for freq in [659, 440]:
+        t = np.linspace(0, 0.12, int(sr * 0.12), endpoint=False)
+        env = np.minimum(t / 0.005, 1.0) * np.maximum(1.0 - t / 0.14, 0.0)
+        tones.append(env * np.sin(2 * np.pi * freq * t))
+        tones.append(np.zeros(int(sr * 0.02)))
+    signal = np.concatenate(tones)
+    signal = (signal / np.max(np.abs(signal)) * 32700).astype(np.int16)
+    with wave.open(str(path), "w") as wf:
+        wf.setnchannels(1)
+        wf.setsampwidth(2)
+        wf.setframerate(sr)
+        wf.writeframes(signal.tobytes())
+
+
+def generate_enroll_start(path: Path) -> None:
+    """Two rising tones signaling 'say your wake word now'."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    sr = 22050
+    tones = []
+    for freq in [523, 784]:  # C5 → G5
+        t = np.linspace(0, 0.15, int(sr * 0.15), endpoint=False)
+        env = np.minimum(t / 0.005, 1.0) * np.maximum(1.0 - t / 0.18, 0.0)
+        tones.append(env * np.sin(2 * np.pi * freq * t))
+        tones.append(np.zeros(int(sr * 0.05)))
+    signal = np.concatenate(tones)
+    signal = (signal / np.max(np.abs(signal)) * 32700).astype(np.int16)
+    with wave.open(str(path), "w") as wf:
+        wf.setnchannels(1)
+        wf.setsampwidth(2)
+        wf.setframerate(sr)
+        wf.writeframes(signal.tobytes())
+
+
+def generate_enroll_complete(path: Path) -> None:
+    """Success jingle — ascending C-E-G-C(octave)."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    sr = 22050
+    tones = []
+    for freq in [523, 659, 784, 1047]:  # C5-E5-G5-C6
+        t = np.linspace(0, 0.12, int(sr * 0.12), endpoint=False)
+        env = np.minimum(t / 0.005, 1.0) * np.maximum(1.0 - t / 0.14, 0.0)
+        tones.append(env * np.sin(2 * np.pi * freq * t))
+        tones.append(np.zeros(int(sr * 0.02)))
+    signal = np.concatenate(tones)
+    signal = (signal / np.max(np.abs(signal)) * 32700).astype(np.int16)
+    with wave.open(str(path), "w") as wf:
+        wf.setnchannels(1)
+        wf.setsampwidth(2)
+        wf.setframerate(sr)
+        wf.writeframes(signal.tobytes())
+
+
+def play_acknowledgement() -> None:
+    if not CHIME_PATH.exists():
+        generate_chime(CHIME_PATH)
+    # Use cached TV state (non-blocking) to decide routing:
+    # TV on → HDMI only (user hears it through TV speakers)
+    # TV off → HAT only (user hears it through ReSpeaker speaker)
+    tv_on = _local_server.is_tv_on_cached() if _local_server else False
+    if tv_on:
+        play_sound(CHIME_PATH, prefer_hat=False)
+        log.info("Playing acknowledgement chime (HDMI — TV is on)")
+    else:
+        play_sound(CHIME_PATH, prefer_hat=True)
+        log.info("Playing acknowledgement chime (HAT — TV is off)")
+
+
+# ---------------------------------------------------------------------------
+# Microphone helpers (ALSA)
+# ---------------------------------------------------------------------------
+
+def find_respeaker_device() -> str | None:
+    try:
+        result = subprocess.run(
+            ["arecord", "-l"], capture_output=True, text=True, timeout=5,
+        )
+        for line in result.stdout.splitlines():
+            lower = line.lower()
+            if lower.startswith("card") and any(
+                kw in lower for kw in ("respeaker", "seeed", "wm8960", "2mic")
+            ):
+                card_num = lower.split(":")[0].replace("card", "").strip()
+                device = f"hw:{card_num},0"
+                log.info("Found ReSpeaker at %s", device)
+                return device
+    except Exception as e:
+        log.warning("Error scanning for ReSpeaker: %s", e)
+    return None
+
+
+def open_alsa_capture(device: str, channels: int, rate: int, period_size: int) -> alsaaudio.PCM:
+    return alsaaudio.PCM(
+        type=alsaaudio.PCM_CAPTURE,
+        mode=alsaaudio.PCM_NORMAL,
+        device=device,
+        channels=channels,
+        rate=rate,
+        format=alsaaudio.PCM_FORMAT_S16_LE,
+        periodsize=period_size,
+    )
+
+
+def record_audio(pcm: alsaaudio.PCM, seconds: float) -> np.ndarray:
+    """Record audio from an open ALSA PCM device, return mono int16 array."""
+    chunks = []
+    total_samples = int(SAMPLE_RATE * seconds)
+    collected = 0
+    while collected < total_samples:
+        length, data = pcm.read()
+        if length <= 0:
+            continue
+        audio = np.frombuffer(data, dtype=np.int16)
+        if CHANNELS > 1:
+            audio = audio.reshape(-1, CHANNELS).mean(axis=1).astype(np.int16)
+        chunks.append(audio)
+        collected += len(audio)
+    return np.concatenate(chunks)[:total_samples]
+
+
+# ---------------------------------------------------------------------------
+# Speech-to-text (faster-whisper)
+# ---------------------------------------------------------------------------
+
+_whisper_model = None
+
+
+def get_whisper_model():
+    global _whisper_model
+    if _whisper_model is None:
+        from faster_whisper import WhisperModel
+        log.info("Loading faster-whisper base model (int8)...")
+        _whisper_model = WhisperModel("base", compute_type="int8", device="cpu")
+        log.info("Whisper model loaded.")
+    return _whisper_model
+
+
+_silero_vad = None
+
+
+def get_silero_vad():
+    """Load Silero VAD model for speech trimming."""
+    global _silero_vad
+    if _silero_vad is None:
+        import torch
+        model, utils = torch.hub.load(
+            repo_or_dir="snakers4/silero-vad", model="silero_vad",
+            trust_repo=True, verbose=False,
+        )
+        _silero_vad = (model, utils)
+        log.info("Silero VAD loaded for audio trimming.")
+    return _silero_vad
+
+
+def vad_trim(audio: np.ndarray, sr: int = 16000, pad_ms: int = 300) -> np.ndarray:
+    """Trim audio to speech regions using Silero VAD.
+
+    Returns the concatenated speech segments with padding, or the
+    original audio if no speech is detected.
+    """
+    import torch
+    try:
+        model, utils = get_silero_vad()
+        get_speech_timestamps = utils[0]
+
+        audio_f32 = torch.from_numpy(audio.astype(np.float32) / 32768.0)
+        timestamps = get_speech_timestamps(audio_f32, model, sampling_rate=sr,
+                                           threshold=0.3, min_speech_duration_ms=100)
+        if not timestamps:
+            log.debug("VAD: no speech found, using full audio")
+            return audio
+
+        # Merge speech regions with padding
+        pad_samples = int(sr * pad_ms / 1000)
+        start = max(0, timestamps[0]["start"] - pad_samples)
+        end = min(len(audio), timestamps[-1]["end"] + pad_samples)
+        trimmed = audio[start:end]
+
+        orig_dur = len(audio) / sr
+        trim_dur = len(trimmed) / sr
+        log.info("VAD trim: %.1fs → %.1fs (%.0f%% reduction)",
+                 orig_dur, trim_dur, (1 - trim_dur / orig_dur) * 100)
+        model.reset_states()
+        return trimmed
+    except Exception as e:
+        log.warning("VAD trim failed, using full audio: %s", e)
+        return audio
+
+
+def transcribe(audio: np.ndarray) -> str:
+    """Transcribe int16 mono audio array to text. Trims silence with VAD first."""
+    # Trim to speech regions before transcribing
+    audio = vad_trim(audio)
+
+    model = get_whisper_model()
+    # Remove DC offset, then standard int16 normalization
+    audio_f32 = audio.astype(np.float32)
+    audio_f32 = audio_f32 - np.mean(audio_f32)
+    audio_f32 = audio_f32 / 32768.0
+    segments, _ = model.transcribe(
+        audio_f32, beam_size=3, language="en",
+        no_speech_threshold=0.95,  # Don't skip segments unless very confident it's silence
+        initial_prompt="Hey Jarvis",  # Bias toward hearing the wake word
+    )
+    text = " ".join(seg.text.strip() for seg in segments).strip()
+    return text
+
+
+# ---------------------------------------------------------------------------
+# Command parsing
+# ---------------------------------------------------------------------------
+
+NEGATIVE_KNOWLEDGE_FEEDBACK_PHRASES = {
+    "that was wrong",
+    "that's wrong",
+    "that is wrong",
+    "bad answer",
+    "wrong answer",
+    "bad response",
+}
+
+NEGATIVE_IMAGE_FEEDBACK_PHRASES = {
+    "bad image",
+    "wrong image",
+    "bad picture",
+    "wrong picture",
+    "that image is wrong",
+}
+
+
+def negative_knowledge_feedback_intent(text: str) -> str | None:
+    normalized = re.sub(r"[^\w\s']", " ", text.lower())
+    normalized = re.sub(r"\s+", " ", normalized).strip()
+    if normalized in NEGATIVE_KNOWLEDGE_FEEDBACK_PHRASES:
+        return "knowledge"
+    if normalized in NEGATIVE_IMAGE_FEEDBACK_PHRASES:
+        return "image"
+    return None
+
+
+def is_negative_knowledge_feedback(text: str) -> bool:
+    return negative_knowledge_feedback_intent(text) == "knowledge"
+
+
+def parse_command(text: str) -> dict:
+    """Parse transcribed text into a command dict."""
+    text = text.lower().strip()
+    log.info("Transcribed: '%s'", text)
+
+    # Strip wake word prefix — user says "Hey Homer open calendar" as one phrase.
+    # Whisper mangles the legacy "hey jarvis" and current "hey homer" variants.
+    text = re.sub(r'^(hey|hi|hay|in|a|the|and)?\s*(homer|hommer|jarvis|jervis|service|travis|jarvis,)\s*[,.]?\s*', '', text).strip()
+    log.info("After wake word strip: '%s'", text)
+
+    if not text:
+        return {"action": "turn_on"}
+
+    # Negative feedback on the most recent knowledge answer.
+    # Keep this as an explicit phrase list so nearby commands do not trigger it.
+    feedback_intent = negative_knowledge_feedback_intent(text)
+    if feedback_intent == "knowledge":
+        return {"action": "flag_knowledge_negative"}
+    if feedback_intent == "image":
+        return {"action": "flag_knowledge_image_negative"}
+
+    if re.search(r"\b(show|switch(?:\s+to)?|use)\s+(version\s+)?(one|1|v1)\b", text):
+        return {"action": "design_system", "version": "v1"}
+    if re.search(r"\b(show|switch(?:\s+to)?|use)\s+(version\s+)?(two|to|too|2|v2)\b", text):
+        return {"action": "design_system", "version": "v2"}
+
+    # Enroll — start enrollment flow (navigate to enrollment page)
+    if re.search(r'\benroll(ment)?\b', text):
+        return {"action": "enroll"}
+
+    # Record wake word — "record Olivia's wake word [for photos]"
+    record_match = re.search(
+        r"record\s+(\w+?)(?:'?s)?\s+wake\s*word"
+        r"(?:\s+(?:for|to)\s+(\w+))?",
+        text,
+    )
+    if record_match:
+        name = record_match.group(1).capitalize()
+        target = record_match.group(2) or "dashboard"
+        return {"action": "enroll_record", "name": name, "target": target}
+
+    # Stop / dismiss / cancel
+    if re.search(r'\b(stop|dismiss|cancel|quiet|shut up|silence)\b', text):
+        return {"action": "stop"}
+
+    # Turn off — Whisper frequently mis-transcribes "turn off" as "turn up", "turn of", etc.
+    if re.search(r'\bturn(ed|s)?\s*(it\s+)?(off|of|up|down|f)\b', text):
+        # "turn up/down" could be legit but in our context always means "turn off"
+        return {"action": "turn_off"}
+
+    # Set a timer
+    timer_match = re.search(
+        r'(?:set\s+(?:a\s+)?timer|remind\s+me|timer)\s+'
+        r'(?:for\s+)?(\d+)\s*'
+        r'(second|sec|minute|min|hour|hr)s?\b'
+        r'(?:\s+(?:for|to|called?|named?|labele?d?)\s+(.+))?',
+        text
+    )
+    if timer_match:
+        amount = int(timer_match.group(1))
+        unit = timer_match.group(2).lower()
+        label = (timer_match.group(3) or "timer").strip().rstrip(".")
+        if unit.startswith("hour") or unit.startswith("hr"):
+            seconds = amount * 3600
+        elif unit.startswith("min"):
+            seconds = amount * 60
+        else:
+            seconds = amount
+        return {"action": "set_timer", "label": label, "duration": seconds}
+
+    # Navigate to calendar
+    if re.search(r'\b(open|show|go\s+to)\s+(the\s+)?calendar\b', text):
+        return {"action": "navigate", "page": "calendar"}
+
+    # Navigate to weather
+    if re.search(r'\b(open|show|go\s+to)\s+(the\s+)?weather\b', text):
+        return {"action": "navigate", "page": "weather"}
+
+    # Navigate to photos
+    if re.search(r'\b(open|show|go\s+to)\s+(the\s+)?(photos?|pictures?|gallery)\b', text):
+        return {"action": "navigate", "page": "photos"}
+
+    # Switch calendar view
+    view_match = re.search(r'\b(monthly|weekly|daily)\s*(view)?\b', text)
+    if view_match:
+        return {"action": "navigate", "view": view_match.group(1)}
+
+    # Go back / go home (return to dashboard)
+    if re.search(r'\b(go\s+(back|home)|back\s+to\s+(dashboard|home)|close\s+(calendar|weather|photos?))\b', text):
+        return {"action": "navigate", "page": "dashboard"}
+
+    # Show/hide debug overlay (Whisper mis-transcribes "debug" many ways)
+    debug_pat = r"(debug|debud|d-bug|d bug|the\s*bug|de-?bug)"
+    if re.search(r'\b(show|open|display)\s+(the\s+)?' + debug_pat, text):
+        return {"action": "debug_show"}
+    if re.search(r"(hi|hide|high|close|dismiss|remove|i'm)\s+(the\s+)?" + debug_pat, text):
+        return {"action": "debug_hide"}
+
+    # Turn on (explicit)
+    if re.search(r'\bturn(ed|s)?\s*(it\s+)?on\b', text):
+        return {"action": "turn_on"}
+
+    # General knowledge query — question words or substantial speech
+    if re.search(r'\b(what|who|where|when|why|how|tell\s+me|explain|describe)\b', text) or len(text.split()) > 4:
+        return {"action": "ask", "query": text}
+
+    # Default: ignore unrecognized speech (don't act on false positives)
+    log.info("No command matched, ignoring: '%s'", text)
+    return {"action": "none"}
+
+
+# ---------------------------------------------------------------------------
+# Worker API client
+# ---------------------------------------------------------------------------
+
+def worker_post(url: str, token: str | None, path: str, data: dict | None = None) -> dict | None:
+    """POST to worker API. Returns parsed JSON or None on failure."""
+    import requests
+    headers = {"Content-Type": "application/json"}
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    try:
+        resp = requests.post(
+            f"{url}{path}",
+            headers=headers,
+            json=data or {},
+            timeout=10,
+        )
+        if resp.ok:
+            return resp.json()
+        log.warning("Worker POST %s failed: %d %s", path, resp.status_code, resp.text[:200])
+    except Exception as e:
+        log.warning("Worker POST %s error: %s", path, e)
+    return None
+
+
+def worker_get(url: str, token: str | None, path: str) -> dict | None:
+    """GET from worker API. Returns parsed JSON or None on failure."""
+    import requests
+    headers = {}
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    try:
+        resp = requests.get(f"{url}{path}", headers=headers, timeout=10)
+        if resp.ok:
+            return resp.json()
+    except Exception as e:
+        log.debug("Worker GET %s error: %s", path, e)
+    return None
+
+
+# ---------------------------------------------------------------------------
+# Debug event emission
+# ---------------------------------------------------------------------------
+
+_debug_worker_url = None
+_debug_worker_token = None
+
+
+def debug_init(worker_url: str | None, worker_token: str | None) -> None:
+    global _debug_worker_url, _debug_worker_token
+    _debug_worker_url = worker_url
+    _debug_worker_token = worker_token
+
+
+_local_server = None  # Set to RecordingManager instance in main()
+
+
+def debug_post(event_type: str, data: dict | None = None) -> None:
+    """Post debug event to local server (in-process, no HTTP)."""
+    if _local_server:
+        _local_server.add_debug_event(event_type, data)
+        return
+    # Fallback to worker if local server not ready
+    if not _debug_worker_url:
+        return
+    event = {"type": event_type, "timestamp": int(time.time() * 1000)}
+    if data:
+        event["data"] = data
+
+    def _send():
+        try:
+            import requests
+            headers = {"Content-Type": "application/json"}
+            if _debug_worker_token:
+                headers["Authorization"] = f"Bearer {_debug_worker_token}"
+            requests.post(
+                f"{_debug_worker_url}/api/wake-debug",
+                headers=headers, json=event, timeout=5,
+            )
+        except Exception:
+            pass
+
+    threading.Thread(target=_send, daemon=True).start()
+
+
+# ---------------------------------------------------------------------------
+# Config poller thread
+# ---------------------------------------------------------------------------
+
+
+# ConfigPoller removed — config is now local (RecordingManager._wake_config)
+
+
+# ---------------------------------------------------------------------------
+# Alarm thread
+# ---------------------------------------------------------------------------
+
+class AlarmThread(threading.Thread):
+    """Background thread that checks local timers for expiry and plays alarm."""
+
+    def __init__(self, rec_mgr: "RecordingManager", dry_run: bool = False):
+        super().__init__(daemon=True)
+        self.rec_mgr = rec_mgr
+        self.dry_run = dry_run
+        self._stop_event = threading.Event()
+        self._alarm_proc = None
+
+    def stop(self):
+        self._stop_event.set()
+        self._kill_alarm()
+
+    def _kill_alarm(self):
+        if self._alarm_proc and self._alarm_proc.poll() is None:
+            self._alarm_proc.terminate()
+            self._alarm_proc = None
+
+    def run(self):
+        if not ALARM_PATH.exists():
+            generate_alarm(ALARM_PATH)
+
+        alarming = False
+        while not self._stop_event.is_set():
+            try:
+                timers = self.rec_mgr.get_active_timers()
+                now_ms = time.time() * 1000
+                expired_undismissed = [
+                    t for t in timers
+                    if t.get("expiresAt", 0) <= now_ms and not t.get("dismissed", False)
+                ]
+
+                if expired_undismissed and not alarming:
+                    log.info("Expired timer(s) detected, starting alarm on Pi speaker")
+                    alarming = True
+                elif not expired_undismissed and alarming:
+                    log.info("All timers dismissed, stopping alarm")
+                    alarming = False
+                    self._kill_alarm()
+
+                # Play alarm sound in a loop while active
+                if alarming and (self._alarm_proc is None or self._alarm_proc.poll() is not None):
+                    if not self.dry_run:
+                        self._alarm_proc = play_sound(ALARM_PATH)
+                    else:
+                        log.info("[DRY RUN] Would play alarm sound")
+            except Exception as e:
+                log.debug("Alarm thread error: %s", e)
+
+            self._stop_event.wait(ALARM_POLL_INTERVAL)
+
+
+# ---------------------------------------------------------------------------
+# Gesture thread (HandController → CEC TV on)
+# ---------------------------------------------------------------------------
+
+class GestureThread(threading.Thread):
+    """Background thread that polls for hand gestures and triggers CEC TV on.
+
+    """
+
+    def __init__(self, worker_url: str, worker_token: str | None, dry_run: bool = False):
+        super().__init__(daemon=True)
+        self.worker_url = worker_url
+        self.worker_token = worker_token
+        self.dry_run = dry_run
+        self._stop_event = threading.Event()
+        self._last_gesture_id = None
+
+    def stop(self):
+        self._stop_event.set()
+
+    def run(self):
+        while not self._stop_event.is_set():
+            try:
+                data = worker_get(self.worker_url, self.worker_token, "/api/gesture")
+                if data and data.get("gesture"):
+                    g = data["gesture"]
+                    gesture_id = g.get("id")
+                    gesture_type = g.get("gesture")
+                    timestamp = g.get("timestamp", 0)
+
+                    # Only process new gestures within the last 10s
+                    age_ms = time.time() * 1000 - timestamp
+                    if gesture_id != self._last_gesture_id:
+                        self._last_gesture_id = gesture_id
+
+                        if gesture_type == "middleThumbPinch" and age_ms < 10000:
+                            log.info("Gesture middleThumbPinch — turning TV on via CEC")
+                            if not self.dry_run:
+                                turn_on_tv()
+                            else:
+                                log.info("[DRY RUN] Would turn on TV via CEC (gesture)")
+
+
+            except Exception as e:
+                log.debug("Gesture thread error: %s", e)
+
+            self._stop_event.wait(2)  # Poll every 2 seconds
+
+
+# ---------------------------------------------------------------------------
+# Recording mode (for training data collection via HandController)
+# ---------------------------------------------------------------------------
+
+class RecordingManager:
+    """Local API server on port 8765 — replaces Cloudflare Worker for Pi-local endpoints.
+
+    All state lives in-memory on the Pi (config persists to JSON file).
+    Dashboard and HandController talk directly to http://localhost:8765/.
+
+    Endpoints:
+        Recording:
+            GET/POST /status  → {active, type, count, totalPositive, totalNegative}
+            POST /toggle  → toggles recording
+            POST /reset   → zeroes counts
+            POST /clear   → zeroes counts + deletes saved audio files
+
+        Wake config:
+            GET  /api/wake-config  → config dict
+            PUT/POST /api/wake-config  → update config, persist to disk
+
+        Wake debug:
+            GET  /api/wake-debug?since=N  → {events: [...]}
+            POST /api/wake-debug  → append event
+
+        Navigation:
+            GET  /api/navigate  → {navigation: {page, view, timestamp}}
+            POST /api/navigate  → update page/view
+
+        Timers:
+            GET  /api/timers  → {timers: [...], serverTime: ms}
+            POST /api/timers  → create timer
+            POST /api/timers/dismiss-all  → dismiss all expired
+            POST /api/timers/<id>/dismiss  → dismiss specific timer
+
+        Gestures:
+            GET  /gesture  → {gesture: ...}
+            POST /gesture  → accept gesture from HandController
+
+    """
+
+    HTTP_PORT = 8765
+    MAX_DEBUG_EVENTS = 100
+
+    def __init__(self, worker_url: str | None = None, worker_token: str | None = None):
+        self.worker_url = worker_url
+        self.worker_token = worker_token
+        # Recording state
+        self.active = False
+        self.record_type = "positive"
+        self._session_count = 0
+        self._recording_buffer: list[np.ndarray] = []
+        self._chime_mute_until = 0.0
+        self._save_dir = Path(__file__).parent / "models" / "recorded_samples"
+        # Gesture state
+        self._gesture_latest = None  # {gesture, hand, timestamp, id}
+        # Wake config (persisted to JSON)
+        self._config_path = Path(__file__).parent / "wake_config.json"
+        self._wake_config = dict(_DEFAULT_CONFIG)
+        if self._config_path.exists():
+            try:
+                self._wake_config.update(json.loads(self._config_path.read_text()))
+                log.info("Loaded wake config from %s", self._config_path)
+            except Exception:
+                pass
+        # Wake debug events (circular buffer)
+        self._debug_events: list[dict] = []
+        # Navigation state
+        self._navigation = {"page": "dashboard", "view": None, "timestamp": 0}
+        self._design_system = {"version": "v2", "timestamp": 0}
+        self._tv_action_lock = threading.Lock()
+        # Timers
+        self._timers: list[dict] = []
+        self._timer_counter = 0
+        # Live voice caption state from the Mac mini voice service.
+        self._transcription = {"text": "", "is_wake": False, "ts": 0}
+        # Enrollment state (custom wake word recording)
+        self._enroll_state = "idle"  # idle, waiting, recording, processing
+        self._enroll_name = None
+        self._enroll_action = "navigate"
+        self._enroll_target = "dashboard"
+        self._enroll_buffer: list[np.ndarray] = []
+        self._enroll_silence_start = 0.0
+        self._enroll_speech_start = 0.0
+        self._enroll_start_time = 0.0
+        # Loaded enrollments: {name_lower: {embeddings, action, target, wake_phrase, ...}}
+        self._enrollments: dict[str, dict] = {}
+        # Listening state (for TV overlay)
+        self._listening_until = 0.0
+        # Cached TV power state (updated in background to avoid CEC blocking)
+        self._tv_on_cached = False
+        self._tv_on_last_check = 0.0
+        # Thread lock
+        self._lock = threading.Lock()
+        self._load_enrollments()
+        self._start_tv_power_poller()
+        self._start_http_server()
+
+    def _start_tv_power_poller(self):
+        """Background thread that checks TV power state every 30s via CEC."""
+        def _poll():
+            while True:
+                try:
+                    on = is_tv_on()
+                    with self._lock:
+                        self._tv_on_cached = on
+                        self._tv_on_last_check = time.time()
+                except Exception:
+                    pass
+                time.sleep(30)
+        t = threading.Thread(target=_poll, daemon=True)
+        t.start()
+
+    def is_tv_on_cached(self) -> bool:
+        """Return cached TV power state (non-blocking)."""
+        with self._lock:
+            return self._tv_on_cached
+
+    def set_listening(self, duration: float = 6.0):
+        """Mark as listening for the next `duration` seconds (for TV overlay)."""
+        with self._lock:
+            self._listening_until = time.time() + duration
+
+    @property
+    def is_listening(self) -> bool:
+        with self._lock:
+            return time.time() < self._listening_until
+
+    # ── Public methods for in-process callers (no HTTP round-trip) ──
+
+    def add_debug_event(self, event_type: str, data: dict | None = None):
+        """Add a debug event (called from detection loop)."""
+        event = {
+            "type": event_type,
+            "timestamp": int(time.time() * 1000),
+            **(data or {}),
+        }
+        with self._lock:
+            self._debug_events.append(event)
+            if len(self._debug_events) > self.MAX_DEBUG_EVENTS:
+                self._debug_events = self._debug_events[-self.MAX_DEBUG_EVENTS:]
+
+    def navigate(self, page: str | None = None, view: str | None = None):
+        """Update navigation state (called from detection loop)."""
+        with self._lock:
+            if page:
+                self._navigation["page"] = page
+            if view:
+                self._navigation["view"] = view
+            self._navigation["timestamp"] = int(time.time() * 1000)
+
+    def set_design_system(self, version: str | None = None):
+        """Update dashboard design-system state."""
+        normalized = str(version or "").lower()
+        if normalized not in {"v1", "v2"}:
+            normalized = "v2"
+        with self._lock:
+            self._design_system["version"] = normalized
+            self._design_system["timestamp"] = int(time.time() * 1000)
+            return dict(self._design_system)
+
+    def run_tv_action_async(self, action: str):
+        """Acknowledge TV commands quickly and serialize slow HDMI-CEC work."""
+        def _run():
+            if not self._tv_action_lock.acquire(blocking=False):
+                log.info("TV %s request ignored; another TV action is already running.", action)
+                return
+            try:
+                if action == "on":
+                    turn_on_tv()
+                elif action == "off":
+                    turn_off_tv()
+            finally:
+                self._tv_action_lock.release()
+
+        threading.Thread(target=_run, daemon=True).start()
+
+    def add_timer(self, name: str, total_seconds: int, source: str = "voice") -> dict:
+        """Create a timer (called from detection loop)."""
+        with self._lock:
+            self._timer_counter += 1
+            timer = {
+                "id": f"timer_{int(time.time() * 1000)}_{self._timer_counter}",
+                "name": name,
+                "totalSeconds": total_seconds,
+                "expiresAt": int(time.time() * 1000) + total_seconds * 1000,
+                "dismissed": False,
+                "source": source,
+                "createdAt": int(time.time() * 1000),
+            }
+            self._timers.append(timer)
+            log.info("Timer created: %s (%ds)", name, total_seconds)
+            return timer
+
+    def set_transcription(self, payload: dict) -> dict:
+        """Update live transcription state for the dashboard overlay."""
+        text = str(payload.get("text", ""))
+        ts = float(payload.get("ts", time.time()))
+        state = {
+            "text": text,
+            "is_wake": bool(payload.get("is_wake", payload.get("isWake", False))),
+            "ts": ts,
+        }
+        for key in ("stage", "wakeScore", "command"):
+            if key in payload:
+                state[key] = payload[key]
+        with self._lock:
+            if ts < float(self._transcription.get("ts", 0)):
+                return dict(self._transcription)
+            self._transcription = state
+            if state["is_wake"]:
+                self._listening_until = time.time() + 5.0
+            return dict(self._transcription)
+
+    def dismiss_all_timers(self):
+        """Dismiss all expired timers."""
+        now = int(time.time() * 1000)
+        with self._lock:
+            for t in self._timers:
+                if t["expiresAt"] <= now:
+                    t["dismissed"] = True
+
+    def dismiss_timer(self, timer_id: str):
+        """Dismiss a specific timer."""
+        with self._lock:
+            for t in self._timers:
+                if t["id"] == timer_id:
+                    t["dismissed"] = True
+
+    def get_config(self, key: str):
+        """Get a config value (thread-safe)."""
+        with self._lock:
+            return self._wake_config.get(key, _DEFAULT_CONFIG.get(key))
+
+    def get_active_timers(self) -> list[dict]:
+        """Get non-stale timers (cleanup old dismissed ones)."""
+        now = int(time.time() * 1000)
+        with self._lock:
+            # Remove timers dismissed more than 1 hour ago
+            self._timers = [t for t in self._timers
+                           if not (t["dismissed"] and now - t["expiresAt"] > 3600000)]
+            return list(self._timers)
+
+    def _count_files(self, prefix: str) -> int:
+        """Count .npz training files on disk — always accurate."""
+        models_dir = self._save_dir.parent
+        return len(list(models_dir.glob(f"real_samples_{prefix}_*.npz")))
+
+    def _get_status(self) -> dict:
+        return {
+            "active": self.active,
+            "type": self.record_type,
+            "count": self._session_count,
+            "totalPositive": self._count_files("positive"),
+            "totalNegative": self._count_files("negative"),
+        }
+
+    # ── Enrollment methods (custom wake words) ──────────────────────────
+
+    def _load_enrollments(self):
+        """Load all saved enrollments from disk."""
+        if not ENROLLMENTS_DIR.exists():
+            return
+        for json_path in ENROLLMENTS_DIR.glob("*.json"):
+            try:
+                meta = json.loads(json_path.read_text())
+                name = meta["name"]
+                npz_path = ENROLLMENTS_DIR / meta.get("embeddings_file", f"{name.lower()}_embeddings.npz")
+                if npz_path.exists():
+                    data = np.load(str(npz_path))
+                    meta["embeddings"] = data["embeddings"]
+                    self._enrollments[name.lower()] = meta
+                    log.info("Loaded enrollment: %s (%d templates, phrase='%s')",
+                             name, len(meta["embeddings"]), meta.get("wake_phrase", "?"))
+            except Exception as e:
+                log.warning("Failed to load enrollment %s: %s", json_path, e)
+
+    def has_enrollments(self) -> bool:
+        return bool(self._enrollments)
+
+    def is_enrolling(self) -> bool:
+        with self._lock:
+            return self._enroll_state != "idle"
+
+    def enroll_start(self, name: str, action: str = "navigate", target: str = "dashboard"):
+        """Start enrollment recording for a person's custom wake word."""
+        with self._lock:
+            self._enroll_state = "waiting"
+            self._enroll_name = name
+            self._enroll_action = action
+            self._enroll_target = target
+            self._enroll_buffer = []
+            self._enroll_speech_start = 0.0
+            self._enroll_silence_start = 0.0
+            self._enroll_start_time = time.time()
+            ENROLLMENTS_DIR.mkdir(parents=True, exist_ok=True)
+        log.info("Enrollment started for '%s' (action=%s, target=%s)", name, action, target)
+        # Play enrollment prompt sound
+        if not ENROLL_START_PATH.exists():
+            generate_enroll_start(ENROLL_START_PATH)
+        play_sound(ENROLL_START_PATH)
+
+    def enroll_process_audio(self, audio_chunk: np.ndarray,
+                             preprocessor: "AudioPreprocessor") -> str:
+        """Process audio during enrollment recording. Returns current state.
+
+        State machine: waiting → recording → done
+        - waiting: listening for speech to begin
+        - recording: capturing speech, watching for silence after speech
+        - done: silence detected after speech, ready to finalize
+        """
+        with self._lock:
+            if self._enroll_state == "idle":
+                return "idle"
+
+            now = time.time()
+
+            # Timeout — give up after ENROLL_MAX_DURATION
+            if now - self._enroll_start_time > ENROLL_MAX_DURATION:
+                log.info("Enrollment recording timed out (%.0fs)", ENROLL_MAX_DURATION)
+                self._enroll_state = "idle"
+                return "timeout"
+
+            is_speech = preprocessor.is_speech_likely(audio_chunk)
+
+            if self._enroll_state == "waiting":
+                if is_speech:
+                    self._enroll_state = "recording"
+                    self._enroll_speech_start = now
+                    self._enroll_buffer.append(audio_chunk.copy())
+                    log.info("Enrollment: speech detected, recording...")
+                return self._enroll_state
+
+            elif self._enroll_state == "recording":
+                self._enroll_buffer.append(audio_chunk.copy())
+
+                if is_speech:
+                    # Reset silence timer while speech continues
+                    self._enroll_silence_start = 0.0
+                else:
+                    if self._enroll_silence_start == 0.0:
+                        self._enroll_silence_start = now
+                    elif now - self._enroll_silence_start >= ENROLL_SILENCE_TIMEOUT:
+                        # Speech followed by sufficient silence — done
+                        speech_dur = now - self._enroll_speech_start
+                        log.info("Enrollment: auto-stopped after %.1fs speech + %.1fs silence",
+                                 speech_dur, ENROLL_SILENCE_TIMEOUT)
+                        self._enroll_state = "processing"
+                        return "done"
+
+                return "recording"
+
+            return self._enroll_state
+
+    def enroll_finalize(self):
+        """Extract embeddings from recorded audio, save enrollment. Runs in background thread."""
+        with self._lock:
+            if not self._enroll_buffer:
+                log.warning("Enrollment finalize: no audio buffered")
+                self._enroll_state = "idle"
+                return
+            audio = np.concatenate(self._enroll_buffer)
+            name = self._enroll_name
+            action = self._enroll_action
+            target = self._enroll_target
+            self._enroll_buffer = []
+
+        log.info("Processing enrollment for '%s': %.1fs audio", name, len(audio) / SAMPLE_RATE)
+
+        try:
+            # Transcribe to identify the wake phrase
+            wake_phrase = transcribe(audio).strip().lower()
+            log.info("Enrollment transcription: '%s'", wake_phrase)
+
+            # Create augmented variants from the single sample
+            variants = augment_single_clip(audio, n_augments=ENROLL_N_AUGMENTS)
+            log.info("Created %d augmented variants", len(variants))
+
+            # Extract embeddings via AudioFeatures pipeline
+            embeddings = extract_enrollment_embeddings(variants)
+            if len(embeddings) == 0:
+                log.error("Failed to extract embeddings for enrollment '%s'", name)
+                with self._lock:
+                    self._enroll_state = "idle"
+                return
+
+            log.info("Extracted %d embeddings, shape %s", len(embeddings), embeddings.shape)
+
+            # Save to disk
+            name_lower = name.lower()
+            ENROLLMENTS_DIR.mkdir(parents=True, exist_ok=True)
+
+            emb_file = f"{name_lower}_embeddings.npz"
+            np.savez(str(ENROLLMENTS_DIR / emb_file), embeddings=embeddings)
+
+            audio_file = f"{name_lower}_sample.npy"
+            np.save(str(ENROLLMENTS_DIR / audio_file), audio)
+
+            meta = {
+                "name": name,
+                "wake_phrase": wake_phrase,
+                "action": action,
+                "target": target,
+                "embeddings_file": emb_file,
+                "audio_file": audio_file,
+                "n_templates": int(len(embeddings)),
+                "sample_duration": round(len(audio) / SAMPLE_RATE, 2),
+                "created_at": int(time.time()),
+            }
+            (ENROLLMENTS_DIR / f"{name_lower}.json").write_text(json.dumps(meta, indent=2))
+
+            # Load into memory
+            meta["embeddings"] = embeddings
+            with self._lock:
+                self._enrollments[name_lower] = meta
+                self._enroll_state = "idle"
+
+            log.info("Enrollment complete: '%s' phrase='%s', %d templates",
+                     name, wake_phrase, len(embeddings))
+
+            # Play success jingle
+            if not ENROLL_COMPLETE_PATH.exists():
+                generate_enroll_complete(ENROLL_COMPLETE_PATH)
+            play_sound(ENROLL_COMPLETE_PATH)
+
+        except Exception as e:
+            log.error("Enrollment failed for '%s': %s", name, e)
+            with self._lock:
+                self._enroll_state = "idle"
+
+    def check_enrolled(self, feature_buffer: np.ndarray, rms: float) -> dict | None:
+        """Check if current audio matches any enrolled wake word via cosine similarity.
+
+        Args:
+            feature_buffer: openWakeWord preprocessor feature buffer (n_frames, 96)
+            rms: Current audio RMS energy
+
+        Returns:
+            Enrollment metadata dict if match found, None otherwise.
+        """
+        if not self._enrollments or feature_buffer is None:
+            return None
+        if len(feature_buffer) < 16:
+            return None
+
+        current_flat = feature_buffer[-16:].flatten().astype(np.float32)
+        current_norm = np.linalg.norm(current_flat)
+        if current_norm < 1e-10:
+            return None
+
+        best_match = None
+        best_score = 0.0
+
+        with self._lock:
+            for _name, enrollment in self._enrollments.items():
+                templates = enrollment.get("embeddings")
+                if templates is None:
+                    continue
+                for template in templates:
+                    t_flat = template.flatten()
+                    sim = float(np.dot(current_flat, t_flat) /
+                                (current_norm * np.linalg.norm(t_flat) + 1e-10))
+                    if sim > best_score:
+                        best_score = sim
+                        best_match = enrollment
+
+        if best_score >= ENROLL_SIMILARITY_THRESHOLD:
+            return best_match
+
+        return None
+
+    def get_enrollment_status(self) -> dict:
+        """Get current enrollment recording state."""
+        with self._lock:
+            return {
+                "state": self._enroll_state,
+                "name": self._enroll_name,
+                "elapsed": round(time.time() - self._enroll_start_time, 1)
+                           if self._enroll_start_time else 0,
+                "buffer_seconds": round(
+                    sum(len(c) for c in self._enroll_buffer) / SAMPLE_RATE, 1
+                ) if self._enroll_buffer else 0,
+            }
+
+    def list_enrollments(self) -> list[dict]:
+        """List all enrolled wake words (without embedding data)."""
+        with self._lock:
+            return [
+                {
+                    "name": d.get("name", n),
+                    "wake_phrase": d.get("wake_phrase", ""),
+                    "action": d.get("action", "navigate"),
+                    "target": d.get("target", "dashboard"),
+                    "n_templates": d.get("n_templates", 0),
+                    "sample_duration": d.get("sample_duration", 0),
+                    "created_at": d.get("created_at", 0),
+                }
+                for n, d in self._enrollments.items()
+            ]
+
+    def delete_enrollment(self, name: str) -> bool:
+        """Delete an enrollment by name."""
+        name_lower = name.lower()
+        with self._lock:
+            if name_lower not in self._enrollments:
+                return False
+            del self._enrollments[name_lower]
+        # Delete files from disk
+        for pattern in [f"{name_lower}.json", f"{name_lower}_embeddings.npz",
+                        f"{name_lower}_sample.npy"]:
+            p = ENROLLMENTS_DIR / pattern
+            if p.exists():
+                p.unlink()
+                log.info("Deleted enrollment file: %s", p)
+        return True
+
+    def _start_http_server(self) -> None:
+        """Run a tiny HTTP server in a daemon thread."""
+        from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+        import json as _json
+
+        mgr = self  # closure reference
+
+        class Handler(BaseHTTPRequestHandler):
+            def log_message(self, fmt, *a):
+                log.debug("🎙️  HTTP: " + fmt % a)
+
+            def _cors_headers(self):
+                self.send_header("Access-Control-Allow-Origin", "*")
+                self.send_header("Access-Control-Allow-Methods", "GET, POST, PUT, OPTIONS")
+                self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization")
+
+            def _respond_json(self, data, code=200):
+                body = _json.dumps(data).encode()
+                self.send_response(code)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Cache-Control", "no-store, max-age=0")
+                self._cors_headers()
+                self.end_headers()
+                self.wfile.write(body)
+
+            def do_OPTIONS(self):
+                self.send_response(204)
+                self._cors_headers()
+                self.end_headers()
+
+            def do_PUT(self):
+                # Route PUT to POST handler (for wake-config)
+                self.do_POST()
+
+            def _handle_gesture(self, body):
+                title = body.get("title", "")
+                m = re.match(r"(Left|Right|L|R|Both) (?:Hands?): (.+)", title)
+                if m:
+                    raw = m.group(2).strip()
+                    parts = re.split(r"[-\s]+", raw)
+                    gesture = parts[0].lower() + "".join(w.capitalize() for w in parts[1:])
+                    with mgr._lock:
+                        mgr._gesture_latest = {
+                            "gesture": gesture,
+                            "hand": m.group(1),
+                            "timestamp": body.get("timestamp", int(time.time() * 1000)),
+                            "id": body.get("id", ""),
+                        }
+                    self._respond_json({"ok": True})
+                else:
+                    self._respond_json({"error": "invalid title format"}, 400)
+
+            def do_GET(self):
+                path = self.path.split("?")[0]  # strip query string
+                qs = self.path.split("?")[1] if "?" in self.path else ""
+                params = dict(p.split("=", 1) for p in qs.split("&") if "=" in p) if qs else {}
+
+                if path == "/status":
+                    with mgr._lock:
+                        self._respond_json(mgr._get_status())
+                elif path == "/gesture" or path == "/api/gesture":
+                    with mgr._lock:
+                        self._respond_json({
+                            "gesture": mgr._gesture_latest,
+                            "listening": time.time() < mgr._listening_until,
+                        })
+                elif path == "/api/wake-config":
+                    with mgr._lock:
+                        self._respond_json(dict(mgr._wake_config))
+                elif path == "/api/wake-debug":
+                    since = int(params.get("since", "0"))
+                    with mgr._lock:
+                        events = [e for e in mgr._debug_events if e["timestamp"] > since]
+                    self._respond_json({"events": events})
+                elif path == "/api/transcription":
+                    with mgr._lock:
+                        self._respond_json(dict(mgr._transcription))
+                elif path == "/api/navigate":
+                    with mgr._lock:
+                        self._respond_json({"navigation": dict(mgr._navigation)})
+                elif path == "/api/design-system":
+                    with mgr._lock:
+                        self._respond_json({"designSystem": dict(mgr._design_system)})
+                elif path == "/api/timers":
+                    timers = mgr.get_active_timers()
+                    self._respond_json({"timers": timers, "serverTime": int(time.time() * 1000)})
+                elif path == "/api/enrollments":
+                    self._respond_json({"enrollments": mgr.list_enrollments()})
+                elif path.startswith("/api/enrollments/"):
+                    # GET /api/enrollments/<name> — individual enrollment details
+                    ename = path.split("/")[3].lower() if len(path.split("/")) >= 4 else ""
+                    with mgr._lock:
+                        enrollment = mgr._enrollments.get(ename)
+                    if enrollment:
+                        self._respond_json({
+                            "name": enrollment.get("name", ename),
+                            "wake_phrase": enrollment.get("wake_phrase", ""),
+                            "action": enrollment.get("action", "navigate"),
+                            "target": enrollment.get("target", "dashboard"),
+                            "n_templates": enrollment.get("n_templates", 0),
+                            "sample_duration": enrollment.get("sample_duration", 0),
+                            "created_at": enrollment.get("created_at", 0),
+                        })
+                    else:
+                        self._respond_json({"error": "not found"}, 404)
+                elif path == "/api/enrollment-status":
+                    self._respond_json(mgr.get_enrollment_status())
+                else:
+                    self._respond_json({"error": "not found"}, 404)
+
+            def do_POST(self):
+                length = int(self.headers.get("Content-Length", 0))
+                body = {}
+                if length > 0:
+                    try:
+                        body = _json.loads(self.rfile.read(length))
+                    except Exception:
+                        pass
+
+                if self.path == "/toggle":
+                    with mgr._lock:
+                        if not mgr.active:
+                            mgr.active = True
+                            mgr.record_type = body.get("type", "positive")
+                            mgr._session_count = 0
+                            mgr._recording_buffer = []
+                            mgr._save_dir.mkdir(parents=True, exist_ok=True)
+                            log.info("🎙️  RECORDING START — type=%s", mgr.record_type)
+                            sound = RECORD_START_PATH
+                            gen = generate_record_start
+                        else:
+                            mgr.active = False
+                            if mgr._recording_buffer:
+                                mgr._save_clip()
+                            else:
+                                log.info("🎙️  RECORDING STOP — no audio buffered")
+                            sound = RECORD_STOP_PATH
+                            gen = generate_record_stop
+                        # Respond immediately — don't block on sound
+                        self._respond_json(mgr._get_status())
+                    # Play sound and sync in background
+                    def _after(s=sound, g=gen):
+                        if not s.exists(): g(s)
+                        play_sound(s)
+                        mgr._chime_mute_until = time.time() + 1.5
+    
+                    threading.Thread(target=_after, daemon=True).start()
+
+                elif self.path == "/gesture":
+                    self._handle_gesture(body)
+
+                elif self.path == "/reset":
+                    with mgr._lock:
+                        mgr._session_count = 0
+                        log.info("🎙️  Session count reset")
+                        self._respond_json(mgr._get_status())
+
+
+                elif self.path == "/clear":
+                    with mgr._lock:
+                        mgr.active = False
+                        mgr._session_count = 0
+                        mgr._recording_buffer = []
+                        mgr._clear_saved_files()
+                        self._respond_json(mgr._get_status())
+
+
+                elif self.path == "/status":
+                    with mgr._lock:
+                        self._respond_json(mgr._get_status())
+
+                elif self.path == "/api/wake-config":
+                    # PUT or POST to update config
+                    with mgr._lock:
+                        for k, v in body.items():
+                            if k in mgr._wake_config:
+                                mgr._wake_config[k] = type(mgr._wake_config[k])(v)
+                        # Also update live config
+                        _live_config.update(mgr._wake_config)
+                        # Persist to disk
+                        try:
+                            mgr._config_path.write_text(json.dumps(mgr._wake_config, indent=2))
+                        except Exception:
+                            pass
+                        self._respond_json(dict(mgr._wake_config))
+
+                elif self.path == "/api/wake-debug":
+                    mgr.add_debug_event(
+                        body.get("type", "unknown"),
+                        {k: v for k, v in body.items() if k not in ("type",)},
+                    )
+                    self._respond_json({"ok": True})
+
+                elif self.path == "/api/transcription":
+                    state = mgr.set_transcription(body)
+                    self._respond_json({"ok": True, **state})
+
+                elif self.path == "/api/wake-ack":
+                    payload = {
+                        "text": body.get("text", "Hey Homer"),
+                        "is_wake": body.get("is_wake", True),
+                        "ts": body.get("ts", time.time()),
+                        "stage": body.get("stage", "listening"),
+                        "wakeScore": body.get("wakeScore", 1.0),
+                    }
+                    for key in ("wakeSource", "wakeEngine"):
+                        if key in body:
+                            payload[key] = body[key]
+                    state = mgr.set_transcription(payload)
+                    mgr.set_listening(float(body.get("duration", 5.0)))
+                    self._respond_json({"ok": True, **state})
+
+                    if body.get("chime", True):
+                        def _play_chime():
+                            try:
+                                play_acknowledgement()
+                            except Exception as e:
+                                log.warning("Background wake ack chime failed: %s", e)
+
+                        threading.Thread(target=_play_chime, daemon=True).start()
+
+                elif self.path == "/api/chime":
+                    mgr.set_listening(5.0)
+                    self._respond_json({"ok": True})
+
+                    def _play_chime():
+                        try:
+                            play_acknowledgement()
+                        except Exception as e:
+                            log.warning("Background chime failed: %s", e)
+
+                    threading.Thread(target=_play_chime, daemon=True).start()
+
+                elif self.path == "/api/tv/on":
+                    mgr.run_tv_action_async("on")
+                    self._respond_json({"ok": True, "queued": True, "action": "on"})
+
+                elif self.path == "/api/tv/off":
+                    mgr.run_tv_action_async("off")
+                    self._respond_json({"ok": True, "queued": True, "action": "off"})
+
+                elif self.path == "/api/navigate":
+                    mgr.navigate(body.get("page"), body.get("view"))
+                    with mgr._lock:
+                        self._respond_json({"ok": True, "navigation": dict(mgr._navigation)})
+
+                elif self.path == "/api/design-system":
+                    state = mgr.set_design_system(body.get("version") or body.get("designSystem"))
+                    self._respond_json({"ok": True, "designSystem": state})
+
+                elif self.path == "/api/timers":
+                    name = body.get("name") or body.get("label") or "timer"
+                    seconds = body.get("totalSeconds", body.get("duration", 60))
+                    source = body.get("source", "voice")
+                    timer = mgr.add_timer(name, int(seconds), source)
+                    self._respond_json({"ok": True, "timer": timer})
+
+                elif self.path == "/api/timers/dismiss-all":
+                    mgr.dismiss_all_timers()
+                    self._respond_json({"ok": True})
+
+                elif self.path.startswith("/api/timers/") and self.path.endswith("/dismiss"):
+                    # /api/timers/<id>/dismiss
+                    parts = self.path.split("/")
+                    if len(parts) >= 4:
+                        timer_id = parts[3]
+                        mgr.dismiss_timer(timer_id)
+                    self._respond_json({"ok": True})
+
+                elif self.path == "/api/gesture":
+                    # Accept gesture via /api/ path too
+                    self._handle_gesture(body)
+
+                elif self.path == "/api/enrollments":
+                    # Start enrollment recording
+                    name = body.get("name", "")
+                    action = body.get("action", "navigate")
+                    target = body.get("target", "dashboard")
+                    if not name:
+                        self._respond_json({"error": "name required"}, 400)
+                    else:
+                        mgr.enroll_start(name, action, target)
+                        self._respond_json({"ok": True, "status": mgr.get_enrollment_status()})
+
+                elif self.path.startswith("/api/enrollments/") and self.path.endswith("/delete"):
+                    # Delete enrollment: POST /api/enrollments/<name>/delete
+                    parts = self.path.split("/")
+                    if len(parts) >= 4:
+                        ename = parts[3]
+                        if mgr.delete_enrollment(ename):
+                            self._respond_json({"ok": True})
+                        else:
+                            self._respond_json({"error": "not found"}, 404)
+                    else:
+                        self._respond_json({"error": "invalid path"}, 400)
+
+                elif self.path == "/api/enrollment-stop":
+                    # Force stop enrollment recording
+                    with mgr._lock:
+                        mgr._enroll_state = "idle"
+                        mgr._enroll_buffer = []
+                    self._respond_json({"ok": True})
+
+                else:
+                    self._respond_json({"error": "not found"}, 404)
+
+        server = ThreadingHTTPServer(("0.0.0.0", self.HTTP_PORT), Handler)
+        server.daemon_threads = True
+        t = threading.Thread(target=server.serve_forever, daemon=True)
+        t.start()
+        log.info("🎙️  Recording HTTP server listening on port %d", self.HTTP_PORT)
+
+    def process_audio(self, audio_chunk: np.ndarray) -> bool:
+        """Buffer audio while recording is active.
+
+        Returns True if recording mode is active (caller should skip wake detection).
+        """
+        with self._lock:
+            if not self.active:
+                return False
+            if time.time() < self._chime_mute_until:
+                return True
+            self._recording_buffer.append(audio_chunk.copy())
+            return True
+
+    def _save_clip(self) -> None:
+        """Save the entire recording buffer as one clip. Must hold self._lock."""
+        if not self._recording_buffer:
+            return
+        audio = np.concatenate(self._recording_buffer)
+        self._recording_buffer = []
+        self._session_count += 1
+
+        # Use timestamp for unique filenames — no counter drift
+        ts = int(time.time())
+
+        # Save .npy clip
+        self._save_dir.mkdir(parents=True, exist_ok=True)
+        clip_path = self._save_dir / f"{self.record_type}_{ts}.npy"
+        np.save(str(clip_path), audio)
+        duration = len(audio) / SAMPLE_RATE
+        rms = np.sqrt(np.mean(audio.astype(np.float64) ** 2))
+        log.info("🎙️  Saved clip: %s (%.1fs, RMS=%.0f)", clip_path.name, duration, rms)
+
+        # Also save as .npz for training
+        npz_path = self._save_dir.parent / f"real_samples_{self.record_type}_{ts}.npz"
+        np.savez(npz_path, audio)
+        log.info("🎙️  Saved training file → %s", npz_path)
+
+    def _clear_saved_files(self) -> None:
+        """Delete all saved .npy clips and .npz training files. Must hold self._lock."""
+        models_dir = self._save_dir.parent
+        count = 0
+        if self._save_dir.exists():
+            for f in self._save_dir.glob("*.npy"):
+                f.unlink()
+                count += 1
+        for f in models_dir.glob("real_samples_*.npz"):
+            f.unlink()
+            count += 1
+        log.info("🎙️  Cleared %d saved recording files", count)
+
+
+# ---------------------------------------------------------------------------
+# Audio preprocessing
+# ---------------------------------------------------------------------------
+
+class AudioPreprocessor:
+    """Simple audio preprocessing: high-pass filter + adaptive noise gate.
+
+    Runs before DNN inference to clean up the audio signal:
+    - High-pass filter removes low-freq rumble (TV bass, HVAC, fans)
+    - Adaptive noise gate tracks ambient noise floor and suppresses
+      audio that's only slightly above it (reduces TV dialogue triggers)
+    """
+
+    def __init__(self, cutoff_hz: float = 85, sr: int = 16000,
+                 noise_adapt_rate: float = 0.02):
+        # High-pass filter state (first-order IIR)
+        rc = 1.0 / (2.0 * np.pi * cutoff_hz)
+        dt = 1.0 / sr
+        self.hp_alpha = rc / (rc + dt)
+        self.hp_prev_raw = 0.0
+        self.hp_prev_out = 0.0
+
+        # Adaptive noise floor
+        self.noise_floor_rms = 300.0  # Initial estimate
+        self.noise_adapt_rate = noise_adapt_rate  # How fast floor adapts
+
+    def process(self, audio: np.ndarray) -> np.ndarray:
+        """Process a chunk of int16 mono audio."""
+        # High-pass filter (vectorized for speed)
+        audio_f = audio.astype(np.float64)
+        output = np.zeros_like(audio_f)
+        prev_raw = self.hp_prev_raw
+        prev_out = self.hp_prev_out
+        alpha = self.hp_alpha
+        for i in range(len(audio_f)):
+            output[i] = alpha * (prev_out + audio_f[i] - prev_raw)
+            prev_raw = audio_f[i]
+            prev_out = output[i]
+        self.hp_prev_raw = prev_raw
+        self.hp_prev_out = prev_out
+
+        # Update adaptive noise floor (slow tracking of quiet periods)
+        chunk_rms = np.sqrt(np.mean(output ** 2))
+        if chunk_rms < self.noise_floor_rms * 1.5:
+            # Likely noise/ambient — adapt floor toward it
+            self.noise_floor_rms += self.noise_adapt_rate * (chunk_rms - self.noise_floor_rms)
+
+        return np.clip(output, -32768, 32767).astype(np.int16)
+
+    def is_speech_likely(self, audio: np.ndarray) -> bool:
+        """Check if audio is likely speech (well above noise floor)."""
+        rms = np.sqrt(np.mean(audio.astype(np.float64) ** 2))
+        # Speech should be at least 3x the noise floor
+        return rms > self.noise_floor_rms * 3.0
+
+
+# ---------------------------------------------------------------------------
+# Enrollment helpers (single-sample wake word via embedding similarity)
+# ---------------------------------------------------------------------------
+
+def augment_single_clip(audio: np.ndarray, n_augments: int = 20) -> list[np.ndarray]:
+    """Create augmented variants of a single audio clip for enrollment.
+
+    Takes one real recording and produces n_augments variations with
+    random gain, speed shift, and noise injection. Returns list including
+    the original clip.
+    """
+    variants = [audio.copy()]
+    for _ in range(n_augments):
+        clip = audio.astype(np.float64)
+        # Random gain (-6dB to +6dB)
+        gain_db = np.random.uniform(-6, 6)
+        clip = clip * (10 ** (gain_db / 20))
+        # Random speed shift (resampling) — changes pitch slightly too
+        speed = np.random.uniform(0.88, 1.12)
+        indices = np.arange(0, len(clip), speed)
+        indices = indices[indices < len(clip)].astype(int)
+        clip = clip[indices]
+        # Add noise at random SNR
+        snr_db = np.random.uniform(15, 30)
+        noise = np.random.randn(len(clip))
+        signal_power = np.mean(clip ** 2) + 1e-10
+        noise_power = signal_power / (10 ** (snr_db / 10))
+        clip = clip + noise * np.sqrt(noise_power)
+        variants.append(np.clip(clip, -32768, 32767).astype(np.int16))
+    return variants
+
+
+def extract_enrollment_embeddings(audio_clips: list[np.ndarray],
+                                  target_len: int = 32000) -> np.ndarray:
+    """Extract (N, 16, 96) embeddings from audio clips using openWakeWord's AudioFeatures.
+
+    Each clip is padded/trimmed to target_len samples (2s at 16kHz),
+    then streamed through AudioFeatures in 80ms chunks.
+    Returns shape (N, 16, 96) where N = number of clips with valid features.
+    """
+    from openwakeword.utils import AudioFeatures
+    chunk_size = 1280
+    embeddings = []
+    for clip in audio_clips:
+        # Pad or trim to target length
+        if len(clip) < target_len:
+            clip = np.pad(clip, (0, target_len - len(clip)))
+        else:
+            clip = clip[:target_len]
+        af = AudioFeatures(inference_framework=_inference_framework())
+        for i in range(0, len(clip) - chunk_size + 1, chunk_size):
+            af(clip[i:i + chunk_size])
+        if len(af.feature_buffer) >= 16:
+            embeddings.append(af.feature_buffer[-16:])
+    if not embeddings:
+        return np.array([])
+    return np.array(embeddings, dtype=np.float32)
+
+
+# ---------------------------------------------------------------------------
+# Wake word model setup
+# ---------------------------------------------------------------------------
+
+def get_or_train_model() -> "Model":
+    framework = _inference_framework()
+    log.info("Using inference framework: %s", framework)
+
+    # Use built-in "hey_jarvis" model — well-trained, no custom model needed
+    import openwakeword
+    openwakeword.utils.download_models()
+    log.info("Loading built-in 'hey_jarvis' model with Silero VAD")
+    return Model(
+        wakeword_models=["hey_jarvis"],
+        inference_framework=framework,
+        vad_threshold=0.3,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Main loop
+# ---------------------------------------------------------------------------
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Wake word listener for Home Center")
+    parser.add_argument("--threshold", type=float, default=DETECTION_THRESHOLD,
+                        help="Detection confidence threshold (0-1)")
+    parser.add_argument("--cooldown", type=int, default=COOLDOWN_SECONDS,
+                        help="Seconds to wait between triggers")
+    parser.add_argument("--debug", action="store_true", help="Enable debug logging")
+    parser.add_argument("--dry-run", action="store_true",
+                        help="Print detections without executing actions")
+    parser.add_argument("--device", type=str, default=None,
+                        help="ALSA device (e.g., hw:2,0). Auto-detected if not specified.")
+    parser.add_argument("--worker-url", type=str, default=None,
+                        help="Worker API base URL (e.g., https://your-worker.workers.dev)")
+    parser.add_argument("--worker-token", type=str, default=None,
+                        help="Worker API auth token")
+    parser.add_argument("--no-wake-detection", action="store_true",
+                        help="Run only HTTP endpoints, chimes, timers, and gestures.")
+    args = parser.parse_args()
+
+    if args.debug:
+        logging.getLogger().setLevel(logging.DEBUG)
+
+    # Init debug emission
+    debug_init(args.worker_url, args.worker_token)
+
+    # Pre-generate sounds
+    if not CHIME_PATH.exists():
+        generate_chime(CHIME_PATH)
+    if not ALARM_PATH.exists():
+        generate_alarm(ALARM_PATH)
+    if not RECORD_BEEP_PATH.exists():
+        generate_record_beep(RECORD_BEEP_PATH)
+    if not RECORD_START_PATH.exists():
+        generate_record_start(RECORD_START_PATH)
+    if not RECORD_STOP_PATH.exists():
+        generate_record_stop(RECORD_STOP_PATH)
+    if not ENROLL_START_PATH.exists():
+        generate_enroll_start(ENROLL_START_PATH)
+    if not ENROLL_COMPLETE_PATH.exists():
+        generate_enroll_complete(ENROLL_COMPLETE_PATH)
+
+    threading.Thread(target=warm_audio_output, daemon=True).start()
+
+    if args.no_wake_detection:
+        rec_mgr = RecordingManager(args.worker_url, args.worker_token)
+        global _local_server
+        _local_server = rec_mgr
+
+        alarm_thread = AlarmThread(rec_mgr, args.dry_run)
+        alarm_thread.start()
+        log.info("Alarm thread started (local timers, every %ds)", ALARM_POLL_INTERVAL)
+
+        gesture_thread = None
+        if args.worker_url:
+            gesture_thread = GestureThread(args.worker_url, args.worker_token, args.dry_run)
+            gesture_thread.start()
+            log.info("Gesture thread started (polling worker every 2s)")
+
+        log.info("Wake detection disabled; command HTTP server is ready.")
+        try:
+            while True:
+                time.sleep(3600)
+        except KeyboardInterrupt:
+            log.info("Shutting down...")
+        finally:
+            alarm_thread.stop()
+            if gesture_thread:
+                gesture_thread.stop()
+        return
+
+    # Pre-load models so first command is fast
+    try:
+        get_whisper_model()
+    except Exception as e:
+        log.warning("Could not pre-load whisper model: %s", e)
+    try:
+        get_silero_vad()
+    except Exception as e:
+        log.warning("Could not pre-load Silero VAD: %s", e)
+
+    # Load wake word model
+    model = get_or_train_model()
+    wake_words = list(model.models.keys())
+    log.info("Listening for wake words: %s (threshold=%.2f)", wake_words, args.threshold)
+
+    # Find the ReSpeaker device
+    device = args.device or find_respeaker_device()
+    if device is None:
+        log.error("No ReSpeaker found! Check your HAT connection or specify --device")
+        sys.exit(1)
+
+    # Boost mic gain — default 32/119 is too quiet for across-room detection
+    mic_card = device.replace("hw:", "").split(",")[0] if device else "2"
+    set_mic_gain(mic_card, gain=80)
+
+    # Open ALSA capture
+    log.info("Opening ALSA capture on %s (%d ch, %d Hz)", device, CHANNELS, SAMPLE_RATE)
+    try:
+        pcm = open_alsa_capture(device, CHANNELS, SAMPLE_RATE, CHUNK_SIZE)
+    except alsaaudio.ALSAAudioError as e:
+        log.error("Failed to open ALSA device %s: %s", device, e)
+        sys.exit(1)
+
+    gesture_thread = None
+
+    # Audio preprocessor — high-pass filter + adaptive noise gate
+    preprocessor = AudioPreprocessor(cutoff_hz=85)
+
+    # Recording manager — local API server on :8765
+    rec_mgr = RecordingManager(args.worker_url, args.worker_token)
+
+    # Wire up global reference for in-process callers (debug_post, cfg)
+    _local_server = rec_mgr
+
+    # Start alarm thread (uses local timers via rec_mgr)
+    alarm_thread = AlarmThread(rec_mgr, args.dry_run)
+    alarm_thread.start()
+    log.info("Alarm thread started (local timers, every %ds)", ALARM_POLL_INTERVAL)
+
+    # Gesture thread — only if worker configured (HandController still posts to worker)
+    if args.worker_url:
+        gesture_thread = GestureThread(args.worker_url, args.worker_token, args.dry_run)
+        gesture_thread.start()
+        log.info("Gesture thread started (polling worker every 2s)")
+
+    log.info("=== openWakeWord DNN mode (no Whisper verification) ===")
+    log.info("Microphone stream open. Listening...")
+    last_trigger = 0.0
+    last_action_time = 0.0
+    consecutive_hits = {ww: 0 for ww in wake_words}
+    enroll_consecutive: dict[str, int] = {}  # tracks consecutive enrollment matches
+
+    # Rolling buffer: ~2 seconds of raw mono audio for "Hey Jarvis, open calendar" style commands
+    # Each chunk = CHUNK_SIZE samples (80ms at 16kHz), so 2s ≈ 25 chunks
+    PREBUFFER_SECONDS = 2.0
+    prebuf_max = int(PREBUFFER_SECONDS * SAMPLE_RATE / CHUNK_SIZE)
+    prebuffer = collections.deque(maxlen=prebuf_max)
+    TAIL_SECONDS = 1.5  # Extra recording after detection to catch trailing words
+
+    try:
+        while True:
+            length, data = pcm.read()
+            if length <= 0:
+                continue
+
+            audio_array = np.frombuffer(data, dtype=np.int16)
+            if CHANNELS > 1:
+                audio_array = audio_array.reshape(-1, CHANNELS).mean(axis=1).astype(np.int16)
+
+            raw_audio = audio_array.copy()
+            prebuffer.append(raw_audio)
+
+            # Apply audio preprocessing (high-pass filter, noise tracking)
+            audio_array = preprocessor.process(audio_array)
+
+            now = time.time()
+
+            # Recording mode — skip wake word detection
+            if rec_mgr.process_audio(raw_audio):
+                model.predict(audio_array)  # Keep model state current
+                continue
+
+            # Enrollment recording mode — auto-stops on speech→silence
+            if rec_mgr.is_enrolling():
+                enroll_result = rec_mgr.enroll_process_audio(raw_audio, preprocessor)
+                model.predict(audio_array)  # Keep model state current
+                if enroll_result == "done":
+                    threading.Thread(target=rec_mgr.enroll_finalize, daemon=True).start()
+                elif enroll_result == "timeout":
+                    log.info("Enrollment timed out")
+                continue
+
+            # Post-action mute (live config)
+            if now - last_action_time < cfg("post_action_mute"):
+                model.predict(audio_array)
+                continue
+
+            # RMS energy gate (live config) — use preprocessed audio
+            rms = np.sqrt(np.mean(audio_array.astype(np.float64) ** 2))
+            if rms < cfg("min_rms_energy"):
+                model.predict(audio_array)
+                if args.debug:
+                    log.debug("RMS %.0f below threshold %d, skipping", rms, cfg("min_rms_energy"))
+                for ww in consecutive_hits:
+                    consecutive_hits[ww] = 0
+                continue
+
+            model.predict(audio_array)
+
+            # ── Check enrolled custom wake words via embedding similarity ──
+            if rec_mgr.has_enrollments() and now - last_trigger >= cfg("cooldown_seconds"):
+                try:
+                    feat_buf = model.preprocessor.feature_buffer
+                    if feat_buf is not None and len(feat_buf) >= 16:
+                        match = rec_mgr.check_enrolled(feat_buf, rms)
+                        if match:
+                            match_name = match.get("name", "").lower()
+                            enroll_consecutive[match_name] = enroll_consecutive.get(match_name, 0) + 1
+
+                            if enroll_consecutive[match_name] >= ENROLL_MIN_CONSECUTIVE:
+                                log.info("Custom wake word '%s' triggered! (phrase='%s', action=%s, target=%s)",
+                                         match.get("name"), match.get("wake_phrase"),
+                                         match.get("action"), match.get("target"))
+                                debug_post("custom_wake", {
+                                    "name": match.get("name"),
+                                    "wake_phrase": match.get("wake_phrase"),
+                                    "action": match.get("action"),
+                                    "target": match.get("target"),
+                                })
+
+                                model.reset()
+                                for ww in consecutive_hits:
+                                    consecutive_hits[ww] = 0
+                                enroll_consecutive.clear()
+                                last_trigger = now
+
+                                if not args.dry_run:
+                                    rec_mgr.set_listening(6.0)
+                                    play_acknowledgement()
+
+                                # Dispatch the enrolled action
+                                e_action = match.get("action", "navigate")
+                                e_target = match.get("target", "dashboard")
+                                if e_action == "navigate":
+                                    rec_mgr.navigate(e_target)
+                                    log.info("Custom wake → navigate to %s", e_target)
+
+                                last_action_time = time.time()
+                                continue  # Skip DNN wake word check this cycle
+                        else:
+                            enroll_consecutive.clear()
+                except AttributeError:
+                    pass  # model.preprocessor.feature_buffer may not exist
+
+            for ww_name in wake_words:
+                buf = model.prediction_buffer[ww_name]
+                if len(buf) == 0:
+                    continue
+
+                n = min(int(cfg("score_smooth_window")), len(buf))
+                scores = list(buf)[-n:]
+                score = float(np.mean(scores))
+
+                if args.debug and score > 0.1:
+                    log.debug("%s score: %.3f (raw=%.3f, rms=%.0f, consec=%d)",
+                              ww_name, score, float(list(buf)[-1]), rms,
+                              consecutive_hits.get(ww_name, 0))
+                if score > 0.3:
+                    debug_post("dnn_score", {"score": round(score, 3), "rms": round(rms), "consecutive": consecutive_hits.get(ww_name, 0)})
+
+                # Adaptive threshold: lower when speech energy is strong
+                base_threshold = cfg("detection_threshold")
+                if rms > cfg("min_rms_energy") * 4:
+                    effective_threshold = base_threshold * 0.85
+                else:
+                    effective_threshold = base_threshold
+
+                if score >= effective_threshold:
+                    consecutive_hits[ww_name] = consecutive_hits.get(ww_name, 0) + 1
+
+                    if consecutive_hits[ww_name] < cfg("min_consecutive"):
+                        continue
+
+                    if now - last_trigger < cfg("cooldown_seconds"):
+                        log.debug("Cooldown active, ignoring detection")
+                        continue
+
+                    # ── Wake word detected! No Whisper verification — act immediately ──
+                    log.info("Wake word '%s' DETECTED (score=%.3f, consec=%d, rms=%.0f)",
+                             ww_name, score, consecutive_hits[ww_name], rms)
+                    debug_post("wake_confirmed", {"score": round(score, 3), "consecutive": consecutive_hits[ww_name]})
+
+                    # Reset model state
+                    model.reset()
+                    for ww in consecutive_hits:
+                        consecutive_hits[ww] = 0
+                    last_trigger = now
+
+                    # Chime immediately — user gets instant feedback
+                    if not args.dry_run:
+                        rec_mgr.set_listening(6.0)
+                        play_acknowledgement()
+
+                    # Grab pre-trigger audio buffer + record short tail
+                    # This captures "Hey Jarvis open calendar" as one phrase
+                    log.info("Capturing pre-buffer + %.1fs tail...", TAIL_SECONDS)
+                    tail_clip = record_audio(pcm, TAIL_SECONDS)
+                    pre_audio = np.concatenate(list(prebuffer)) if prebuffer else np.array([], dtype=np.int16)
+                    full_audio = np.concatenate([pre_audio, tail_clip])
+                    log.info("Total audio: %.1fs (%.1fs pre + %.1fs tail)",
+                             len(full_audio) / SAMPLE_RATE,
+                             len(pre_audio) / SAMPLE_RATE, TAIL_SECONDS)
+                    command = parse_command(transcribe(full_audio))
+
+                    log.info("Command: %s", command)
+                    debug_post("command", {"action": command.get("action"), "details": command})
+
+                    # Dispatch — all local now (no worker round-trip)
+                    action = command["action"]
+                    if action == "set_timer":
+                        label = command.get("label", "timer")
+                        duration = command.get("duration", 60)
+                        if args.dry_run:
+                            log.info("[DRY RUN] Would create timer: %s (%ds)", label, duration)
+                        else:
+                            rec_mgr.add_timer(label, duration, "voice")
+
+                    elif action == "stop":
+                        if args.dry_run:
+                            log.info("[DRY RUN] Would dismiss all timers")
+                        else:
+                            rec_mgr.dismiss_all_timers()
+                            log.info("Dismissed all timers")
+
+                    elif action == "ask" and args.worker_url:
+                        query_text = command.get("query", "")
+                        if args.dry_run:
+                            log.info("[DRY RUN] Would ask: %s", query_text)
+                        else:
+                            rec_mgr.navigate("knowledge")
+                            result = worker_post(args.worker_url, args.worker_token, "/api/ask-query", {"query": query_text})
+                            log.info("LLM query %s: %s", "sent" if result else "FAILED", query_text)
+
+                    elif action == "flag_knowledge_negative":
+                        if args.dry_run:
+                            log.info("[DRY RUN] Would flag most recent knowledge response as user_negative")
+                        elif args.worker_url:
+                            result = worker_post(args.worker_url, args.worker_token, "/api/knowledge-feedback", {})
+                            if result and result.get("flagged"):
+                                log.info("Knowledge feedback flag written: %s", result.get("record", {}).get("target_log_row_id"))
+                            else:
+                                log.info("Knowledge feedback command had no target: %s", (result or {}).get("reason", "request_failed"))
+                            try:
+                                play_acknowledgement()
+                            except Exception as e:
+                                log.warning("Feedback acknowledgement chime failed: %s", e)
+                        else:
+                            log.info("Knowledge feedback command ignored: no worker URL configured")
+
+                    elif action == "flag_knowledge_image_negative":
+                        if args.dry_run:
+                            log.info("[DRY RUN] Would flag most recent knowledge image as user_negative_image")
+                        elif args.worker_url:
+                            result = worker_post(args.worker_url, args.worker_token, "/api/knowledge-feedback", {"feedback_type": "image"})
+                            if result and result.get("flagged"):
+                                log.info("Knowledge image feedback flag written: %s", result.get("record", {}).get("target_log_row_id"))
+                            else:
+                                log.info("Knowledge image feedback command had no target: %s", (result or {}).get("reason", "request_failed"))
+                            try:
+                                play_acknowledgement()
+                            except Exception as e:
+                                log.warning("Image feedback acknowledgement chime failed: %s", e)
+                        else:
+                            log.info("Knowledge image feedback command ignored: no worker URL configured")
+
+                    elif action == "navigate":
+                        page = command.get("page")
+                        view = command.get("view")
+                        if args.dry_run:
+                            log.info("[DRY RUN] Would navigate: page=%s view=%s", page, view)
+                        else:
+                            rec_mgr.navigate(page, view)
+                            log.info("Navigation: page=%s view=%s", page, view)
+
+                    elif action == "design_system":
+                        version = command.get("version", "v1")
+                        if args.dry_run:
+                            log.info("[DRY RUN] Would switch design system: %s", version)
+                        else:
+                            rec_mgr.set_design_system(version)
+                            log.info("Design system: %s", version)
+
+                    elif action in ("debug_hide", "debug_show"):
+                        debug_post(action, {"message": action.replace("_", " ")})
+                        log.info("Debug overlay: %s", action)
+
+                    elif action == "enroll":
+                        if args.dry_run:
+                            log.info("[DRY RUN] Would navigate to enrollment page")
+                        else:
+                            rec_mgr.navigate("enrollment")
+                            log.info("Navigating to enrollment page")
+
+                    elif action == "enroll_record":
+                        name = command.get("name", "unknown")
+                        target = command.get("target", "dashboard")
+                        if args.dry_run:
+                            log.info("[DRY RUN] Would start enrollment for %s (target=%s)", name, target)
+                        else:
+                            rec_mgr.enroll_start(name, "navigate", target)
+                            log.info("Started enrollment recording for %s → %s", name, target)
+
+                    elif action == "turn_off":
+                        if args.dry_run:
+                            log.info("[DRY RUN] Would turn off TV")
+                        else:
+                            turn_off_tv()
+
+                    else:  # turn_on or unrecognized
+                        if args.dry_run:
+                            log.info("[DRY RUN] Would turn on TV")
+                        else:
+                            turn_on_tv()
+
+                    last_action_time = time.time()
+                    break  # Only handle one wake word per cycle
+
+                else:
+                    consecutive_hits[ww_name] = 0
+
+    except KeyboardInterrupt:
+        log.info("Shutting down...")
+    finally:
+        pcm.close()
+        if alarm_thread:
+            alarm_thread.stop()
+        if gesture_thread:
+            gesture_thread.stop()
+
+
+if __name__ == "__main__":
+    main()

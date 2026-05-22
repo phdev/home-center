@@ -1,0 +1,51 @@
+{
+  "screen": "dashboard-evening",
+  "time_of_day": "20:45",
+  "goal": "wind the house down — only kids' bedtime and tomorrow's setup matter",
+  "constraints": {
+    "device": "shared 4K TV, low ambient light",
+    "interaction": "ambient primary; a single tap to dismiss bedtime toast",
+    "glanceability": "primary signal readable in under 2 seconds at a glance",
+    "max_visible_cards": 3
+  },
+  "design_principles": [
+    "show only the essential information at this moment",
+    "one primary thing, clearly, before secondary things",
+    "ambient over interruptive unless a deadline is imminent",
+    "clarity beats completeness"
+  ],
+  "derived_state": {
+    "showMorningChecklist": false,
+    "hasMorningOverlap": false,
+    "peter0800_0900Risk": false,
+    "takeoutDecisionPending": false,
+    "lunchDecisionNeeded": true,
+    "birthdayGiftNeeded": false,
+    "bedtimeReminderActive": true,
+    "showClawSuggestions": false
+  },
+  "current_structure": {
+    "layout": "stacked_cards",
+    "rows": [
+      {
+        "region": "top",
+        "cards": [
+          { "id": "calendar",  "priority": 2, "note": "showing TOMORROW, not today" },
+          { "id": "weather",   "priority": 3, "note": "tomorrow's forecast" }
+        ]
+      },
+      {
+        "region": "mid",
+        "cards": [
+          { "id": "lunchDecision", "priority": 2, "note": "renders via ContextualSlot" }
+        ]
+      },
+      {
+        "region": "overlay",
+        "cards": [
+          { "id": "bedtimeToast", "priority": 1, "note": "single overlay; blocks ambient cards visually" }
+        ]
+      }
+    ]
+  }
+}

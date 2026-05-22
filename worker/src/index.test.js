@@ -1,0 +1,1109 @@
+import { afterEach, describe, expect, it, vi } from "vitest";
+import worker from "./index.js";
+
+const originalFetch = global.fetch;
+
+function jsonResponse(body, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { "Content-Type": "application/json" },
+  });
+}
+
+function createKv(initial = {}) {
+  const store = new Map(Object.entries(initial));
+  return {
+    store,
+    get: vi.fn(async (key, options = {}) => {
+      const value = store.get(key);
+      if (value == null) return null;
+      return options.type === "json" ? JSON.parse(value) : value;
+    }),
+    put: vi.fn(async (key, value) => {
+      store.set(key, value);
+    }),
+    delete: vi.fn(async (key) => {
+      store.delete(key);
+    }),
+  };
+}
+
+function env(overrides = {}) {
+  return {
+    NOTIFICATIONS: createKv(),
+    OPENAI_API_KEY: "test-openai-key",
+    KNOWLEDGE_TEXT_BRIDGE_URL: "https://bridge.test",
+    ...overrides,
+  };
+}
+
+function askRequest(query = "What is a black hole?") {
+  return new Request("https://worker.test/api/ask-query", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ query }),
+  });
+}
+
+function bridgePayloads() {
+  return global.fetch.mock.calls
+    .filter(([url]) => String(url).startsWith("https://bridge.test"))
+    .map(([, options]) => JSON.parse(options.body));
+}
+
+function defaultFetchMock({ classification, answer, wikipediaImage = "https://wiki.test/image.jpg", nasaImage = null } = {}) {
+  const classificationData = classification || {
+    type: "concept",
+    title: "Black hole",
+    visualNeed: "useful",
+    spaceScience: false,
+    entityQuery: "Black hole",
+    visualSearchQuery: "black hole diagram",
+  };
+  const answerData = answer || {
+    type: "concept",
+    title: classificationData.title,
+    summary: "A short answer.",
+    sections: [],
+    infographic: null,
+    visualNeed: classificationData.visualNeed,
+    imagePrompt: "A clear educational diagram.",
+  };
+
+  return vi.fn(async (url, options = {}) => {
+    const href = String(url);
+    if (href.startsWith("https://bridge.test")) {
+      if (href.endsWith("/knowledge-feedback")) {
+        return jsonResponse({ ok: true });
+      }
+      const bridgeCallCount = global.fetch.mock.calls
+        .filter(([calledUrl]) => String(calledUrl).startsWith("https://bridge.test")).length;
+      return jsonResponse({
+        json: bridgeCallCount === 1 ? classificationData : answerData,
+        model: "gemma-test",
+        log_row_id: `kb-test-${bridgeCallCount}`,
+      });
+    }
+    if (href.startsWith("https://images-api.nasa.gov/search")) {
+      return jsonResponse({
+        collection: {
+          items: nasaImage ? [{
+            href: "https://images-assets.nasa.gov/details",
+            data: [{
+              title: "NASA Black Hole",
+              description: "NASA context about a black hole.",
+              nasa_id: "NASA-BH",
+              center: "NASA",
+            }],
+            links: [{ href: nasaImage }],
+          }] : [],
+        },
+      });
+    }
+    if (href.startsWith("https://en.wikipedia.org/w/rest.php/v1/search/page")) {
+      return jsonResponse({ pages: [{ key: classificationData.entityQuery, title: classificationData.title }] });
+    }
+    if (href.startsWith("https://en.wikipedia.org/api/rest_v1/page/summary/")) {
+      return jsonResponse({
+        title: classificationData.title,
+        description: "Wikipedia description.",
+        extract: "Wikipedia context for the answer.",
+        content_urls: { desktop: { page: "https://en.wikipedia.org/wiki/Test" } },
+        ...(wikipediaImage ? { originalimage: { source: wikipediaImage } } : {}),
+      });
+    }
+    if (href === "https://api.openai.com/v1/images/generations") {
+      return jsonResponse({ data: [{ b64_json: "ZmFrZS1qcGVn" }] });
+    }
+    throw new Error(`Unexpected fetch: ${href}`);
+  });
+}
+
+async function askAndRead(currentEnv, query) {
+  const response = await worker.fetch(askRequest(query), currentEnv);
+  expect(response.status).toBe(200);
+  return response.json();
+}
+
+afterEach(() => {
+  vi.useRealTimers();
+  vi.restoreAllMocks();
+  global.fetch = originalFetch;
+});
+
+describe("calendar", () => {
+  it("expands recurring iCal events whose original start is before the fetch window", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-05-18T09:00:00-07:00"));
+    const currentEnv = env({ CALENDAR_URLS: "https://calendar.test/feed.ics" });
+    global.fetch = vi.fn(async (url) => {
+      expect(String(url)).toBe("https://calendar.test/feed.ics");
+      return new Response(`BEGIN:VCALENDAR
+BEGIN:VEVENT
+UID:weekly-standup
+SUMMARY:Weekly Standup
+DTSTART:20260504T083000
+DTEND:20260504T090000
+RRULE:FREQ=WEEKLY;BYDAY=MO
+END:VEVENT
+END:VCALENDAR`);
+    });
+
+    const response = await worker.fetch(new Request("https://worker.test/api/calendar"), currentEnv);
+    const body = await response.json();
+    const expectedStart = new Date("2026-05-18T08:30:00-07:00").getTime();
+    const expectedEnd = new Date("2026-05-18T09:00:00-07:00").getTime();
+
+    expect(response.status).toBe(200);
+    expect(body.events).toContainEqual(
+      expect.objectContaining({
+        id: `weekly-standup-${expectedStart}`,
+        title: "Weekly Standup",
+        time: "8:30 AM",
+        start: expectedStart,
+        end: expectedEnd,
+      }),
+    );
+  });
+
+  it("uses the Howell Family iCloud calendar instead of falling back to iPhone calendars", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-05-18T09:00:00-07:00"));
+    const currentEnv = env({
+      ICLOUD_APPLE_ID: "peter@example.com",
+      ICLOUD_APP_PASSWORD: "app-password",
+    });
+    const reportUrls = [];
+    global.fetch = vi.fn(async (url, options = {}) => {
+      const href = String(url);
+      if (options.method === "PROPFIND" && href === "https://caldav.icloud.com/") {
+        return new Response(`<d:multistatus xmlns:d="DAV:">
+<d:response><d:propstat><d:prop><d:current-user-principal><d:href>/principal/</d:href></d:current-user-principal></d:prop></d:propstat></d:response>
+</d:multistatus>`);
+      }
+      if (options.method === "PROPFIND" && href === "https://caldav.icloud.com/principal/") {
+        return new Response(`<d:multistatus xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav">
+<d:response><d:propstat><d:prop><c:calendar-home-set><d:href>/calendars/</d:href></c:calendar-home-set></d:prop></d:propstat></d:response>
+</d:multistatus>`);
+      }
+      if (options.method === "PROPFIND" && href === "https://caldav.icloud.com/calendars/") {
+        return new Response(`<d:multistatus xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav">
+<d:response><d:href>/calendars/iphone/</d:href><d:propstat><d:prop><d:displayname>Peter iPhone</d:displayname><d:resourcetype><d:collection/><c:calendar/></d:resourcetype></d:prop></d:propstat></d:response>
+<d:response><d:href>/calendars/howell-family/</d:href><d:propstat><d:prop><d:displayname>Howell Family</d:displayname><d:resourcetype><d:collection/><c:calendar/></d:resourcetype></d:prop></d:propstat></d:response>
+</d:multistatus>`);
+      }
+      if (options.method === "REPORT") {
+        reportUrls.push(href);
+        return new Response(`BEGIN:VCALENDAR
+BEGIN:VEVENT
+UID:family-dinner
+SUMMARY:Family Dinner
+DTSTART:20260518T173000
+DTEND:20260518T183000
+END:VEVENT
+END:VCALENDAR`);
+      }
+      throw new Error(`Unexpected fetch: ${href}`);
+    });
+
+    const response = await worker.fetch(new Request("https://worker.test/api/calendar"), currentEnv);
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(reportUrls).toEqual(["https://caldav.icloud.com/calendars/howell-family/"]);
+    expect(body.events).toHaveLength(1);
+    expect(body.events[0]).toMatchObject({
+      title: "Family Dinner",
+      calendar: "howell-family",
+      calendarName: "Howell Family",
+    });
+  });
+});
+
+describe("design system state", () => {
+  it("stores and returns the requested dashboard design system", async () => {
+    const currentEnv = env();
+
+    const post = await worker.fetch(new Request("https://worker.test/api/design-system", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ version: "v2" }),
+    }), currentEnv);
+    expect(post.status).toBe(200);
+    await expect(post.json()).resolves.toMatchObject({
+      ok: true,
+      designSystem: { version: "v2" },
+    });
+
+    const get = await worker.fetch(new Request("https://worker.test/api/design-system"), currentEnv);
+    expect(get.status).toBe(200);
+    await expect(get.json()).resolves.toMatchObject({
+      designSystem: { version: "v2" },
+    });
+  });
+});
+
+describe("knowledge image pipeline", () => {
+  it("carries the bridge answer log row id into the stored knowledge response", async () => {
+    const currentEnv = env();
+    global.fetch = defaultFetchMock();
+
+    const body = await askAndRead(currentEnv, "What is a black hole?");
+
+    expect(body.log_row_id).toBe("kb-test-2");
+    expect(await currentEnv.NOTIFICATIONS.get("llm_latest", { type: "json" })).toMatchObject({
+      log_row_id: "kb-test-2",
+      query: "What is a black hole?",
+    });
+  });
+
+  it("posts negative knowledge feedback for the latest fresh response", async () => {
+    const currentEnv = env();
+    global.fetch = defaultFetchMock();
+    await askAndRead(currentEnv, "What is a black hole?");
+
+    const response = await worker.fetch(new Request("https://worker.test/api/knowledge-feedback", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "{}",
+    }), currentEnv);
+    const body = await response.json();
+    const feedbackCall = global.fetch.mock.calls.find(([url]) => String(url) === "https://bridge.test/knowledge-feedback");
+    const feedbackPayload = JSON.parse(feedbackCall[1].body);
+
+    expect(response.status).toBe(200);
+    expect(body.flagged).toBe(true);
+    expect(feedbackPayload).toMatchObject({
+      flag_type: "user_negative",
+      target_log_row_id: "kb-test-2",
+      query_text: "What is a black hole?",
+    });
+    expect(feedbackPayload.flagged_at).toEqual(expect.any(String));
+  });
+
+  it("posts negative knowledge feedback for an explicit frontend buffer target", async () => {
+    const currentEnv = env();
+    global.fetch = defaultFetchMock();
+
+    const response = await worker.fetch(new Request("https://worker.test/api/knowledge-feedback", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        target_log_row_id: "kb-front-buffer",
+        query_text: "what is an ibis",
+        timestamp: Date.now(),
+      }),
+    }), currentEnv);
+    const body = await response.json();
+    const feedbackCall = global.fetch.mock.calls.find(([url]) => String(url) === "https://bridge.test/knowledge-feedback");
+    const feedbackPayload = JSON.parse(feedbackCall[1].body);
+
+    expect(response.status).toBe(200);
+    expect(body.flagged).toBe(true);
+    expect(feedbackPayload).toMatchObject({
+      flag_type: "user_negative",
+      target_log_row_id: "kb-front-buffer",
+      query_text: "what is an ibis",
+    });
+  });
+
+  it("posts negative image feedback separately for the latest displayed image", async () => {
+    const notifications = createKv({
+      llm_latest: JSON.stringify({
+        kind: "knowledge",
+        query: "what is an ibis",
+        log_row_id: "kb-image",
+        timestamp: Date.now(),
+        imageSourceType: "known",
+        imageUrl: "https://wiki.test/ibis.jpg",
+      }),
+    });
+    const currentEnv = env({ NOTIFICATIONS: notifications });
+    global.fetch = defaultFetchMock();
+
+    const response = await worker.fetch(new Request("https://worker.test/api/knowledge-feedback", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ feedback_type: "image" }),
+    }), currentEnv);
+    const body = await response.json();
+    const feedbackCall = global.fetch.mock.calls.find(([url]) => String(url) === "https://bridge.test/knowledge-feedback");
+    const feedbackPayload = JSON.parse(feedbackCall[1].body);
+
+    expect(response.status).toBe(200);
+    expect(body.flagged).toBe(true);
+    expect(feedbackPayload).toMatchObject({
+      flag_type: "user_negative_image",
+      target_log_row_id: "kb-image",
+      query_text: "what is an ibis",
+      image_source_type: "known",
+      image_ref: "https://wiki.test/ibis.jpg",
+    });
+  });
+
+  it("records image feedback locally and purges cached image keys when no bridge row exists", async () => {
+    const notifications = createKv({
+      llm_latest: JSON.stringify({
+        kind: "knowledge",
+        query: "how big is the sun",
+        log_row_id: null,
+        timestamp: Date.now(),
+        imageSourceType: "known",
+        imageUrl: "https://images-assets.nasa.gov/image/2013-1994/2013-1994~medium.jpg",
+        retrieval: {
+          subject: "sun",
+          classification: {
+            type: "concept",
+            title: "Sun size",
+            visualNeed: "useful",
+            spaceScience: true,
+            entityQuery: "Sun size diameter Wikipedia",
+            visualSearchQuery: "Sun size comparison image",
+          },
+        },
+      }),
+      "knowledge:image:v2:query:how-big-is-the-sun": JSON.stringify({ url: "https://bad.test/sun.jpg" }),
+      "knowledge:image:v2:subject:sun": JSON.stringify({ url: "https://bad.test/sun.jpg" }),
+      "knowledge:image:v2:visual:sun-size-comparison-image": JSON.stringify({ url: "https://bad.test/sun.jpg" }),
+    });
+    const currentEnv = env({ NOTIFICATIONS: notifications });
+    global.fetch = vi.fn(async () => {
+      throw new Error("feedback bridge should not be called without a log row id");
+    });
+
+    const response = await worker.fetch(new Request("https://worker.test/api/knowledge-feedback", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ feedback_type: "image" }),
+    }), currentEnv);
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body).toMatchObject({
+      ok: true,
+      flagged: true,
+      reason: "local_image_feedback_recorded",
+    });
+    expect(notifications.delete).toHaveBeenCalledWith("knowledge:image:v2:query:how-big-is-the-sun");
+    expect(notifications.delete).toHaveBeenCalledWith("knowledge:image:v2:subject:sun");
+    expect(notifications.delete).toHaveBeenCalledWith("knowledge:image:v2:visual:sun-size-comparison-image");
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  it("does not post image feedback when the latest knowledge response showed no image", async () => {
+    const notifications = createKv({
+      llm_latest: JSON.stringify({
+        kind: "knowledge",
+        query: "what is the meaning of justice",
+        log_row_id: "kb-none",
+        timestamp: Date.now(),
+        imageSourceType: "none",
+        imageUrl: null,
+      }),
+    });
+    const currentEnv = env({ NOTIFICATIONS: notifications });
+    global.fetch = vi.fn(async () => {
+      throw new Error("feedback bridge should not be called");
+    });
+
+    const response = await worker.fetch(new Request("https://worker.test/api/knowledge-feedback", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ feedback_type: "image" }),
+    }), currentEnv);
+    const body = await response.json();
+
+    expect(body).toMatchObject({
+      ok: true,
+      flagged: false,
+      reason: "no_recent_knowledge_image",
+    });
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  it("writes separate answer and image flags for the same response", async () => {
+    const notifications = createKv({
+      llm_latest: JSON.stringify({
+        kind: "knowledge",
+        query: "what is an ibis",
+        log_row_id: "kb-shared",
+        timestamp: Date.now(),
+        imageSourceType: "known",
+        imageUrl: "https://wiki.test/ibis.jpg",
+      }),
+    });
+    const currentEnv = env({ NOTIFICATIONS: notifications });
+    global.fetch = defaultFetchMock();
+
+    await worker.fetch(new Request("https://worker.test/api/knowledge-feedback", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "{}",
+    }), currentEnv);
+    await worker.fetch(new Request("https://worker.test/api/knowledge-feedback", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ feedback_type: "image" }),
+    }), currentEnv);
+
+    const feedbackPayloads = global.fetch.mock.calls
+      .filter(([url]) => String(url) === "https://bridge.test/knowledge-feedback")
+      .map(([, options]) => JSON.parse(options.body));
+
+    expect(feedbackPayloads).toHaveLength(2);
+    expect(feedbackPayloads.map((payload) => payload.flag_type)).toEqual([
+      "user_negative",
+      "user_negative_image",
+    ]);
+    expect(new Set(feedbackPayloads.map((payload) => payload.target_log_row_id))).toEqual(new Set(["kb-shared"]));
+  });
+
+
+  it("does not post feedback when the latest response is stale", async () => {
+    const notifications = createKv({
+      llm_latest: JSON.stringify({
+        kind: "knowledge",
+        query: "What is a black hole?",
+        log_row_id: "kb-old",
+        timestamp: Date.now() - 11 * 60 * 1000,
+      }),
+    });
+    const currentEnv = env({ NOTIFICATIONS: notifications });
+    global.fetch = vi.fn(async () => {
+      throw new Error("feedback bridge should not be called");
+    });
+
+    const response = await worker.fetch(new Request("https://worker.test/api/knowledge-feedback", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "{}",
+    }), currentEnv);
+    const body = await response.json();
+
+    expect(body).toMatchObject({
+      ok: true,
+      flagged: false,
+      reason: "stale_knowledge_response",
+    });
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  it("generates GPT Image 2 imagery while preserving cached/Wikipedia answer context", async () => {
+    const notifications = createKv({
+      "knowledge:image:v2:query:what-is-a-black-hole": JSON.stringify({
+        url: "https://cache.test/black-hole.jpg",
+        source: "NASA",
+        mode: "retrieved",
+      }),
+    });
+    const currentEnv = env({ NOTIFICATIONS: notifications });
+    global.fetch = defaultFetchMock({
+      classification: {
+        type: "concept",
+        title: "Black hole",
+        visualNeed: "useful",
+        spaceScience: false,
+        entityQuery: "Black hole",
+        visualSearchQuery: "black hole diagram",
+      },
+      wikipediaImage: "https://wiki.test/black-hole.jpg",
+    });
+
+    const body = await askAndRead(currentEnv, "What is a black hole?");
+    const imageCalls = global.fetch.mock.calls.filter(([url]) => String(url) === "https://api.openai.com/v1/images/generations");
+    const answerPayload = bridgePayloads()[1];
+    const answerInput = JSON.parse(answerPayload.messages[1].content);
+
+    expect(imageCalls).toHaveLength(1);
+    expect(answerInput.retrievalContext.wikipedia.extract).toBe("Wikipedia context for the answer.");
+    expect(body.imageUrl).toMatch(/^data:image\/jpeg;base64,/);
+    expect(body.visual.source).toBe("GPT Image 2");
+    expect(body.visual.model).toBe("gpt-image-2");
+  });
+
+  it("uses GPT Image 2 instead of retrieved NASA imagery for space science queries", async () => {
+    const currentEnv = env();
+    global.fetch = defaultFetchMock({
+      classification: {
+        type: "concept",
+        title: "Black hole",
+        visualNeed: "required",
+        spaceScience: true,
+        entityQuery: "Black hole",
+        visualSearchQuery: "black hole",
+      },
+      nasaImage: "http://nasa.test/black-hole.jpg",
+      wikipediaImage: "https://wiki.test/black-hole.jpg",
+    });
+
+    const body = await askAndRead(currentEnv, "Show me a black hole");
+    const imageCalls = global.fetch.mock.calls.filter(([url]) => String(url) === "https://api.openai.com/v1/images/generations");
+
+    expect(imageCalls).toHaveLength(1);
+    expect(body.imageUrl).toMatch(/^data:image\/jpeg;base64,/);
+    expect(body.visual.source).toBe("GPT Image 2");
+    expect(body.visual.mode).toBe("generated");
+    expect(body.visual.model).toBe("gpt-image-2");
+  });
+
+  it("generates GPT Image 2 fallback metadata when retrieval has no image", async () => {
+    const currentEnv = env();
+    global.fetch = defaultFetchMock({
+      classification: {
+        type: "concept",
+        title: "Photosynthesis",
+        visualNeed: "required",
+        spaceScience: false,
+        entityQuery: "Photosynthesis",
+        visualSearchQuery: "photosynthesis diagram",
+      },
+      wikipediaImage: null,
+    });
+
+    const body = await askAndRead(currentEnv, "Show me how photosynthesis works");
+    const imageCall = global.fetch.mock.calls.find(([url]) => String(url) === "https://api.openai.com/v1/images/generations");
+    const requestBody = JSON.parse(imageCall[1].body);
+
+    expect(requestBody).toMatchObject({
+      model: "gpt-image-2",
+      quality: "low",
+      size: "1536x1024",
+      output_format: "jpeg",
+    });
+    expect(body.visual.source).toBe("GPT Image 2");
+    expect(body.visual.mode).toBe("generated");
+    expect(body.visual.model).toBe("gpt-image-2");
+    expect(body.visual.metadata).toMatchObject({
+      quality: "low",
+      size: "1536x1024",
+      outputFormat: "jpeg",
+      promptSource: "worker-enriched",
+      generator: "openai",
+    });
+  });
+
+  it("pins generated knowledge images to GPT Image 2 despite legacy env overrides", async () => {
+    const currentEnv = env({
+      IMAGE_GENERATION_MODEL: "dall-e-3",
+      OPENAI_IMAGE_MODEL: "dall-e-3",
+    });
+    global.fetch = defaultFetchMock({
+      classification: {
+        type: "concept",
+        title: "Photosynthesis",
+        visualNeed: "required",
+        spaceScience: false,
+        entityQuery: "Photosynthesis",
+        visualSearchQuery: "photosynthesis diagram",
+      },
+      wikipediaImage: null,
+    });
+
+    const body = await askAndRead(currentEnv, "Show me how photosynthesis works");
+    const imageCall = global.fetch.mock.calls.find(([url]) => String(url) === "https://api.openai.com/v1/images/generations");
+    const requestBody = JSON.parse(imageCall[1].body);
+
+    expect(requestBody.model).toBe("gpt-image-2");
+    expect(body.visual.model).toBe("gpt-image-2");
+  });
+
+  it("returns typed page modules and leaves diagram visuals for the React UI", async () => {
+    const currentEnv = env();
+    global.fetch = defaultFetchMock({
+      classification: {
+        type: "flora",
+        title: "Giant sequoia",
+        visualNeed: "required",
+        spaceScience: false,
+        entityQuery: "Giant sequoia",
+        visualSearchQuery: "giant sequoia range and scale infographic",
+      },
+      answer: {
+        type: "flora",
+        title: "Giant sequoia",
+        summary: "Giant sequoias are enormous conifer trees.",
+        sections: [],
+        profile: {
+          facts: [
+            { label: "Species", value: "Sequoiadendron giganteum" },
+            { label: "Years on Earth", value: "Ancient conifer lineage" },
+          ],
+          maps: [{ scope: "world", label: "World range", value: "Sierra Nevada, California" }],
+          relatedConcepts: [],
+        },
+        infographics: [{
+          title: "Tree scale",
+          kind: "comparison",
+          description: "Compare giant sequoia height and trunk volume with familiar objects.",
+          items: [{ label: "Height", value: "Up to 95 m" }],
+        }],
+        infographic: {
+          type: "stats",
+          items: [{ label: "Height", value: "Up to 95 m" }],
+        },
+        visualNeed: "required",
+        imageSourceType: "diagram",
+        imageQuery: "giant sequoia range and scale infographic",
+      },
+      wikipediaImage: null,
+    });
+
+    const body = await askAndRead(currentEnv, "Tell me about giant sequoias");
+    const imageCalls = global.fetch.mock.calls.filter(([url]) => String(url) === "https://api.openai.com/v1/images/generations");
+
+    expect(body).toMatchObject({
+      type: "flora",
+      imageSourceType: "diagram",
+      imagePending: false,
+      imageUrl: null,
+      imagePrompt: null,
+      visual: {
+        source: "none",
+        mode: "none",
+        metadata: { reason: "ui_rendered_diagram" },
+      },
+      profile: {
+        facts: [
+          { label: "Species", value: "Sequoiadendron giganteum" },
+          { label: "Years on Earth", value: "Ancient conifer lineage" },
+        ],
+        maps: [{ scope: "world", label: "World range", value: "Sierra Nevada, California" }],
+      },
+      infographics: [{ title: "Tree scale", kind: "comparison" }],
+    });
+    expect(imageCalls).toHaveLength(0);
+  });
+
+  it("stores a text-first pending response before the generated image finishes", async () => {
+    const currentEnv = env();
+    global.fetch = defaultFetchMock({
+      classification: {
+        type: "concept",
+        title: "Mercury distance from Earth",
+        visualNeed: "useful",
+        spaceScience: true,
+        entityQuery: "Mercury distance from Earth",
+        visualSearchQuery: "Mercury orbit distance from Earth diagram",
+      },
+      answer: {
+        type: "concept",
+        title: "How far away Mercury is",
+        summary: "Mercury's distance from Earth changes all the time.",
+        sections: [],
+        infographic: null,
+        visualNeed: "useful",
+        imageSourceType: "generated",
+        imagePrompt: "A calm raw editorial visual of Mercury orbiting the Sun.",
+      },
+      nasaImage: null,
+      wikipediaImage: null,
+    });
+
+    const body = await askAndRead(currentEnv, "How far away is Mercury?");
+    const latestWrites = currentEnv.NOTIFICATIONS.put.mock.calls
+      .filter(([key]) => key === "llm_latest")
+      .map(([, value]) => JSON.parse(value));
+
+    expect(latestWrites).toHaveLength(2);
+    expect(latestWrites[0]).toMatchObject({
+      id: body.id,
+      imagePending: true,
+      imageUrl: null,
+      imageSourceType: "generated",
+      visual: {
+        metadata: { reason: "image_generating", attemptedModel: "gpt-image-2" },
+      },
+    });
+    expect(latestWrites[1]).toMatchObject({
+      id: body.id,
+      imagePending: false,
+      imageSourceType: "generated",
+      visual: { source: "GPT Image 2", model: "gpt-image-2" },
+    });
+    expect(latestWrites[1].imageUrl).toMatch(/^data:image\/jpeg;base64,/);
+    expect(latestWrites[1].updatedAt).toBeGreaterThanOrEqual(latestWrites[0].updatedAt);
+  });
+
+  it("stores pending text first, then returns the completed image response", async () => {
+    const currentEnv = env();
+    const ctx = {
+      waitUntil: vi.fn(),
+    };
+    global.fetch = defaultFetchMock({
+      classification: {
+        type: "concept",
+        title: "Mercury distance from Earth",
+        visualNeed: "useful",
+        spaceScience: true,
+        entityQuery: "Mercury distance from Earth",
+        visualSearchQuery: "Mercury orbit distance from Earth diagram",
+      },
+      answer: {
+        type: "concept",
+        title: "How far away Mercury is",
+        summary: "Mercury's distance from Earth changes all the time.",
+        sections: [],
+        infographic: null,
+        visualNeed: "useful",
+        imageSourceType: "generated",
+        imagePrompt: "A calm raw editorial visual of Mercury orbiting the Sun.",
+      },
+      nasaImage: null,
+      wikipediaImage: null,
+    });
+
+    const response = await worker.fetch(askRequest("How far away is Mercury?"), currentEnv, ctx);
+    const body = await response.json();
+
+    expect(ctx.waitUntil).not.toHaveBeenCalled();
+    expect(body).toMatchObject({
+      imagePending: false,
+      imageSourceType: "generated",
+      visual: { source: "GPT Image 2", model: "gpt-image-2" },
+    });
+    expect(body.imageUrl).toMatch(/^data:image\/jpeg;base64,/);
+
+    const latestWrites = currentEnv.NOTIFICATIONS.put.mock.calls
+      .filter(([key]) => key === "llm_latest")
+      .map(([, value]) => JSON.parse(value));
+
+    expect(latestWrites).toHaveLength(2);
+    expect(latestWrites[0]).toMatchObject({
+      id: body.id,
+      imagePending: true,
+      imageUrl: null,
+      imageSourceType: "generated",
+    });
+    expect(latestWrites[1]).toMatchObject({
+      id: body.id,
+      imagePending: false,
+      visual: { source: "GPT Image 2", model: "gpt-image-2" },
+    });
+  });
+
+  it("returns explicit no-image visual shape when a visual is not needed", async () => {
+    const currentEnv = env();
+    global.fetch = defaultFetchMock({
+      classification: {
+        type: "concept",
+        title: "Ambiguous",
+        visualNeed: "none",
+        spaceScience: false,
+        entityQuery: "Ambiguous",
+        visualSearchQuery: "",
+      },
+      answer: {
+        type: "concept",
+        title: "Ambiguous",
+        summary: "Ambiguous means having more than one possible meaning.",
+        sections: [],
+        infographic: null,
+        visualNeed: "none",
+        imagePrompt: "",
+      },
+      wikipediaImage: null,
+    });
+
+    const body = await askAndRead(currentEnv, "What does ambiguous mean?");
+    const imageCalls = global.fetch.mock.calls.filter(([url]) => String(url) === "https://api.openai.com/v1/images/generations");
+
+    expect(imageCalls).toHaveLength(0);
+    expect(body.imageUrl).toBeNull();
+    expect(body.visual).toMatchObject({
+      imageUrl: null,
+      image: null,
+      source: "none",
+      mode: "none",
+      model: null,
+      generated: false,
+      metadata: { reason: "visual_not_needed" },
+    });
+  });
+
+  it("does not generate GPT Image 2 art for known imageSourceType imageQuery", async () => {
+    const currentEnv = env();
+    global.fetch = defaultFetchMock({
+      classification: {
+        type: "event",
+        title: "Apollo 11",
+        visualNeed: "required",
+        spaceScience: true,
+        entityQuery: "Apollo 11",
+        visualSearchQuery: "Apollo 11 lunar module Eagle moon surface NASA archival photo",
+      },
+      answer: {
+        type: "event",
+        title: "Apollo 11",
+        summary: "Apollo 11 landed the first humans on the Moon.",
+        sections: [],
+        infographic: null,
+        visualNeed: "required",
+        imageSourceType: "known",
+        imageQuery: "Apollo 11 lunar module Eagle moon surface NASA archival photo",
+      },
+      nasaImage: null,
+      wikipediaImage: null,
+    });
+
+    const body = await askAndRead(currentEnv, "What happened during Apollo 11?");
+    const imageCalls = global.fetch.mock.calls.filter(([url]) => String(url) === "https://api.openai.com/v1/images/generations");
+
+    expect(imageCalls).toHaveLength(0);
+    expect(body.imageSourceType).toBe("known");
+    expect(body.imageQuery).toBe("Apollo 11 lunar module Eagle moon surface NASA archival photo");
+    expect(body.imagePrompt).toBeNull();
+    expect(body.imageUrl).toBeNull();
+    expect(body.visual).toMatchObject({
+      source: "none",
+      mode: "none",
+      metadata: { reason: "retrieval_failed" },
+    });
+  });
+
+  it("normalizes sun size questions to a concise answer and retrieved NASA visual", async () => {
+    const currentEnv = env();
+    global.fetch = defaultFetchMock({
+      classification: {
+        type: "concept",
+        title: "The Sun",
+        visualNeed: "required",
+        spaceScience: true,
+        entityQuery: "Sun",
+        visualSearchQuery: "NASA Sun image solar disk Earth size comparison",
+      },
+      answer: {
+        type: "concept",
+        title: "Poor Generic Answer",
+        summary: "This response does not mention the Sun.",
+        sections: [],
+        infographic: null,
+        visualNeed: "required",
+        imageSourceType: "generated",
+        imagePrompt: "A fake cartoon star.",
+      },
+      wikipediaImage: null,
+      nasaImage: "https://nasa.test/sun.jpg",
+    });
+
+    const body = await askAndRead(currentEnv, "Hey Homer, how big is the sun?");
+    const imageCalls = global.fetch.mock.calls.filter(([url]) => String(url) === "https://api.openai.com/v1/images/generations");
+
+    expect(imageCalls).toHaveLength(0);
+    expect(body.title).toBe("The Sun's Size");
+    expect(body.summary).toContain("1.39 million kilometers");
+    expect(body.summary).toContain("109 Earths");
+    expect(body.imageSourceType).toBe("known");
+    expect(body.imageQuery).toBe("NASA Sun image solar disk Earth size comparison");
+    expect(body.imagePrompt).toBeNull();
+    expect(body.imageUrl).toBe("https://nasa.test/sun.jpg");
+    expect(body.image).toMatchObject({
+      url: "https://nasa.test/sun.jpg",
+      source: "NASA",
+      mode: "retrieved",
+      assetRole: "hero",
+    });
+    expect(body.retrieval.subject).toBe("sun");
+    expect(body.visual.source).toBe("NASA");
+    expect(body.visual.mode).toBe("retrieved");
+    expect(body.visual.metadata.retrievalSource).toBe("NASA");
+  });
+
+  it("answers moon distance questions with exact facts and a UI-rendered distance diagram", async () => {
+    const currentEnv = env();
+    global.fetch = defaultFetchMock({
+      classification: {
+        type: "concept",
+        title: "The Moon",
+        visualNeed: "required",
+        spaceScience: true,
+        entityQuery: "Moon",
+        visualSearchQuery: "Moon distance from Earth NASA",
+      },
+      answer: {
+        type: "concept",
+        title: "Poor Generic Moon Answer",
+        summary: "The Moon is a natural satellite.",
+        sections: [],
+        infographic: null,
+        visualNeed: "required",
+        imageSourceType: "known",
+        imageQuery: "Moon photograph",
+      },
+      wikipediaImage: "https://wiki.test/plain-moon-photo.jpg",
+      nasaImage: "https://nasa.test/unrelated-moon-photo.jpg",
+    });
+
+    const body = await askAndRead(currentEnv, "Hey Homer, how far away is the moon?");
+    const imageCalls = global.fetch.mock.calls.filter(([url]) => String(url) === "https://api.openai.com/v1/images/generations");
+
+    expect(body.title).toBe("Moon Distance");
+    expect(body.summary).toContain("384,400 kilometers");
+    expect(body.summary).toContain("238,855 miles");
+    expect(body.summary).toContain("363,300 km");
+    expect(body.imageSourceType).toBe("diagram");
+    expect(body.imageQuery).toContain("384,400 km");
+    expect(body.imagePrompt).toBeNull();
+    expect(body.imageUrl).toBeNull();
+    expect(body.visual).toMatchObject({
+      source: "none",
+      mode: "none",
+      metadata: { reason: "ui_rendered_diagram" },
+    });
+    expect(imageCalls).toHaveLength(0);
+  });
+
+  it("generates only when imageSourceType is generated and imagePrompt is present", async () => {
+    const currentEnv = env();
+    global.fetch = defaultFetchMock({
+      classification: {
+        type: "concept",
+        title: "Democracy",
+        visualNeed: "useful",
+        spaceScience: false,
+        entityQuery: "Democracy",
+        visualSearchQuery: "democracy",
+      },
+      answer: {
+        type: "concept",
+        title: "Democracy",
+        summary: "Democracy is a system where people participate in government.",
+        sections: [],
+        infographic: null,
+        visualNeed: "useful",
+        imageSourceType: "generated",
+        imagePrompt: "A simple symbolic civic scene with people voting and discussing ideas peacefully.",
+      },
+      wikipediaImage: null,
+    });
+
+    const body = await askAndRead(currentEnv, "What does democracy look like?");
+    const imageCall = global.fetch.mock.calls.find(([url]) => String(url) === "https://api.openai.com/v1/images/generations");
+    const requestBody = JSON.parse(imageCall[1].body);
+
+    expect(requestBody.prompt).toContain("people voting");
+    expect(requestBody.prompt).toContain("No text.");
+    expect(requestBody.prompt).toContain("No labels.");
+    expect(requestBody.prompt).toContain("No UI.");
+    expect(requestBody.prompt).toContain("No poster.");
+    expect(requestBody.prompt).toContain("No infographic panels.");
+    expect(requestBody.prompt).toContain("No logos.");
+    expect(requestBody.prompt).toContain("Leave negative space for Home Center UI text.");
+    expect(body.imageSourceType).toBe("generated");
+    expect(body.imageQuery).toBeNull();
+    expect(body.visual.mode).toBe("generated");
+  });
+
+  it("keeps retrieval anchored when classification drifts to dashboard terms", async () => {
+    const currentEnv = env();
+    global.fetch = vi.fn(async (url, options = {}) => {
+      const href = String(url);
+      if (href.startsWith("https://bridge.test")) {
+        const bridgeCallCount = global.fetch.mock.calls
+          .filter(([calledUrl]) => String(calledUrl).startsWith("https://bridge.test")).length;
+        return jsonResponse({
+          json: bridgeCallCount === 1 ? {
+            type: "concept",
+            title: "Wake Word",
+            visualNeed: "required",
+            spaceScience: false,
+            entityQuery: "wake word",
+            visualSearchQuery: "voice assistant wake word",
+          } : {
+            type: "concept",
+            title: "Wake Word",
+            summary: "Wake words activate voice assistants.",
+            sections: [{ heading: "Voice", content: "Wake words are used by smart speakers." }],
+            infographic: null,
+            visualNeed: "required",
+            imagePrompt: "A voice assistant wake word diagram.",
+          },
+          model: "gemma-test",
+        });
+      }
+      if (href.startsWith("https://en.wikipedia.org/w/rest.php/v1/search/page")) {
+        expect(new URL(href).searchParams.get("q")).toBe("ibis");
+        return jsonResponse({ pages: [{ key: "Ibis", title: "Ibis" }] });
+      }
+      if (href.startsWith("https://en.wikipedia.org/api/rest_v1/page/summary/")) {
+        return jsonResponse({
+          title: "Ibis",
+          description: "Long-legged wading birds",
+          extract: "Ibises are long-legged wading birds with curved bills.",
+          content_urls: { desktop: { page: "https://en.wikipedia.org/wiki/Ibis" } },
+          originalimage: { source: "https://wiki.test/ibis.jpg" },
+        });
+      }
+      if (href === "https://api.openai.com/v1/images/generations") {
+        return jsonResponse({ data: [{ b64_json: "ZmFrZS1qcGVn" }] });
+      }
+      throw new Error(`Unexpected fetch: ${href}`);
+    });
+
+    const body = await askAndRead(currentEnv, "is that i-b's");
+    const answerPayload = bridgePayloads()[1];
+    const answerInput = JSON.parse(answerPayload.messages[1].content);
+
+    expect(answerInput.subject).toBe("ibis");
+    expect(answerInput.retrievalContext.wikipedia.title).toBe("Ibis");
+    expect(body.title).toBe("ibis");
+    expect(body.summary).toBe("Ibises are long-legged wading birds with curved bills.");
+    expect(body.sections).toEqual([]);
+    expect(body.imageUrl).toMatch(/^data:image\/jpeg;base64,/);
+    expect(body.visual.source).toBe("GPT Image 2");
+    expect(body.visual.model).toBe("gpt-image-2");
+    expect(body.retrieval.classification).toMatchObject({
+      title: "ibis",
+      entityQuery: "ibis",
+      visualSearchQuery: "ibis",
+    });
+  });
+
+  it("rejects unrelated Wikipedia images instead of showing irrelevant visuals", async () => {
+    const currentEnv = env();
+    global.fetch = defaultFetchMock({
+      classification: {
+        type: "concept",
+        title: "Ibis",
+        visualNeed: "required",
+        spaceScience: false,
+        entityQuery: "Ibis",
+        visualSearchQuery: "Ibis bird",
+      },
+      wikipediaImage: "https://wiki.test/wake-word.jpg",
+    });
+    global.fetch.mockImplementation(async (url, options = {}) => {
+      const href = String(url);
+      if (href.startsWith("https://bridge.test") || href.startsWith("https://api.openai.com/v1/images/generations")) {
+        return defaultFetchMock({
+          classification: {
+            type: "concept",
+            title: "Ibis",
+            visualNeed: "required",
+            spaceScience: false,
+            entityQuery: "Ibis",
+            visualSearchQuery: "Ibis bird",
+          },
+          wikipediaImage: null,
+        })(url, options);
+      }
+      if (href.startsWith("https://en.wikipedia.org/w/rest.php/v1/search/page")) {
+        return jsonResponse({ pages: [{ key: "Wake_word", title: "Wake word" }] });
+      }
+      if (href.startsWith("https://en.wikipedia.org/api/rest_v1/page/summary/")) {
+        return jsonResponse({
+          title: "Wake word",
+          description: "Voice assistant phrase",
+          extract: "A wake word activates a voice assistant.",
+          content_urls: { desktop: { page: "https://en.wikipedia.org/wiki/Wake_word" } },
+          originalimage: { source: "https://wiki.test/wake-word.jpg" },
+        });
+      }
+      throw new Error(`Unexpected fetch: ${href}`);
+    });
+
+    const body = await askAndRead(currentEnv, "ibis");
+    expect(body.retrieval.wikipedia).toBeNull();
+    expect(body.visual.mode).toBe("generated");
+    expect(body.visual.source).toBe("GPT Image 2");
+  });
+});

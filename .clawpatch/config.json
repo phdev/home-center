@@ -1,0 +1,58 @@
+{
+  "schemaVersion": 1,
+  "stateDir": ".clawpatch",
+  "include": [
+    "src/**",
+    "worker/**",
+    "pi/**",
+    "voice-service/**",
+    "openclaw/eval/**",
+    "scripts/**",
+    "package.json",
+    "README.md",
+    "docs/**"
+  ],
+  "exclude": [
+    "node_modules/**",
+    "dist/**",
+    "build/**",
+    "target/**",
+    ".build/**",
+    ".git/**",
+    ".clawpatch/**",
+    ".openclaw/**",
+    "memory/**",
+    "design_outputs/**",
+    "design_memory/**",
+    "**/.venv/**",
+    "**/.pytest_cache/**",
+    "**/__pycache__/**",
+    "voice-service/models/**",
+    "voice-service/logs/**",
+    "voice-service/benchmark_outputs/**",
+    "school-updates/logs/**",
+    "email-triage/logs/**",
+    "openclaw/eval/results/**"
+  ],
+  "provider": {
+    "name": "codex",
+    "model": null
+  },
+  "commands": {
+    "typecheck": null,
+    "lint": null,
+    "format": null,
+    "test": "npm test -- worker/src/index.test.js"
+  },
+  "review": {
+    "maxContextFiles": 24,
+    "maxOwnedFiles": 12,
+    "maxFindingsPerFeature": 5,
+    "minConfidenceToFix": "medium"
+  },
+  "git": {
+    "requireCleanWorktreeForFix": true,
+    "commit": false,
+    "openPr": false
+  }
+}

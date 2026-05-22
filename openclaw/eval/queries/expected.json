@@ -1,0 +1,520 @@
+[
+  {
+    "query_id": "simple_01",
+    "expected_classification": "simple",
+    "pass_criteria": ["acknowledges_action", "appropriate_refusal"],
+    "min_acceptable_tier": "edge",
+    "max_acceptable_tier": "local",
+    "requires_action": true,
+    "expected_classification_v2": "local"
+  },
+  {
+    "query_id": "simple_02",
+    "expected_classification": "simple",
+    "pass_criteria": ["acknowledges_action", "appropriate_refusal"],
+    "min_acceptable_tier": "edge",
+    "max_acceptable_tier": "local",
+    "requires_action": true,
+    "expected_classification_v2": "local"
+  },
+  {
+    "query_id": "simple_03",
+    "expected_classification": "simple",
+    "pass_criteria": ["acknowledges_action", "appropriate_refusal"],
+    "min_acceptable_tier": "edge",
+    "max_acceptable_tier": "local",
+    "requires_action": true,
+    "expected_classification_v2": "local"
+  },
+  {
+    "query_id": "simple_04",
+    "expected_classification": "simple",
+    "pass_criteria": ["acknowledges_action", "appropriate_refusal"],
+    "min_acceptable_tier": "edge",
+    "max_acceptable_tier": "local",
+    "requires_action": true,
+    "expected_classification_v2": "local"
+  },
+  {
+    "query_id": "simple_05",
+    "expected_classification": "simple",
+    "pass_criteria": ["acknowledges_action", "appropriate_refusal"],
+    "min_acceptable_tier": "edge",
+    "max_acceptable_tier": "local",
+    "requires_action": true,
+    "expected_classification_v2": "local"
+  },
+  {
+    "query_id": "simple_06",
+    "expected_classification": "simple",
+    "pass_criteria": ["acknowledges_action", "appropriate_refusal"],
+    "min_acceptable_tier": "edge",
+    "max_acceptable_tier": "local",
+    "requires_action": true,
+    "expected_classification_v2": "local"
+  },
+  {
+    "query_id": "simple_07",
+    "expected_classification": "simple",
+    "pass_criteria": ["acknowledges_timer", "appropriate_refusal"],
+    "min_acceptable_tier": "edge",
+    "max_acceptable_tier": "local",
+    "requires_action": true,
+    "expected_classification_v2": "local"
+  },
+  {
+    "query_id": "simple_08",
+    "expected_classification": "simple",
+    "pass_criteria": ["acknowledges_timer", "appropriate_refusal"],
+    "min_acceptable_tier": "edge",
+    "max_acceptable_tier": "local",
+    "requires_action": true,
+    "expected_classification_v2": "local"
+  },
+  {
+    "query_id": "simple_09",
+    "expected_classification": "simple",
+    "pass_criteria": "acknowledges_feedback",
+    "min_acceptable_tier": "edge",
+    "max_acceptable_tier": "local",
+    "requires_action": true,
+    "expected_classification_v2": "local"
+  },
+  {
+    "query_id": "simple_10",
+    "expected_classification": "simple",
+    "pass_criteria": "acknowledges_feedback",
+    "min_acceptable_tier": "edge",
+    "max_acceptable_tier": "local",
+    "requires_action": true,
+    "expected_classification_v2": "local"
+  },
+  {
+    "query_id": "simple_11",
+    "expected_classification": "simple",
+    "pass_criteria": "contains_greeting",
+    "min_acceptable_tier": "edge",
+    "max_acceptable_tier": "local",
+    "expected_classification_v2": "local"
+  },
+  {
+    "query_id": "simple_12",
+    "expected_classification": "simple",
+    "pass_criteria": "contains_greeting",
+    "min_acceptable_tier": "edge",
+    "max_acceptable_tier": "local",
+    "expected_classification_v2": "local"
+  },
+  {
+    "query_id": "mod_01",
+    "expected_classification": "moderate",
+    "pass_criteria": "contains_list",
+    "min_acceptable_tier": "edge",
+    "max_acceptable_tier": "local",
+    "requires_context": true,
+    "expected_classification_v2": "local",
+    "context_fixture": "morning-runway"
+  },
+  {
+    "query_id": "mod_02",
+    "expected_classification": "moderate",
+    "pass_criteria": "contains_list",
+    "min_acceptable_tier": "edge",
+    "max_acceptable_tier": "local",
+    "requires_context": true,
+    "expected_classification_v2": "local",
+    "context_fixture": "morning-runway"
+  },
+  {
+    "query_id": "mod_03",
+    "expected_classification": "moderate",
+    "pass_criteria": "contains_weather",
+    "min_acceptable_tier": "edge",
+    "max_acceptable_tier": "local",
+    "requires_context": true,
+    "expected_classification_v2": "local",
+    "context_fixture": "morning-runway"
+  },
+  {
+    "query_id": "mod_04",
+    "expected_classification": "moderate",
+    "pass_criteria": "contains_recommendation",
+    "min_acceptable_tier": "edge",
+    "max_acceptable_tier": "local",
+    "requires_context": true,
+    "expected_classification_v2": "local",
+    "context_fixture": "morning-school-priority"
+  },
+  {
+    "query_id": "mod_05",
+    "expected_classification": "moderate",
+    "pass_criteria": "contains_summary",
+    "min_acceptable_tier": "edge",
+    "max_acceptable_tier": "local",
+    "requires_context": true,
+    "expected_classification_v2": "local",
+    "context_fixture": "morning-school-priority"
+  },
+  {
+    "query_id": "mod_06",
+    "expected_classification": "moderate",
+    "pass_criteria": "contains_summary",
+    "min_acceptable_tier": "edge",
+    "max_acceptable_tier": "local",
+    "requires_context": true,
+    "expected_classification_v2": "local",
+    "context_fixture": "morning-school-priority"
+  },
+  {
+    "query_id": "mod_07",
+    "expected_classification": "moderate",
+    "pass_criteria": "contains_summary",
+    "min_acceptable_tier": "edge",
+    "max_acceptable_tier": "local",
+    "requires_context": true,
+    "expected_classification_v2": "local",
+    "context_fixture": "school-updates-digest"
+  },
+  {
+    "query_id": "mod_08",
+    "expected_classification": "moderate",
+    "pass_criteria": "contains_time_or_date",
+    "min_acceptable_tier": "edge",
+    "max_acceptable_tier": "local",
+    "requires_context": true,
+    "expected_classification_v2": "local",
+    "context_fixture": "school-updates-digest"
+  },
+  {
+    "query_id": "mod_09",
+    "expected_classification": "moderate",
+    "pass_criteria": "contains_events",
+    "min_acceptable_tier": "edge",
+    "max_acceptable_tier": "local",
+    "requires_context": true,
+    "expected_classification_v2": "local",
+    "context_fixture": "school-updates-digest"
+  },
+  {
+    "query_id": "mod_10",
+    "expected_classification": "moderate",
+    "pass_criteria": "contains_summary",
+    "min_acceptable_tier": "edge",
+    "max_acceptable_tier": "local",
+    "requires_context": true,
+    "expected_classification_v2": "local",
+    "context_fixture": "school-updates-digest-with-agent"
+  },
+  {
+    "query_id": "mod_11",
+    "expected_classification": "moderate",
+    "pass_criteria": "contains_recommendation",
+    "min_acceptable_tier": "edge",
+    "max_acceptable_tier": "local",
+    "requires_context": true,
+    "expected_classification_v2": "local",
+    "context_fixture": "school-updates-digest-with-agent"
+  },
+  {
+    "query_id": "mod_12",
+    "expected_classification": "moderate",
+    "pass_criteria": "contains_reminder",
+    "min_acceptable_tier": "edge",
+    "max_acceptable_tier": "local",
+    "requires_context": true,
+    "expected_classification_v2": "local",
+    "context_fixture": "evening-bedtime-gate"
+  },
+  {
+    "query_id": "mod_13",
+    "expected_classification": "moderate",
+    "pass_criteria": "contains_time",
+    "min_acceptable_tier": "edge",
+    "max_acceptable_tier": "local",
+    "requires_context": true,
+    "expected_classification_v2": "local",
+    "context_fixture": "evening-bedtime-gate"
+  },
+  {
+    "query_id": "mod_14",
+    "expected_classification": "moderate",
+    "pass_criteria": "contains_food",
+    "min_acceptable_tier": "edge",
+    "max_acceptable_tier": "local",
+    "requires_context": true,
+    "expected_classification_v2": "local",
+    "context_fixture": "evening-lunch-setup-after-bedtime-dismissed"
+  },
+  {
+    "query_id": "mod_15",
+    "expected_classification": "moderate",
+    "pass_criteria": "contains_food",
+    "min_acceptable_tier": "edge",
+    "max_acceptable_tier": "local",
+    "requires_context": true,
+    "expected_classification_v2": "local",
+    "context_fixture": "evening-lunch-setup-after-bedtime-dismissed"
+  },
+  {
+    "query_id": "complex_01",
+    "expected_classification": "complex",
+    "pass_criteria": "contains_analysis",
+    "min_acceptable_tier": "local",
+    "max_acceptable_tier": "anthropic",
+    "requires_context": true,
+    "expected_classification_v2": "escalate",
+    "expected_escalation_target_v2": "sonnet",
+    "context_fixture": "morning-runway"
+  },
+  {
+    "query_id": "complex_02",
+    "expected_classification": "complex",
+    "pass_criteria": "contains_recommendation",
+    "min_acceptable_tier": "local",
+    "max_acceptable_tier": "anthropic",
+    "requires_context": true,
+    "expected_classification_v2": "escalate",
+    "expected_escalation_target_v2": "sonnet",
+    "context_fixture": "morning-runway"
+  },
+  {
+    "query_id": "complex_03",
+    "expected_classification": "complex",
+    "pass_criteria": "contains_analysis",
+    "min_acceptable_tier": "local",
+    "max_acceptable_tier": "anthropic",
+    "requires_context": true,
+    "expected_classification_v2": "escalate",
+    "expected_escalation_target_v2": "sonnet",
+    "context_fixture": "morning-school-priority"
+  },
+  {
+    "query_id": "complex_04",
+    "expected_classification": "complex",
+    "pass_criteria": "contains_summary",
+    "min_acceptable_tier": "local",
+    "max_acceptable_tier": "anthropic",
+    "requires_context": true,
+    "expected_classification_v2": "escalate",
+    "expected_escalation_target_v2": "sonnet",
+    "context_fixture": "morning-school-priority"
+  },
+  {
+    "query_id": "complex_05",
+    "expected_classification": "complex",
+    "pass_criteria": "contains_recommendation",
+    "min_acceptable_tier": "local",
+    "max_acceptable_tier": "anthropic",
+    "requires_context": true,
+    "expected_classification_v2": "escalate",
+    "expected_escalation_target_v2": "sonnet",
+    "context_fixture": "school-updates-digest"
+  },
+  {
+    "query_id": "complex_06",
+    "expected_classification": "complex",
+    "pass_criteria": "contains_summary",
+    "min_acceptable_tier": "local",
+    "max_acceptable_tier": "anthropic",
+    "requires_context": true,
+    "expected_classification_v2": "escalate",
+    "expected_escalation_target_v2": "sonnet",
+    "context_fixture": "school-updates-digest"
+  },
+  {
+    "query_id": "complex_07",
+    "expected_classification": "complex",
+    "pass_criteria": "contains_analysis",
+    "min_acceptable_tier": "local",
+    "max_acceptable_tier": "anthropic",
+    "requires_context": true,
+    "expected_classification_v2": "escalate",
+    "expected_escalation_target_v2": "sonnet",
+    "context_fixture": "school-updates-digest-with-agent"
+  },
+  {
+    "query_id": "complex_08",
+    "expected_classification": "complex",
+    "pass_criteria": "contains_comparison",
+    "min_acceptable_tier": "local",
+    "max_acceptable_tier": "anthropic",
+    "requires_context": true,
+    "expected_classification_v2": "escalate",
+    "expected_escalation_target_v2": "sonnet",
+    "context_fixture": "school-updates-digest-with-agent"
+  },
+  {
+    "query_id": "complex_09",
+    "expected_classification": "complex",
+    "pass_criteria": "contains_analysis",
+    "min_acceptable_tier": "local",
+    "max_acceptable_tier": "anthropic",
+    "requires_context": true,
+    "expected_classification_v2": "escalate",
+    "expected_escalation_target_v2": "sonnet",
+    "context_fixture": "evening-bedtime-gate"
+  },
+  {
+    "query_id": "complex_10",
+    "expected_classification": "complex",
+    "pass_criteria": "contains_recommendation",
+    "min_acceptable_tier": "local",
+    "max_acceptable_tier": "anthropic",
+    "requires_context": true,
+    "expected_classification_v2": "escalate",
+    "expected_escalation_target_v2": "sonnet",
+    "context_fixture": "evening-bedtime-gate"
+  },
+  {
+    "query_id": "complex_11",
+    "expected_classification": "complex",
+    "pass_criteria": "contains_analysis",
+    "min_acceptable_tier": "local",
+    "max_acceptable_tier": "anthropic",
+    "requires_context": true,
+    "expected_classification_v2": "escalate",
+    "expected_escalation_target_v2": "sonnet",
+    "context_fixture": "evening-lunch-setup-after-bedtime-dismissed"
+  },
+  {
+    "query_id": "complex_12",
+    "expected_classification": "complex",
+    "pass_criteria": "contains_plan",
+    "min_acceptable_tier": "local",
+    "max_acceptable_tier": "anthropic",
+    "requires_context": true,
+    "expected_classification_v2": "escalate",
+    "expected_escalation_target_v2": "sonnet",
+    "context_fixture": "evening-lunch-setup-after-bedtime-dismissed"
+  },
+  {
+    "query_id": "knowledge_01",
+    "expected_classification": "knowledge",
+    "pass_criteria": ["parseable_knowledge_json", "subject_aligned", "visual_need_correct", "prefers_known_source"],
+    "min_acceptable_tier": "local",
+    "max_acceptable_tier": "anthropic",
+    "expected_classification_v2": "local"
+  },
+  {
+    "query_id": "knowledge_02",
+    "expected_classification": "knowledge",
+    "pass_criteria": ["parseable_knowledge_json", "subject_aligned", "visual_need_correct", "prefers_known_source"],
+    "min_acceptable_tier": "local",
+    "max_acceptable_tier": "anthropic",
+    "expected_classification_v2": "local"
+  },
+  {
+    "query_id": "knowledge_03",
+    "expected_classification": "knowledge",
+    "pass_criteria": ["parseable_knowledge_json", "subject_aligned", "visual_need_correct", "prefers_known_source"],
+    "min_acceptable_tier": "local",
+    "max_acceptable_tier": "anthropic",
+    "expected_classification_v2": "local"
+  },
+  {
+    "query_id": "knowledge_04",
+    "expected_classification": "knowledge",
+    "pass_criteria": ["parseable_knowledge_json", "subject_aligned", "visual_need_correct", "prefers_known_source"],
+    "min_acceptable_tier": "local",
+    "max_acceptable_tier": "anthropic",
+    "expected_classification_v2": "local"
+  },
+  {
+    "query_id": "knowledge_05",
+    "expected_classification": "knowledge",
+    "pass_criteria": ["parseable_knowledge_json", "subject_aligned", "visual_need_correct", "prefers_known_source"],
+    "min_acceptable_tier": "local",
+    "max_acceptable_tier": "anthropic",
+    "expected_classification_v2": "local"
+  },
+  {
+    "query_id": "knowledge_06",
+    "expected_classification": "knowledge",
+    "pass_criteria": ["parseable_knowledge_json", "subject_aligned", "visual_need_correct", "prefers_known_source"],
+    "min_acceptable_tier": "local",
+    "max_acceptable_tier": "anthropic",
+    "expected_classification_v2": "local"
+  },
+  {
+    "query_id": "knowledge_07",
+    "expected_classification": "knowledge",
+    "pass_criteria": ["parseable_knowledge_json", "subject_aligned", "prefers_known_source"],
+    "min_acceptable_tier": "local",
+    "max_acceptable_tier": "anthropic",
+    "expected_classification_v2": "local"
+  },
+  {
+    "query_id": "knowledge_08",
+    "expected_classification": "knowledge",
+    "pass_criteria": ["parseable_knowledge_json", "subject_aligned", "visual_need_correct"],
+    "min_acceptable_tier": "local",
+    "max_acceptable_tier": "anthropic",
+    "expected_classification_v2": "local"
+  },
+  {
+    "query_id": "knowledge_09",
+    "expected_classification": "knowledge",
+    "pass_criteria": ["parseable_knowledge_json", "subject_aligned", "visual_need_correct"],
+    "min_acceptable_tier": "anthropic",
+    "max_acceptable_tier": "anthropic",
+    "expected_classification_v2": "escalate",
+    "expected_escalation_target_v2": "sonnet"
+  },
+  {
+    "query_id": "knowledge_10",
+    "expected_classification": "knowledge",
+    "pass_criteria": ["parseable_knowledge_json", "subject_aligned", "visual_need_correct", "prefers_known_source"],
+    "min_acceptable_tier": "anthropic",
+    "max_acceptable_tier": "anthropic",
+    "expected_classification_v2": "escalate",
+    "expected_escalation_target_v2": "sonnet"
+  },
+  {
+    "query_id": "knowledge_11",
+    "expected_classification": "knowledge",
+    "pass_criteria": ["parseable_knowledge_json", "subject_aligned", "visual_need_correct", "prefers_known_source"],
+    "min_acceptable_tier": "local",
+    "max_acceptable_tier": "anthropic",
+    "expected_classification_v2": "local"
+  },
+  {
+    "query_id": "knowledge_12",
+    "expected_classification": "knowledge",
+    "pass_criteria": ["parseable_knowledge_json", "subject_aligned", "visual_need_correct", "prefers_known_source"],
+    "min_acceptable_tier": "local",
+    "max_acceptable_tier": "anthropic",
+    "expected_classification_v2": "local"
+  },
+  {
+    "query_id": "knowledge_13",
+    "expected_classification": "knowledge",
+    "pass_criteria": ["parseable_knowledge_json", "subject_aligned", "visual_need_correct", "prefers_known_source"],
+    "min_acceptable_tier": "local",
+    "max_acceptable_tier": "anthropic",
+    "expected_classification_v2": "local"
+  },
+  {
+    "query_id": "knowledge_14",
+    "expected_classification": "knowledge",
+    "pass_criteria": ["parseable_knowledge_json", "subject_aligned", "visual_need_correct", "prefers_known_source"],
+    "min_acceptable_tier": "local",
+    "max_acceptable_tier": "anthropic",
+    "expected_classification_v2": "local"
+  },
+  {
+    "query_id": "knowledge_15",
+    "expected_classification": "knowledge",
+    "pass_criteria": ["parseable_knowledge_json", "safe_knowledge_refusal"],
+    "min_acceptable_tier": "local",
+    "max_acceptable_tier": "anthropic",
+    "expected_classification_v2": "local"
+  },
+  {
+    "query_id": "knowledge_16",
+    "expected_classification": "knowledge",
+    "pass_criteria": ["parseable_knowledge_json", "subject_aligned"],
+    "min_acceptable_tier": "local",
+    "max_acceptable_tier": "anthropic",
+    "expected_classification_v2": "local"
+  }
+]

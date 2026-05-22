@@ -1,0 +1,21 @@
+{
+  "name": "openclaw-router",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Tiered model orchestration for OpenClaw + Telegram bridge",
+  "main": "router/index.js",
+  "scripts": {
+    "bridge": "node index.js",
+    "route": "node router/index.js",
+    "eval:env": "node eval/check-environment.js",
+    "eval": "node eval/runner.js",
+    "eval:score": "node eval/runner.js --tier all --suite all",
+    "eval:compare": "node eval/runner.js --mode compare --suite all",
+    "eval-report": "node eval/report.js"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.0.0",
+    "express": "^4.19.2",
+    "node-telegram-bot-api": "^0.66.0"
+  }
+}

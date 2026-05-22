@@ -1,0 +1,48 @@
+{
+  "screen": "dashboard-afternoon",
+  "time_of_day": "16:30",
+  "goal": "surface the one decision the family still has to make before dinner",
+  "constraints": {
+    "device": "shared 4K TV, viewed from across the living room",
+    "interaction": "ambient primary; one tap to choose a takeout vendor",
+    "glanceability": "primary signal readable in under 2 seconds after school pickup",
+    "max_visible_cards": 4
+  },
+  "design_principles": [
+    "show only the essential information at this moment",
+    "actionable beats informational",
+    "one primary thing, clearly, before secondary things",
+    "clarity beats completeness"
+  ],
+  "derived_state": {
+    "showMorningChecklist": false,
+    "hasMorningOverlap": false,
+    "peter0800_0900Risk": false,
+    "takeoutDecisionPending": true,
+    "lunchDecisionNeeded": false,
+    "birthdayGiftNeeded": true,
+    "bedtimeReminderActive": false,
+    "showClawSuggestions": true
+  },
+  "current_structure": {
+    "layout": "stacked_cards",
+    "rows": [
+      {
+        "region": "top",
+        "cards": [
+          { "id": "calendar",        "priority": 3 },
+          { "id": "birthdays",       "priority": 4 },
+          { "id": "weather",         "priority": 4 },
+          { "id": "clawSuggestions", "priority": 1 }
+        ]
+      },
+      {
+        "region": "mid",
+        "cards": [
+          { "id": "takeoutDecision", "priority": 1, "note": "renders via ContextualSlot — displaces Photos" },
+          { "id": "schoolUpdates",   "priority": 3 }
+        ]
+      }
+    ]
+  }
+}

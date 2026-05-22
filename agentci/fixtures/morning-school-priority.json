@@ -1,0 +1,129 @@
+{
+  "scenarioId": "morning-school-priority",
+  "timeContext": {
+    "now": "2026-05-05T14:30:00.000Z",
+    "user": {
+      "isPeter": true,
+      "email": "peter@example.test"
+    }
+  },
+  "commandEvents": [
+    {
+      "source": "fixture",
+      "transcript": "good morning",
+      "wakewordDetected": true,
+      "confidenceBucket": "high",
+      "locale": "en-US",
+      "deviceType": "agentci-fixture"
+    }
+  ],
+  "rawData": {
+    "calendar": {
+      "events": [
+        {
+          "id": "peter-focus-block",
+          "title": "Peter focus block",
+          "start": "2026-05-05T15:00:00.000Z",
+          "end": "2026-05-05T16:00:00.000Z",
+          "calendarOwner": "peter",
+          "attendees": ["peter@example.test"],
+          "status": "confirmed"
+        }
+      ]
+    },
+    "weather": {
+      "today": {
+        "highTempF": 82,
+        "lowTempF": 62,
+        "precipProb": 0.05,
+        "summary": "Warm and clear"
+      }
+    },
+    "birthdays": [],
+    "bedtime": [],
+    "checklist": {
+      "items": [
+        {
+          "id": "backpacks",
+          "label": "Backpacks packed",
+          "condition": "always"
+        },
+        {
+          "id": "water-bottles",
+          "label": "Water bottles filled",
+          "condition": "always"
+        },
+        {
+          "id": "sunscreen",
+          "label": "Sunscreen on",
+          "condition": "hot"
+        }
+      ]
+    },
+    "takeout": {
+      "today": {
+        "date": "2026-05-05",
+        "decision": "home"
+      }
+    },
+    "lunchDecisions": {},
+    "schoolLunchMenu": [],
+    "schoolItems": [
+      {
+        "id": "school-action-reading-log",
+        "kind": "action",
+        "title": "Turn in reading log",
+        "summary": "Reading log is due today and needs a parent signature.",
+        "dueDate": "2026-05-05T20:00:00.000Z",
+        "eventDate": "2026-05-05",
+        "child": "Test Student",
+        "class": "Grade 3",
+        "teacher": "Ms. Example",
+        "urgency": 0.83,
+        "extractionSource": "regex",
+        "rawSnippet": "Reading log is due today and needs a parent signature.",
+        "sourceEmailId": "fake-email-002"
+      }
+    ],
+    "schoolUpdates": [
+      {
+        "id": "school-action-reading-log",
+        "kind": "action",
+        "title": "Turn in reading log",
+        "summary": "Reading log is due today and needs a parent signature.",
+        "dueDate": "2026-05-05T20:00:00.000Z",
+        "eventDate": "2026-05-05",
+        "child": "Test Student",
+        "urgency": 0.83,
+        "extractionSource": "regex",
+        "sourceEmailId": "fake-email-002"
+      }
+    ],
+    "settings": {}
+  },
+  "expected": {
+    "derivedState": {
+      "showMorningChecklist": true,
+      "peter0800_0900Risk": true,
+      "hasMorningOverlap": false,
+      "hasUrgentSchoolItem": true,
+      "needsSchoolActionToday": true
+    },
+    "cards": [
+      {
+        "id": "school-updates",
+        "type": "SchoolUpdatesCard",
+        "priority": "urgent",
+        "placement": "main",
+        "index": 0
+      },
+      {
+        "id": "morning-checklist",
+        "type": "MorningChecklistCard",
+        "priority": "ambient",
+        "placement": "contextual",
+        "index": 1
+      }
+    ]
+  }
+}

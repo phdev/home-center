@@ -1,0 +1,134 @@
+[
+  {
+    "id": "complex_01",
+    "query": "analyze the morning runway context and explain why the checklist should appear",
+    "context_fixture": "morning-runway",
+    "expected_classification": "complex",
+    "expected_classification_v2": "escalate",
+    "expected_escalation_target_v2": "sonnet",
+    "criterion": "contains_analysis",
+    "requires_action": false,
+    "requires_context": true
+  },
+  {
+    "id": "complex_02",
+    "query": "prioritize the morning runway cards using only the fixture data",
+    "context_fixture": "morning-runway",
+    "expected_classification": "complex",
+    "expected_classification_v2": "escalate",
+    "expected_escalation_target_v2": "sonnet",
+    "criterion": "contains_recommendation",
+    "requires_action": false,
+    "requires_context": true
+  },
+  {
+    "id": "complex_03",
+    "query": "analyze why school updates outrank the morning checklist in this scenario",
+    "context_fixture": "morning-school-priority",
+    "expected_classification": "complex",
+    "expected_classification_v2": "escalate",
+    "expected_escalation_target_v2": "sonnet",
+    "criterion": "contains_analysis",
+    "requires_action": false,
+    "requires_context": true
+  },
+  {
+    "id": "complex_04",
+    "query": "analyze the morning school priority scenario and flag what needs parent attention",
+    "context_fixture": "morning-school-priority",
+    "expected_classification": "complex",
+    "expected_classification_v2": "escalate",
+    "expected_escalation_target_v2": "sonnet",
+    "criterion": "contains_summary",
+    "requires_action": false,
+    "requires_context": true
+  },
+  {
+    "id": "complex_05",
+    "query": "analyze the school updates digest and recommend the next family action",
+    "context_fixture": "school-updates-digest",
+    "expected_classification": "complex",
+    "expected_classification_v2": "escalate",
+    "expected_escalation_target_v2": "sonnet",
+    "criterion": "contains_recommendation",
+    "requires_action": false,
+    "requires_context": true
+  },
+  {
+    "id": "complex_06",
+    "query": "analyze the school update with due date, event date, child, and location",
+    "context_fixture": "school-updates-digest",
+    "expected_classification": "complex",
+    "expected_classification_v2": "escalate",
+    "expected_escalation_target_v2": "sonnet",
+    "criterion": "contains_summary",
+    "requires_action": false,
+    "requires_context": true
+  },
+  {
+    "id": "complex_07",
+    "query": "analyze how the agent-enhanced school update should remain deterministic",
+    "context_fixture": "school-updates-digest-with-agent",
+    "expected_classification": "complex",
+    "expected_classification_v2": "escalate",
+    "expected_escalation_target_v2": "sonnet",
+    "criterion": "contains_analysis",
+    "requires_action": false,
+    "requires_context": true
+  },
+  {
+    "id": "complex_08",
+    "query": "compare the school update card's deterministic facts with the agent summary",
+    "context_fixture": "school-updates-digest-with-agent",
+    "expected_classification": "complex",
+    "expected_classification_v2": "escalate",
+    "expected_escalation_target_v2": "sonnet",
+    "criterion": "contains_comparison",
+    "requires_action": false,
+    "requires_context": true
+  },
+  {
+    "id": "complex_09",
+    "query": "analyze why bedtime should gate the lunch card in this evening scenario",
+    "context_fixture": "evening-bedtime-gate",
+    "expected_classification": "complex",
+    "expected_classification_v2": "escalate",
+    "expected_escalation_target_v2": "sonnet",
+    "criterion": "contains_analysis",
+    "requires_action": false,
+    "requires_context": true
+  },
+  {
+    "id": "complex_10",
+    "query": "prioritize the evening cards when bedtime and lunch are both relevant",
+    "context_fixture": "evening-bedtime-gate",
+    "expected_classification": "complex",
+    "expected_classification_v2": "escalate",
+    "expected_escalation_target_v2": "sonnet",
+    "criterion": "contains_recommendation",
+    "requires_action": false,
+    "requires_context": true
+  },
+  {
+    "id": "complex_11",
+    "query": "analyze what changes after bedtime is dismissed and lunch setup remains",
+    "context_fixture": "evening-lunch-setup-after-bedtime-dismissed",
+    "expected_classification": "complex",
+    "expected_classification_v2": "escalate",
+    "expected_escalation_target_v2": "sonnet",
+    "criterion": "contains_analysis",
+    "requires_action": false,
+    "requires_context": true
+  },
+  {
+    "id": "complex_12",
+    "query": "analyze and plan the evening lunch decision from the dismissed bedtime fixture",
+    "context_fixture": "evening-lunch-setup-after-bedtime-dismissed",
+    "expected_classification": "complex",
+    "expected_classification_v2": "escalate",
+    "expected_escalation_target_v2": "sonnet",
+    "criterion": "contains_plan",
+    "requires_action": false,
+    "requires_context": true
+  }
+]

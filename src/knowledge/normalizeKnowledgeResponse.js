@@ -1,0 +1,150 @@
+const VALID_TYPES = new Set(["location", "person", "fauna", "flora", "event", "concept"]);
+
+function text(value, max = 240) {
+  return String(value || "").replace(/\s+/g, " ").trim().slice(0, max);
+}
+
+function asArray(value) {
+  return Array.isArray(value) ? value : [];
+}
+
+function titleFromHeading(heading, fallback) {
+  const value = text(heading, 64);
+  return value || fallback;
+}
+
+function normalizeFacts(response) {
+  const profileFacts = asArray(response?.profile?.facts).map((fact) => ({
+    label: text(fact?.label, 44),
+    value: text(fact?.value, 90),
+    icon: text(fact?.icon, 24),
+    detail: text(fact?.detail, 120),
+  }));
+  const legacyFacts = asArray(response?.infographic?.items).map((fact) => ({
+    label: text(fact?.label, 44),
+    value: text(fact?.value, 90),
+    icon: text(fact?.icon, 24),
+  }));
+  return [...profileFacts, ...legacyFacts]
+    .filter((fact) => fact.label && fact.value)
+    .slice(0, 6);
+}
+
+function normalizeMaps(response) {
+  return asArray(response?.profile?.maps).map((map) => ({
+    scope: text(map?.scope || "world", 24),
+    label: text(map?.label || map?.value, 64),
+    highlight: text(map?.highlight || map?.value || map?.label, 90),
+    lat: Number.isFinite(Number(map?.lat)) ? Number(map.lat) : null,
+    lon: Number.isFinite(Number(map?.lon)) ? Number(map.lon) : null,
+    regionCode: text(map?.regionCode || map?.state || map?.countryCode, 16).toUpperCase(),
+  })).filter((map) => map.label || map.highlight).slice(0, 3);
+}
+
+function normalizeTimeline(response) {
+  const timelineModules = asArray(response?.infographics).filter((item) => item?.kind === "timeline");
+  const items = [
+    ...asArray(response?.timeline),
+    ...timelineModules.flatMap((item) => asArray(item?.items)),
+  ];
+  return items.map((item) => ({
+    label: text(item?.label || item?.title, 54),
+    date: text(item?.date || item?.value, 44),
+    description: text(item?.description || item?.detail, 120),
+  })).filter((item) => item.label || item.date || item.description).slice(0, 5);
+}
+
+function normalizeGlance(response, type) {
+  const modules = asArray(response?.infographics);
+  const preferred = modules.find((item) => item?.kind && item.kind !== "timeline" && item.kind !== "map" && item.kind !== "process")
+    || modules[0]
+    || response?.infographic
+    || null;
+  const defaultTitle = {
+    location: "At a Glance",
+    person: "Legacy Signals",
+    fauna: "Life Pattern",
+    flora: "Growth Pattern",
+    event: "Timeline Glance",
+    concept: "Concept Map",
+  }[type] || "At a Glance";
+  const metrics = asArray(preferred?.items).map((item) => ({
+    label: text(item?.label, 42),
+    value: text(item?.value, 80),
+    sublabel: text(item?.sublabel || item?.detail, 80),
+    icon: text(item?.icon, 24),
+  })).filter((metric) => metric.label && metric.value).slice(0, 4);
+  return {
+    title: titleFromHeading(preferred?.title || preferred?.type, defaultTitle),
+    description: text(preferred?.description, 180),
+    metrics,
+  };
+}
+
+function normalizeRelated(response) {
+  return [
+    ...asArray(response?.relatedTopics),
+    ...asArray(response?.profile?.relatedConcepts),
+  ].map((item) => text(typeof item === "string" ? item : item?.label || item?.title, 40))
+    .filter(Boolean)
+    .slice(0, 6);
+}
+
+function normalizeHeroImage(response) {
+  const image = response?.image || response?.heroImage || {};
+  const url = image?.url || response?.imageUrl || image?.imageUrl || null;
+  if (!url) return null;
+  return {
+    url,
+    source: text(image?.source || response?.visual?.source || response?.retrieval?.source, 80),
+    sourceUrl: image?.sourceUrl || response?.visual?.sourceUrl || response?.retrieval?.wikipedia?.sourceUrl || response?.retrieval?.nasa?.sourceUrl || null,
+    mode: image?.mode || response?.visual?.mode || "retrieved",
+    assetRole: image?.assetRole || response?.visual?.assetRole || "hero",
+    width: image?.width || null,
+    height: image?.height || null,
+    createdAt: image?.createdAt || null,
+    expiresAt: image?.expiresAt || null,
+    alt: image?.alt || response?.title || response?.query || "Knowledge image",
+  };
+}
+
+function sourceLabel(response, heroImage) {
+  if (response?.imagePending) return "GPT Image 2 · generating raw visual";
+  if (!heroImage) return "";
+  if (heroImage.mode === "generated") return "GPT Image 2 · generated raw visual";
+  const source = heroImage.source || response?.visual?.metadata?.retrievalSource || response?.retrieval?.source || "source";
+  return `${source} · retrieved source image`;
+}
+
+export function normalizeKnowledgeResponse(response = {}) {
+  const type = VALID_TYPES.has(response?.type) ? response.type : "concept";
+  const sections = asArray(response?.sections);
+  const insightSection = sections[0] || {};
+  const heroImage = normalizeHeroImage(response);
+  return {
+    type,
+    title: text(response?.title || response?.query || "Knowledge", 96),
+    query: text(response?.query, 160),
+    summary: text(response?.summary || response?.answer || "Loading knowledge answer...", 700),
+    insight: {
+      title: titleFromHeading(response?.insight?.title || insightSection.heading, {
+        location: "Why It Matters",
+        person: "Why They Matter",
+        fauna: "Adaptation",
+        flora: "Ecosystem Role",
+        event: "Impact",
+        concept: "Key Idea",
+      }[type] || "Insight"),
+      body: text(response?.insight?.body || insightSection.content || sections[1]?.content, 520),
+    },
+    facts: normalizeFacts(response),
+    maps: normalizeMaps(response),
+    timeline: normalizeTimeline(response),
+    glance: normalizeGlance(response, type),
+    relatedTopics: normalizeRelated(response),
+    heroImage,
+    sourceLabel: sourceLabel(response, heroImage),
+    imagePending: response?.imagePending === true,
+    raw: response,
+  };
+}

@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Optional fallback template for the Home Center Devon morning brief.
+
+  The preferred activation path is the OpenClaw Gateway scheduler configured
+  by deploy/mac-mini/setup-devon-morning.sh. This launchd template is only for
+  environments where the Gateway cron scheduler is not being used.
+
+    __REPO_DIR__              absolute path to the home-center clone
+    __OPENCLAW_CODEX_BIN__    absolute path to the OpenClaw CLI with Codex
+                              agent runtime support. This must not be a tmux
+                              or raw Codex CLI wrapper.
+
+  Schedule: 08:15 America/Los_Angeles, daily. It runs the existing OpenClaw
+  cron job named devon-morning-brief.
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.homecenter.devon-morning</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>__OPENCLAW_CODEX_BIN__</string>
+        <string>cron</string>
+        <string>run</string>
+        <string>devon-morning-brief</string>
+        <string>--expect-final</string>
+        <string>--timeout</string>
+        <string>900000</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>__REPO_DIR__</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/opt/homebrew/sbin</string>
+        <key>TZ</key>
+        <string>America/Los_Angeles</string>
+    </dict>
+
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Hour</key>
+        <integer>8</integer>
+        <key>Minute</key>
+        <integer>15</integer>
+    </dict>
+
+    <key>StandardOutPath</key>
+    <string>__REPO_DIR__/docs/status/devon-morning.stdout.log</string>
+    <key>StandardErrorPath</key>
+    <string>__REPO_DIR__/docs/status/devon-morning.stderr.log</string>
+
+    <key>RunAtLoad</key>
+    <false/>
+</dict>
+</plist>
