@@ -3,15 +3,15 @@
   <windowRules>
     <windowRule identifier="chromium" serverDecoration="no">
       <action name="MoveTo" x="0" y="0" />
-      <action name="Maximize" />
+      <action name="ToggleFullscreen" />
     </windowRule>
     <windowRule identifier="chromium-browser" serverDecoration="no">
       <action name="MoveTo" x="0" y="0" />
-      <action name="Maximize" />
+      <action name="ToggleFullscreen" />
     </windowRule>
     <windowRule title="*Home Center*" serverDecoration="no">
       <action name="MoveTo" x="0" y="0" />
-      <action name="Maximize" />
+      <action name="ToggleFullscreen" />
     </windowRule>
   </windowRules>
 </openbox_config>
