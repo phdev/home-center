@@ -18,7 +18,9 @@
     "eval:compare": "node openclaw/eval/runner.js --mode compare --suite all",
     "eval:report": "node openclaw/eval/report.js",
     "agentci:gate": "node scripts/agentci.js gate",
-    "audit:clawpatch": "bash scripts/clawpatch-audit.sh"
+    "audit:clawpatch": "bash scripts/clawpatch-audit.sh",
+    "check:knowledge-visual-contract": "node scripts/check-knowledge-visual-contract.mjs",
+    "check:knowledge-visual-contract:live": "node scripts/check-knowledge-visual-contract.mjs --live"
   },
   "dependencies": {
     "lucide-react": "^0.575.0",
