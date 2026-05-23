@@ -1,0 +1,200 @@
+{
+  "workerVersion": "9b634928-1416-498f-83ba-c3e26fe61d4c",
+  "workerUrl": "https://home-center-api.phhowell.workers.dev",
+  "dashboardBundle": {
+    "css": "dist/assets/index-CCOBJuHU.css",
+    "js": "dist/assets/index-D-53cM2B.js"
+  },
+  "screenshotTimestamp": "2026-05-23T21:37:17Z",
+  "captureMethod": {
+    "browserViewport": {
+      "width": 1920,
+      "height": 1080
+    },
+    "imagePixels": {
+      "width": 3840,
+      "height": 2160
+    },
+    "tool": "remote grim screenshots from Pi displays after browser-side query navigation",
+    "note": "Chromium CDP screenshots stalled on long captures, so display screenshots were captured with grim. Browser DOM checks confirmed 1920x1080 viewport on both Pis."
+  },
+  "staleArtifacts": {
+    "oldUntrackedScreenshots": "deleted with trash",
+    "oldUntrackedSummaries": "deleted with trash",
+    "replacementScreenshotsCaptured": true
+  },
+  "piVerification": {
+    "homecenter.local": {
+      "dashboardLocalActive": true,
+      "viewportReliable": true,
+      "visualPass": true
+    },
+    "homecenter2.local": {
+      "dashboardLocalActive": true,
+      "viewportReliable": true,
+      "visualPass": true,
+      "note": "Pi 2 screenshot capture is reliable for this pass; browser viewport checks reported 1920x1080 and the display capture covered the full dashboard."
+    }
+  },
+  "regressionCheck": {
+    "script": "scripts/check-knowledge-visual-contract.mjs",
+    "defaultCommand": "npm run check:knowledge-visual-contract",
+    "liveCommand": "WORKER_TOKEN=<token> npm run check:knowledge-visual-contract:live",
+    "defaultMode": "mocked local Worker contract check; no production network dependency",
+    "assertions": [
+      "responses include type and title",
+      "known, diagram, and none responses do not set imagePending true",
+      "known, diagram, and none responses do not include imagePrompt",
+      "imageQuery does not imply imagePending",
+      "generated responses require imageSourceType generated and imagePrompt",
+      "image responses include source metadata",
+      "related chips are present"
+    ]
+  },
+  "visualChecks": [
+    {
+      "target": "homecenter.local",
+      "query": "Where is Madagascar?",
+      "type": "location",
+      "imageSourceType": "known",
+      "source": "Wikipedia",
+      "heroImagePresent": true,
+      "fallbackIntentional": false,
+      "pass": true,
+      "path": "docs/qa/knowledge-pages/location-madagascar-post-fidelity-v2.png"
+    },
+    {
+      "target": "homecenter.local",
+      "query": "Who was Ada Lovelace?",
+      "type": "person",
+      "imageSourceType": "known",
+      "source": "Wikipedia",
+      "heroImagePresent": true,
+      "fallbackIntentional": false,
+      "pass": true,
+      "path": "docs/qa/knowledge-pages/person-ada-lovelace-post-fidelity-v2.png"
+    },
+    {
+      "target": "homecenter.local",
+      "query": "Tell me about emperor penguins.",
+      "type": "fauna",
+      "imageSourceType": "known",
+      "source": "Wikipedia",
+      "heroImagePresent": true,
+      "fallbackIntentional": false,
+      "pass": true,
+      "path": "docs/qa/knowledge-pages/fauna-emperor-penguin-post-fidelity-v2.png"
+    },
+    {
+      "target": "homecenter.local",
+      "query": "Tell me about coast redwoods.",
+      "type": "flora",
+      "imageSourceType": "known",
+      "source": "Wikipedia",
+      "heroImagePresent": true,
+      "fallbackIntentional": false,
+      "pass": true,
+      "path": "docs/qa/knowledge-pages/flora-coast-redwood-post-fidelity-v2.png"
+    },
+    {
+      "target": "homecenter.local",
+      "query": "What happened during Apollo 11?",
+      "type": "event",
+      "imageSourceType": "known",
+      "source": "NASA",
+      "heroImagePresent": true,
+      "fallbackIntentional": false,
+      "pass": true,
+      "path": "docs/qa/knowledge-pages/event-apollo-11-post-fidelity-v2.png"
+    },
+    {
+      "target": "homecenter.local",
+      "query": "What is the internet?",
+      "type": "concept",
+      "imageSourceType": "none",
+      "source": "none",
+      "heroImagePresent": false,
+      "fallbackIntentional": true,
+      "pass": true,
+      "path": "docs/qa/knowledge-pages/concept-internet-post-fidelity-v2.png"
+    },
+    {
+      "target": "homecenter2.local",
+      "query": "Where is Madagascar?",
+      "type": "location",
+      "imageSourceType": "known",
+      "source": "Wikipedia",
+      "heroImagePresent": true,
+      "fallbackIntentional": false,
+      "pass": true,
+      "path": "docs/qa/knowledge-pages/location-madagascar-homecenter2-post-fidelity-v2.png"
+    },
+    {
+      "target": "homecenter2.local",
+      "query": "Who was Ada Lovelace?",
+      "type": "person",
+      "imageSourceType": "known",
+      "source": "Wikipedia",
+      "heroImagePresent": true,
+      "fallbackIntentional": false,
+      "pass": true,
+      "path": "docs/qa/knowledge-pages/person-ada-lovelace-homecenter2-post-fidelity-v2.png"
+    },
+    {
+      "target": "homecenter2.local",
+      "query": "Tell me about emperor penguins.",
+      "type": "fauna",
+      "imageSourceType": "known",
+      "source": "Wikipedia",
+      "heroImagePresent": true,
+      "fallbackIntentional": false,
+      "pass": true,
+      "path": "docs/qa/knowledge-pages/fauna-emperor-penguin-homecenter2-post-fidelity-v2.png"
+    },
+    {
+      "target": "homecenter2.local",
+      "query": "Tell me about coast redwoods.",
+      "type": "flora",
+      "imageSourceType": "known",
+      "source": "Wikipedia",
+      "heroImagePresent": true,
+      "fallbackIntentional": false,
+      "pass": true,
+      "path": "docs/qa/knowledge-pages/flora-coast-redwood-homecenter2-post-fidelity-v2.png"
+    },
+    {
+      "target": "homecenter2.local",
+      "query": "What happened during Apollo 11?",
+      "type": "event",
+      "imageSourceType": "known",
+      "source": "NASA",
+      "heroImagePresent": true,
+      "fallbackIntentional": false,
+      "pass": true,
+      "path": "docs/qa/knowledge-pages/event-apollo-11-homecenter2-post-fidelity-v2.png"
+    },
+    {
+      "target": "homecenter2.local",
+      "query": "What is the internet?",
+      "type": "concept",
+      "imageSourceType": "none",
+      "source": "none",
+      "heroImagePresent": false,
+      "fallbackIntentional": true,
+      "pass": true,
+      "path": "docs/qa/knowledge-pages/concept-internet-homecenter2-post-fidelity-v2.png"
+    }
+  ],
+  "visualPassCriteria": {
+    "liquidGlassLayout": true,
+    "noGeneratedRawVisualLoadingText": true,
+    "noGeneratedPosterOrInfographic": true,
+    "heroImageOrIntentionalFallback": true,
+    "nativeRightSideCards": true,
+    "bottomCategoryAndRelatedChips": true,
+    "noBrokenImageShell": true,
+    "noOverflowAtTvViewport": true,
+    "headerDateTimeAlignmentAcceptable": true
+  },
+  "remainingIssues": []
+}
