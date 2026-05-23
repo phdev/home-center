@@ -101,7 +101,13 @@ function defaultFetchMock({ classification, answer, wikipediaImage = "https://wi
       });
     }
     if (href.startsWith("https://en.wikipedia.org/w/rest.php/v1/search/page")) {
-      return jsonResponse({ pages: [{ key: classificationData.entityQuery, title: classificationData.title }] });
+      return jsonResponse({
+        pages: [{
+          key: classificationData.entityQuery,
+          title: classificationData.title,
+          thumbnail: wikipediaImage ? { url: wikipediaImage } : undefined,
+        }],
+      });
     }
     if (href.startsWith("https://en.wikipedia.org/api/rest_v1/page/summary/")) {
       return jsonResponse({
@@ -116,6 +122,17 @@ function defaultFetchMock({ classification, answer, wikipediaImage = "https://wi
       return jsonResponse({ data: [{ b64_json: "ZmFrZS1qcGVn" }] });
     }
     throw new Error(`Unexpected fetch: ${href}`);
+  });
+}
+
+function fetchMockWithWikipediaSummaryFailure({ classification, answer, searchImage }) {
+  const base = defaultFetchMock({ classification, answer, wikipediaImage: searchImage, nasaImage: null });
+  return vi.fn(async (url, options = {}) => {
+    const href = String(url);
+    if (href.startsWith("https://en.wikipedia.org/api/rest_v1/page/summary/")) {
+      return jsonResponse({ error: "summary unavailable" }, 503);
+    }
+    return base(url, options);
   });
 }
 
@@ -857,6 +874,89 @@ describe("knowledge image pipeline", () => {
       source: "none",
       mode: "none",
       metadata: { reason: "retrieval_failed" },
+    });
+  });
+
+  it("normalizes question prefixes before Wikipedia retrieval for known people", async () => {
+    const currentEnv = env();
+    global.fetch = defaultFetchMock({
+      classification: {
+        type: "person",
+        title: "Ada Lovelace",
+        visualNeed: "useful",
+        spaceScience: false,
+        entityQuery: "Ada Lovelace biography",
+        visualSearchQuery: "Ada Lovelace portrait",
+      },
+      answer: {
+        type: "person",
+        title: "Ada Lovelace",
+        summary: "Ada Lovelace wrote notes on Charles Babbage's Analytical Engine.",
+        sections: [],
+        infographic: null,
+        profile: {
+          facts: [{ label: "Notable for", value: "Early computer programming" }],
+          relatedConcepts: [],
+        },
+        visualNeed: "useful",
+        imageSourceType: "known",
+        imageQuery: "Ada Lovelace portrait Wikimedia Commons",
+      },
+      wikipediaImage: "https://wiki.test/ada.jpg",
+      nasaImage: null,
+    });
+
+    const body = await askAndRead(currentEnv, "Who was Ada Lovelace?");
+
+    expect(body.retrieval.subject).toBe("Ada Lovelace");
+    expect(body.imageSourceType).toBe("known");
+    expect(body.imagePrompt).toBeNull();
+    expect(body.imageUrl).toBe("https://wiki.test/ada.jpg");
+    expect(body.image).toMatchObject({
+      source: "Wikipedia",
+      mode: "retrieved",
+      sourceUrl: "https://en.wikipedia.org/wiki/Test",
+    });
+    expect(body.profile.relatedConcepts).toEqual(["timeline", "legacy", "field"]);
+  });
+
+  it("falls back to Wikipedia search thumbnails when the summary image path fails", async () => {
+    const currentEnv = env();
+    const classification = {
+      type: "person",
+      title: "Ada Lovelace",
+      visualNeed: "useful",
+      spaceScience: false,
+      entityQuery: "Ada Lovelace biography",
+      visualSearchQuery: "Ada Lovelace portrait",
+    };
+    const answer = {
+      type: "person",
+      title: "Ada Lovelace",
+      summary: "Ada Lovelace wrote notes on Charles Babbage's Analytical Engine.",
+      sections: [],
+      infographic: null,
+      visualNeed: "useful",
+      imageSourceType: "known",
+      imageQuery: "Ada Lovelace portrait Wikimedia Commons",
+    };
+    global.fetch = fetchMockWithWikipediaSummaryFailure({
+      classification,
+      answer,
+      searchImage: "//upload.wikimedia.org/ada-thumb.png",
+    });
+
+    const body = await askAndRead(currentEnv, "Who was Ada Lovelace?");
+
+    expect(body.imageUrl).toBe("https://upload.wikimedia.org/ada-thumb.png");
+    expect(body.image).toMatchObject({
+      source: "Wikipedia",
+      sourceUrl: "https://en.wikipedia.org/wiki/Ada%20Lovelace%20biography",
+      mode: "retrieved",
+    });
+    expect(body.visual).toMatchObject({
+      source: "Wikipedia",
+      mode: "retrieved",
     });
   });
 

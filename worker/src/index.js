@@ -801,6 +801,14 @@ async function retrieveKnowledge(query, subject, classification, env) {
     image = wikipedia.image;
     source = "wikipedia";
   }
+  if (!image) {
+    const commons = await fetchWikimediaCommonsImage(searchQuery, subject);
+    if (commons?.image?.url) {
+      image = commons.image;
+      source = "wikimedia";
+      if (!wikipedia) wikipedia = commons;
+    }
+  }
 
   return {
     source,
@@ -866,14 +874,25 @@ async function fetchWikipediaSummary(query, expectedSubject = query) {
     const searchRes = await fetch(searchUrl.toString(), { headers });
     if (!searchRes.ok) return null;
     const searchData = await searchRes.json();
-    const key = searchData?.pages?.[0]?.key || searchData?.pages?.[0]?.title;
+    const searchPage = searchData?.pages?.[0] || {};
+    const key = searchPage.key || searchPage.title;
     if (!key) return null;
+    const searchTitle = searchPage.title || query;
+    const searchImageUrl = normalizeExternalImageUrl(searchPage.thumbnail?.url);
+    const fallbackSourceUrl = `https://en.wikipedia.org/wiki/${encodeURIComponent(key)}`;
+    const fallbackSearchResult = {
+      title: searchTitle,
+      description: compactText(searchPage.description || ""),
+      extract: compactText(searchPage.excerpt || ""),
+      sourceUrl: fallbackSourceUrl,
+      image: searchImageUrl ? wikipediaImageAsset(searchImageUrl, fallbackSourceUrl, searchTitle, query) : null,
+    };
 
     const summaryRes = await fetch(
       `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(key)}`,
       { headers },
     );
-    if (!summaryRes.ok) return null;
+    if (!summaryRes.ok) return fallbackSearchResult;
     const summary = await summaryRes.json();
     if (!isRelevantToSubject(expectedSubject, [
       summary.title,
@@ -882,33 +901,92 @@ async function fetchWikipediaSummary(query, expectedSubject = query) {
     ].join(" "))) {
       return null;
     }
-    const imageUrl = summary.originalimage?.source || summary.thumbnail?.source || null;
-    const sourceUrl = summary.content_urls?.desktop?.page || `https://en.wikipedia.org/wiki/${encodeURIComponent(key)}`;
+    const imageUrl = normalizeExternalImageUrl(summary.originalimage?.source || summary.thumbnail?.source) || searchImageUrl;
+    const sourceUrl = summary.content_urls?.desktop?.page || fallbackSourceUrl;
     return {
-      title: summary.title || searchData.pages[0].title || query,
+      title: summary.title || searchTitle || query,
       description: compactText(summary.description || ""),
       extract: compactText(summary.extract || ""),
       sourceUrl,
-      image: imageUrl ? {
-        url: imageUrl.replace(/^http:/, "https:"),
-        imageUrl: imageUrl.replace(/^http:/, "https:"),
-        image: imageUrl.replace(/^http:/, "https:"),
-        source: "Wikipedia",
-        sourceUrl,
-        attribution: {
-          title: summary.title || query,
-          author: "Wikimedia Commons",
-          pageUrl: sourceUrl,
-        },
-        credit: "Wikimedia Commons",
-        alt: summary.title || query,
-        mode: "retrieved",
-        model: null,
-      } : null,
+      image: imageUrl ? wikipediaImageAsset(imageUrl, sourceUrl, summary.title || searchTitle, query) : null,
     };
   } catch {
     return null;
   }
+}
+
+async function fetchWikimediaCommonsImage(query, expectedSubject = query) {
+  try {
+    const url = new URL("https://commons.wikimedia.org/w/api.php");
+    url.searchParams.set("action", "query");
+    url.searchParams.set("generator", "search");
+    url.searchParams.set("gsrsearch", query);
+    url.searchParams.set("gsrnamespace", "6");
+    url.searchParams.set("gsrlimit", "1");
+    url.searchParams.set("prop", "imageinfo");
+    url.searchParams.set("iiprop", "url|extmetadata");
+    url.searchParams.set("format", "json");
+    url.searchParams.set("origin", "*");
+    const res = await fetch(url.toString(), { headers: { "Api-User-Agent": "HomeCenter/1.0 (family dashboard)" } });
+    if (!res.ok) return null;
+    const data = await res.json();
+    const page = Object.values(data?.query?.pages || {})[0];
+    const imageInfo = page?.imageinfo?.[0];
+    const imageUrl = normalizeExternalImageUrl(imageInfo?.url);
+    if (!page?.title || !imageUrl) return null;
+    const description = compactText(stripHtml(imageInfo?.extmetadata?.ImageDescription?.value || ""), 300);
+    const author = compactText(stripHtml(imageInfo?.extmetadata?.Artist?.value || ""), 120) || "Wikimedia Commons";
+    if (!isRelevantToSubject(expectedSubject, `${page.title} ${description}`)) return null;
+    const sourceUrl = imageInfo?.descriptionurl || `https://commons.wikimedia.org/wiki/${encodeURIComponent(page.title.replace(/^File:/, "File:"))}`;
+    return {
+      title: page.title.replace(/^File:/, ""),
+      description,
+      extract: description,
+      sourceUrl,
+      image: {
+        ...wikipediaImageAsset(imageUrl, sourceUrl, page.title.replace(/^File:/, "") || query, query),
+        source: "Wikimedia Commons",
+        credit: author,
+        attribution: {
+          title: page.title.replace(/^File:/, "") || query,
+          author,
+          pageUrl: sourceUrl,
+        },
+      },
+    };
+  } catch {
+    return null;
+  }
+}
+
+function stripHtml(value) {
+  return String(value || "").replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+}
+
+function normalizeExternalImageUrl(url) {
+  if (!url) return null;
+  const value = String(url);
+  if (value.startsWith("//")) return `https:${value}`;
+  return value.replace(/^http:/, "https:");
+}
+
+function wikipediaImageAsset(imageUrl, sourceUrl, title, query) {
+  return {
+    url: imageUrl,
+    imageUrl,
+    image: imageUrl,
+    source: "Wikipedia",
+    sourceUrl,
+    attribution: {
+      title: title || query,
+      author: "Wikimedia Commons",
+      pageUrl: sourceUrl,
+    },
+    credit: "Wikimedia Commons",
+    alt: title || query,
+    mode: "retrieved",
+    model: null,
+  };
 }
 
 function normalizeKnowledgeSubject(query) {
@@ -921,7 +999,8 @@ function normalizeKnowledgeSubject(query) {
     .replace(/\b(i\s+b\s+i\s+s)\b/ig, "ibis")
     .replace(/^\s*(hey homer|homer)[, ]+/i, "")
     .replace(/^\s*how\s+(?:big|large|small|tall|long|old|far|fast|hot|cold|heavy|deep|wide|many|much)\s+(?:is|are|was|were)\s+/i, "")
-    .replace(/^\s*(what is|what are|who is|who are|tell me about|explain|describe|show me|show us|is that|is this|are those|are these)\s+/i, "")
+    .replace(/^\s*what\s+happened\s+(?:during|at|in|on)\s+/i, "")
+    .replace(/^\s*(what is|what are|who is|who are|who was|who were|where is|where are|where was|where were|tell me about|explain|describe|show me|show us|is that|is this|are those|are these)\s+/i, "")
     .replace(/^\s*(?:the|a|an)\s+/i, "")
     .replace(/[?.!]+$/g, "")
     .trim();
@@ -1079,7 +1158,7 @@ function defaultKnowledgeProfile(type = "concept", subject = "") {
         { scope: "world", label: "World map", value: title },
         { scope: "continent", label: "Continent map", value: title },
       ],
-      relatedConcepts: [],
+      relatedConcepts: ["geography", "region", "culture"],
     };
   }
   if (type === "person") {
@@ -1089,7 +1168,7 @@ function defaultKnowledgeProfile(type = "concept", subject = "") {
         { label: "Notable for", value: title, detail: "" },
       ],
       maps: [],
-      relatedConcepts: [],
+      relatedConcepts: ["timeline", "legacy", "field"],
     };
   }
   if (type === "fauna" || type === "flora") {
@@ -1099,7 +1178,9 @@ function defaultKnowledgeProfile(type = "concept", subject = "") {
         { label: "Years on Earth", value: "Unknown", detail: "" },
       ],
       maps: [{ scope: "world", label: "World range", value: title }],
-      relatedConcepts: [],
+      relatedConcepts: type === "fauna"
+        ? ["habitat", "adaptations", "conservation"]
+        : ["habitat", "growth", "ecosystem"],
     };
   }
   if (type === "event") {
@@ -1109,13 +1190,13 @@ function defaultKnowledgeProfile(type = "concept", subject = "") {
         { scope: "country", label: "Country map", value: title },
         { scope: "city", label: "City map", value: title },
       ],
-      relatedConcepts: [],
+      relatedConcepts: ["timeline", "causes", "impact"],
     };
   }
   return {
     facts: [{ label: "Date", value: "Not invented", detail: "Use a discovered, invented, or evolved date when relevant." }],
     maps: [],
-    relatedConcepts: [],
+    relatedConcepts: ["how it works", "examples", "history"],
   };
 }
 
