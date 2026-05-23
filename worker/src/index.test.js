@@ -1131,6 +1131,183 @@ describe("knowledge image pipeline", () => {
     });
   });
 
+  it("uses a pinned curated asset before retrieved candidates", async () => {
+    const currentEnv = env({
+      CURATED_KNOWLEDGE_ASSETS_JSON: JSON.stringify([{
+        topicKey: "ada-lovelace",
+        title: "Ada Lovelace",
+        type: "person",
+        heroImage: {
+          url: "https://curated.test/ada-hero.jpg",
+          source: "Curated Archive",
+          sourceUrl: "https://curated.test/ada",
+          credit: "Curator",
+          license: "Public domain",
+          width: 1400,
+          height: 820,
+          focalPoint: { x: 0.72, y: 0.42 },
+          cropHint: "right-subject",
+        },
+      }]),
+    });
+    global.fetch = defaultFetchMock({
+      classification: {
+        type: "person",
+        title: "Ada Lovelace",
+        visualNeed: "useful",
+        spaceScience: false,
+        entityQuery: "Ada Lovelace",
+        visualSearchQuery: "Ada Lovelace portrait",
+      },
+      answer: {
+        type: "person",
+        title: "Ada Lovelace",
+        summary: "Ada Lovelace wrote notes on the Analytical Engine.",
+        sections: [],
+        visualNeed: "useful",
+        imageSourceType: "known",
+        imageQuery: "Ada Lovelace portrait",
+      },
+      wikipediaImage: "https://wiki.test/ada.jpg",
+    });
+
+    const body = await askAndRead(currentEnv, "Who was Ada Lovelace?", { debug: true });
+
+    expect(body.imageUrl).toBe("https://curated.test/ada-hero.jpg");
+    expect(body.image).toMatchObject({
+      mode: "pinned",
+      assetMode: "pinned",
+      source: "Curated Archive",
+      sourceUrl: "https://curated.test/ada",
+      cropHint: "right-subject",
+      focalPoint: { x: 0.72, y: 0.42 },
+    });
+    expect(body.curatedAsset).toMatchObject({
+      mode: "pinned",
+      status: "ready",
+      source: "Curated Archive",
+    });
+    expect(body.retrieval.diagnostics.final.assetMode).toBe("pinned");
+  });
+
+  it("scores retrieved candidates and selects the best relevant hero image", async () => {
+    const currentEnv = env();
+    global.fetch = vi.fn(async (url, options = {}) => {
+      const href = String(url);
+      if (href.startsWith("https://bridge.test")) {
+        const bridgeCallCount = global.fetch.mock.calls
+          .filter(([calledUrl]) => String(calledUrl).startsWith("https://bridge.test")).length;
+        return jsonResponse({
+          json: bridgeCallCount === 1 ? {
+            type: "person",
+            title: "Ada Lovelace",
+            visualNeed: "useful",
+            spaceScience: false,
+            entityQuery: "Ada Lovelace",
+            visualSearchQuery: "Ada Lovelace portrait",
+          } : {
+            type: "person",
+            title: "Ada Lovelace",
+            summary: "Ada Lovelace wrote notes on the Analytical Engine.",
+            sections: [],
+            visualNeed: "useful",
+            imageSourceType: "known",
+            imageQuery: "Ada Lovelace portrait",
+          },
+          model: "gemma-test",
+        });
+      }
+      if (href.startsWith("https://en.wikipedia.org/w/rest.php/v1/search/page")) {
+        return jsonResponse({ pages: [{ key: "Ada_Lovelace", title: "Ada Lovelace", thumbnail: { url: "https://wiki.test/ada-flag.svg" } }] });
+      }
+      if (href.startsWith("https://en.wikipedia.org/api/rest_v1/page/summary/")) {
+        return jsonResponse({
+          title: "Ada Lovelace",
+          description: "Mathematician",
+          extract: "Ada Lovelace was a mathematician.",
+          content_urls: { desktop: { page: "https://en.wikipedia.org/wiki/Ada_Lovelace" } },
+          originalimage: { source: "https://wiki.test/ada-flag.svg", width: 1000, height: 600 },
+        });
+      }
+      if (href.startsWith("https://commons.wikimedia.org/w/api.php")) {
+        return jsonResponse({
+          query: {
+            pages: {
+              1: {
+                title: "File:Ada Lovelace portrait.jpg",
+                imageinfo: [{
+                  url: "https://commons.test/ada-lovelace-portrait.jpg",
+                  width: 1300,
+                  height: 900,
+                  descriptionurl: "https://commons.wikimedia.org/wiki/File:Ada_Lovelace_portrait.jpg",
+                  extmetadata: {
+                    Artist: { value: "Historical archive" },
+                    ImageDescription: { value: "Ada Lovelace portrait" },
+                  },
+                }],
+              },
+            },
+          },
+        });
+      }
+      throw new Error(`Unexpected fetch: ${href}`);
+    });
+
+    const body = await askAndRead(currentEnv, "Who was Ada Lovelace?", { debug: true });
+
+    expect(body.imageUrl).toBe("https://commons.test/ada-lovelace-portrait.jpg");
+    expect(body.image).toMatchObject({
+      source: "Wikimedia Commons",
+      mode: "retrieved",
+      cropHint: "right-subject",
+    });
+    expect(body.retrieval.diagnostics.attempted.some((candidate) => (
+      candidate.failureReason === "bad_summary_image" || candidate.failureReason === "bad_search_thumbnail"
+    ))).toBe(true);
+    expect(body.retrieval.diagnostics.final.image.score).toBeGreaterThan(45);
+    expect(currentEnv.NOTIFICATIONS.put.mock.calls.some(([key, value]) => (
+      String(key).startsWith("knowledge:image:v2:")
+      && JSON.parse(value).url === "https://commons.test/ada-lovelace-portrait.jpg"
+    ))).toBe(true);
+  });
+
+  it("keeps generated curated fallback disabled for known topics by default", async () => {
+    const currentEnv = env({ ENABLE_CURATED_HERO_GENERATION: "false" });
+    global.fetch = defaultFetchMock({
+      classification: {
+        type: "fauna",
+        title: "Imaginary Test Animal",
+        visualNeed: "required",
+        spaceScience: false,
+        entityQuery: "Imaginary Test Animal",
+        visualSearchQuery: "Imaginary Test Animal photo",
+      },
+      answer: {
+        type: "fauna",
+        title: "Imaginary Test Animal",
+        summary: "A test animal answer.",
+        sections: [],
+        visualNeed: "required",
+        imageSourceType: "known",
+        imageQuery: "Imaginary Test Animal photo",
+      },
+      wikipediaImage: null,
+      nasaImage: null,
+    });
+
+    const body = await askAndRead(currentEnv, "Tell me about imaginary test animals.");
+    const imageCalls = global.fetch.mock.calls.filter(([url]) => String(url) === "https://api.openai.com/v1/images/generations");
+
+    expect(imageCalls).toHaveLength(0);
+    expect(body.imageSourceType).toBe("known");
+    expect(body.imagePending).toBe(false);
+    expect(body.imagePrompt).toBeNull();
+    expect(body.curatedAsset).toMatchObject({
+      mode: "fallback",
+      status: "missing",
+    });
+  });
+
   it("canonicalizes smallest-country and World Wide Web inventor queries for retrieval", async () => {
     const currentEnv = env();
     global.fetch = defaultFetchMock({

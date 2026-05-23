@@ -182,14 +182,24 @@ function validate(query, body) {
   const failures = [];
   if (!body.type) failures.push("missing type");
   if (!body.title) failures.push("missing title");
+  const assetMode = body.curatedAsset?.mode || body.visual?.assetMode || body.image?.assetMode || body.image?.mode || body.visual?.mode || "";
+  if (assetMode && !["pinned", "retrieved", "generated", "fallback", "none", "rendered"].includes(assetMode)) {
+    failures.push(`invalid asset mode ${assetMode}`);
+  }
   if (["known", "diagram", "none"].includes(body.imageSourceType)) {
     if (body.imagePending === true) failures.push("imagePending true");
     if (body.imagePrompt) failures.push("imagePrompt present");
   }
   if (body.imageQuery && body.imagePending === true) failures.push("imageQuery triggered pending generation");
   if (body.imageSourceType === "generated" && !body.imagePrompt) failures.push("generated without imagePrompt");
+  if (assetMode === "generated" && process.env.ENABLE_CURATED_HERO_GENERATION !== "true" && body.imageSourceType !== "generated") {
+    failures.push("generated curated asset without explicit enable flag");
+  }
   if (body.imageUrl && !(body.image?.sourceUrl || body.visual?.sourceUrl || body.visual?.metadata)) {
     failures.push("image source metadata missing");
+  }
+  if (["pinned", "retrieved"].includes(assetMode) && body.imageUrl && !(body.image?.sourceUrl || body.visual?.sourceUrl)) {
+    failures.push("curated source metadata missing");
   }
   if (!body.profile?.relatedConcepts?.length) {
     failures.push("related chips missing");
@@ -203,6 +213,7 @@ for (const query of QUERIES) {
   try {
     const body = live ? await checkLive(query) : await checkMock(query);
     const failures = validate(query, body);
+    const assetMode = body.curatedAsset?.mode || body.visual?.assetMode || body.image?.assetMode || body.image?.mode || body.visual?.mode || "";
     failed ||= failures.length > 0;
     rows.push({
       query,
@@ -212,11 +223,12 @@ for (const query of QUERIES) {
       imagePrompt: !!body.imagePrompt,
       heroImage: !!body.imageUrl,
       source: body.image?.source || body.visual?.source || "",
+      assetMode,
       result: failures.length ? `FAIL: ${failures.join("; ")}` : "PASS",
     });
   } catch (error) {
     failed = true;
-    rows.push({ query, type: "", imageSourceType: "", imagePending: "", imagePrompt: "", heroImage: "", source: "", result: `FAIL: ${error.message}` });
+    rows.push({ query, type: "", imageSourceType: "", imagePending: "", imagePrompt: "", heroImage: "", source: "", assetMode: "", result: `FAIL: ${error.message}` });
   }
 }
 

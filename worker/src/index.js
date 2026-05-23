@@ -1,3 +1,5 @@
+import { curatedKnowledgeAssetsFromEnv, curatedTopicKey } from "./curatedKnowledgeAssets.js";
+
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
@@ -491,6 +493,33 @@ async function handleAskQuery(request, env, ctx) {
     imageQuery: parsed.imageQuery || null,
     imageUrl: retrievedImage?.url || null,
     image: retrievedImage,
+    curatedAsset: retrievedImage ? {
+      mode: retrievedImage.assetMode || retrievedImage.mode || "retrieved",
+      status: "ready",
+      assetRole: retrievedImage.assetRole || "hero",
+      url: retrievedImage.url,
+      originalUrl: retrievedImage.originalUrl || retrievedImage.url,
+      source: retrievedImage.source || null,
+      sourceUrl: retrievedImage.sourceUrl || null,
+      pageTitle: retrievedImage.attribution?.title || retrievedImage.alt || null,
+      credit: retrievedImage.credit || retrievedImage.attribution?.author || null,
+      license: retrievedImage.license || null,
+      width: retrievedImage.width || null,
+      height: retrievedImage.height || null,
+      focalPoint: retrievedImage.focalPoint || null,
+      cropHint: retrievedImage.cropHint || null,
+      tone: retrievedImage.tone || null,
+      score: retrievedImage.score ?? null,
+      reasons: retrievedImage.reasons || [],
+    } : {
+      mode: parsed.imageSourceType === "diagram" || parsed.visualNeed === "none" ? "fallback" : "fallback",
+      status: "missing",
+      assetRole: "hero",
+      url: null,
+      reasons: [parsed.visualNeed === "none"
+        ? "visual_not_needed"
+        : (parsed.imageSourceType === "diagram" ? "ui_rendered_diagram" : "retrieval_failed")],
+    },
     imagePrompt: parsed.imagePrompt || null,
     imagePending: shouldGenerateImage,
     visual: buildKnowledgeVisual(retrievedImage, {
@@ -526,6 +555,11 @@ async function handleAskQuery(request, env, ctx) {
   };
 
   if (!shouldGenerateImage) {
+    if (retrievedImage?.mode === "retrieved" && retrieved.source !== "cache") {
+      const cachePromise = cacheKnowledgeImage(env, query, subject, classification, retrievedImage);
+      if (ctx?.waitUntil) ctx.waitUntil(cachePromise);
+      else await cachePromise;
+    }
     return storeLLMResponse(response, env);
   }
 
@@ -547,6 +581,23 @@ async function handleAskQuery(request, env, ctx) {
       ...response,
       imageUrl: image?.url || null,
       image,
+      curatedAsset: image ? {
+        mode: image.assetMode || image.mode || "generated",
+        status: "ready",
+        assetRole: image.assetRole || "hero",
+        url: image.url,
+        originalUrl: image.originalUrl || image.url,
+        source: image.source || null,
+        sourceUrl: image.sourceUrl || null,
+        credit: image.credit || null,
+        width: image.width || null,
+        height: image.height || null,
+        focalPoint: image.focalPoint || null,
+        cropHint: image.cropHint || null,
+        tone: image.tone || null,
+        score: image.score ?? null,
+        reasons: image.reasons || [],
+      } : response.curatedAsset,
       imagePending: false,
       updatedAt: Date.now(),
       visual: buildKnowledgeVisual(image, {
@@ -788,26 +839,52 @@ async function retrieveKnowledge(query, subject, classification, env, parsed = n
   let image = null;
   let source = "none";
   let fallbackReason = "";
+  const candidateImages = [];
+  const pinnedAsset = findPinnedCuratedAsset(env, subject, classification, parsed);
+  diagnostics.attempted.push({
+    source: "pinned",
+    candidateQuery: pinnedAsset?.topicKey || terms.normalizedSubject,
+    selectedPageTitle: pinnedAsset?.title || null,
+    candidateImageUrlPresent: !!pinnedAsset?.url,
+    relevance: pinnedAsset?.url ? "pass" : "missing",
+    failureReason: pinnedAsset ? "" : "no_pinned_asset",
+  });
+  if (pinnedAsset?.url) {
+    candidateImages.push(scoreKnowledgeImageCandidate(pinnedAsset, {
+      type: classification.type,
+      subject: terms.normalizedSubject,
+      source: "pinned",
+    }));
+  }
   const cachedImage = await getCachedKnowledgeImage(env, knowledgeImageCacheCandidates(query, subject, classification));
   diagnostics.attempted.push({ source: "cache", candidateQuery: "knowledge:image:v2", imagePresent: !!cachedImage?.url });
   if (cachedImage?.url) {
-    image = cachedImage;
-    source = "cache";
+    candidateImages.push(scoreKnowledgeImageCandidate(cachedImage, {
+      type: classification.type,
+      subject: terms.normalizedSubject,
+      source: "cache",
+    }));
   }
 
   if (spaceScience) {
     nasa = await fetchNasaImage(searchQuery);
+    const scored = scoreKnowledgeImageCandidate(nasa?.image, {
+      type: classification.type,
+      subject: terms.normalizedSubject,
+      source: "nasa",
+      pageTitle: nasa?.title,
+      preferred: true,
+    });
     diagnostics.attempted.push({
       source: "NASA",
       candidateQuery: searchQuery,
       selectedPageTitle: nasa?.title || null,
       candidateImageUrlPresent: !!nasa?.image?.url,
-      relevance: nasa?.image?.url ? "pass" : "missing",
+      relevance: scored.accepted ? "pass" : (nasa?.image?.url ? "fail" : "missing"),
+      score: scored.score,
+      failureReason: scored.accepted ? "" : scored.reasons.join(","),
     });
-    if (!image && nasa?.image?.url) {
-      image = nasa.image;
-      source = "nasa";
-    }
+    if (nasa?.image?.url) candidateImages.push(scored);
   }
 
   const wikipediaResult = await fetchWikipediaSummary(entityQuery, terms.normalizedSubject, classification.type);
@@ -818,24 +895,42 @@ async function retrieveKnowledge(query, subject, classification, env, parsed = n
     relevance: "missing",
   }]));
   wikipedia = wikipediaResult?.title || wikipediaResult?.image ? wikipediaResult : null;
-  if (!image && wikipedia?.image?.url) {
-    image = wikipedia.image;
-    source = "wikipedia";
+  if (wikipedia?.image?.url) {
+    candidateImages.push(scoreKnowledgeImageCandidate(wikipedia.image, {
+      type: classification.type,
+      subject: terms.normalizedSubject,
+      source: "wikipedia",
+      pageTitle: wikipedia.title,
+    }));
   }
-  if (!image) {
-    const commonsResult = await fetchWikimediaCommonsImage(searchQuery, terms.normalizedSubject, classification.type);
-    diagnostics.attempted.push(...(commonsResult?.diagnostics || [{
-      source: "Wikimedia Commons",
-      candidateQuery: searchQuery,
-      candidateImageUrlPresent: false,
-      relevance: "missing",
-    }]));
-    const commons = commonsResult?.title || commonsResult?.image ? commonsResult : null;
-    if (commons?.image?.url) {
-      image = commons.image;
-      source = "wikimedia";
-      if (!wikipedia) wikipedia = commons;
-    }
+  const commonsResult = await fetchWikimediaCommonsImage(searchQuery, terms.normalizedSubject, classification.type);
+  diagnostics.attempted.push(...(commonsResult?.diagnostics || [{
+    source: "Wikimedia Commons",
+    candidateQuery: searchQuery,
+    candidateImageUrlPresent: false,
+    relevance: "missing",
+  }]));
+  const commons = commonsResult?.title || commonsResult?.image ? commonsResult : null;
+  if (commons?.image?.url) {
+    candidateImages.push(scoreKnowledgeImageCandidate(commons.image, {
+      type: classification.type,
+      subject: terms.normalizedSubject,
+      source: "wikimedia",
+      pageTitle: commons.title,
+    }));
+    if (!wikipedia) wikipedia = commons;
+  }
+
+  const selected = selectCuratedCandidate(candidateImages);
+  if (selected?.asset) {
+    image = decorateCuratedAsset(selected.asset, {
+      mode: selected.asset.mode || selected.mode,
+      score: selected.score,
+      reasons: selected.reasons,
+      type: classification.type,
+      source: selected.source,
+    });
+    source = selected.source || image.mode || "retrieved";
   }
   if (!image) {
     fallbackReason = source === "none" ? "no_relevant_retrieved_image" : "retrieval_failed";
@@ -843,6 +938,16 @@ async function retrieveKnowledge(query, subject, classification, env, parsed = n
   diagnostics.final = {
     selectedSource: source,
     fallbackReason,
+    assetMode: image?.mode || (fallbackReason ? "fallback" : null),
+    candidates: candidateImages.map((candidate) => ({
+      source: candidate.source,
+      mode: candidate.mode,
+      score: candidate.score,
+      accepted: candidate.accepted,
+      title: candidate.asset?.attribution?.title || candidate.pageTitle || candidate.asset?.alt || null,
+      imageUrlPresent: !!candidate.asset?.url,
+      reasons: candidate.reasons,
+    })),
     image: image ? {
       source: image.source || source,
       sourceUrl: image.sourceUrl || null,
@@ -850,6 +955,10 @@ async function retrieveKnowledge(query, subject, classification, env, parsed = n
       width: image.width || null,
       height: image.height || null,
       credit: image.credit || null,
+      focalPoint: image.focalPoint || null,
+      cropHint: image.cropHint || null,
+      tone: image.tone || null,
+      score: image.score || null,
     } : null,
   };
 
@@ -866,6 +975,164 @@ async function retrieveKnowledge(query, subject, classification, env, parsed = n
 
 function isSpaceScienceQuery(query) {
   return /\b(nasa|space|sun|star|planet|moon|mars|venus|jupiter|saturn|galaxy|universe|asteroid|comet|nebula|eclipse|rocket|astronaut|telescope|earth|orbit|solar|lunar)\b/i.test(query);
+}
+
+function findPinnedCuratedAsset(env, subject, classification = {}, parsed = null) {
+  const keys = new Set([
+    curatedTopicKey(subject),
+    curatedTopicKey(classification.title),
+    curatedTopicKey(classification.entityQuery),
+    curatedTopicKey(parsed?.title),
+  ].filter(Boolean));
+  const match = curatedKnowledgeAssetsFromEnv(env)
+    .find((asset) => keys.has(curatedTopicKey(asset.topicKey || asset.title)));
+  if (!match?.heroImage?.url) return match ? { ...match, url: null } : null;
+  return decorateCuratedAsset({
+    ...match.heroImage,
+    topicKey: match.topicKey,
+    queryType: match.type || classification.type || parsed?.type || "concept",
+    title: match.title || parsed?.title || classification.title || subject,
+    url: match.heroImage.url,
+    imageUrl: match.heroImage.imageUrl || match.heroImage.url,
+    image: match.heroImage.image || match.heroImage.url,
+    source: match.heroImage.source || "Curated",
+    sourceUrl: match.heroImage.sourceUrl || null,
+    credit: match.heroImage.credit || null,
+    license: match.heroImage.license || null,
+    width: match.heroImage.width || null,
+    height: match.heroImage.height || null,
+    mode: "pinned",
+    assetMode: "pinned",
+    assetRole: match.assetRole || "hero",
+    focalPoint: match.heroImage.focalPoint || match.focalPoint,
+    cropHint: match.heroImage.cropHint || match.cropHint,
+    tone: match.heroImage.tone || match.tone,
+    attribution: {
+      title: match.title || subject,
+      author: match.heroImage.credit || match.heroImage.source || "Curated",
+      pageUrl: match.heroImage.sourceUrl || null,
+    },
+  }, {
+    mode: "pinned",
+    type: match.type || classification.type,
+    source: "pinned",
+  });
+}
+
+function scoreKnowledgeImageCandidate(asset, context = {}) {
+  const candidate = {
+    asset,
+    source: context.source || asset?.source || "retrieved",
+    pageTitle: context.pageTitle || asset?.attribution?.title || asset?.alt || "",
+    mode: asset?.mode || (context.source === "pinned" ? "pinned" : "retrieved"),
+    accepted: false,
+    score: 0,
+    reasons: [],
+  };
+  if (!asset?.url) {
+    candidate.reasons.push("missing_url");
+    return candidate;
+  }
+
+  const type = context.type || "concept";
+  const haystack = `${asset.url} ${asset.source || ""} ${asset.sourceUrl || ""} ${candidate.pageTitle} ${asset.alt || ""}`.toLowerCase();
+  const width = Number(asset.width || 0);
+  const height = Number(asset.height || 0);
+  const subjectRelevant = isRelevantToSubject(context.subject || "", `${candidate.pageTitle} ${asset.url} ${asset.alt || ""}`);
+  let score = 40;
+  if (candidate.source === "pinned" || asset.mode === "pinned") {
+    score += 60;
+    candidate.reasons.push("pinned_override");
+  }
+  if (/nasa/i.test(asset.source || candidate.source)) score += type === "event" || context.preferred ? 24 : 10;
+  if (/wikipedia|wikimedia/i.test(asset.source || candidate.source)) score += 18;
+  if (asset.sourceUrl) score += 10;
+  if (asset.credit || asset.license || asset.attribution?.author) score += 6;
+  if (width >= 900 && height >= 500) score += 14;
+  else if (width && height && (width < 360 || height < 220)) {
+    score -= 35;
+    candidate.reasons.push("too_small");
+  }
+  if (width && height) {
+    const ratio = width / height;
+    if (ratio >= 1.25 && ratio <= 2.4) score += 10;
+    if (ratio < 0.75) {
+      score -= type === "person" ? 2 : 18;
+      candidate.reasons.push("portrait_crop");
+    }
+  }
+  if (subjectRelevant) score += 18;
+  else {
+    score -= 32;
+    candidate.reasons.push("weak_subject_overlap");
+  }
+  if (/\b(svg|icon|logo|symbol|emblem|seal|coat[_ -]?of[_ -]?arms|flag)\b/.test(haystack)) {
+    score -= 60;
+    candidate.reasons.push("logo_icon_flag");
+  }
+  if (["person", "fauna", "flora"].includes(type) && /\b(map|range[_ -]?map|distribution[_ -]?map)\b/.test(haystack)) {
+    score -= 50;
+    candidate.reasons.push("map_for_living_subject");
+  }
+  if (/\b(infographic|poster|diagram|chart|graph|labeled|labelled|text)\b/.test(haystack)) {
+    score -= 28;
+    candidate.reasons.push("poster_or_diagram_like");
+  }
+
+  candidate.score = score;
+  candidate.accepted = score >= 45 && !candidate.reasons.includes("logo_icon_flag");
+  if (candidate.accepted) candidate.reasons.push("selected_candidate");
+  return candidate;
+}
+
+function selectCuratedCandidate(candidates = []) {
+  return candidates
+    .filter((candidate) => candidate?.accepted && candidate.asset?.url)
+    .sort((a, b) => b.score - a.score)[0] || null;
+}
+
+function decorateCuratedAsset(asset, context = {}) {
+  if (!asset?.url) return null;
+  const queryType = context.type || asset.queryType || "concept";
+  const cropDefaults = defaultCropForKnowledgeType(queryType);
+  const mode = context.mode || asset.assetMode || asset.mode || "retrieved";
+  return {
+    ...asset,
+    url: asset.url,
+    imageUrl: asset.imageUrl || asset.url,
+    image: asset.image || asset.url,
+    mode,
+    assetMode: mode,
+    assetRole: asset.assetRole || "hero",
+    queryType,
+    focalPoint: normalizeFocalPoint(asset.focalPoint) || cropDefaults.focalPoint,
+    cropHint: asset.cropHint || cropDefaults.cropHint,
+    tone: asset.tone || "home-center-dark",
+    score: context.score ?? asset.score ?? null,
+    reasons: context.reasons || asset.reasons || [],
+    originalUrl: asset.originalUrl || asset.url,
+  };
+}
+
+function normalizeFocalPoint(point) {
+  if (!point || !Number.isFinite(Number(point.x)) || !Number.isFinite(Number(point.y))) return null;
+  return {
+    x: Math.max(0, Math.min(1, Number(point.x))),
+    y: Math.max(0, Math.min(1, Number(point.y))),
+  };
+}
+
+function defaultCropForKnowledgeType(type) {
+  if (type === "person" || type === "fauna") {
+    return { cropHint: "right-subject", focalPoint: { x: 0.66, y: 0.46 } };
+  }
+  if (type === "event") {
+    return { cropHint: "center-subject", focalPoint: { x: 0.58, y: 0.5 } };
+  }
+  if (type === "concept") {
+    return { cropHint: "left-text-safe", focalPoint: { x: 0.62, y: 0.5 } };
+  }
+  return { cropHint: "wide-landscape", focalPoint: { x: 0.58, y: 0.5 } };
 }
 
 function createRetrievalDiagnostics(query, subject, classification = {}, parsed = null) {
@@ -1742,7 +2009,10 @@ async function getCachedKnowledgeImage(env, values) {
         image: cached.image || cachedUrl,
         source: "cache",
         originalSource: cached.originalSource || cached.source || "unknown",
-        mode: cached.mode === "generated" ? "generated" : "retrieved",
+        mode: ["generated", "pinned"].includes(cached.mode) ? cached.mode : "retrieved",
+        assetMode: ["generated", "pinned"].includes(cached.assetMode || cached.mode)
+          ? (cached.assetMode || cached.mode)
+          : "retrieved",
       };
     }
   }
@@ -1839,6 +2109,9 @@ async function generateKnowledgeImage(imagePrompt, query, env, knowledgeData = {
 function normalizeKnowledgeAsset(image, assetRole = "hero") {
   if (!image?.url) return null;
   const createdAt = image.createdAt || new Date().toISOString();
+  const mode = ["generated", "rendered", "pinned", "fallback"].includes(image.mode)
+    ? image.mode
+    : "retrieved";
   return {
     ...image,
     url: image.url,
@@ -1846,10 +2119,17 @@ function normalizeKnowledgeAsset(image, assetRole = "hero") {
     image: image.image || image.url,
     source: image.source || (image.mode === "generated" ? "GPT Image 2" : "unknown"),
     sourceUrl: image.sourceUrl || null,
-    mode: image.mode === "generated" ? "generated" : (image.mode === "rendered" ? "rendered" : "retrieved"),
+    mode,
+    assetMode: image.assetMode || mode,
     assetRole: image.assetRole || assetRole,
     width: image.width || null,
     height: image.height || null,
+    focalPoint: normalizeFocalPoint(image.focalPoint),
+    cropHint: image.cropHint || null,
+    tone: image.tone || null,
+    score: image.score ?? null,
+    reasons: Array.isArray(image.reasons) ? image.reasons : [],
+    originalUrl: image.originalUrl || image.url,
     createdAt,
     expiresAt: image.expiresAt || null,
   };
@@ -1871,10 +2151,15 @@ function buildKnowledgeVisual(image, options = {}) {
       title: asset.attribution?.title || asset.alt || null,
       pageUrl: asset.attribution?.pageUrl || asset.sourceUrl || null,
       attribution: asset.attribution || null,
-      retrievalSource: asset.mode === "retrieved" ? (asset.originalSource || asset.source || null) : null,
+      retrievalSource: ["retrieved", "pinned"].includes(asset.mode) ? (asset.originalSource || asset.source || null) : null,
       assetRole: asset.assetRole,
       width: asset.width,
       height: asset.height,
+      focalPoint: asset.focalPoint || null,
+      cropHint: asset.cropHint || null,
+      tone: asset.tone || null,
+      score: asset.score ?? null,
+      reasons: asset.reasons || [],
       createdAt: asset.createdAt,
       expiresAt: asset.expiresAt,
       ...(asset.metadata || {}),
@@ -1885,6 +2170,7 @@ function buildKnowledgeVisual(image, options = {}) {
       source: asset.source || "cache",
       sourceUrl: asset.sourceUrl || null,
       mode: asset.mode || "retrieved",
+      assetMode: asset.assetMode || asset.mode || "retrieved",
       assetRole: asset.assetRole,
       model: asset.model || null,
       metadata,

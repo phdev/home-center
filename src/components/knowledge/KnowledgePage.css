@@ -192,15 +192,35 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
+  object-position: 58% 50%;
+  filter: saturate(0.82) contrast(1.08) brightness(0.76);
   display: block;
+}
+
+.knowledge-hero-visual-right-subject img {
+  object-position: 68% 48%;
+}
+
+.knowledge-hero-visual-left-text-safe img {
+  object-position: 64% 50%;
+}
+
+.knowledge-hero-visual-center-subject img {
+  object-position: 58% 50%;
+}
+
+.knowledge-hero-tone-home-center-dark img {
+  filter: saturate(0.78) contrast(1.1) brightness(0.72);
 }
 
 .knowledge-hero-visual::after {
   content: "";
   position: absolute;
   inset: 0;
-  background: linear-gradient(90deg, rgba(5, 10, 22, 0.4), transparent 42%),
-    linear-gradient(0deg, rgba(2, 6, 23, 0.52), transparent 45%);
+  background:
+    linear-gradient(90deg, rgba(3, 8, 20, 0.74), rgba(3, 8, 20, 0.36) 38%, transparent 70%),
+    linear-gradient(0deg, rgba(2, 6, 23, 0.62), rgba(2, 6, 23, 0.12) 52%),
+    radial-gradient(circle at 14% 18%, color-mix(in srgb, var(--knowledge-accent) 22%, transparent), transparent 44%);
   pointer-events: none;
 }
 

@@ -53,6 +53,25 @@ describe("FullKnowledgePage", () => {
     expect(screen.getByText("GPT Image 2 · generated raw visual")).toBeTruthy();
   });
 
+  it("applies curated focal point and crop hints to the hero image", () => {
+    render(<FullKnowledgePage response={response({
+      image: {
+        url: "https://example.test/ada.jpg",
+        source: "Curated Archive",
+        mode: "pinned",
+        sourceUrl: "https://example.test/ada",
+        focalPoint: { x: 0.72, y: 0.42 },
+        cropHint: "right-subject",
+        tone: "home-center-dark",
+      },
+    })} onBack={() => {}} />);
+
+    const image = screen.getByAltText("How big is the Sun?");
+    expect(image.style.objectPosition).toBe("72% 42%");
+    expect(image.closest(".knowledge-hero-visual").className).toContain("knowledge-hero-visual-right-subject");
+    expect(screen.getByText("Curated Archive · curated hero image")).toBeTruthy();
+  });
+
   it("shows a generating placeholder while the image is pending", () => {
     render(<FullKnowledgePage response={response({
       imageUrl: null,

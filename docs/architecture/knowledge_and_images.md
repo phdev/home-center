@@ -35,19 +35,23 @@ The flow is:
    rejects classifier fields that drift away from that subject. This protects
    cases like speech text `"is that i-b's"` becoming the subject `ibis` rather
    than an unrelated dashboard or wake-word topic.
-3. `retrieveKnowledge()` checks the image cache, then retrieves NASA imagery for
-   space-science queries, then retrieves Wikipedia summary text and imagery.
+3. `retrieveKnowledge()` checks pinned curated assets, the image cache, NASA
+   imagery for space-science queries, Wikipedia summary imagery, and Wikimedia
+   Commons candidates. Candidate images are scored for source quality, subject
+   relevance, dimensions, query-type fit, metadata, and whether they avoid
+   logos/icons/flags/maps/poster-like imagery.
 4. `buildKnowledgeAnswer()` asks the knowledge text provider for a structured
    JSON answer with summary, sections, optional infographic, visual need, and an
    image prompt fallback.
 5. Answer text and Wikipedia results are checked for subject relevance. If the
    answer model drifts, the worker falls back to verified retrieved source text
    or a conservative no-solid-match message.
-6. If no retrieved/cached image exists and the answer says a visual is useful or
-   required, `generateKnowledgeImage()` generates a fallback image through
-   OpenAI.
-7. `buildKnowledgeVisual()` normalizes retrieved, cached, generated, or missing
-   image state for the UI.
+6. If the answer explicitly uses `imageSourceType: "generated"` with an
+   `imagePrompt`, `generateKnowledgeImage()` can generate a raw no-text hero
+   asset through OpenAI. Known, diagram, and no-image responses must not use
+   imageQuery as a generation prompt.
+7. `buildKnowledgeVisual()` normalizes pinned, retrieved, cached, generated, or
+   missing image state for the UI.
 8. `storeLLMResponse()` writes the latest response and history to the
    `NOTIFICATIONS` KV namespace for the full knowledge/history screens.
 
@@ -57,27 +61,67 @@ For text, the worker prefers `KNOWLEDGE_TEXT_BRIDGE_URL` /
 local Gemma and Sonnet. If the bridge fails or is not configured, the worker
 falls back to OpenAI chat completions with `OPENAI_MODEL`.
 
-For images, GPT Image 2 generation is preferred for every visual knowledge
-response:
+For images, the knowledge page now uses a curated hero asset pipeline:
 
-1. retrieved NASA/Wikipedia/cache context can inform the answer
-2. worker generates the displayed visual with `gpt-image-2`
-3. generated visuals are cached under `knowledge:image:v2:*`
-4. "bad image" feedback purges matching cached image keys, even when there is
-   no bridge log row to flag
-5. explicit no-image visual object
+1. pinned curated asset override, when `CURATED_KNOWLEDGE_ASSETS_JSON` or the
+   worker-side manifest provides a manually approved hero image
+2. scored retrieved candidate from cache, NASA, Wikipedia, or Wikimedia Commons
+3. explicit generated raw hero asset only for generated-mode answers
+4. native React/SVG fallback for diagram/concept/no-image cases
 
-Displayed knowledge images are pinned to `gpt-image-2`, low quality,
+The pinned manifest lives in `worker/src/curatedKnowledgeAssets.js`. The
+canonical topics are present with crop/tone metadata even when no manually
+approved URL is pinned yet. To add an override without code changes, set
+`CURATED_KNOWLEDGE_ASSETS_JSON` to an array containing:
+
+```json
+{
+  "topicKey": "ada-lovelace",
+  "title": "Ada Lovelace",
+  "type": "person",
+  "heroImage": {
+    "url": "https://example.com/ada-hero.jpg",
+    "source": "Curated Archive",
+    "sourceUrl": "https://example.com/source-page",
+    "credit": "Archive name",
+    "license": "Public domain",
+    "width": 1400,
+    "height": 820,
+    "focalPoint": { "x": 0.72, "y": 0.42 },
+    "cropHint": "right-subject"
+  }
+}
+```
+
+Generated visual prompts are still constrained to raw hero assets: no text, no
+labels, no UI, no posters, no infographic panels, and no logos. Displayed
+generated knowledge images are pinned to `gpt-image-2`, low quality,
 `1536x1024`, JPEG output, and a 120-second timeout. High quality is blocked
 unless `IMAGE_GENERATION_ALLOW_HIGH_QUALITY=true`.
 
 ## UI Consumption
 
 Knowledge responses are stored with both legacy fields (`imageUrl`, `image`) and
-the richer `visual` object. The richer object identifies source, mode,
-generation status, model, retrieval metadata, and fallback reason so the UI can
-label retrieved imagery differently from generated imagery.
+the richer `visual` / `curatedAsset` objects. The richer objects identify
+source, asset mode (`pinned`, `retrieved`, `generated`, or `fallback`),
+generation status, model, retrieval metadata, focal point, crop hint, tone,
+score, and fallback reason so the UI can make retrieved images feel art-directed
+without turning images into the final UI.
+
+The hero card applies focal-point object positioning, dark navy toning, and a
+left-side readability gradient. Facts, maps, timelines, process diagrams,
+lifecycle cards, metric cards, and chips remain native React/SVG UI.
 
 The worker tests in `worker/src/index.test.js` cover the important visual
-decisions: cache beats generation, NASA beats generation for space science,
-GPT Image 2 fallback metadata is preserved, and no-image responses are explicit.
+decisions: pinned assets beat retrieval, bad candidates are rejected, source
+metadata is preserved, known/diagram/none responses do not reintroduce
+`imagePrompt` or `imagePending`, GPT Image 2 fallback metadata is preserved for
+generated answers, and no-image responses are explicit.
+
+Run the normal gate with:
+
+```bash
+npm run verify
+npm run check:knowledge-visual-contract
+WORKER_TOKEN=<token> npm run check:knowledge-visual-contract:live
+```

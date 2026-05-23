@@ -91,17 +91,25 @@ function normalizeRelated(response) {
 }
 
 function normalizeHeroImage(response) {
-  const image = response?.image || response?.heroImage || {};
+  const image = response?.image || response?.heroImage || response?.curatedAsset || {};
   const url = image?.url || response?.imageUrl || image?.imageUrl || null;
   if (!url) return null;
+  const visualMetadata = response?.visual?.metadata || {};
+  const focalPoint = image?.focalPoint || visualMetadata?.focalPoint || null;
   return {
     url,
     source: text(image?.source || response?.visual?.source || response?.retrieval?.source, 80),
     sourceUrl: image?.sourceUrl || response?.visual?.sourceUrl || response?.retrieval?.wikipedia?.sourceUrl || response?.retrieval?.nasa?.sourceUrl || null,
-    mode: image?.mode || response?.visual?.mode || "retrieved",
+    mode: image?.assetMode || image?.mode || response?.visual?.assetMode || response?.visual?.mode || "retrieved",
     assetRole: image?.assetRole || response?.visual?.assetRole || "hero",
     width: image?.width || null,
     height: image?.height || null,
+    focalPoint: focalPoint && Number.isFinite(Number(focalPoint.x)) && Number.isFinite(Number(focalPoint.y))
+      ? { x: Number(focalPoint.x), y: Number(focalPoint.y) }
+      : null,
+    cropHint: text(image?.cropHint || visualMetadata?.cropHint, 32),
+    tone: text(image?.tone || visualMetadata?.tone, 32),
+    score: Number.isFinite(Number(image?.score ?? visualMetadata?.score)) ? Number(image?.score ?? visualMetadata?.score) : null,
     createdAt: image?.createdAt || null,
     expiresAt: image?.expiresAt || null,
     alt: image?.alt || response?.title || response?.query || "Knowledge image",
@@ -111,6 +119,7 @@ function normalizeHeroImage(response) {
 function sourceLabel(response, heroImage) {
   if (response?.imagePending) return "GPT Image 2 · generating raw visual";
   if (!heroImage) return "";
+  if (heroImage.mode === "pinned") return `${heroImage.source || "Curated"} · curated hero image`;
   if (heroImage.mode === "generated") return "GPT Image 2 · generated raw visual";
   const source = heroImage.source || response?.visual?.metadata?.retrievalSource || response?.retrieval?.source || "source";
   return `${source} · retrieved source image`;
