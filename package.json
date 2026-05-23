@@ -9,6 +9,7 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
+    "verify": "npm test && npm run check:knowledge-visual-contract && npm run build",
     "agentci:record": "node scripts/agentci.js record",
     "agentci:replay": "node scripts/agentci.js replay",
     "agentci:diff": "node scripts/agentci.js diff",

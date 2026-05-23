@@ -52,9 +52,23 @@ npm install
 npm run dev        # http://localhost:5173
 npm run build      # outputs to ./dist
 npm test           # Vitest suite (architecture invariants)
+npm run verify     # test + knowledge visual contract + build
 ```
 
 **Display target:** 1920x1080 logical (rendered at 2x on 4K TV via `--force-device-scale-factor=2`).
+
+### Knowledge Visual Contract
+
+```bash
+npm run check:knowledge-visual-contract
+WORKER_TOKEN=<token> npm run check:knowledge-visual-contract:live
+```
+
+The knowledge visual-contract check prevents regressions where known,
+diagram, or no-image responses accidentally reintroduce `imagePrompt`,
+`imagePending`, or generated poster-style visuals. Run the local mocked check
+before deploys. Run live mode only when validating production Worker behavior;
+it requires `WORKER_TOKEN` and must not print secrets.
 
 ## Deploying to Pi
 

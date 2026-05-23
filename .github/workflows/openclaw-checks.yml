@@ -35,6 +35,8 @@ jobs:
     # raw → derived → UI architectural invariants. See
     # docs/home_center_state_model.md and CLAUDE.md → Testing.
     runs-on: ubuntu-latest
+    env:
+      WORKER_TOKEN: ${{ secrets.WORKER_TOKEN }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -50,6 +52,17 @@ jobs:
 
       - name: Run Vitest suite
         run: npm test
+
+      - name: Run knowledge visual-contract check
+        run: npm run check:knowledge-visual-contract
+
+      - name: Skip live knowledge visual-contract check
+        if: ${{ env.WORKER_TOKEN == '' }}
+        run: echo "WORKER_TOKEN is not configured; skipping live knowledge visual-contract check."
+
+      - name: Run live knowledge visual-contract check
+        if: ${{ env.WORKER_TOKEN != '' }}
+        run: npm run check:knowledge-visual-contract:live
 
   secret-scan:
     name: Secret Scan (gitleaks)

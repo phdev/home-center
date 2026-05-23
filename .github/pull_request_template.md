@@ -18,7 +18,7 @@ what doesn't:
       adapter wrapper; components are source-agnostic
 - [ ] If I changed an invariant, rule, or pattern, I logged it in
       `docs/home_center_decisions_log.md`
-- [ ] `npm test` and `npm run build` pass locally
+- [ ] `npm run verify` passes locally
 
 ## Compound Step
 
