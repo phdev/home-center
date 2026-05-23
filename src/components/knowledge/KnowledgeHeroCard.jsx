@@ -17,7 +17,11 @@ export function KnowledgeHeroCard({ knowledge, config }) {
           <img src={knowledge.heroImage.url} alt={knowledge.heroImage.alt} />
         ) : (
           <div className="knowledge-fallback-art">
-            {knowledge.imagePending ? <Loader2 size={86} /> : <ImageIcon size={92} />}
+            <div className="knowledge-fallback-orbit" />
+            <div className="knowledge-fallback-mark">
+              {knowledge.imagePending ? <Loader2 size={70} /> : <Icon size={76} />}
+            </div>
+            <ImageIcon className="knowledge-fallback-ghost" size={128} />
           </div>
         )}
       </div>

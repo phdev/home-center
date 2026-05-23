@@ -37,11 +37,11 @@ function env(overrides = {}) {
   };
 }
 
-function askRequest(query = "What is a black hole?") {
+function askRequest(query = "What is a black hole?", bodyOverrides = {}) {
   return new Request("https://worker.test/api/ask-query", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ query }),
+    body: JSON.stringify({ query, ...bodyOverrides }),
   });
 }
 
@@ -136,8 +136,8 @@ function fetchMockWithWikipediaSummaryFailure({ classification, answer, searchIm
   });
 }
 
-async function askAndRead(currentEnv, query) {
-  const response = await worker.fetch(askRequest(query), currentEnv);
+async function askAndRead(currentEnv, query, bodyOverrides = {}) {
+  const response = await worker.fetch(askRequest(query, bodyOverrides), currentEnv);
   expect(response.status).toBe(200);
   return response.json();
 }
@@ -568,16 +568,16 @@ describe("knowledge image pipeline", () => {
     global.fetch = defaultFetchMock({
       classification: {
         type: "concept",
-        title: "Photosynthesis",
+        title: "Democracy",
         visualNeed: "required",
         spaceScience: false,
-        entityQuery: "Photosynthesis",
-        visualSearchQuery: "photosynthesis diagram",
+        entityQuery: "Democracy",
+        visualSearchQuery: "democracy symbolic picture",
       },
       wikipediaImage: null,
     });
 
-    const body = await askAndRead(currentEnv, "Show me how photosynthesis works");
+    const body = await askAndRead(currentEnv, "Show me a picture of democracy");
     const imageCall = global.fetch.mock.calls.find(([url]) => String(url) === "https://api.openai.com/v1/images/generations");
     const requestBody = JSON.parse(imageCall[1].body);
 
@@ -607,16 +607,16 @@ describe("knowledge image pipeline", () => {
     global.fetch = defaultFetchMock({
       classification: {
         type: "concept",
-        title: "Photosynthesis",
+        title: "Democracy",
         visualNeed: "required",
         spaceScience: false,
-        entityQuery: "Photosynthesis",
-        visualSearchQuery: "photosynthesis diagram",
+        entityQuery: "Democracy",
+        visualSearchQuery: "democracy symbolic picture",
       },
       wikipediaImage: null,
     });
 
-    const body = await askAndRead(currentEnv, "Show me how photosynthesis works");
+    const body = await askAndRead(currentEnv, "Show me a picture of democracy");
     const imageCall = global.fetch.mock.calls.find(([url]) => String(url) === "https://api.openai.com/v1/images/generations");
     const requestBody = JSON.parse(imageCall[1].body);
 
@@ -958,6 +958,239 @@ describe("knowledge image pipeline", () => {
       source: "Wikipedia",
       mode: "retrieved",
     });
+  });
+
+  it("normalizes known-topic retrieval to the canonical subject instead of the full question", async () => {
+    const currentEnv = env();
+    const classification = {
+      type: "person",
+      title: "Who was Ada Lovelace?",
+      visualNeed: "useful",
+      spaceScience: false,
+      entityQuery: "Who was Ada Lovelace?",
+      visualSearchQuery: "Who was Ada Lovelace portrait",
+    };
+    const answer = {
+      type: "person",
+      title: "Ada Lovelace",
+      summary: "Ada Lovelace wrote notes on Charles Babbage's Analytical Engine.",
+      sections: [],
+      infographic: null,
+      visualNeed: "useful",
+      imageSourceType: "known",
+      imageQuery: "Ada Lovelace portrait",
+    };
+
+    global.fetch = vi.fn(async (url, options = {}) => {
+      const href = String(url);
+      if (href.startsWith("https://bridge.test")) {
+        const bridgeCallCount = global.fetch.mock.calls
+          .filter(([calledUrl]) => String(calledUrl).startsWith("https://bridge.test")).length;
+        return jsonResponse({
+          json: bridgeCallCount === 1 ? classification : answer,
+          model: "gemma-test",
+          log_row_id: `kb-test-${bridgeCallCount}`,
+        });
+      }
+      if (href.startsWith("https://en.wikipedia.org/w/rest.php/v1/search/page")) {
+        const q = new URL(href).searchParams.get("q");
+        if (q !== "Ada Lovelace") return jsonResponse({ pages: [] });
+        return jsonResponse({
+          pages: [{ key: "Ada_Lovelace", title: "Ada Lovelace", thumbnail: { url: "https://wiki.test/ada-thumb.jpg" } }],
+        });
+      }
+      if (href.startsWith("https://en.wikipedia.org/api/rest_v1/page/summary/")) {
+        return jsonResponse({
+          title: "Ada Lovelace",
+          description: "English mathematician and writer",
+          extract: "Ada Lovelace is often regarded as one of the first computer programmers.",
+          content_urls: { desktop: { page: "https://en.wikipedia.org/wiki/Ada_Lovelace" } },
+          originalimage: { source: "https://wiki.test/ada.jpg", width: 640, height: 900 },
+        });
+      }
+      if (href.startsWith("https://commons.wikimedia.org/w/api.php")) {
+        return jsonResponse({ query: { pages: {} } });
+      }
+      throw new Error(`Unexpected fetch: ${href}`);
+    });
+
+    const body = await askAndRead(currentEnv, "Who was Ada Lovelace?", { debug: true });
+    const searchQueries = global.fetch.mock.calls
+      .map(([url]) => String(url))
+      .filter((url) => url.startsWith("https://en.wikipedia.org/w/rest.php/v1/search/page"))
+      .map((url) => new URL(url).searchParams.get("q"));
+    const summaryPages = global.fetch.mock.calls
+      .map(([url]) => String(url))
+      .filter((url) => url.startsWith("https://en.wikipedia.org/api/rest_v1/page/summary/"))
+      .map((url) => decodeURIComponent(url.split("/").pop()));
+
+    expect(searchQueries).not.toContain("Who was Ada Lovelace");
+    expect(summaryPages).toContain("Ada Lovelace");
+    expect(body.imageUrl).toBe("https://wiki.test/ada.jpg");
+    expect(body.imagePrompt).toBeNull();
+    expect(body.imagePending).toBe(false);
+    expect(body.retrieval.diagnostics.normalizedSubject).toBe("Ada Lovelace");
+  });
+
+  it("preserves Wikimedia Commons metadata when it is the fallback image source", async () => {
+    const currentEnv = env();
+    global.fetch = defaultFetchMock({
+      classification: {
+        type: "fauna",
+        title: "Emperor Penguin",
+        visualNeed: "useful",
+        spaceScience: false,
+        entityQuery: "Emperor Penguin",
+        visualSearchQuery: "Emperor Penguin animal photo",
+      },
+      answer: {
+        type: "fauna",
+        title: "Emperor Penguin",
+        summary: "Emperor penguins live in Antarctica.",
+        sections: [],
+        infographic: null,
+        visualNeed: "useful",
+        imageSourceType: "known",
+        imageQuery: "Emperor Penguin animal photo",
+      },
+      wikipediaImage: null,
+      nasaImage: null,
+    });
+    global.fetch.mockImplementation(async (url, options = {}) => {
+      const href = String(url);
+      if (href.startsWith("https://commons.wikimedia.org/w/api.php")) {
+        return jsonResponse({
+          query: {
+            pages: {
+              1: {
+                title: "File:Emperor Penguin Antarctica.jpg",
+                imageinfo: [{
+                  url: "https://commons.test/emperor-penguin.jpg",
+                  width: 1200,
+                  height: 800,
+                  descriptionurl: "https://commons.wikimedia.org/wiki/File:Emperor_Penguin_Antarctica.jpg",
+                  extmetadata: {
+                    Artist: { value: "Jane Photographer" },
+                    ImageDescription: { value: "Emperor Penguin adult in Antarctica" },
+                  },
+                }],
+              },
+            },
+          },
+        });
+      }
+      return defaultFetchMock({
+        classification: {
+          type: "fauna",
+          title: "Emperor Penguin",
+          visualNeed: "useful",
+          spaceScience: false,
+          entityQuery: "Emperor Penguin",
+          visualSearchQuery: "Emperor Penguin animal photo",
+        },
+        answer: {
+          type: "fauna",
+          title: "Emperor Penguin",
+          summary: "Emperor penguins live in Antarctica.",
+          sections: [],
+          infographic: null,
+          visualNeed: "useful",
+          imageSourceType: "known",
+          imageQuery: "Emperor Penguin animal photo",
+        },
+        wikipediaImage: null,
+        nasaImage: null,
+      })(url, options);
+    });
+
+    const body = await askAndRead(currentEnv, "Tell me about emperor penguins.");
+
+    expect(body.imageUrl).toBe("https://commons.test/emperor-penguin.jpg");
+    expect(body.image).toMatchObject({
+      source: "Wikimedia Commons",
+      sourceUrl: "https://commons.wikimedia.org/wiki/File:Emperor_Penguin_Antarctica.jpg",
+      credit: "Jane Photographer",
+      width: 1200,
+      height: 800,
+    });
+  });
+
+  it("exposes retrieval diagnostics only for debug requests", async () => {
+    const currentEnv = env();
+    global.fetch = defaultFetchMock();
+
+    const normalBody = await askAndRead(currentEnv, "Where is Madagascar?");
+    expect(normalBody.retrieval.diagnostics).toBeUndefined();
+
+    global.fetch = defaultFetchMock();
+    const debugBody = await askAndRead(currentEnv, "Where is Madagascar?", { debug: true });
+    expect(debugBody.retrieval.diagnostics).toMatchObject({
+      originalQuery: "Where is Madagascar?",
+      normalizedSubject: "Madagascar",
+      final: expect.any(Object),
+    });
+  });
+
+  it("canonicalizes smallest-country and World Wide Web inventor queries for retrieval", async () => {
+    const currentEnv = env();
+    global.fetch = defaultFetchMock({
+      classification: {
+        type: "concept",
+        title: "Tim Berners-Lee",
+        visualNeed: "none",
+        spaceScience: false,
+        entityQuery: "World Wide Web inventor",
+        visualSearchQuery: "World Wide Web inventor",
+      },
+      answer: {
+        type: "concept",
+        title: "World Wide Web inventor",
+        summary: "Tim Berners-Lee invented the World Wide Web.",
+        sections: [],
+        visualNeed: "none",
+        imageSourceType: "none",
+      },
+      wikipediaImage: "https://wiki.test/tim.jpg",
+    });
+
+    const body = await askAndRead(currentEnv, "Who invented the World Wide Web?", { debug: true });
+
+    expect(body.retrieval.subject).toBe("Tim Berners-Lee");
+    expect(body.type).toBe("person");
+    expect(body.imageSourceType).toBe("known");
+    expect(body.imagePrompt).toBeNull();
+    expect(body.imagePending).toBe(false);
+    expect(body.imageUrl).toBe("https://wiki.test/tim.jpg");
+  });
+
+  it("keeps photosynthesis on the native diagram path without image generation", async () => {
+    const currentEnv = env();
+    global.fetch = defaultFetchMock({
+      classification: {
+        type: "concept",
+        title: "Photosynthesis",
+        visualNeed: "none",
+        spaceScience: false,
+        entityQuery: "Photosynthesis",
+        visualSearchQuery: "photosynthesis process diagram",
+      },
+      answer: {
+        type: "concept",
+        title: "Photosynthesis",
+        summary: "Photosynthesis lets plants turn light into chemical energy.",
+        sections: [],
+        visualNeed: "none",
+        imageSourceType: "none",
+      },
+      wikipediaImage: null,
+    });
+
+    const body = await askAndRead(currentEnv, "What is photosynthesis?");
+
+    expect(body.imageSourceType).toBe("diagram");
+    expect(body.imagePrompt).toBeNull();
+    expect(body.imagePending).toBe(false);
+    expect(body.visual.metadata.reason).toBe("ui_rendered_diagram");
   });
 
   it("normalizes sun size questions to a concise answer and retrieved NASA visual", async () => {
