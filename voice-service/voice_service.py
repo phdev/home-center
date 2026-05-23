@@ -1115,11 +1115,19 @@ def command_from_transcript(
     text: str,
     fallback_text: str = "",
     allow_bare_ask: bool = True,
+    allow_wake_knowledge: bool = False,
 ) -> tuple[str, dict]:
     """Extract a command-shaped payload from local STT text."""
     candidates = hybrid_command_body_candidates(text, fallback_text=fallback_text)
     parsed = [
-        (body, parse_command(body, allow_bare_ask=allow_bare_ask))
+        (
+            body,
+            parse_command(
+                body,
+                allow_bare_ask=allow_bare_ask,
+                allow_wake_knowledge=allow_wake_knowledge,
+            ),
+        )
         for body in candidates
     ]
     for body, command in parsed:
@@ -2249,7 +2257,11 @@ def main() -> None:
         pre_audio = rolling.tail(args.pre_wake_seconds)
 
         wake_body = command_body_from_transcript(wake_text)
-        wake_command = parse_command(wake_body) if wake_body and COMMAND_KEYWORD_RE.search(wake_body) else {"action": "none"}
+        wake_command = (
+            parse_command(wake_body, allow_bare_ask=False, allow_wake_knowledge=True)
+            if wake_body and COMMAND_KEYWORD_RE.search(wake_body)
+            else {"action": "none"}
+        )
         if wake_command.get("action") != "none" and not is_dispatchable_command(wake_command):
             log.info("Rejecting incomplete fast command body=%r command=%s", wake_body, wake_command)
             wake_command = {"action": "none"}
@@ -2285,7 +2297,12 @@ def main() -> None:
 
         command_audio, post_seconds = capture_command(mic, rolling, noise, pre_audio)
         text = transcribe(command_audio, args.whisper_model, args.whisper_no_speech_threshold)
-        body, command = command_from_transcript(text, fallback_text=wake_text)
+        body, command = command_from_transcript(
+            text,
+            fallback_text=wake_text,
+            allow_bare_ask=False,
+            allow_wake_knowledge=True,
+        )
         howie_wake_context = bool(HOWIE_WAKE_PHRASE_RE.search(wake_text) or HOWIE_WAKE_PHRASE_RE.search(text))
         if command.get("action") != "none" and not is_dispatchable_command(command):
             log.info("Rejecting incomplete command body=%r command=%s", body, command)
@@ -2350,7 +2367,15 @@ def main() -> None:
                 )
             )
             if force_howie_openai
-            else lambda cloud_text: (*command_from_transcript(cloud_text, fallback_text=wake_text), []),
+            else lambda cloud_text: (
+                *command_from_transcript(
+                    cloud_text,
+                    fallback_text=wake_text,
+                    allow_bare_ask=False,
+                    allow_wake_knowledge=True,
+                ),
+                [],
+            ),
         )
         if force_howie_openai and is_dispatchable_command(openai_diag.command or {}):
             log.info(
@@ -2392,6 +2417,7 @@ def main() -> None:
         if (
             args.howie_openai_stt
             and not is_dispatchable_command(command)
+            and howie_wake_context
             and (wake_text or text)
         ):
             fallback_text = openai_diag.transcript if openai_diag.transcript else text

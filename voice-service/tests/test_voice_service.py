@@ -871,6 +871,36 @@ def test_confirmed_command_can_reject_bare_ask_after_hallucinated_wake():
     )
 
 
+def test_command_from_transcript_strict_wake_context_rejects_short_background_question_fragment():
+    assert command_from_transcript(
+        "there are",
+        fallback_text="a over",
+        allow_bare_ask=False,
+        allow_wake_knowledge=True,
+    ) == ("there are", {"action": "none"})
+
+
+def test_command_from_transcript_strict_wake_context_accepts_complete_knowledge_question():
+    assert command_from_transcript(
+        "how big is the sun",
+        fallback_text="Hey Homer",
+        allow_bare_ask=False,
+        allow_wake_knowledge=True,
+    ) == ("how big is the sun", {"action": "ask", "query": "how big is the sun"})
+
+
+def test_confirmed_command_uses_latest_wake_under_background_speech():
+    assert confirmed_command_from_transcript(
+        "People are still talking near the microphone. Hey Homer, open calendar.",
+        wake_re=CONFIRM_WAKE_PHRASE_RE,
+        allow_bare_ask=False,
+    ) == (
+        "open calendar",
+        {"action": "navigate", "page": "calendar"},
+        [{"body": "open calendar", "command": {"action": "navigate", "page": "calendar"}}],
+    )
+
+
 def test_confirmed_command_accepts_wake_knowledge_question():
     assert confirmed_command_from_transcript(
         "Hey Homer, how big is the sun?",

@@ -56,7 +56,7 @@
         <key>WAKE_ENGINE</key>
         <string>vosk</string>
         <key>WAKE_CONFIRM_COMMAND</key>
-        <string>0</string>
+        <string>1</string>
         <key>CONFIRM_PRE_WAKE_SECONDS</key>
         <string>5.0</string>
         <key>CONFIRM_POST_WAKE_SECONDS</key>

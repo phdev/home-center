@@ -50,7 +50,7 @@
         <key>COMMAND_MIN_SECONDS</key>
         <string>0.16</string>
         <key>COMMAND_MAX_SECONDS</key>
-        <string>0.9</string>
+        <string>1.6</string>
         <key>POST_WAKE_SILENCE_SECONDS</key>
         <string>0.08</string>
         <key>FOLLOWUP_COMMAND_WAIT_SECONDS</key>
@@ -60,7 +60,7 @@
         <key>WAKE_ENGINE</key>
         <string>vosk</string>
         <key>WAKE_CONFIRM_COMMAND</key>
-        <string>0</string>
+        <string>1</string>
         <key>CONFIRM_PRE_WAKE_SECONDS</key>
         <string>5.0</string>
         <key>CONFIRM_POST_WAKE_SECONDS</key>
