@@ -4,6 +4,10 @@
 # Disable screen blanking / DPMS
 wlr-randr --output HDMI-A-1 --on --mode 3840x2160@60Hz --scale 1 2>/dev/null &
 
+# Keep the compositor desktop black whenever Chromium is not covering it.
+killall swaybg 2>/dev/null
+swaybg --color '#000000' --mode solid 2>/dev/null &
+
 # Kill swayidle if running (prevent screen blanking)
 killall swayidle 2>/dev/null
 

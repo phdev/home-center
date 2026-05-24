@@ -9,6 +9,14 @@ KIOSK_URL="http://localhost:8080/home-center/"
 
 echo "=== Home Center Kiosk Setup ==="
 
+# labwc does not draw a wallpaper itself; swaybg gives the compositor a
+# persistent solid black desktop behind Chromium.
+if ! command -v swaybg &>/dev/null; then
+    echo "Installing swaybg (solid black compositor background)..."
+    sudo apt-get update
+    sudo apt-get install -y swaybg
+fi
+
 # 1. Install autostart file
 echo "Installing labwc autostart..."
 mkdir -p ~/.config/labwc
