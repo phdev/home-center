@@ -1,5 +1,6 @@
 export function WorldMap({ maps = [], accent = "#b993ff" }) {
   const pin = maps.find((map) => Number.isFinite(map.lat) && Number.isFinite(map.lon));
+  const highlightsAntarctica = maps.some((map) => /antarctica/i.test(`${map.label} ${map.highlight}`));
   const x = pin ? ((pin.lon + 180) / 360) * 600 : 305;
   const y = pin ? ((90 - pin.lat) / 180) * 270 : 126;
 
@@ -24,11 +25,30 @@ export function WorldMap({ maps = [], accent = "#b993ff" }) {
         <path d="M398 76c42-18 93-13 128 12 28 20 20 55-19 62-24 5-41 17-52 39-12 26-49 24-59-4-9-24 21-44 8-68-8-14-23-31-6-41Z" />
         <path d="M447 180c20 8 44 6 61 21 15 14 6 31-17 32-27 1-63-24-55-43 2-5 6-8 11-10Z" />
       </g>
+      {highlightsAntarctica && (
+        <g>
+          <path
+            d="M205 226c44-15 73-10 104-11 44-2 88-13 130-5 31 6 58 6 82 2-11 17-41 24-85 25-49 2-89-6-132-3-48 3-82 0-99-8Z"
+            fill={accent}
+            fillOpacity="0.62"
+            stroke={accent}
+            strokeOpacity="0.75"
+            strokeWidth="1.5"
+          />
+          <text x="365" y="253" textAnchor="middle" fill={accent} fontSize="17" fontWeight="900">
+            ANTARCTICA
+          </text>
+        </g>
+      )}
       <path d="M36 228C118 196 178 218 256 202c75-15 134-61 220-42 43 10 70 30 88 50" fill="none" stroke={accent} strokeOpacity="0.22" strokeWidth="2" />
-      <circle cx={x} cy={y} r="24" fill={accent} opacity="0.18" />
-      <circle cx={x} cy={y} r="14" fill="none" stroke={accent} strokeWidth="2" opacity="0.7" />
-      <circle cx={x} cy={y} r="8" fill={accent} />
-      <circle cx={x} cy={y} r="3" fill="#fff" />
+      {!highlightsAntarctica && (
+        <>
+          <circle cx={x} cy={y} r="24" fill={accent} opacity="0.18" />
+          <circle cx={x} cy={y} r="14" fill="none" stroke={accent} strokeWidth="2" opacity="0.7" />
+          <circle cx={x} cy={y} r="8" fill={accent} />
+          <circle cx={x} cy={y} r="3" fill="#fff" />
+        </>
+      )}
     </svg>
   );
 }

@@ -1812,6 +1812,46 @@ function defaultKnowledgeProfile(type = "concept", subject = "") {
 }
 
 function deterministicKnowledgeAnswer(query, subject, classification = {}) {
+  if (/\bemperor\s+penguins?\b/i.test(`${subject} ${query}`)) {
+    return {
+      type: "fauna",
+      title: "Emperor Penguin",
+      summary:
+        "The emperor penguin is the tallest and heaviest living penguin. Native to Antarctica, it is adapted to extreme cold with dense feathers and a thick layer of fat. It breeds through the year's harshest months.",
+      sections: [
+        {
+          heading: "Adaptation",
+          content:
+            "Emperor penguins thrive in one of Earth's harshest environments. Dense, waterproof feathers, a thick layer of fat, and huddling behavior help them conserve heat and withstand brutal Antarctic winds and temperatures.",
+        },
+      ],
+      profile: {
+        facts: [
+          { label: "Species", value: "A. forsteri", icon: "paw" },
+          { label: "Range", value: "Antarctica", icon: "globe" },
+        ],
+        maps: [
+          { scope: "world", label: "Antarctica", highlight: "Antarctica", lat: -82, lon: 0 },
+        ],
+        relatedConcepts: ["Antarctica", "Birds", "Cold adaptation"],
+      },
+      infographics: [
+        {
+          title: "At a Glance",
+          kind: "metrics",
+          items: [
+            { label: "Height", value: "100-130 cm", sublabel: "39-51 in", icon: "ruler" },
+            { label: "Weight", value: "22-45 kg", sublabel: "49-99 lb", icon: "weight" },
+            { label: "Penguin lineage", value: "60M+", sublabel: "years", icon: "dna" },
+          ],
+        },
+      ],
+      visualNeed: classification.visualNeed === "none" ? "useful" : (classification.visualNeed || "useful"),
+      imageSourceType: "known",
+      imageQuery: "emperor penguins Antarctica adult chick",
+    };
+  }
+
   if (/\bsun\b/i.test(subject) && /\bhow\s+(?:big|large|wide)\b/i.test(query)) {
     return {
       type: "concept",

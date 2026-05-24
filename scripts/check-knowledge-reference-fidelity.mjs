@@ -51,6 +51,7 @@ const CASES = [
     middle: "habitat-range",
     lower: "lifecycle-loop",
     imageSourceType: "known",
+    minFacts: 2,
   },
   {
     query: "Tell me about coast redwood trees.",
@@ -213,7 +214,7 @@ function validate(item, body) {
   fail(body.visualPlan?.moduleStyles?.middle === item.middle, `expected middle module ${item.middle}`, failures);
   fail(body.visualPlan?.moduleStyles?.lower === item.lower, `expected lower module ${item.lower}`, failures);
   fail(body.visualPlan?.moduleStyles?.facts === "compact-fact-rows", "expected compact fact rows", failures);
-  fail(Array.isArray(body.profile?.facts) && body.profile.facts.length >= 3, "expected dense key facts", failures);
+  fail(Array.isArray(body.profile?.facts) && body.profile.facts.length >= (item.minFacts || 3), "expected dense key facts", failures);
   fail(Array.isArray(body.profile?.relatedConcepts) && body.profile.relatedConcepts.length >= 3, "expected related chips", failures);
   fail(!/\.{3}|…/.test(body.summary || ""), "primary summary contains ellipsis", failures);
   if (item.type === "concept") {

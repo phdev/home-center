@@ -126,6 +126,73 @@ const PREVIEW_KNOWLEDGE_RESPONSE = {
   timestamp: Date.now(),
 };
 
+const EMPEROR_PENGUIN_KNOWLEDGE_RESPONSE = {
+  kind: "knowledge",
+  query: "Tell me about emperor penguins.",
+  title: "Emperor Penguin",
+  type: "fauna",
+  summary: "The emperor penguin is the tallest and heaviest living penguin. Native to Antarctica, it is adapted to extreme cold with dense feathers and a thick layer of fat. It breeds through the year's harshest months.",
+  sections: [
+    {
+      heading: "Adaptation",
+      content: "Emperor penguins thrive in one of Earth's harshest environments. Dense, waterproof feathers, a thick layer of fat, and huddling behavior help them conserve heat and withstand brutal Antarctic winds and temperatures.",
+    },
+  ],
+  profile: {
+    facts: [
+      { label: "Species", value: "A. forsteri", icon: "paw" },
+      { label: "Range", value: "Antarctica", icon: "globe" },
+    ],
+    maps: [{ scope: "world", label: "Antarctica", highlight: "Antarctica", lat: -82, lon: 0 }],
+    relatedConcepts: ["Antarctica", "Birds", "Cold adaptation"],
+  },
+  infographics: [{
+    title: "At a Glance",
+    kind: "metrics",
+    items: [
+      { label: "Height", value: "100-130 cm", sublabel: "39-51 in", icon: "ruler" },
+      { label: "Weight", value: "22-45 kg", sublabel: "49-99 lb", icon: "weight" },
+      { label: "Penguin lineage", value: "60M+", sublabel: "years", icon: "dna" },
+    ],
+  }],
+  imageUrl: "/home-center/knowledge-assets/emperor-penguin-reference-hero.png",
+  image: {
+    url: "/home-center/knowledge-assets/emperor-penguin-reference-hero.png",
+    source: "Wikimedia Commons",
+    mode: "pinned",
+    sourceUrl: "https://commons.wikimedia.org/wiki/File:Emperor_penguins_in_Antarctica.jpg",
+    focalPoint: { x: 0.64, y: 0.5 },
+    cropHint: "right-subject",
+    tone: "home-center-dark",
+    alt: "Emperor penguins in Antarctica",
+  },
+  visualPlan: {
+    visualFamily: "editorial-knowledge-v1",
+    queryType: "fauna",
+    subType: "fauna/polar-animal",
+    compositionPattern: "species-closeup-with-environment",
+    heroStrategy: "retrieved-single-subject",
+    textSafeZone: "left",
+    focalRegion: "right-center",
+    tone: "home-center-dark",
+    contrastLevel: "medium-high",
+    motifStrategy: "snow-habitat-rings",
+    supportingPanelStyle: "lifecycle-loop",
+    mapStyle: "habitat-range",
+    badgeStyle: "green-fauna",
+    atAGlanceStyle: "lifecycle-loop",
+    backgroundTreatment: "navy-glass-vignette",
+    moduleStyles: {
+      hero: "species-closeup-with-environment",
+      facts: "compact-fact-rows",
+      middle: "habitat-range",
+      lower: "lifecycle-loop",
+    },
+  },
+  imageSourceType: "known",
+  timestamp: Date.now(),
+};
+
 const KNOWLEDGE_LOADING_RESPONSE = {
   kind: "knowledge",
   query: "Knowledge query in progress",
@@ -285,7 +352,9 @@ export default function App() {
   const appNow = forceNow ?? now;
   const previewResponse =
     requestedPage === "knowledge"
-      ? PREVIEW_KNOWLEDGE_RESPONSE
+      ? (urlParams.get("knowledgeFixture") === "emperor-penguin"
+        ? EMPEROR_PENGUIN_KNOWLEDGE_RESPONSE
+        : PREVIEW_KNOWLEDGE_RESPONSE)
       : requestedPage === "llm-response"
         ? PREVIEW_LLM_RESPONSE
         : null;

@@ -50,7 +50,7 @@ const CANONICAL_CURATED_ASSETS = [
     focalPoint: { x: 0.64, y: 0.5 },
     tone: "home-center-dark",
     heroImage: {
-      url: "https://upload.wikimedia.org/wikipedia/commons/7/70/Emperor_penguins_in_Antarctica.jpg",
+      url: "/home-center/knowledge-assets/emperor-penguin-reference-hero.png",
       source: "Wikimedia Commons",
       sourceUrl: "https://commons.wikimedia.org/wiki/File:Emperor_penguins_in_Antarctica.jpg",
       credit: "Wikimedia Commons",
