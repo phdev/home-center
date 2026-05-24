@@ -207,7 +207,7 @@ const APOLLO_11_KNOWLEDGE_RESPONSE = {
   ],
   profile: {
     facts: [
-      { label: "Date", value: "July 20, 1969", icon: "calendar" },
+      { label: "Dates", value: "July 16-24, 1969", icon: "calendar" },
       { label: "Crew", value: "3", icon: "crew" },
     ],
     maps: [
@@ -222,13 +222,13 @@ const APOLLO_11_KNOWLEDGE_RESPONSE = {
     { date: "July 20, 1969", label: "Moonwalk", description: "10:56 PM EDT" },
     { date: "July 24, 1969", label: "Return", description: "11:50 AM EDT" },
   ],
-  imageUrl: "https://upload.wikimedia.org/wikipedia/commons/9/9c/Aldrin_Apollo_11.jpg",
+  imageUrl: "/home-center/knowledge-assets/apollo-11-aldrin.jpg",
   image: {
-    url: "https://upload.wikimedia.org/wikipedia/commons/9/9c/Aldrin_Apollo_11.jpg",
+    url: "/home-center/knowledge-assets/apollo-11-aldrin.jpg",
     source: "NASA",
     mode: "pinned",
     sourceUrl: "https://commons.wikimedia.org/wiki/File:Aldrin_Apollo_11.jpg",
-    focalPoint: { x: 0.5, y: 0.48 },
+    focalPoint: { x: 0.5, y: 0.5 },
     cropHint: "center-subject",
     tone: "home-center-dark",
     alt: "Buzz Aldrin on the Moon during Apollo 11",

@@ -241,7 +241,7 @@ describe("FullKnowledgePage", () => {
       },
     })} onBack={() => {}} />);
 
-    expect(screen.getAllByText("July 20, 1969").length).toBeGreaterThan(0);
+    expect(screen.getByText("July 16-24, 1969")).toBeTruthy();
     expect(screen.getByText("Places")).toBeTruthy();
     expect(screen.getByText("Houston")).toBeTruthy();
     expect(screen.getByText("Cape Canaveral")).toBeTruthy();
@@ -250,7 +250,7 @@ describe("FullKnowledgePage", () => {
     expect(screen.getByText("Lunar Landing")).toBeTruthy();
     expect(container.querySelector(".knowledge-insight-planet")).toBeTruthy();
     expect(container.querySelector(".knowledge-module-horizontal-mission-timeline")).toBeTruthy();
-    expect(screen.getByAltText("Apollo 11 Moon Landing").style.objectPosition).toBe("50% 48%");
+    expect(screen.getByAltText("Apollo 11 Moon Landing").style.objectPosition).toBe("50% 50%");
   });
 
   it("renders related topic chips and a no-image fallback", () => {

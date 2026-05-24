@@ -150,7 +150,7 @@ function applyCanonicalKnowledgePolish(knowledge) {
   return {
     ...knowledge,
     facts: [
-      { label: "Date", value: "July 20, 1969", icon: "calendar" },
+      { label: "Dates", value: "July 16-24, 1969", icon: "calendar" },
       { label: "Crew", value: "3", icon: "crew" },
     ],
     insight: {
@@ -189,7 +189,8 @@ function applyCanonicalKnowledgePolish(knowledge) {
     },
     heroImage: knowledge.heroImage ? {
       ...knowledge.heroImage,
-      focalPoint: { x: 0.5, y: knowledge.heroImage.focalPoint?.y ?? 0.48 },
+      url: "/home-center/knowledge-assets/apollo-11-aldrin.jpg",
+      focalPoint: { x: 0.5, y: 0.5 },
       cropHint: knowledge.heroImage.cropHint || "center-subject",
     } : knowledge.heroImage,
   };

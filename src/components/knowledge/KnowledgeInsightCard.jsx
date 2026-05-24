@@ -23,8 +23,9 @@ function InsightOrnament({ type }) {
     return (
       <div className="knowledge-insight-ornament knowledge-insight-ornament-event" aria-hidden="true">
         <div className="knowledge-insight-planet">
-          <div className="knowledge-insight-planet-band knowledge-insight-planet-band-a" />
-          <div className="knowledge-insight-planet-band knowledge-insight-planet-band-b" />
+          <div className="knowledge-insight-earth-land knowledge-insight-earth-land-a" />
+          <div className="knowledge-insight-earth-land knowledge-insight-earth-land-b" />
+          <div className="knowledge-insight-earth-land knowledge-insight-earth-land-c" />
         </div>
         <Sparkle className="knowledge-insight-star knowledge-insight-star-a" size={15} />
         <Sparkle className="knowledge-insight-star knowledge-insight-star-b" size={11} />
