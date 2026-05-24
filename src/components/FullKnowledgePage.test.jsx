@@ -203,7 +203,8 @@ describe("FullKnowledgePage", () => {
 
     expect(container.querySelector(".knowledge-insight-ornament-fauna")).toBeTruthy();
     expect(container.querySelector(".knowledge-module-habitat-range")).toBeTruthy();
-    expect(screen.getByText("ANTARCTICA")).toBeTruthy();
+    expect(container.querySelector("[aria-label='World map']")).toBeTruthy();
+    expect(screen.queryByText("ANTARCTICA")).toBeNull();
   });
 
   it("renders related topic chips and a no-image fallback", () => {

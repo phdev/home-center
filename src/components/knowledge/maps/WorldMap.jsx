@@ -37,9 +37,6 @@ export function WorldMap({ maps = [], accent = "#b993ff" }) {
         <g>
           <rect x="35" y="205" width="530" height="36" fill={accent} fillOpacity="0.72" mask="url(#antarcticaLandMask)" />
           <rect x="35" y="205" width="530" height="36" fill="none" stroke={accent} strokeOpacity="0.45" strokeWidth="1.2" mask="url(#antarcticaLandMask)" />
-          <text x="368" y="247" textAnchor="middle" fill={accent} fontSize="16" fontWeight="900">
-            ANTARCTICA
-          </text>
         </g>
       )}
       {!highlightsAntarctica && (
