@@ -12,6 +12,17 @@ export function WorldMap({ maps = [], accent = "#b993ff" }) {
           <stop offset="58%" stopColor={accent} stopOpacity="0.06" />
           <stop offset="100%" stopColor="#020617" stopOpacity="0.1" />
         </radialGradient>
+        <mask id="antarcticaLandMask" maskUnits="userSpaceOnUse" x="35" y="205" width="530" height="36">
+          <rect x="35" y="205" width="530" height="36" fill="black" />
+          <image
+            href="/home-center/knowledge-assets/world-map-equirectangular.svg"
+            x="35"
+            y="30"
+            width="530"
+            height="210"
+            preserveAspectRatio="none"
+          />
+        </mask>
       </defs>
       <rect width="600" height="270" rx="8" fill="rgba(255,255,255,0.025)" />
       <rect x="1" y="1" width="598" height="268" rx="8" fill="url(#worldMapGlow)" />
@@ -30,14 +41,8 @@ export function WorldMap({ maps = [], accent = "#b993ff" }) {
       />
       {highlightsAntarctica && (
         <g>
-          <path
-            d="M218 220c31-10 60-8 89-9 48-2 91-12 137-5 24 4 49 5 75 1-10 13-34 21-69 23-45 4-84-4-126-1-47 3-85 0-106-9Z"
-            fill={accent}
-            fillOpacity="0.72"
-            stroke={accent}
-            strokeOpacity="0.86"
-            strokeWidth="1.5"
-          />
+          <rect x="35" y="205" width="530" height="36" fill={accent} fillOpacity="0.72" mask="url(#antarcticaLandMask)" />
+          <rect x="35" y="205" width="530" height="36" fill="none" stroke={accent} strokeOpacity="0.45" strokeWidth="1.2" mask="url(#antarcticaLandMask)" />
           <text x="368" y="247" textAnchor="middle" fill={accent} fontSize="16" fontWeight="900">
             ANTARCTICA
           </text>
