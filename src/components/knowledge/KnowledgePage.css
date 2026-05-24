@@ -1,6 +1,8 @@
 .knowledge-page {
   --knowledge-accent: #b993ff;
   --knowledge-accent-soft: rgba(185, 147, 255, 0.18);
+  --knowledge-tab-accent: #7bea8c;
+  --knowledge-tab-accent-soft: rgba(123, 234, 140, 0.16);
   --knowledge-page-bg: url("/home-center/backgrounds/liquid-glass-family-bg-v2-blur.jpg");
   width: 100%;
   height: 100vh;
@@ -67,7 +69,7 @@ body[data-design-system="v2"] .knowledge-page .hc-full-page-bg {
   padding: 0 22px;
   border: 1px solid rgba(255, 255, 255, 0.16);
   border-radius: 8px;
-  background: linear-gradient(145deg, rgba(14, 28, 45, 0.3), rgba(6, 14, 26, 0.16));
+  background: linear-gradient(145deg, rgba(14, 28, 45, 0.2), rgba(6, 14, 26, 0.1));
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
   backdrop-filter: blur(20px) saturate(1.12);
 }
@@ -151,9 +153,9 @@ body[data-design-system="v2"] .knowledge-page .hc-full-page-bg {
 .knowledge-card {
   border-radius: 8px;
   border: 1px solid rgba(255, 255, 255, 0.19);
-  background: linear-gradient(145deg, rgba(14, 30, 48, 0.26), rgba(5, 14, 28, 0.14));
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 18px 52px rgba(0, 0, 0, 0.16);
-  backdrop-filter: blur(22px) saturate(1.18);
+  background: linear-gradient(145deg, rgba(14, 30, 48, 0.2), rgba(5, 14, 28, 0.1));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 18px 52px rgba(0, 0, 0, 0.12);
+  backdrop-filter: blur(24px) saturate(1.16);
   overflow: hidden;
   min-height: 0;
 }
@@ -175,7 +177,7 @@ body[data-design-system="v2"] .knowledge-page .hc-full-page-bg {
   position: relative;
   display: block;
   isolation: isolate;
-  background: linear-gradient(145deg, rgba(14, 30, 48, 0.26), rgba(5, 14, 28, 0.14));
+  background: linear-gradient(145deg, rgba(14, 30, 48, 0.18), rgba(5, 14, 28, 0.1));
 }
 
 .knowledge-hero-copy {
@@ -239,7 +241,7 @@ body[data-design-system="v2"] .knowledge-page .hc-full-page-bg {
   min-height: 0;
   z-index: 0;
   background: transparent;
-  opacity: 0.68;
+  opacity: 0.6;
 }
 
 .knowledge-hero-motif {
@@ -303,19 +305,19 @@ body[data-design-system="v2"] .knowledge-page .hc-full-page-bg {
   object-position: 58% 50%;
   filter: saturate(0.9) contrast(1.04) brightness(0.86);
   display: block;
+  width: 66%;
+  margin-left: auto;
+  -webkit-mask-image: linear-gradient(90deg, transparent 0, rgba(0, 0, 0, 0.18) 6%, #000 22%, #000 100%);
+  mask-image: linear-gradient(90deg, transparent 0, rgba(0, 0, 0, 0.18) 6%, #000 22%, #000 100%);
 }
 
 .knowledge-hero-composition-species-closeup-with-environment .knowledge-hero-visual {
   background: transparent;
-  opacity: 0.62;
+  opacity: 0.6;
 }
 
 .knowledge-hero-composition-species-closeup-with-environment .knowledge-hero-visual img {
-  width: 66%;
-  margin-left: auto;
   object-position: center;
-  -webkit-mask-image: linear-gradient(90deg, transparent 0, rgba(0, 0, 0, 0.18) 6%, #000 22%, #000 100%);
-  mask-image: linear-gradient(90deg, transparent 0, rgba(0, 0, 0, 0.18) 6%, #000 22%, #000 100%);
 }
 
 .knowledge-hero-visual-right-subject img {
@@ -357,9 +359,10 @@ body[data-design-system="v2"] .knowledge-page .hc-full-page-bg {
   inset: 0;
   overflow: hidden;
   background:
-    radial-gradient(circle at 73% 42%, color-mix(in srgb, var(--knowledge-accent) 32%, transparent), transparent 28%),
-    radial-gradient(circle at 56% 62%, rgba(77, 233, 224, 0.12), transparent 26%),
-    linear-gradient(135deg, rgba(255, 255, 255, 0.08), transparent 42%);
+    radial-gradient(circle at 73% 42%, color-mix(in srgb, var(--knowledge-accent) 22%, transparent), transparent 28%),
+    radial-gradient(circle at 56% 62%, rgba(77, 233, 224, 0.08), transparent 26%),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.04), transparent 42%);
+  opacity: 0.9;
 }
 
 .knowledge-concept-orbit {
@@ -680,9 +683,9 @@ body[data-design-system="v2"] .knowledge-page .hc-full-page-bg {
 .knowledge-chip {
   flex-shrink: 0;
   min-width: 116px;
-  color: var(--knowledge-accent);
-  background: color-mix(in srgb, var(--knowledge-accent) 12%, transparent);
-  border: 1px solid color-mix(in srgb, var(--knowledge-accent) 32%, transparent);
+  color: var(--knowledge-tab-accent);
+  background: var(--knowledge-tab-accent-soft);
+  border: 1px solid color-mix(in srgb, var(--knowledge-tab-accent) 38%, transparent);
   border-radius: 8px;
   padding: 8px 16px;
   font-size: 15px;
@@ -694,7 +697,7 @@ body[data-design-system="v2"] .knowledge-page .hc-full-page-bg {
   display: flex;
   align-items: center;
   gap: 9px;
-  color: var(--knowledge-accent);
+  color: var(--knowledge-tab-accent);
   font-family: "JetBrains Mono", ui-monospace, monospace;
   font-size: 14px;
   font-weight: 850;
@@ -706,6 +709,7 @@ body[data-design-system="v2"] .knowledge-page .hc-full-page-bg {
   min-height: 120px;
   border-radius: 8px;
   overflow: hidden;
+  background: transparent;
 }
 
 .knowledge-module-habitat-range .knowledge-map-wrap svg {

@@ -70,12 +70,25 @@ function normalizeGlance(response, type) {
     event: "Timeline Glance",
     concept: "Concept Map",
   }[type] || "At a Glance";
-  const metrics = asArray(preferred?.items).map((item) => ({
+  const priorityLabels = ["height", "weight", "lineage"];
+  const metrics = asArray(preferred?.items).map((item, index) => ({
     label: text(item?.label, 42),
     value: text(item?.value, 80),
     sublabel: text(item?.sublabel || item?.detail, 80),
     icon: text(item?.icon, 24),
-  })).filter((metric) => metric.label && metric.value).slice(0, 4);
+    originalIndex: index,
+  })).filter((metric) => metric.label && metric.value)
+    .sort((a, b) => {
+      if (type !== "fauna" && type !== "flora") return a.originalIndex - b.originalIndex;
+      const aPriority = priorityLabels.findIndex((label) => a.label.toLowerCase().includes(label));
+      const bPriority = priorityLabels.findIndex((label) => b.label.toLowerCase().includes(label));
+      if (aPriority === -1 && bPriority === -1) return a.originalIndex - b.originalIndex;
+      if (aPriority === -1) return 1;
+      if (bPriority === -1) return -1;
+      return aPriority - bPriority || a.originalIndex - b.originalIndex;
+    })
+    .map(({ originalIndex, ...metric }) => metric)
+    .slice(0, 4);
   return {
     title: titleFromHeading(preferred?.title || preferred?.type, defaultTitle),
     description: text(preferred?.description, 180),
