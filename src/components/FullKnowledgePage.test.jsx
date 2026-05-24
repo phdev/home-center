@@ -207,6 +207,18 @@ describe("FullKnowledgePage", () => {
     expect(screen.queryByText("ANTARCTICA")).toBeNull();
   });
 
+  it("renders US event maps without an inner map backing or visible place label", () => {
+    const { container } = render(<FullKnowledgePage response={response({
+      type: "event",
+      profile: { maps: [{ scope: "country", label: "United States", highlight: "United States", regionCode: "FL" }] },
+    })} onBack={() => {}} />);
+
+    expect(screen.getByLabelText("United States map")).toBeTruthy();
+    expect(container.querySelector(".knowledge-map-wrap rect")).toBeFalsy();
+    expect(screen.queryByText("FL")).toBeNull();
+    expect(screen.queryByText("US")).toBeNull();
+  });
+
   it("renders related topic chips and a no-image fallback", () => {
     render(<FullKnowledgePage response={response({
       imageUrl: null,

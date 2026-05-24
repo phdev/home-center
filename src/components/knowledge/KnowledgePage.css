@@ -336,6 +336,14 @@ body[data-design-system="v2"] .knowledge-page .hc-full-page-bg {
   filter: saturate(0.9) contrast(1.04) brightness(0.86);
 }
 
+.knowledge-hero-composition-archival-event-scene .knowledge-hero-visual {
+  opacity: 0.7;
+}
+
+.knowledge-hero-composition-archival-event-scene .knowledge-hero-visual img {
+  filter: saturate(0.96) contrast(1.02) brightness(0.92);
+}
+
 .knowledge-hero-visual::after {
   content: "";
   position: absolute;
@@ -346,6 +354,13 @@ body[data-design-system="v2"] .knowledge-page .hc-full-page-bg {
     radial-gradient(circle at 14% 18%, color-mix(in srgb, var(--knowledge-accent) 22%, transparent), transparent 44%);
   pointer-events: none;
   z-index: 2;
+}
+
+.knowledge-hero-composition-archival-event-scene .knowledge-hero-visual::after {
+  background:
+    linear-gradient(90deg, rgba(3, 8, 20, 0.52), rgba(3, 8, 20, 0.28) 34%, rgba(3, 8, 20, 0.01) 66%),
+    linear-gradient(0deg, rgba(2, 6, 23, 0.16), rgba(2, 6, 23, 0.01) 52%),
+    radial-gradient(circle at 14% 18%, color-mix(in srgb, var(--knowledge-accent) 18%, transparent), transparent 44%);
 }
 
 .knowledge-hero-composition-species-closeup-with-environment .knowledge-hero-visual::after {
