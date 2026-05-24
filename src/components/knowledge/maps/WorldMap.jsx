@@ -24,8 +24,6 @@ export function WorldMap({ maps = [], accent = "#b993ff" }) {
           />
         </mask>
       </defs>
-      <rect width="600" height="270" rx="8" fill="rgba(2,6,23,0.1)" />
-      <rect x="1" y="1" width="598" height="268" rx="8" fill="url(#worldMapGlow)" opacity="0.44" />
       <image
         href="/home-center/knowledge-assets/world-map-equirectangular.svg"
         x="35"

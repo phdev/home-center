@@ -175,9 +175,7 @@ body[data-design-system="v2"] .knowledge-page .hc-full-page-bg {
   position: relative;
   display: block;
   isolation: isolate;
-  background:
-    radial-gradient(circle at 78% 28%, var(--knowledge-accent-soft), transparent 34%),
-    linear-gradient(145deg, rgba(12, 26, 43, 0.24), rgba(4, 12, 25, 0.14));
+  background: linear-gradient(145deg, rgba(14, 30, 48, 0.26), rgba(5, 14, 28, 0.14));
 }
 
 .knowledge-hero-copy {
@@ -240,8 +238,8 @@ body[data-design-system="v2"] .knowledge-page .hc-full-page-bg {
   inset: 0;
   min-height: 0;
   z-index: 0;
-  background: radial-gradient(circle at 28% 24%, var(--knowledge-accent-soft), transparent 34%),
-    linear-gradient(145deg, #07111f, #121827 64%, #08131c);
+  background: transparent;
+  opacity: 0.68;
 }
 
 .knowledge-hero-motif {
@@ -308,9 +306,8 @@ body[data-design-system="v2"] .knowledge-page .hc-full-page-bg {
 }
 
 .knowledge-hero-composition-species-closeup-with-environment .knowledge-hero-visual {
-  background:
-    radial-gradient(circle at 70% 42%, var(--knowledge-accent-soft), transparent 32%),
-    linear-gradient(145deg, rgba(13, 25, 42, 0.88), rgba(5, 12, 25, 0.86));
+  background: transparent;
+  opacity: 0.62;
 }
 
 .knowledge-hero-composition-species-closeup-with-environment .knowledge-hero-visual img {
@@ -342,8 +339,8 @@ body[data-design-system="v2"] .knowledge-page .hc-full-page-bg {
   position: absolute;
   inset: 0;
   background:
-    linear-gradient(90deg, rgba(3, 8, 20, 0.9), rgba(3, 8, 20, 0.6) 34%, rgba(3, 8, 20, 0.08) 66%),
-    linear-gradient(0deg, rgba(2, 6, 23, 0.5), rgba(2, 6, 23, 0.04) 52%),
+    linear-gradient(90deg, rgba(3, 8, 20, 0.62), rgba(3, 8, 20, 0.36) 34%, rgba(3, 8, 20, 0.02) 66%),
+    linear-gradient(0deg, rgba(2, 6, 23, 0.24), rgba(2, 6, 23, 0.02) 52%),
     radial-gradient(circle at 14% 18%, color-mix(in srgb, var(--knowledge-accent) 22%, transparent), transparent 44%);
   pointer-events: none;
   z-index: 2;
@@ -351,8 +348,8 @@ body[data-design-system="v2"] .knowledge-page .hc-full-page-bg {
 
 .knowledge-hero-composition-species-closeup-with-environment .knowledge-hero-visual::after {
   background:
-    linear-gradient(90deg, rgba(3, 8, 20, 0.74), rgba(3, 8, 20, 0.48) 32%, rgba(3, 8, 20, 0.08) 64%),
-    linear-gradient(0deg, rgba(2, 6, 23, 0.34), rgba(2, 6, 23, 0.04) 52%);
+    linear-gradient(90deg, rgba(3, 8, 20, 0.64), rgba(3, 8, 20, 0.38) 32%, rgba(3, 8, 20, 0.02) 64%),
+    linear-gradient(0deg, rgba(2, 6, 23, 0.2), rgba(2, 6, 23, 0.02) 52%);
 }
 
 .knowledge-concept-visual {
