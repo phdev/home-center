@@ -1,5 +1,29 @@
 import { Snowflake, Sparkle, Sprout } from "lucide-react";
 
+function EarthLineArt() {
+  return (
+    <svg className="knowledge-insight-earth" viewBox="0 0 160 160" aria-hidden="true">
+      <defs>
+        <radialGradient id="knowledge-earth-glow" cx="42%" cy="34%" r="68%">
+          <stop offset="0%" stopColor="currentColor" stopOpacity="0.18" />
+          <stop offset="58%" stopColor="currentColor" stopOpacity="0.07" />
+          <stop offset="100%" stopColor="currentColor" stopOpacity="0" />
+        </radialGradient>
+      </defs>
+      <circle className="knowledge-earth-fill" cx="80" cy="80" r="68" />
+      <circle className="knowledge-earth-outline" cx="80" cy="80" r="66" />
+      <path className="knowledge-earth-line" d="M23 77c15-7 29-8 43-2 13 5 24 4 36-3 12-8 24-9 36-5" />
+      <path className="knowledge-earth-line" d="M32 46c12 6 25 8 39 5 14-4 27-2 40 6 7 4 14 6 22 5" />
+      <path className="knowledge-earth-line" d="M42 111c12-7 25-8 39-3 15 6 31 4 47-7" />
+      <path className="knowledge-earth-land" d="M53 38c10-8 24-10 35-3 6 4 8 10 4 16-5 7-17 6-24 12-8 7-3 17-13 21-11 4-22-4-23-16-1-11 8-21 21-30Z" />
+      <path className="knowledge-earth-land" d="M94 70c9-5 23-3 30 5 6 7 5 17-2 22-8 6-19-1-26 5-5 4-5 13-13 14-8 1-15-6-14-15 2-13 13-25 25-31Z" />
+      <path className="knowledge-earth-line" d="M80 15c-15 18-23 40-23 65s8 47 23 65" />
+      <path className="knowledge-earth-line" d="M80 15c15 18 23 40 23 65s-8 47-23 65" />
+      <path className="knowledge-earth-line" d="M19 80h122" />
+    </svg>
+  );
+}
+
 function FeatherLineArt() {
   return (
     <svg className="knowledge-insight-feather" viewBox="0 0 210 150" aria-hidden="true">
@@ -22,12 +46,7 @@ function InsightOrnament({ type }) {
   if (type === "event") {
     return (
       <div className="knowledge-insight-ornament knowledge-insight-ornament-event" aria-hidden="true">
-        <img
-          className="knowledge-insight-earth"
-          src="/home-center/knowledge-assets/earth-blue-marble.jpg"
-          alt=""
-          aria-hidden="true"
-        />
+        <EarthLineArt />
         <Sparkle className="knowledge-insight-star knowledge-insight-star-a" size={15} />
         <Sparkle className="knowledge-insight-star knowledge-insight-star-b" size={11} />
         <Sparkle className="knowledge-insight-star knowledge-insight-star-c" size={9} />
