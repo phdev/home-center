@@ -71,16 +71,6 @@ export const WEEKDAY_MORNING_TASKS = [
   "Pack waterbottles",
   "Pack glasses",
 ];
-const BLURRED_BACKGROUND_PAGES = new Set([
-  "calendar",
-  "weather",
-  "photos",
-  "llm-response",
-  "knowledge",
-  "model-health",
-  "history",
-]);
-
 function VoiceOverlays({ workerSettings, handControllerListening }) {
   const liveCaption = useLiveCaption(workerSettings);
   const knowledgeFeedbackAck = useKnowledgeFeedbackAcknowledgement(liveCaption, workerSettings);
@@ -304,7 +294,7 @@ export default function App() {
   const forcePage = activeLLMResponse ? responsePage : (requestedPage || page);
   const knowledgePageResponse =
     activeLLMResponse || (forcePage === "knowledge" ? KNOWLEDGE_LOADING_RESPONSE : null);
-  const hasBlurredBackground = !isMobile && BLURRED_BACKGROUND_PAGES.has(forcePage);
+  const usesDashboardBackground = forcePage === "dashboard";
 
   const hc = useHandController(settings.worker, forcePage, goTo);
 
@@ -361,16 +351,16 @@ export default function App() {
   const schoolUpdatesCard = findCard(cards, "SchoolUpdatesCard");
 
   useEffect(() => {
-    if (hasBlurredBackground) {
-      document.body.dataset.hcBackground = "blurred";
+    if (usesDashboardBackground) {
+      document.body.dataset.hcBackground = "dashboard";
     } else {
-      document.body.dataset.hcBackground = "sharp";
+      document.body.dataset.hcBackground = "plain";
     }
-  }, [hasBlurredBackground]);
+  }, [usesDashboardBackground]);
 
   useEffect(() => {
     return () => {
-      document.body.dataset.hcBackground = "sharp";
+      document.body.dataset.hcBackground = "plain";
     };
   }, []);
 
