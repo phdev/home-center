@@ -495,12 +495,36 @@
 
 .knowledge-insight-feather {
   position: absolute;
-  right: 76px;
-  top: 40px;
-  transform: rotate(-21deg);
-  opacity: 0.46;
-  stroke-width: 1.35;
-  filter: drop-shadow(0 0 18px color-mix(in srgb, var(--knowledge-accent) 34%, transparent));
+  right: 46px;
+  top: 18px;
+  width: 204px;
+  height: 146px;
+  transform: rotate(-12deg);
+  opacity: 0.52;
+  overflow: visible;
+  filter: drop-shadow(0 0 18px color-mix(in srgb, var(--knowledge-accent) 30%, transparent));
+}
+
+.knowledge-feather-outline,
+.knowledge-feather-spine,
+.knowledge-feather-barb {
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.knowledge-feather-outline {
+  stroke-width: 5.2;
+}
+
+.knowledge-feather-spine {
+  stroke-width: 4.2;
+}
+
+.knowledge-feather-barb {
+  stroke-width: 2.2;
+  opacity: 0.72;
 }
 
 .knowledge-insight-snowflake {
@@ -509,9 +533,9 @@
   stroke-width: 1.5;
 }
 
-.knowledge-insight-snowflake-a { right: 194px; top: 50px; }
-.knowledge-insight-snowflake-b { right: 54px; top: 74px; }
-.knowledge-insight-snowflake-c { right: 116px; bottom: 30px; }
+.knowledge-insight-snowflake-a { right: 220px; top: 48px; }
+.knowledge-insight-snowflake-b { right: 34px; top: 76px; }
+.knowledge-insight-snowflake-c { right: 104px; bottom: 28px; }
 
 .knowledge-insight-sprout {
   position: absolute;

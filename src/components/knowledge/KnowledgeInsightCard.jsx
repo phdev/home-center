@@ -1,4 +1,22 @@
-import { Feather, Snowflake, Sprout } from "lucide-react";
+import { Snowflake, Sprout } from "lucide-react";
+
+function FeatherLineArt() {
+  return (
+    <svg className="knowledge-insight-feather" viewBox="0 0 210 150" aria-hidden="true">
+      <path
+        className="knowledge-feather-outline"
+        d="M38 122C70 77 106 37 157 18c24-9 39-2 35 18-7 42-65 87-130 96"
+      />
+      <path className="knowledge-feather-spine" d="M41 125C84 93 124 61 175 25" />
+      <path className="knowledge-feather-barb" d="M76 96c3-20 3-34-2-48" />
+      <path className="knowledge-feather-barb" d="M98 79c6-24 8-41 6-58" />
+      <path className="knowledge-feather-barb" d="M121 62c7-18 14-31 25-43" />
+      <path className="knowledge-feather-barb" d="M72 100c24 2 47-1 70-8" />
+      <path className="knowledge-feather-barb" d="M96 82c24 0 47-4 70-14" />
+      <path className="knowledge-feather-barb" d="M119 64c18-2 36-8 54-18" />
+    </svg>
+  );
+}
 
 function InsightOrnament({ type }) {
   if (type === "fauna") {
@@ -7,7 +25,7 @@ function InsightOrnament({ type }) {
         <Snowflake className="knowledge-insight-snowflake knowledge-insight-snowflake-a" size={25} />
         <Snowflake className="knowledge-insight-snowflake knowledge-insight-snowflake-b" size={18} />
         <Snowflake className="knowledge-insight-snowflake knowledge-insight-snowflake-c" size={15} />
-        <Feather className="knowledge-insight-feather" size={116} />
+        <FeatherLineArt />
       </div>
     );
   }
