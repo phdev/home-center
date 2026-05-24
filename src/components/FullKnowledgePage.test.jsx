@@ -203,4 +203,42 @@ describe("FullKnowledgePage", () => {
     expect(screen.getByText("protocols")).toBeTruthy();
     expect(screen.getByText("Facts unavailable")).toBeTruthy();
   });
+
+  it("renders a native concept hero visual instead of the generic placeholder", () => {
+    const { container } = render(<FullKnowledgePage response={response({
+      imageUrl: null,
+      image: null,
+      type: "concept",
+      title: "The Internet",
+      summary: "The Internet is a global network that moves data between connected systems.",
+      visualPlan: {
+        visualFamily: "editorial-knowledge-v1",
+        queryType: "concept",
+        subType: "concept/network",
+        compositionPattern: "abstract-concept-orbital",
+        heroStrategy: "abstract-concept",
+        textSafeZone: "balanced",
+        focalRegion: "center",
+        tone: "home-center-dark",
+        contrastLevel: "high",
+        motifStrategy: "node-mesh",
+        supportingPanelStyle: "process-flow",
+        mapStyle: "none",
+        badgeStyle: "violet-concept",
+        atAGlanceStyle: "icon-metric-columns",
+        moduleStyles: {
+          hero: "native-concept-hero",
+          facts: "compact-fact-rows",
+          middle: "process-flow",
+          lower: "icon-metric-columns",
+        },
+        backgroundTreatment: "navy-abstract-linework",
+        retryPolicy: { maxAttempts: 1 },
+      },
+      profile: { facts: [], maps: [], relatedConcepts: ["protocols"] },
+    })} onBack={() => {}} />);
+
+    expect(container.querySelector(".knowledge-concept-visual")).toBeTruthy();
+    expect(container.querySelector(".knowledge-fallback-mark")).toBeFalsy();
+  });
 });

@@ -9,7 +9,7 @@
     "preview": "vite preview",
     "test": "TZ=America/Los_Angeles vitest run",
     "test:watch": "vitest",
-    "verify": "npm test && npm run check:knowledge-visual-contract && npm run build",
+    "verify": "npm test && npm run check:knowledge-visual-contract && npm run check:knowledge-reference-fidelity && npm run build",
     "agentci:record": "node scripts/agentci.js record",
     "agentci:replay": "node scripts/agentci.js replay",
     "agentci:diff": "node scripts/agentci.js diff",
@@ -22,6 +22,7 @@
     "audit:clawpatch": "bash scripts/clawpatch-audit.sh",
     "knowledge:promote-asset": "node scripts/promote-curated-knowledge-asset.mjs",
     "check:knowledge-visual-contract": "node scripts/check-knowledge-visual-contract.mjs",
+    "check:knowledge-reference-fidelity": "node scripts/check-knowledge-reference-fidelity.mjs",
     "check:knowledge-visual-contract:live": "node scripts/check-knowledge-visual-contract.mjs --live"
   },
   "dependencies": {

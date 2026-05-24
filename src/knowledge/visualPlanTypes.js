@@ -41,6 +41,12 @@ export const DEFAULT_VISUAL_PLAN = {
   mapStyle: "none",
   badgeStyle: "violet-concept",
   atAGlanceStyle: "three-pillars",
+  moduleStyles: {
+    hero: "native-concept-hero",
+    facts: "compact-fact-rows",
+    middle: "process-flow",
+    lower: "icon-metric-columns",
+  },
   backgroundTreatment: "navy-abstract-linework",
   retryPolicy: { maxAttempts: 3 },
 };

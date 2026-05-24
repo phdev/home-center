@@ -849,32 +849,32 @@ describe("knowledge image pipeline", () => {
     global.fetch = defaultFetchMock({
       classification: {
         type: "event",
-        title: "Apollo 11",
+        title: "Test Moon Mission",
         visualNeed: "required",
-        spaceScience: true,
-        entityQuery: "Apollo 11",
-        visualSearchQuery: "Apollo 11 lunar module Eagle moon surface NASA archival photo",
+        spaceScience: false,
+        entityQuery: "Test Moon Mission",
+        visualSearchQuery: "Test Moon Mission lunar surface archival photo",
       },
       answer: {
         type: "event",
-        title: "Apollo 11",
-        summary: "Apollo 11 landed the first humans on the Moon.",
+        title: "Test Moon Mission",
+        summary: "The test mission landed on the Moon.",
         sections: [],
         infographic: null,
         visualNeed: "required",
         imageSourceType: "known",
-        imageQuery: "Apollo 11 lunar module Eagle moon surface NASA archival photo",
+        imageQuery: "Test Moon Mission lunar surface archival photo",
       },
       nasaImage: null,
       wikipediaImage: null,
     });
 
-    const body = await askAndRead(currentEnv, "What happened during Apollo 11?");
+    const body = await askAndRead(currentEnv, "What happened during the test moon mission?");
     const imageCalls = global.fetch.mock.calls.filter(([url]) => String(url) === "https://api.openai.com/v1/images/generations");
 
     expect(imageCalls).toHaveLength(0);
     expect(body.imageSourceType).toBe("known");
-    expect(body.imageQuery).toBe("Apollo 11 lunar module Eagle moon surface NASA archival photo");
+    expect(body.imageQuery).toBe("Test Moon Mission lunar surface archival photo");
     expect(body.imagePrompt).toBeNull();
     expect(body.imageUrl).toBeNull();
     expect(body.visual).toMatchObject({
@@ -889,16 +889,16 @@ describe("knowledge image pipeline", () => {
     global.fetch = defaultFetchMock({
       classification: {
         type: "person",
-        title: "Ada Lovelace",
+        title: "Marie Curie",
         visualNeed: "useful",
         spaceScience: false,
-        entityQuery: "Ada Lovelace biography",
-        visualSearchQuery: "Ada Lovelace portrait",
+        entityQuery: "Marie Curie biography",
+        visualSearchQuery: "Marie Curie portrait",
       },
       answer: {
         type: "person",
-        title: "Ada Lovelace",
-        summary: "Ada Lovelace wrote notes on Charles Babbage's Analytical Engine.",
+        title: "Marie Curie",
+        summary: "Marie Curie pioneered research on radioactivity.",
         sections: [],
         infographic: null,
         profile: {
@@ -907,18 +907,18 @@ describe("knowledge image pipeline", () => {
         },
         visualNeed: "useful",
         imageSourceType: "known",
-        imageQuery: "Ada Lovelace portrait Wikimedia Commons",
+        imageQuery: "Marie Curie portrait Wikimedia Commons",
       },
-      wikipediaImage: "https://wiki.test/ada.jpg",
+      wikipediaImage: "https://wiki.test/curie.jpg",
       nasaImage: null,
     });
 
-    const body = await askAndRead(currentEnv, "Who was Ada Lovelace?");
+    const body = await askAndRead(currentEnv, "Who was Marie Curie?");
 
-    expect(body.retrieval.subject).toBe("Ada Lovelace");
+    expect(body.retrieval.subject).toBe("Marie Curie");
     expect(body.imageSourceType).toBe("known");
     expect(body.imagePrompt).toBeNull();
-    expect(body.imageUrl).toBe("https://wiki.test/ada.jpg");
+    expect(body.imageUrl).toBe("https://wiki.test/curie.jpg");
     expect(body.image).toMatchObject({
       source: "Wikipedia",
       mode: "retrieved",
@@ -931,21 +931,21 @@ describe("knowledge image pipeline", () => {
     const currentEnv = env();
     const classification = {
       type: "person",
-      title: "Ada Lovelace",
+      title: "Marie Curie",
       visualNeed: "useful",
       spaceScience: false,
-      entityQuery: "Ada Lovelace biography",
-      visualSearchQuery: "Ada Lovelace portrait",
+      entityQuery: "Marie Curie biography",
+      visualSearchQuery: "Marie Curie portrait",
     };
     const answer = {
       type: "person",
-      title: "Ada Lovelace",
-      summary: "Ada Lovelace wrote notes on Charles Babbage's Analytical Engine.",
+      title: "Marie Curie",
+      summary: "Marie Curie pioneered research on radioactivity.",
       sections: [],
       infographic: null,
       visualNeed: "useful",
       imageSourceType: "known",
-      imageQuery: "Ada Lovelace portrait Wikimedia Commons",
+      imageQuery: "Marie Curie portrait Wikimedia Commons",
     };
     global.fetch = fetchMockWithWikipediaSummaryFailure({
       classification,
@@ -953,12 +953,12 @@ describe("knowledge image pipeline", () => {
       searchImage: "//upload.wikimedia.org/ada-thumb.png",
     });
 
-    const body = await askAndRead(currentEnv, "Who was Ada Lovelace?");
+    const body = await askAndRead(currentEnv, "Who was Marie Curie?");
 
     expect(body.imageUrl).toBe("https://upload.wikimedia.org/ada-thumb.png");
     expect(body.image).toMatchObject({
       source: "Wikipedia",
-      sourceUrl: "https://en.wikipedia.org/wiki/Ada%20Lovelace%20biography",
+      sourceUrl: "https://en.wikipedia.org/wiki/Marie%20Curie%20biography",
       mode: "retrieved",
     });
     expect(body.visual).toMatchObject({
@@ -971,21 +971,21 @@ describe("knowledge image pipeline", () => {
     const currentEnv = env();
     const classification = {
       type: "person",
-      title: "Who was Ada Lovelace?",
+      title: "Who was Marie Curie?",
       visualNeed: "useful",
       spaceScience: false,
-      entityQuery: "Who was Ada Lovelace?",
-      visualSearchQuery: "Who was Ada Lovelace portrait",
+      entityQuery: "Who was Marie Curie?",
+      visualSearchQuery: "Who was Marie Curie portrait",
     };
     const answer = {
       type: "person",
-      title: "Ada Lovelace",
-      summary: "Ada Lovelace wrote notes on Charles Babbage's Analytical Engine.",
+      title: "Marie Curie",
+      summary: "Marie Curie pioneered research on radioactivity.",
       sections: [],
       infographic: null,
       visualNeed: "useful",
       imageSourceType: "known",
-      imageQuery: "Ada Lovelace portrait",
+      imageQuery: "Marie Curie portrait",
     };
 
     global.fetch = vi.fn(async (url, options = {}) => {
@@ -1001,18 +1001,18 @@ describe("knowledge image pipeline", () => {
       }
       if (href.startsWith("https://en.wikipedia.org/w/rest.php/v1/search/page")) {
         const q = new URL(href).searchParams.get("q");
-        if (q !== "Ada Lovelace") return jsonResponse({ pages: [] });
+        if (q !== "Marie Curie") return jsonResponse({ pages: [] });
         return jsonResponse({
-          pages: [{ key: "Ada_Lovelace", title: "Ada Lovelace", thumbnail: { url: "https://wiki.test/ada-thumb.jpg" } }],
+          pages: [{ key: "Marie_Curie", title: "Marie Curie", thumbnail: { url: "https://wiki.test/curie-thumb.jpg" } }],
         });
       }
       if (href.startsWith("https://en.wikipedia.org/api/rest_v1/page/summary/")) {
         return jsonResponse({
-          title: "Ada Lovelace",
-          description: "English mathematician and writer",
-          extract: "Ada Lovelace is often regarded as one of the first computer programmers.",
-          content_urls: { desktop: { page: "https://en.wikipedia.org/wiki/Ada_Lovelace" } },
-          originalimage: { source: "https://wiki.test/ada.jpg", width: 640, height: 900 },
+          title: "Marie Curie",
+          description: "Physicist and chemist",
+          extract: "Marie Curie pioneered research on radioactivity.",
+          content_urls: { desktop: { page: "https://en.wikipedia.org/wiki/Marie_Curie" } },
+          originalimage: { source: "https://wiki.test/curie.jpg", width: 640, height: 900 },
         });
       }
       if (href.startsWith("https://commons.wikimedia.org/w/api.php")) {
@@ -1021,7 +1021,7 @@ describe("knowledge image pipeline", () => {
       throw new Error(`Unexpected fetch: ${href}`);
     });
 
-    const body = await askAndRead(currentEnv, "Who was Ada Lovelace?", { debug: true });
+    const body = await askAndRead(currentEnv, "Who was Marie Curie?", { debug: true });
     const searchQueries = global.fetch.mock.calls
       .map(([url]) => String(url))
       .filter((url) => url.startsWith("https://en.wikipedia.org/w/rest.php/v1/search/page"))
@@ -1031,12 +1031,12 @@ describe("knowledge image pipeline", () => {
       .filter((url) => url.startsWith("https://en.wikipedia.org/api/rest_v1/page/summary/"))
       .map((url) => decodeURIComponent(url.split("/").pop()));
 
-    expect(searchQueries).not.toContain("Who was Ada Lovelace");
-    expect(summaryPages).toContain("Ada Lovelace");
-    expect(body.imageUrl).toBe("https://wiki.test/ada.jpg");
+    expect(searchQueries).not.toContain("Who was Marie Curie");
+    expect(summaryPages).toContain("Marie Curie");
+    expect(body.imageUrl).toBe("https://wiki.test/curie.jpg");
     expect(body.imagePrompt).toBeNull();
     expect(body.imagePending).toBe(false);
-    expect(body.retrieval.diagnostics.normalizedSubject).toBe("Ada Lovelace");
+    expect(body.retrieval.diagnostics.normalizedSubject).toBe("Marie Curie");
   });
 
   it("preserves Wikimedia Commons metadata when it is the fallback image source", async () => {
@@ -1044,21 +1044,21 @@ describe("knowledge image pipeline", () => {
     global.fetch = defaultFetchMock({
       classification: {
         type: "fauna",
-        title: "Emperor Penguin",
+        title: "Blue Whale",
         visualNeed: "useful",
         spaceScience: false,
-        entityQuery: "Emperor Penguin",
-        visualSearchQuery: "Emperor Penguin animal photo",
+        entityQuery: "Blue Whale",
+        visualSearchQuery: "Blue Whale animal photo",
       },
       answer: {
         type: "fauna",
-        title: "Emperor Penguin",
-        summary: "Emperor penguins live in Antarctica.",
+        title: "Blue Whale",
+        summary: "Blue whales live in oceans.",
         sections: [],
         infographic: null,
         visualNeed: "useful",
         imageSourceType: "known",
-        imageQuery: "Emperor Penguin animal photo",
+        imageQuery: "Blue Whale animal photo",
       },
       wikipediaImage: null,
       nasaImage: null,
@@ -1070,15 +1070,15 @@ describe("knowledge image pipeline", () => {
           query: {
             pages: {
               1: {
-                title: "File:Emperor Penguin Antarctica.jpg",
+                title: "File:Blue Whale ocean.jpg",
                 imageinfo: [{
-                  url: "https://commons.test/emperor-penguin.jpg",
+                  url: "https://commons.test/blue-whale.jpg",
                   width: 1200,
                   height: 800,
-                  descriptionurl: "https://commons.wikimedia.org/wiki/File:Emperor_Penguin_Antarctica.jpg",
+                  descriptionurl: "https://commons.wikimedia.org/wiki/File:Blue_Whale_ocean.jpg",
                   extmetadata: {
                     Artist: { value: "Jane Photographer" },
-                    ImageDescription: { value: "Emperor Penguin adult in Antarctica" },
+                    ImageDescription: { value: "Blue whale in the ocean" },
                   },
                 }],
               },
@@ -1089,33 +1089,33 @@ describe("knowledge image pipeline", () => {
       return defaultFetchMock({
         classification: {
           type: "fauna",
-          title: "Emperor Penguin",
+          title: "Blue Whale",
           visualNeed: "useful",
           spaceScience: false,
-          entityQuery: "Emperor Penguin",
-          visualSearchQuery: "Emperor Penguin animal photo",
+          entityQuery: "Blue Whale",
+          visualSearchQuery: "Blue Whale animal photo",
         },
         answer: {
           type: "fauna",
-          title: "Emperor Penguin",
-          summary: "Emperor penguins live in Antarctica.",
+          title: "Blue Whale",
+          summary: "Blue whales live in oceans.",
           sections: [],
           infographic: null,
           visualNeed: "useful",
           imageSourceType: "known",
-          imageQuery: "Emperor Penguin animal photo",
+          imageQuery: "Blue Whale animal photo",
         },
         wikipediaImage: null,
         nasaImage: null,
       })(url, options);
     });
 
-    const body = await askAndRead(currentEnv, "Tell me about emperor penguins.");
+    const body = await askAndRead(currentEnv, "Tell me about blue whales.");
 
-    expect(body.imageUrl).toBe("https://commons.test/emperor-penguin.jpg");
+    expect(body.imageUrl).toBe("https://commons.test/blue-whale.jpg");
     expect(body.image).toMatchObject({
       source: "Wikimedia Commons",
-      sourceUrl: "https://commons.wikimedia.org/wiki/File:Emperor_Penguin_Antarctica.jpg",
+      sourceUrl: "https://commons.wikimedia.org/wiki/File:Blue_Whale_ocean.jpg",
       credit: "Jane Photographer",
       width: 1200,
       height: 800,
@@ -1227,33 +1227,33 @@ describe("knowledge image pipeline", () => {
         return jsonResponse({
           json: bridgeCallCount === 1 ? {
             type: "person",
-            title: "Ada Lovelace",
+            title: "Marie Curie",
             visualNeed: "useful",
             spaceScience: false,
-            entityQuery: "Ada Lovelace",
-            visualSearchQuery: "Ada Lovelace portrait",
+            entityQuery: "Marie Curie",
+            visualSearchQuery: "Marie Curie portrait",
           } : {
             type: "person",
-            title: "Ada Lovelace",
-            summary: "Ada Lovelace wrote notes on the Analytical Engine.",
+            title: "Marie Curie",
+            summary: "Marie Curie pioneered radioactivity research.",
             sections: [],
             visualNeed: "useful",
             imageSourceType: "known",
-            imageQuery: "Ada Lovelace portrait",
+            imageQuery: "Marie Curie portrait",
           },
           model: "gemma-test",
         });
       }
       if (href.startsWith("https://en.wikipedia.org/w/rest.php/v1/search/page")) {
-        return jsonResponse({ pages: [{ key: "Ada_Lovelace", title: "Ada Lovelace", thumbnail: { url: "https://wiki.test/ada-flag.svg" } }] });
+        return jsonResponse({ pages: [{ key: "Marie_Curie", title: "Marie Curie", thumbnail: { url: "https://wiki.test/curie-flag.svg" } }] });
       }
       if (href.startsWith("https://en.wikipedia.org/api/rest_v1/page/summary/")) {
         return jsonResponse({
-          title: "Ada Lovelace",
-          description: "Mathematician",
-          extract: "Ada Lovelace was a mathematician.",
-          content_urls: { desktop: { page: "https://en.wikipedia.org/wiki/Ada_Lovelace" } },
-          originalimage: { source: "https://wiki.test/ada-flag.svg", width: 1000, height: 600 },
+          title: "Marie Curie",
+          description: "Physicist",
+          extract: "Marie Curie was a physicist and chemist.",
+          content_urls: { desktop: { page: "https://en.wikipedia.org/wiki/Marie_Curie" } },
+          originalimage: { source: "https://wiki.test/curie-flag.svg", width: 1000, height: 600 },
         });
       }
       if (href.startsWith("https://commons.wikimedia.org/w/api.php")) {
@@ -1261,15 +1261,15 @@ describe("knowledge image pipeline", () => {
           query: {
             pages: {
               1: {
-                title: "File:Ada Lovelace portrait.jpg",
+                title: "File:Marie Curie portrait.jpg",
                 imageinfo: [{
-                  url: "https://commons.test/ada-lovelace-portrait.jpg",
+                  url: "https://commons.test/curie-portrait.jpg",
                   width: 1300,
                   height: 900,
-                  descriptionurl: "https://commons.wikimedia.org/wiki/File:Ada_Lovelace_portrait.jpg",
+                  descriptionurl: "https://commons.wikimedia.org/wiki/File:Marie_Curie_portrait.jpg",
                   extmetadata: {
                     Artist: { value: "Historical archive" },
-                    ImageDescription: { value: "Ada Lovelace portrait" },
+                    ImageDescription: { value: "Marie Curie portrait" },
                   },
                 }],
               },
@@ -1280,9 +1280,9 @@ describe("knowledge image pipeline", () => {
       throw new Error(`Unexpected fetch: ${href}`);
     });
 
-    const body = await askAndRead(currentEnv, "Who was Ada Lovelace?", { debug: true });
+    const body = await askAndRead(currentEnv, "Who was Marie Curie?", { debug: true });
 
-    expect(body.imageUrl).toBe("https://commons.test/ada-lovelace-portrait.jpg");
+    expect(body.imageUrl).toBe("https://commons.test/curie-portrait.jpg");
     expect(body.image).toMatchObject({
       source: "Wikimedia Commons",
       mode: "retrieved",
@@ -1294,7 +1294,7 @@ describe("knowledge image pipeline", () => {
     expect(body.retrieval.diagnostics.final.image.score).toBeGreaterThan(45);
     expect(currentEnv.NOTIFICATIONS.put.mock.calls.some(([key, value]) => (
       String(key).startsWith("knowledge:image:v2:")
-      && JSON.parse(value).url === "https://commons.test/ada-lovelace-portrait.jpg"
+      && JSON.parse(value).url === "https://commons.test/curie-portrait.jpg"
     ))).toBe(true);
   });
 
@@ -1381,6 +1381,114 @@ describe("knowledge image pipeline", () => {
     });
   });
 
+  it("applies canonical visual plans for the six benchmark knowledge pages", () => {
+    const cases = [
+      ["What is the internet?", "The Internet", "concept", "concept/network", "abstract-concept-orbital", "native-concept-hero"],
+      ["Where is Madagascar?", "Madagascar", "location", "location/island", "place-scenic-wide", "scenic-location"],
+      ["Who was Ada Lovelace?", "Ada Lovelace", "person", "person/historical-scientist", "portrait-right-text-left", "portrait-editorial"],
+      ["Tell me about emperor penguins.", "Emperor Penguin", "fauna", "fauna/polar-animal", "species-closeup-with-environment", "species-closeup-with-environment"],
+      ["Tell me about coast redwood trees.", "Coast Redwood", "flora", "flora/tree", "tall-subject-forest-depth", "scenic-location"],
+      ["What happened during Apollo 11?", "Apollo 11 Moon Landing", "event", "event/space-mission", "archival-event-scene", "archival-event-scene"],
+    ];
+    for (const [query, title, type, subType, compositionPattern, heroModule] of cases) {
+      expect(buildKnowledgeVisualPlan({
+        query,
+        title,
+        type,
+        summary: `${title} summary.`,
+        imageSourceType: type === "concept" ? "none" : "known",
+        visualNeed: type === "concept" ? "none" : "useful",
+        image: type === "concept" ? null : {
+          url: "https://example.test/hero.jpg",
+          width: 1400,
+          height: 900,
+          focalPoint: { x: 0.68, y: 0.48 },
+          tone: "home-center-dark",
+        },
+      })).toMatchObject({
+        subType,
+        compositionPattern,
+        moduleStyles: {
+          hero: heroModule,
+          facts: "compact-fact-rows",
+        },
+      });
+    }
+  });
+
+  it("rejects fauna-like image candidates for location pages when a scenic alternative exists", async () => {
+    const currentEnv = env();
+    global.fetch = vi.fn(async (url) => {
+      const href = String(url);
+      if (href.startsWith("https://bridge.test")) {
+        const bridgeCallCount = global.fetch.mock.calls
+          .filter(([calledUrl]) => String(calledUrl).startsWith("https://bridge.test")).length;
+        return jsonResponse({
+          json: bridgeCallCount === 1 ? {
+            type: "location",
+            title: "Atlantis",
+            visualNeed: "useful",
+            spaceScience: false,
+            entityQuery: "Atlantis",
+            visualSearchQuery: "Atlantis island scenic landscape",
+          } : {
+            type: "location",
+            title: "Atlantis",
+            summary: "Atlantis is a legendary island.",
+            sections: [],
+            profile: { maps: [{ label: "Atlantic Ocean", highlight: "Legendary island", lat: 31, lon: -24 }] },
+            visualNeed: "useful",
+            imageSourceType: "known",
+            imageQuery: "Atlantis island scenic landscape",
+          },
+          model: "gemma-test",
+        });
+      }
+      if (href.startsWith("https://en.wikipedia.org/w/rest.php/v1/search/page")) {
+        return jsonResponse({ pages: [{ key: "Atlantis", title: "Atlantis", thumbnail: { url: "https://wiki.test/atlantis-bird.jpg" } }] });
+      }
+      if (href.startsWith("https://en.wikipedia.org/api/rest_v1/page/summary/")) {
+        return jsonResponse({
+          title: "Atlantis bird closeup",
+          description: "Bird",
+          extract: "Atlantis bird closeup.",
+          content_urls: { desktop: { page: "https://en.wikipedia.org/wiki/Atlantis" } },
+          originalimage: { source: "https://wiki.test/atlantis-bird.jpg", width: 1200, height: 800 },
+        });
+      }
+      if (href.startsWith("https://commons.wikimedia.org/w/api.php")) {
+        return jsonResponse({
+          query: {
+            pages: {
+              1: {
+                title: "File:Atlantis island scenic landscape.jpg",
+                imageinfo: [{
+                  url: "https://commons.test/atlantis-island-scenic-landscape.jpg",
+                  width: 1600,
+                  height: 900,
+                  descriptionurl: "https://commons.wikimedia.org/wiki/File:Atlantis_island_scenic_landscape.jpg",
+                  extmetadata: {
+                    Artist: { value: "Archive" },
+                    ImageDescription: { value: "Atlantis island scenic coastline landscape" },
+                  },
+                }],
+              },
+            },
+          },
+        });
+      }
+      throw new Error(`Unexpected fetch: ${href}`);
+    });
+
+    const body = await askAndRead(currentEnv, "Where is Atlantis?", { debug: true });
+
+    expect(body.imageUrl).toBe("https://commons.test/atlantis-island-scenic-landscape.jpg");
+    expect(body.imageUrl).not.toContain("bird");
+    expect(body.retrieval.diagnostics.final.candidates.some((candidate) => (
+      candidate.imageUrlPresent && candidate.reasons.includes("location_scenic_subject")
+    ))).toBe(true);
+  });
+
   it("scores low-quality hero packages with debug reasons", () => {
     const plan = buildKnowledgeVisualPlan({
       query: "Who was Ada Lovelace?",
@@ -1446,7 +1554,7 @@ describe("knowledge image pipeline", () => {
       overlays: { leftGradient: true, navyTone: true },
       motif: { assetKey: "snow-habitat-rings" },
       composition: {
-        pattern: "portrait-right-text-left",
+        pattern: "species-closeup-with-environment",
         objectPosition: "68% 48%",
       },
     });

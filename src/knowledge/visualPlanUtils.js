@@ -19,6 +19,15 @@ function normalizeRetryPolicy(value) {
   return { maxAttempts: Number.isFinite(maxAttempts) ? Math.max(1, Math.min(5, maxAttempts)) : 3 };
 }
 
+function normalizeModuleStyles(value = {}, fallback = DEFAULT_VISUAL_PLAN.moduleStyles) {
+  return {
+    hero: text(value.hero || fallback.hero, 48),
+    facts: text(value.facts || fallback.facts, 48),
+    middle: text(value.middle || fallback.middle, 48),
+    lower: text(value.lower || fallback.lower, 48),
+  };
+}
+
 export function normalizeVisualPlan(response = {}) {
   const raw = response?.visualPlan || response?.visual?.plan || {};
   const fallback = {
@@ -40,6 +49,7 @@ export function normalizeVisualPlan(response = {}) {
     mapStyle: text(raw.mapStyle || fallback.mapStyle, 48),
     badgeStyle: text(raw.badgeStyle || fallback.badgeStyle, 48),
     atAGlanceStyle: text(raw.atAGlanceStyle || fallback.atAGlanceStyle, 48),
+    moduleStyles: normalizeModuleStyles(raw.moduleStyles, fallback.moduleStyles),
     backgroundTreatment: text(raw.backgroundTreatment || fallback.backgroundTreatment, 64),
     retryPolicy: normalizeRetryPolicy(raw.retryPolicy),
   };

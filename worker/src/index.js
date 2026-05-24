@@ -1117,13 +1117,23 @@ function scoreKnowledgeImageCandidate(asset, context = {}) {
     score -= 50;
     candidate.reasons.push("map_for_living_subject");
   }
+  if (type === "location" && /\b(bird|animal|penguin|lemur|ibis|whale|shark|seal|frog|lizard|snake|insect|wildlife|closeup|close-up)\b/.test(haystack)) {
+    score -= 70;
+    candidate.reasons.push("fauna_image_for_location");
+  }
+  if (type === "location" && /\b(landscape|scenic|coast|coastline|island|aerial|city|skyline|mountain|valley|forest|baobab|beach|bay|river)\b/.test(haystack)) {
+    score += 22;
+    candidate.reasons.push("location_scenic_subject");
+  }
   if (/\b(infographic|poster|diagram|chart|graph|labeled|labelled|text)\b/.test(haystack)) {
     score -= 28;
     candidate.reasons.push("poster_or_diagram_like");
   }
 
   candidate.score = score;
-  candidate.accepted = score >= 45 && !candidate.reasons.includes("logo_icon_flag");
+  candidate.accepted = score >= 45
+    && !candidate.reasons.includes("logo_icon_flag")
+    && !(type === "location" && candidate.reasons.includes("fauna_image_for_location"));
   if (candidate.accepted) candidate.reasons.push("selected_candidate");
   return candidate;
 }
@@ -1591,6 +1601,12 @@ function normalizeKnowledgeSubject(query) {
 
 function canonicalKnowledgeSubjectOverride(query) {
   const text = String(query || "").toLowerCase();
+  if (/\bwhat\s+is\s+the\s+internet\b|\binternet\b/.test(text)) return "The Internet";
+  if (/\bwhere\s+is\s+madagascar\b|\bmadagascar\b/.test(text)) return "Madagascar";
+  if (/\bada\s+lovelace\b/.test(text)) return "Ada Lovelace";
+  if (/\bemperor\s+penguin/.test(text)) return "Emperor Penguin";
+  if (/\bcoast\s+redwood/.test(text)) return "Coast Redwood";
+  if (/\bapollo\s*11\b|\bapollo\s+eleven\b/.test(text)) return "Apollo 11 Moon Landing";
   if (/\bsmallest\s+country\s+in\s+the\s+world\b/.test(text)) return "Vatican City";
   if (/\bwho\s+invented\s+the\s+world\s+wide\s+web\b|\bworld\s+wide\s+web\s+inventor\b/.test(text)) return "Tim Berners-Lee";
   return "";

@@ -1,8 +1,8 @@
-export function TimelineCard({ timeline, fallback }) {
+export function TimelineCard({ timeline, fallback, moduleStyle = "vertical-timeline" }) {
   const items = Array.isArray(timeline) ? timeline.slice(0, 4) : [];
   if (!items.length && fallback) return fallback;
   return (
-    <section className="knowledge-card knowledge-card-pad">
+    <section className={`knowledge-card knowledge-card-pad knowledge-timeline-card knowledge-module-${moduleStyle}`}>
       <h2 className="knowledge-card-title">Timeline</h2>
       {items.length ? (
         <div className="knowledge-timeline">

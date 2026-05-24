@@ -155,12 +155,100 @@ const SUBTYPE_RULES = [
 ];
 
 const TYPE_DEFAULTS = {
-  location: { subType: "location/country", pattern: "landscape-right-text-left", motif: "contour-map-lines", supportingPanelStyle: "map-geography", mapStyle: "locator-glass", badgeStyle: "blue-location", atAGlanceStyle: "geo-pillars" },
-  person: { subType: "person/historical-scientist", pattern: "portrait-right-text-left", motif: "technical-sketch", supportingPanelStyle: "timeline-history", mapStyle: "none", badgeStyle: "gold-person", atAGlanceStyle: "legacy-pillars" },
-  fauna: { subType: "fauna/polar-animal", pattern: "species-closeup-with-environment", motif: "habitat-rings", supportingPanelStyle: "habitat-lifecycle", mapStyle: "habitat-range", badgeStyle: "green-fauna", atAGlanceStyle: "life-pattern" },
-  flora: { subType: "flora/tree", pattern: "tall-subject-forest-depth", motif: "growth-rings", supportingPanelStyle: "habitat-lifecycle", mapStyle: "range-glass", badgeStyle: "emerald-flora", atAGlanceStyle: "growth-pattern" },
-  event: { subType: "event/discovery", pattern: "archival-event-scene", motif: "timeline-arc", supportingPanelStyle: "timeline-history", mapStyle: "event-place", badgeStyle: "amber-event", atAGlanceStyle: "event-pillars" },
-  concept: { subType: "concept/abstract-scientific", pattern: "abstract-concept-orbital", motif: "node-mesh", supportingPanelStyle: "process-concept", mapStyle: "none", badgeStyle: "violet-concept", atAGlanceStyle: "three-pillars" },
+  location: { subType: "location/country", pattern: "landscape-right-text-left", motif: "contour-map-lines", supportingPanelStyle: "map-geography", mapStyle: "world-map-pin", badgeStyle: "blue-location", atAGlanceStyle: "island-shape-stats" },
+  person: { subType: "person/historical-scientist", pattern: "portrait-right-text-left", motif: "technical-sketch", supportingPanelStyle: "vertical-timeline", mapStyle: "none", badgeStyle: "gold-person", atAGlanceStyle: "icon-metric-columns" },
+  fauna: { subType: "fauna/polar-animal", pattern: "species-closeup-with-environment", motif: "habitat-rings", supportingPanelStyle: "lifecycle-loop", mapStyle: "habitat-range", badgeStyle: "green-fauna", atAGlanceStyle: "lifecycle-loop" },
+  flora: { subType: "flora/tree", pattern: "tall-subject-forest-depth", motif: "growth-rings", supportingPanelStyle: "height-comparison", mapStyle: "range-glass", badgeStyle: "emerald-flora", atAGlanceStyle: "height-comparison" },
+  event: { subType: "event/discovery", pattern: "archival-event-scene", motif: "timeline-arc", supportingPanelStyle: "horizontal-mission-timeline", mapStyle: "us-places-map", badgeStyle: "amber-event", atAGlanceStyle: "timeline-icons" },
+  concept: { subType: "concept/abstract-scientific", pattern: "abstract-concept-orbital", motif: "node-mesh", supportingPanelStyle: "process-flow", mapStyle: "none", badgeStyle: "violet-concept", atAGlanceStyle: "icon-metric-columns" },
+};
+
+const CANONICAL_VISUAL_OVERRIDES = {
+  internet: {
+    subType: "concept/network",
+    compositionPattern: "abstract-concept-orbital",
+    motifStrategy: "node-mesh",
+    supportingPanelStyle: "process-flow",
+    mapStyle: "none",
+    atAGlanceStyle: "icon-metric-columns",
+    heroStrategy: "abstract-concept",
+    moduleStyles: {
+      hero: "native-concept-hero",
+      facts: "compact-fact-rows",
+      middle: "process-flow",
+      lower: "icon-metric-columns",
+    },
+  },
+  madagascar: {
+    subType: "location/island",
+    compositionPattern: "place-scenic-wide",
+    motifStrategy: "island-contour",
+    supportingPanelStyle: "map-geography",
+    mapStyle: "world-map-pin",
+    atAGlanceStyle: "island-shape-stats",
+    moduleStyles: {
+      hero: "scenic-location",
+      facts: "compact-fact-rows",
+      middle: "world-map-pin",
+      lower: "island-shape-stats",
+    },
+  },
+  "ada-lovelace": {
+    subType: "person/historical-scientist",
+    compositionPattern: "portrait-right-text-left",
+    motifStrategy: "technical-sketch",
+    supportingPanelStyle: "vertical-timeline",
+    mapStyle: "none",
+    atAGlanceStyle: "icon-metric-columns",
+    moduleStyles: {
+      hero: "portrait-editorial",
+      facts: "compact-fact-rows",
+      middle: "vertical-timeline",
+      lower: "icon-metric-columns",
+    },
+  },
+  "emperor-penguin": {
+    subType: "fauna/polar-animal",
+    compositionPattern: "species-closeup-with-environment",
+    motifStrategy: "snow-habitat-rings",
+    supportingPanelStyle: "lifecycle-loop",
+    mapStyle: "habitat-range",
+    atAGlanceStyle: "lifecycle-loop",
+    moduleStyles: {
+      hero: "species-closeup-with-environment",
+      facts: "compact-fact-rows",
+      middle: "habitat-range",
+      lower: "lifecycle-loop",
+    },
+  },
+  "coast-redwood": {
+    subType: "flora/tree",
+    compositionPattern: "tall-subject-forest-depth",
+    motifStrategy: "growth-rings",
+    supportingPanelStyle: "height-comparison",
+    mapStyle: "range-glass",
+    atAGlanceStyle: "height-comparison",
+    moduleStyles: {
+      hero: "scenic-location",
+      facts: "compact-fact-rows",
+      middle: "range-glass",
+      lower: "height-comparison",
+    },
+  },
+  "apollo-11-moon-landing": {
+    subType: "event/space-mission",
+    compositionPattern: "archival-event-scene",
+    motifStrategy: "orbital",
+    supportingPanelStyle: "horizontal-mission-timeline",
+    mapStyle: "us-places-map",
+    atAGlanceStyle: "timeline-icons",
+    moduleStyles: {
+      hero: "archival-event-scene",
+      facts: "compact-fact-rows",
+      middle: "us-places-map",
+      lower: "horizontal-mission-timeline",
+    },
+  },
 };
 
 function cleanText(value, max = 120) {
@@ -169,6 +257,25 @@ function cleanText(value, max = 120) {
 
 function searchText(query, title, summary = "") {
   return `${query} ${title} ${summary}`.toLowerCase();
+}
+
+function topicKey(value) {
+  return cleanText(value, 160)
+    .toLowerCase()
+    .replace(/['’]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+function canonicalVisualOverride(query, title) {
+  const keys = [topicKey(title), topicKey(query)];
+  if (/\binternet\b/.test(`${query} ${title}`.toLowerCase())) keys.push("internet");
+  if (/\bmadagascar\b/.test(`${query} ${title}`.toLowerCase())) keys.push("madagascar");
+  if (/\bada-lovelace\b/.test(keys.join(" "))) keys.push("ada-lovelace");
+  if (/\bemperor-penguin/.test(keys.join(" "))) keys.push("emperor-penguin");
+  if (/\bcoast-redwood/.test(keys.join(" "))) keys.push("coast-redwood");
+  if (/\bapollo-11\b/.test(keys.join(" ")) || /\bapollo-eleven\b/.test(keys.join(" "))) keys.push("apollo-11-moon-landing");
+  return keys.map((key) => CANONICAL_VISUAL_OVERRIDES[key]).find(Boolean) || null;
 }
 
 function includesAny(value, words) {
@@ -267,7 +374,7 @@ function patternFor(subtypePlan, image, imageSourceType, visualNeed) {
     if (imageSourceType === "diagram" || visualNeed === "none") return subtypePlan.compositionPattern;
     return "fallback-graphic";
   }
-  if (image.cropHint === "right-subject") return "portrait-right-text-left";
+  if (image.cropHint === "right-subject" && subtypePlan.queryType === "person") return "portrait-right-text-left";
   if (image.cropHint === "center-subject" && subtypePlan.queryType === "event") return "archival-event-scene";
   return subtypePlan.compositionPattern;
 }
@@ -314,11 +421,21 @@ export function buildKnowledgeVisualPlan({
   retrieved = {},
 } = {}) {
   const subtype = inferKnowledgeSubtype({ type, query, title: title || classification.title, summary });
+  const override = canonicalVisualOverride(query, title || classification.title);
+  const plannedSubtype = override ? {
+    ...subtype,
+    subType: override.subType || subtype.subType,
+    compositionPattern: override.compositionPattern || subtype.compositionPattern,
+    motifType: override.motifStrategy || subtype.motifType,
+    supportingPanelStyle: override.supportingPanelStyle || subtype.supportingPanelStyle,
+    mapStyle: override.mapStyle || subtype.mapStyle,
+    atAGlanceStyle: override.atAGlanceStyle || subtype.atAGlanceStyle,
+  } : subtype;
   const hasMaps = Array.isArray(profile?.maps) && profile.maps.length > 0;
-  const initialPattern = patternFor(subtype, image, imageSourceType, visualNeed);
+  const initialPattern = override?.compositionPattern || patternFor(plannedSubtype, image, imageSourceType, visualNeed);
   const provisionalPlan = {
     compositionPattern: initialPattern,
-    motifStrategy: subtype.motifType,
+    motifStrategy: plannedSubtype.motifType,
     heroStrategy: image?.url ? "retrieved-single-subject" : "fallback-graphic",
   };
   const candidateScore = image?.score ?? retrieved?.diagnostics?.final?.image?.score ?? null;
@@ -328,28 +445,36 @@ export function buildKnowledgeVisualPlan({
     candidateScore,
     fallbackReason: retrieved?.diagnostics?.final?.fallbackReason,
   });
-  const heroStrategy = heroStrategyFor(image, imageSourceType, visualNeed, quality);
+  const heroStrategy = override?.heroStrategy && !image?.url
+    ? override.heroStrategy
+    : heroStrategyFor(image, imageSourceType, visualNeed, quality);
   const pattern = heroStrategy === "fallback-graphic" ? "fallback-graphic" : initialPattern;
   const patternData = COMPOSITION_PATTERNS[pattern] || COMPOSITION_PATTERNS["fallback-graphic"];
   const candidates = candidateSummary(retrieved);
-  const concrete = subtype.queryType !== "concept" || imageSourceType === "known";
+  const concrete = plannedSubtype.queryType !== "concept" || imageSourceType === "known";
 
   return {
     visualFamily: VISUAL_FAMILY,
-    queryType: subtype.queryType,
-    subType: subtype.subType,
+    queryType: plannedSubtype.queryType,
+    subType: plannedSubtype.subType,
     compositionPattern: pattern,
     heroStrategy,
     textSafeZone: patternData.textSafeZone,
     focalRegion: focalRegionFor(pattern, image),
     tone: image?.tone || DEFAULT_TONE,
     contrastLevel: image?.url ? patternData.overlayIntensity : "high",
-    motifStrategy: subtype.motifType,
+    motifStrategy: plannedSubtype.motifType,
     motifPlacement: patternData.motifPlacement,
-    supportingPanelStyle: subtype.supportingPanelStyle,
-    mapStyle: hasMaps ? subtype.mapStyle : "none",
-    badgeStyle: subtype.badgeStyle,
-    atAGlanceStyle: subtype.atAGlanceStyle,
+    supportingPanelStyle: plannedSubtype.supportingPanelStyle,
+    mapStyle: hasMaps ? plannedSubtype.mapStyle : "none",
+    badgeStyle: plannedSubtype.badgeStyle,
+    atAGlanceStyle: plannedSubtype.atAGlanceStyle,
+    moduleStyles: override?.moduleStyles || {
+      hero: image?.url ? plannedSubtype.compositionPattern : (plannedSubtype.queryType === "concept" ? "native-concept-hero" : "fallback-graphic"),
+      facts: "compact-fact-rows",
+      middle: hasMaps ? plannedSubtype.mapStyle : plannedSubtype.supportingPanelStyle,
+      lower: plannedSubtype.atAGlanceStyle,
+    },
     backgroundTreatment: image?.url ? "navy-glass-vignette" : "navy-abstract-linework",
     concrete,
     contentDensity: cleanText(summary).length > 260 ? "dense" : "standard",
