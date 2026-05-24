@@ -1,6 +1,7 @@
 .knowledge-page {
   --knowledge-accent: #b993ff;
   --knowledge-accent-soft: rgba(185, 147, 255, 0.18);
+  --knowledge-page-bg: url("/home-center/backgrounds/liquid-glass-family-bg-v2-blur.jpg");
   width: 100%;
   height: 100vh;
   color: #fff;
@@ -9,6 +10,28 @@
   overflow: hidden;
   font-family: "Geist", "Inter", system-ui, sans-serif;
   background: #020617;
+}
+
+.knowledge-page .hc-full-page-bg {
+  background:
+    linear-gradient(180deg, rgba(2, 6, 23, 0.18), rgba(2, 6, 23, 0.3)),
+    var(--knowledge-page-bg) center / cover no-repeat;
+  opacity: 1;
+  filter: blur(10px) saturate(1.1) brightness(0.74);
+  transform: scale(1.05);
+}
+
+body[data-design-system="v2"] .knowledge-page .hc-full-page-bg {
+  background:
+    linear-gradient(180deg, rgba(2, 6, 23, 0.18), rgba(2, 6, 23, 0.3)),
+    var(--knowledge-page-bg) center / cover no-repeat;
+  opacity: 1;
+}
+
+.knowledge-page .hc-full-page-veil {
+  background:
+    radial-gradient(circle at 70% 18%, rgba(255, 255, 255, 0.08), transparent 30%),
+    rgba(2, 6, 23, 0.46);
 }
 
 .knowledge-stage {
