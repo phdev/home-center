@@ -89,7 +89,7 @@ const CANONICAL_CURATED_ASSETS = [
     type: "event",
     assetRole: "hero",
     cropHint: "center-subject",
-    focalPoint: { x: 0.62, y: 0.48 },
+    focalPoint: { x: 0.5, y: 0.48 },
     tone: "home-center-dark",
     heroImage: {
       url: "https://upload.wikimedia.org/wikipedia/commons/9/9c/Aldrin_Apollo_11.jpg",
@@ -99,7 +99,7 @@ const CANONICAL_CURATED_ASSETS = [
       license: "Public domain",
       width: 5940,
       height: 5940,
-      focalPoint: { x: 0.62, y: 0.48 },
+      focalPoint: { x: 0.5, y: 0.48 },
       cropHint: "center-subject",
       tone: "home-center-dark",
     },

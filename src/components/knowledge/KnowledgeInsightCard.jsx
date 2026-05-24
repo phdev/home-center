@@ -1,4 +1,4 @@
-import { Snowflake, Sprout } from "lucide-react";
+import { Snowflake, Sparkle, Sprout } from "lucide-react";
 
 function FeatherLineArt() {
   return (
@@ -19,6 +19,19 @@ function FeatherLineArt() {
 }
 
 function InsightOrnament({ type }) {
+  if (type === "event") {
+    return (
+      <div className="knowledge-insight-ornament knowledge-insight-ornament-event" aria-hidden="true">
+        <div className="knowledge-insight-planet">
+          <div className="knowledge-insight-planet-band knowledge-insight-planet-band-a" />
+          <div className="knowledge-insight-planet-band knowledge-insight-planet-band-b" />
+        </div>
+        <Sparkle className="knowledge-insight-star knowledge-insight-star-a" size={15} />
+        <Sparkle className="knowledge-insight-star knowledge-insight-star-b" size={11} />
+        <Sparkle className="knowledge-insight-star knowledge-insight-star-c" size={9} />
+      </div>
+    );
+  }
   if (type === "fauna") {
     return (
       <div className="knowledge-insight-ornament knowledge-insight-ornament-fauna" aria-hidden="true">

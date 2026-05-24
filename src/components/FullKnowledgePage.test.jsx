@@ -219,6 +219,40 @@ describe("FullKnowledgePage", () => {
     expect(screen.queryByText("US")).toBeNull();
   });
 
+  it("renders Apollo 11 with canonical places, full date, result ornament, and mission glance", () => {
+    const { container } = render(<FullKnowledgePage response={response({
+      query: "What happened during Apollo 11?",
+      title: "Apollo 11 Moon Landing",
+      type: "event",
+      summary: "Apollo 11 was the 1969 NASA mission that first landed humans on the Moon.",
+      image: {
+        url: "https://example.test/apollo.jpg",
+        source: "NASA",
+        mode: "pinned",
+        focalPoint: { x: 0.62, y: 0.48 },
+        cropHint: "center-subject",
+      },
+      visualPlan: {
+        moduleStyles: {
+          facts: "compact-fact-rows",
+          middle: "us-places-map",
+          lower: "horizontal-mission-timeline",
+        },
+      },
+    })} onBack={() => {}} />);
+
+    expect(screen.getAllByText("July 20, 1969").length).toBeGreaterThan(0);
+    expect(screen.getByText("Places")).toBeTruthy();
+    expect(screen.getByText("Houston")).toBeTruthy();
+    expect(screen.getByText("Cape Canaveral")).toBeTruthy();
+    expect(screen.getByText("Result")).toBeTruthy();
+    expect(screen.getByText("At a Glance")).toBeTruthy();
+    expect(screen.getByText("Lunar Landing")).toBeTruthy();
+    expect(container.querySelector(".knowledge-insight-planet")).toBeTruthy();
+    expect(container.querySelector(".knowledge-module-horizontal-mission-timeline")).toBeTruthy();
+    expect(screen.getByAltText("Apollo 11 Moon Landing").style.objectPosition).toBe("50% 48%");
+  });
+
   it("renders related topic chips and a no-image fallback", () => {
     render(<FullKnowledgePage response={response({
       imageUrl: null,

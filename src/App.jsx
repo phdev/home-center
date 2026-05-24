@@ -193,6 +193,73 @@ const EMPEROR_PENGUIN_KNOWLEDGE_RESPONSE = {
   timestamp: Date.now(),
 };
 
+const APOLLO_11_KNOWLEDGE_RESPONSE = {
+  kind: "knowledge",
+  query: "What happened during Apollo 11?",
+  title: "Apollo 11 Moon Landing",
+  type: "event",
+  summary: "Apollo 11 was the 1969 NASA mission that first landed humans on the Moon. On July 20, 1969, Neil Armstrong and Buzz Aldrin walked on the lunar surface while Michael Collins orbited above in the command module.",
+  sections: [
+    {
+      heading: "Result",
+      content: "Apollo 11 proved that humans could travel to another world and return safely, opening the door to future exploration and inspiring generations around the globe.",
+    },
+  ],
+  profile: {
+    facts: [
+      { label: "Date", value: "July 20, 1969", icon: "calendar" },
+      { label: "Crew", value: "3", icon: "crew" },
+    ],
+    maps: [
+      { scope: "country", label: "Houston", highlight: "Houston, Texas", detail: "Mission Control", regionCode: "TX" },
+      { scope: "country", label: "Cape Canaveral", highlight: "Cape Canaveral, Florida", detail: "Kennedy Space Center", regionCode: "FL" },
+    ],
+    relatedConcepts: ["NASA", "Moon mission", "Space exploration"],
+  },
+  timeline: [
+    { date: "July 16, 1969", label: "Launch", description: "9:32 AM EDT" },
+    { date: "July 20, 1969", label: "Lunar Landing", description: "4:17 PM EDT" },
+    { date: "July 20, 1969", label: "Moonwalk", description: "10:56 PM EDT" },
+    { date: "July 24, 1969", label: "Return", description: "11:50 AM EDT" },
+  ],
+  imageUrl: "https://upload.wikimedia.org/wikipedia/commons/9/9c/Aldrin_Apollo_11.jpg",
+  image: {
+    url: "https://upload.wikimedia.org/wikipedia/commons/9/9c/Aldrin_Apollo_11.jpg",
+    source: "NASA",
+    mode: "pinned",
+    sourceUrl: "https://commons.wikimedia.org/wiki/File:Aldrin_Apollo_11.jpg",
+    focalPoint: { x: 0.5, y: 0.48 },
+    cropHint: "center-subject",
+    tone: "home-center-dark",
+    alt: "Buzz Aldrin on the Moon during Apollo 11",
+  },
+  visualPlan: {
+    visualFamily: "editorial-knowledge-v1",
+    queryType: "event",
+    subType: "event/space-mission",
+    compositionPattern: "archival-event-scene",
+    heroStrategy: "retrieved-single-subject",
+    textSafeZone: "left",
+    focalRegion: "center-center",
+    tone: "home-center-dark",
+    contrastLevel: "medium-high",
+    motifStrategy: "orbital",
+    supportingPanelStyle: "horizontal-mission-timeline",
+    mapStyle: "us-places-map",
+    badgeStyle: "amber-event",
+    atAGlanceStyle: "timeline-icons",
+    backgroundTreatment: "navy-glass-vignette",
+    moduleStyles: {
+      hero: "archival-event-scene",
+      facts: "compact-fact-rows",
+      middle: "us-places-map",
+      lower: "horizontal-mission-timeline",
+    },
+  },
+  imageSourceType: "known",
+  timestamp: Date.now(),
+};
+
 const KNOWLEDGE_LOADING_RESPONSE = {
   kind: "knowledge",
   query: "Knowledge query in progress",
@@ -352,13 +419,15 @@ export default function App() {
   const appNow = forceNow ?? now;
   const previewResponse =
     requestedPage === "knowledge"
-      ? (urlParams.get("knowledgeFixture") === "emperor-penguin"
-        ? EMPEROR_PENGUIN_KNOWLEDGE_RESPONSE
-        : PREVIEW_KNOWLEDGE_RESPONSE)
+      ? (urlParams.get("knowledgeFixture") === "apollo-11"
+        ? APOLLO_11_KNOWLEDGE_RESPONSE
+        : urlParams.get("knowledgeFixture") === "emperor-penguin"
+          ? EMPEROR_PENGUIN_KNOWLEDGE_RESPONSE
+          : PREVIEW_KNOWLEDGE_RESPONSE)
       : requestedPage === "llm-response"
         ? PREVIEW_LLM_RESPONSE
         : null;
-  const activeLLMResponse = llm.latestResponse || previewResponse;
+  const activeLLMResponse = previewResponse || llm.latestResponse;
   const responsePage = activeLLMResponse?.kind === "knowledge" ? "knowledge" : "llm-response";
   const forcePage = activeLLMResponse ? responsePage : (requestedPage || page);
   const knowledgePageResponse =
