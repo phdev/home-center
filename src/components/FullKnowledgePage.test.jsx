@@ -64,11 +64,32 @@ describe("FullKnowledgePage", () => {
         cropHint: "right-subject",
         tone: "home-center-dark",
       },
+      visualPlan: {
+        visualFamily: "editorial-knowledge-v1",
+        queryType: "person",
+        subType: "historical-scientist",
+        compositionPattern: "portrait-right-text-left",
+        heroStrategy: "retrieved-single-subject",
+        textSafeZone: "left",
+        focalRegion: "right-center",
+        tone: "home-center-dark",
+        contrastLevel: "medium-high",
+        motifStrategy: "analytical-linework",
+        supportingPanelStyle: "timeline-history",
+        mapStyle: "none",
+        badgeStyle: "gold-person",
+        atAGlanceStyle: "legacy-pillars",
+        backgroundTreatment: "navy-glass-vignette",
+        retryPolicy: { maxAttempts: 1 },
+      },
     })} onBack={() => {}} />);
 
     const image = screen.getByAltText("How big is the Sun?");
+    const hero = image.closest(".knowledge-hero");
     expect(image.style.objectPosition).toBe("72% 42%");
     expect(image.closest(".knowledge-hero-visual").className).toContain("knowledge-hero-visual-right-subject");
+    expect(hero.className).toContain("knowledge-hero-composition-portrait-right-text-left");
+    expect(hero.className).toContain("knowledge-hero-strategy-retrieved-single-subject");
     expect(screen.getByText("Curated Archive · curated hero image")).toBeTruthy();
   });
 

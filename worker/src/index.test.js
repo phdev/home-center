@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import worker from "./index.js";
+import { buildKnowledgeVisualPlan } from "./knowledgeVisualPlanner.js";
 
 const originalFetch = global.fetch;
 
@@ -1188,6 +1189,19 @@ describe("knowledge image pipeline", () => {
       source: "Curated Archive",
     });
     expect(body.retrieval.diagnostics.final.assetMode).toBe("pinned");
+    expect(body.visualPlan).toMatchObject({
+      visualFamily: "editorial-knowledge-v1",
+      queryType: "person",
+      compositionPattern: "portrait-right-text-left",
+      heroStrategy: "retrieved-single-subject",
+      textSafeZone: "left",
+      tone: "home-center-dark",
+    });
+    expect(body.heroComposition).toMatchObject({
+      pattern: "portrait-right-text-left",
+      strategy: "retrieved-single-subject",
+      textSafeZone: "left",
+    });
   });
 
   it("scores retrieved candidates and selects the best relevant hero image", async () => {
@@ -1305,6 +1319,32 @@ describe("knowledge image pipeline", () => {
     expect(body.curatedAsset).toMatchObject({
       mode: "fallback",
       status: "missing",
+    });
+    expect(body.visualPlan).toMatchObject({
+      visualFamily: "editorial-knowledge-v1",
+      queryType: "fauna",
+      compositionPattern: "fallback-graphic",
+      heroStrategy: "fallback-graphic",
+      retryPolicy: { maxAttempts: 3 },
+    });
+  });
+
+  it("builds deterministic visual plans for abstract concept fallbacks", () => {
+    expect(buildKnowledgeVisualPlan({
+      query: "What is quantum entanglement?",
+      title: "Quantum entanglement",
+      type: "concept",
+      summary: "Quantum entanglement connects measurements across systems.",
+      imageSourceType: "none",
+      visualNeed: "none",
+    })).toMatchObject({
+      visualFamily: "editorial-knowledge-v1",
+      queryType: "concept",
+      subType: "systems-concept",
+      compositionPattern: "abstract-concept",
+      heroStrategy: "abstract-concept",
+      motifStrategy: "network-linework",
+      backgroundTreatment: "navy-abstract-linework",
     });
   });
 

@@ -182,6 +182,10 @@ function validate(query, body) {
   const failures = [];
   if (!body.type) failures.push("missing type");
   if (!body.title) failures.push("missing title");
+  if (body.visualPlan?.visualFamily !== "editorial-knowledge-v1") failures.push("missing visual plan");
+  if (!body.visualPlan?.compositionPattern) failures.push("missing composition pattern");
+  if (!body.visualPlan?.heroStrategy) failures.push("missing hero strategy");
+  if (!body.heroComposition?.pattern) failures.push("missing hero composition package");
   const assetMode = body.curatedAsset?.mode || body.visual?.assetMode || body.image?.assetMode || body.image?.mode || body.visual?.mode || "";
   if (assetMode && !["pinned", "retrieved", "generated", "fallback", "none", "rendered"].includes(assetMode)) {
     failures.push(`invalid asset mode ${assetMode}`);

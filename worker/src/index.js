@@ -1,4 +1,5 @@
 import { curatedKnowledgeAssetsFromEnv, curatedTopicKey } from "./curatedKnowledgeAssets.js";
+import { buildHeroCompositionPackage, buildKnowledgeVisualPlan } from "./knowledgeVisualPlanner.js";
 
 export default {
   async fetch(request, env, ctx) {
@@ -477,6 +478,19 @@ async function handleAskQuery(request, env, ctx) {
   const retrievedImage = !shouldGenerateImage && parsed.imageSourceType === "known" && retrieved.image?.url
     ? normalizeKnowledgeAsset(retrieved.image, "hero")
     : null;
+  const visualPlan = buildKnowledgeVisualPlan({
+    query,
+    title: parsed.title || classification.title || subject,
+    type: parsed.type || classification.type || "concept",
+    summary: parsed.summary || "",
+    profile: parsed.profile || null,
+    image: retrievedImage,
+    imageSourceType: parsed.imageSourceType,
+    visualNeed: parsed.visualNeed || classification.visualNeed || "useful",
+    classification,
+    retrieved,
+  });
+  const heroComposition = buildHeroCompositionPackage(visualPlan, retrievedImage);
   const startedAt = Date.now();
   const response = {
     id: `knowledge_${startedAt}_${Math.random().toString(36).slice(2, 6)}`,
@@ -522,6 +536,8 @@ async function handleAskQuery(request, env, ctx) {
     },
     imagePrompt: parsed.imagePrompt || null,
     imagePending: shouldGenerateImage,
+    visualPlan,
+    heroComposition,
     visual: buildKnowledgeVisual(retrievedImage, {
       need: parsed.visualNeed || classification.visualNeed || "useful",
       strategy: shouldGenerateImage ? "generating" : "none",
@@ -529,6 +545,8 @@ async function handleAskQuery(request, env, ctx) {
       fallbackReason: parsed.visualNeed === "none"
         ? "visual_not_needed"
         : (parsed.imageSourceType === "diagram" ? "ui_rendered_diagram" : (shouldGenerateImage ? "image_generating" : "retrieval_failed")),
+      visualPlan,
+      heroComposition,
     }),
     retrieval: {
       classification,
@@ -600,6 +618,18 @@ async function handleAskQuery(request, env, ctx) {
       } : response.curatedAsset,
       imagePending: false,
       updatedAt: Date.now(),
+      visualPlan: buildKnowledgeVisualPlan({
+        query,
+        title: parsed.title || classification.title || subject,
+        type: parsed.type || classification.type || "concept",
+        summary: parsed.summary || "",
+        profile: parsed.profile || null,
+        image,
+        imageSourceType: image ? "generated" : parsed.imageSourceType,
+        visualNeed: parsed.visualNeed || classification.visualNeed || "useful",
+        classification,
+        retrieved,
+      }),
       visual: buildKnowledgeVisual(image, {
         need: parsed.visualNeed || classification.visualNeed || "useful",
         strategy: image?.mode || (generationFailed ? "generation_failed" : "none"),
@@ -607,6 +637,12 @@ async function handleAskQuery(request, env, ctx) {
         attemptedModel: generationFailed ? openaiImageModel(env) : null,
         fallbackReason: image ? null : (generationFailed ? "generation_failed" : "retrieval_failed"),
       }),
+    };
+    updatedResponse.heroComposition = buildHeroCompositionPackage(updatedResponse.visualPlan, image);
+    updatedResponse.visual = {
+      ...updatedResponse.visual,
+      plan: updatedResponse.visualPlan,
+      heroComposition: updatedResponse.heroComposition,
     };
 
     await storeLLMResponse(updatedResponse, env);
@@ -2177,6 +2213,8 @@ function buildKnowledgeVisual(image, options = {}) {
       need: options.need || "useful",
       strategy: options.strategy || asset.mode || "retrieved",
       generated: asset.mode === "generated",
+      plan: options.visualPlan || null,
+      heroComposition: options.heroComposition || null,
     };
   }
 
@@ -2193,6 +2231,8 @@ function buildKnowledgeVisual(image, options = {}) {
     need: options.need || "none",
     strategy: options.strategy || "none",
     generated: false,
+    plan: options.visualPlan || null,
+    heroComposition: options.heroComposition || null,
   };
 }
 

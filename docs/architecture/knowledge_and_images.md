@@ -69,6 +69,24 @@ For images, the knowledge page now uses a curated hero asset pipeline:
 3. explicit generated raw hero asset only for generated-mode answers
 4. native React/SVG fallback for diagram/concept/no-image cases
 
+After content and image retrieval, the worker also builds a deterministic
+`visualPlan` and `heroComposition` package. This is the art-direction layer for
+arbitrary queries: it chooses a reusable composition pattern, text-safe zone,
+focal region, dark tone, motif strategy, supporting panel style, map style, and
+retry policy from the query type, topic, available image, and retrieved
+candidate diagnostics. The plan is data, not a generated screenshot, so the
+dashboard can keep facts, maps, timelines, process diagrams, cards, and chips as
+native React/SVG UI.
+
+Current composition patterns:
+
+- `portrait-right-text-left`
+- `landscape-right-text-left`
+- `centered-subject-soft-vignette`
+- `environmental-depth-scene`
+- `abstract-concept`
+- `fallback-graphic`
+
 The pinned manifest lives in `worker/src/curatedKnowledgeAssets.js`. The
 canonical topics are present with crop/tone metadata even when no manually
 approved URL is pinned yet. To add an override without code changes, set
@@ -131,6 +149,8 @@ WORKER_TOKEN=<token> npm run check:knowledge-visual-contract:live
 - v1: liquid-glass knowledge page design system.
 - v1.5: curated hero asset pipeline with pinned manifest support, scored
   retrieval, focal-point crops, dark hero toning, and selected-asset caching.
+- v1.6: art-directed visual planning with structured `visualPlan` and
+  `heroComposition` data for reusable knowledge-page compositions.
 - `npm run verify` protects the local visual contract.
 - Generated hero fallback remains gated off by default.
 - Live Worker validation remains manual unless `WORKER_TOKEN` is added to CI.

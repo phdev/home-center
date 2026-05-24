@@ -1,3 +1,5 @@
+import { normalizeVisualPlan } from "./visualPlanUtils";
+
 const VALID_TYPES = new Set(["location", "person", "fauna", "flora", "event", "concept"]);
 
 function text(value, max = 240) {
@@ -130,6 +132,7 @@ export function normalizeKnowledgeResponse(response = {}) {
   const sections = asArray(response?.sections);
   const insightSection = sections[0] || {};
   const heroImage = normalizeHeroImage(response);
+  const visualPlan = normalizeVisualPlan(response);
   return {
     type,
     title: text(response?.title || response?.query || "Knowledge", 96),
@@ -152,6 +155,8 @@ export function normalizeKnowledgeResponse(response = {}) {
     glance: normalizeGlance(response, type),
     relatedTopics: normalizeRelated(response),
     heroImage,
+    visualPlan,
+    heroComposition: response?.heroComposition || response?.visual?.heroComposition || null,
     sourceLabel: sourceLabel(response, heroImage),
     imagePending: response?.imagePending === true,
     raw: response,
