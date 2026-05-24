@@ -191,6 +191,21 @@ describe("FullKnowledgePage", () => {
     }
   });
 
+  it("renders fauna adaptation ornamentation and habitat range map treatment", () => {
+    const { container } = render(<FullKnowledgePage response={response({
+      type: "fauna",
+      sections: [{ heading: "Adaptation", content: "Dense feathers and huddling behavior conserve heat." }],
+      profile: { maps: [{ scope: "world", label: "Habitat", highlight: "Antarctica" }] },
+      visualPlan: {
+        moduleStyles: { middle: "habitat-range", lower: "lifecycle-loop" },
+      },
+    })} onBack={() => {}} />);
+
+    expect(container.querySelector(".knowledge-insight-ornament-fauna")).toBeTruthy();
+    expect(container.querySelector(".knowledge-module-habitat-range")).toBeTruthy();
+    expect(screen.getByText("ANTARCTICA")).toBeTruthy();
+  });
+
   it("renders related topic chips and a no-image fallback", () => {
     render(<FullKnowledgePage response={response({
       imageUrl: null,
