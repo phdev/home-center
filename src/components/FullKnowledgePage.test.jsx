@@ -220,6 +220,23 @@ describe("FullKnowledgePage", () => {
     expect(screen.getByText("Facts unavailable")).toBeTruthy();
   });
 
+  it("does not nest metric grids for standard at-a-glance cards", () => {
+    const { container } = render(<FullKnowledgePage response={response({
+      type: "person",
+      infographics: [{
+        title: "Computing Firsts",
+        kind: "metrics",
+        items: [
+          { label: "Known for", value: "Analytical Engine" },
+          { label: "Legacy", value: "First programmer" },
+        ],
+      }],
+    })} onBack={() => {}} />);
+
+    expect(container.querySelector(".knowledge-metrics .knowledge-metrics")).toBeFalsy();
+    expect(container.querySelectorAll(".knowledge-metric").length).toBeGreaterThanOrEqual(2);
+  });
+
   it("renders a native concept hero visual instead of the generic placeholder", () => {
     const { container } = render(<FullKnowledgePage response={response({
       imageUrl: null,
