@@ -22,11 +22,19 @@ function InsightOrnament({ type }) {
   if (type === "event") {
     return (
       <div className="knowledge-insight-ornament knowledge-insight-ornament-event" aria-hidden="true">
-        <div className="knowledge-insight-planet">
-          <div className="knowledge-insight-earth-land knowledge-insight-earth-land-a" />
-          <div className="knowledge-insight-earth-land knowledge-insight-earth-land-b" />
-          <div className="knowledge-insight-earth-land knowledge-insight-earth-land-c" />
-        </div>
+        <svg className="knowledge-insight-earth" viewBox="0 0 160 160" aria-hidden="true">
+          <defs>
+            <radialGradient id="knowledge-earth-ocean" cx="34%" cy="28%" r="72%">
+              <stop offset="0%" stopColor="#7dccff" />
+              <stop offset="48%" stopColor="#1b75d0" />
+              <stop offset="100%" stopColor="#08306f" />
+            </radialGradient>
+          </defs>
+          <circle cx="80" cy="80" r="68" fill="url(#knowledge-earth-ocean)" />
+          <path className="knowledge-earth-grid" d="M18 80h124M31 48c24 10 49 15 98 0M31 112c24-10 49-15 98 0M80 12c18 18 27 41 27 68s-9 50-27 68M80 12c-18 18-27 41-27 68s9 50 27 68" />
+          <path className="knowledge-earth-shine" d="M47 31c17-11 41-14 61-5" />
+          <circle className="knowledge-earth-rim" cx="80" cy="80" r="68" />
+        </svg>
         <Sparkle className="knowledge-insight-star knowledge-insight-star-a" size={15} />
         <Sparkle className="knowledge-insight-star knowledge-insight-star-b" size={11} />
         <Sparkle className="knowledge-insight-star knowledge-insight-star-c" size={9} />
