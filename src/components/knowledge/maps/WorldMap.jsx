@@ -24,12 +24,8 @@ export function WorldMap({ maps = [], accent = "#b993ff" }) {
           />
         </mask>
       </defs>
-      <rect width="600" height="270" rx="8" fill="rgba(255,255,255,0.025)" />
-      <rect x="1" y="1" width="598" height="268" rx="8" fill="url(#worldMapGlow)" />
-      <g stroke="rgba(255,255,255,0.07)" strokeWidth="1">
-        {[80, 160, 240, 320, 400, 480, 560].map((line) => <line key={`v${line}`} x1={line} y1="18" x2={line} y2="232" />)}
-        {[54, 108, 162, 216].map((line) => <line key={`h${line}`} x1="24" y1={line} x2="576" y2={line} />)}
-      </g>
+      <rect width="600" height="270" rx="8" fill="rgba(2,6,23,0.1)" />
+      <rect x="1" y="1" width="598" height="268" rx="8" fill="url(#worldMapGlow)" opacity="0.44" />
       <image
         href="/home-center/knowledge-assets/world-map-equirectangular.svg"
         x="35"
@@ -37,7 +33,7 @@ export function WorldMap({ maps = [], accent = "#b993ff" }) {
         width="530"
         height="210"
         preserveAspectRatio="none"
-        opacity="0.72"
+        opacity="0.9"
       />
       {highlightsAntarctica && (
         <g>

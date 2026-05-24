@@ -7,6 +7,7 @@ export function KnowledgeBottomBar({ config, relatedTopics }) {
         {config.label}
       </div>
       <div className="knowledge-related">
+        <span className="knowledge-related-label">Related Topics</span>
         {relatedTopics.map((topic) => (
           <span className="knowledge-chip" key={topic}>{topic}</span>
         ))}

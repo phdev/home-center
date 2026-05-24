@@ -8,9 +8,9 @@ function MetricIcon({ icon, fallback }) {
   return fallback;
 }
 
-export function AtAGlanceCard({ glance, moduleStyle = "icon-metric-columns", type, accent }) {
+export function AtAGlanceCard({ glance, moduleStyle = "icon-metric-columns", type, accent, subjectTitle = "" }) {
   const metrics = Array.isArray(glance?.metrics) ? glance.metrics.slice(0, 3) : [];
-  const showLifecycle = (type === "fauna" || type === "flora") && metrics.length > 0;
+  const showLifecycle = /emperor penguin/i.test(subjectTitle) && metrics.length > 0;
   return (
     <section className={`knowledge-card knowledge-card-pad knowledge-glance-card knowledge-module-${moduleStyle}`}>
       <h2 className="knowledge-card-title">{glance?.title || "At a Glance"}</h2>
@@ -19,7 +19,7 @@ export function AtAGlanceCard({ glance, moduleStyle = "icon-metric-columns", typ
         <div className={showLifecycle ? "knowledge-glance-content" : "knowledge-metrics"}>
           {showLifecycle && (
             <div className="knowledge-glance-life" aria-hidden="true">
-              <LifecycleDiagram items={metrics} accent={accent} />
+              <LifecycleDiagram variant="emperor-penguin" accent={accent} />
             </div>
           )}
           <div className="knowledge-metrics">
@@ -28,9 +28,9 @@ export function AtAGlanceCard({ glance, moduleStyle = "icon-metric-columns", typ
                 <div className="knowledge-metric-icon">
                   <MetricIcon icon={metric.icon} fallback={String(index + 1).padStart(2, "0")} />
                 </div>
+                <div className="knowledge-metric-label">{metric.label}</div>
                 <div className="knowledge-metric-value">{metric.value}</div>
                 {metric.sublabel && <div className="knowledge-metric-sublabel">{metric.sublabel}</div>}
-                <div className="knowledge-metric-label">{metric.label}</div>
               </div>
             ))}
           </div>

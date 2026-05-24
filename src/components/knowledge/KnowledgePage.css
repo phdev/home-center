@@ -668,15 +668,29 @@ body[data-design-system="v2"] .knowledge-page .hc-full-page-bg {
   overflow: hidden;
 }
 
+.knowledge-related-label {
+  flex-shrink: 0;
+  margin-left: 8px;
+  padding-left: 24px;
+  border-left: 1px solid rgba(255, 255, 255, 0.14);
+  color: rgba(255, 255, 255, 0.42);
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 13px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
 .knowledge-chip {
   flex-shrink: 0;
-  color: rgba(255, 255, 255, 0.9);
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  border-radius: 999px;
-  padding: 8px 13px;
+  min-width: 116px;
+  color: var(--knowledge-accent);
+  background: color-mix(in srgb, var(--knowledge-accent) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--knowledge-accent) 32%, transparent);
+  border-radius: 8px;
+  padding: 8px 16px;
   font-size: 15px;
-  font-weight: 720;
+  font-weight: 760;
+  text-align: center;
 }
 
 .knowledge-bottom-label {
@@ -698,7 +712,7 @@ body[data-design-system="v2"] .knowledge-page .hc-full-page-bg {
 }
 
 .knowledge-module-habitat-range .knowledge-map-wrap svg {
-  transform: scale(1.08);
+  transform: scale(1.03);
   transform-origin: center;
 }
 
@@ -706,13 +720,13 @@ body[data-design-system="v2"] .knowledge-page .hc-full-page-bg {
   height: calc(100% - 32px);
   min-height: 118px;
   display: grid;
-  grid-template-columns: 140px minmax(0, 1fr);
+  grid-template-columns: 154px minmax(0, 1fr);
   align-items: center;
-  gap: 12px;
+  gap: 10px;
 }
 
 .knowledge-glance-life {
-  height: 136px;
+  height: 142px;
   min-width: 0;
   overflow: hidden;
 }
@@ -844,10 +858,10 @@ body[data-design-system="v2"] .knowledge-page .hc-full-page-bg {
 }
 
 .knowledge-metric-label {
-  color: rgba(255, 255, 255, 0.58);
+  color: rgba(255, 255, 255, 0.92);
   font-size: 12px;
-  font-weight: 750;
-  margin-top: 3px;
+  font-weight: 820;
+  margin: 0 0 5px;
 }
 
 .knowledge-metric-sublabel {
@@ -855,4 +869,10 @@ body[data-design-system="v2"] .knowledge-page .hc-full-page-bg {
   font-size: 12px;
   font-weight: 650;
   margin-top: 2px;
+}
+
+.knowledge-module-lifecycle-loop .knowledge-metric-value,
+.knowledge-module-icon-metric-columns .knowledge-metric-value {
+  color: #fff;
+  font-weight: 900;
 }
