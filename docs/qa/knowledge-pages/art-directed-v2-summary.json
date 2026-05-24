@@ -1,0 +1,111 @@
+{
+  "pipelineVersion": "art-directed-v2",
+  "implementationCommit": "4e50d10",
+  "workerVersion": "f5c7c678-7c9a-4728-8378-39f6d251da31",
+  "dashboardBundle": {
+    "js": "assets/index-CAwNw5-m.js",
+    "css": "assets/index-g92-a0Te.css"
+  },
+  "verification": {
+    "npmRunVerify": "pass",
+    "liveVisualContract": "pass",
+    "generatedHeroFallback": "disabled by default; gated by ENABLE_ART_DIRECTED_HERO_GENERATION"
+  },
+  "piTargetsVerified": [
+    {
+      "host": "homecenter.local",
+      "dashboardLocalService": "active",
+      "kioskWatchdogService": "active"
+    },
+    {
+      "host": "homecenter2.local",
+      "dashboardLocalService": "active",
+      "kioskWatchdogService": "active"
+    }
+  ],
+  "canonicalPages": [
+    {
+      "query": "Where is Madagascar?",
+      "type": "location",
+      "subType": "location/island",
+      "compositionPattern": "place-scenic-wide",
+      "mode": "retrieved",
+      "qualityScore": 100,
+      "screenshots": [
+        "location-madagascar-art-directed-v2.png",
+        "location-madagascar-homecenter2-art-directed-v2.png"
+      ],
+      "pass": true
+    },
+    {
+      "query": "Who was Ada Lovelace?",
+      "type": "person",
+      "subType": "person/historical-scientist",
+      "compositionPattern": "portrait-right-text-left",
+      "mode": "retrieved",
+      "qualityScore": 100,
+      "screenshots": [
+        "person-ada-lovelace-art-directed-v2.png",
+        "person-ada-lovelace-homecenter2-art-directed-v2.png"
+      ],
+      "pass": true
+    },
+    {
+      "query": "Tell me about emperor penguins.",
+      "type": "fauna",
+      "subType": "fauna/polar-animal",
+      "compositionPattern": "portrait-right-text-left",
+      "mode": "retrieved",
+      "qualityScore": 100,
+      "screenshots": [
+        "fauna-emperor-penguin-art-directed-v2.png",
+        "fauna-emperor-penguin-homecenter2-art-directed-v2.png"
+      ],
+      "pass": true
+    },
+    {
+      "query": "Tell me about coast redwoods.",
+      "type": "flora",
+      "subType": "flora/tree",
+      "compositionPattern": "tall-subject-forest-depth",
+      "mode": "retrieved",
+      "qualityScore": 100,
+      "screenshots": [
+        "flora-coast-redwood-art-directed-v2.png",
+        "flora-coast-redwood-homecenter2-art-directed-v2.png"
+      ],
+      "pass": true
+    },
+    {
+      "query": "What happened during Apollo 11?",
+      "type": "event",
+      "subType": "event/space-mission",
+      "compositionPattern": "archival-event-scene",
+      "mode": "retrieved",
+      "qualityScore": 100,
+      "screenshots": [
+        "event-apollo-11-art-directed-v2.png",
+        "event-apollo-11-homecenter2-art-directed-v2.png"
+      ],
+      "pass": true
+    },
+    {
+      "query": "What is the internet?",
+      "type": "concept",
+      "subType": "concept/network",
+      "compositionPattern": "abstract-concept-orbital",
+      "mode": "fallback",
+      "qualityScore": 76,
+      "screenshots": [
+        "concept-internet-art-directed-v2.png",
+        "concept-internet-homecenter2-art-directed-v2.png"
+      ],
+      "pass": true
+    }
+  ],
+  "notes": [
+    "Art direction remains DOM/CSS/SVG composition, not generated full-page imagery.",
+    "Maps, facts, timelines, process diagrams, metric cards, and chips remain native UI.",
+    "Concept fallback uses intentional abstract motif treatment without requiring a raw hero image."
+  ]
+}
