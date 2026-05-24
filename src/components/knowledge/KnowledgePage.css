@@ -334,11 +334,16 @@ body[data-design-system="v2"] .knowledge-page .hc-full-page-bg {
 }
 
 .knowledge-hero-composition-archival-event-scene .knowledge-hero-visual-center-subject img {
-  width: 62%;
-  object-position: center;
+  position: absolute;
+  top: 14px;
+  right: 18px;
+  bottom: 14px;
+  width: auto;
+  height: calc(100% - 28px);
+  object-position: 100% 50%;
   object-fit: contain;
-  margin-left: auto;
-  padding: 14px 18px 14px 0;
+  margin-left: 0;
+  padding: 0;
 }
 
 .knowledge-hero-tone-home-center-dark img {
