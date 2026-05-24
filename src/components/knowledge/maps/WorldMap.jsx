@@ -48,7 +48,6 @@ export function WorldMap({ maps = [], accent = "#b993ff" }) {
           </text>
         </g>
       )}
-      <path d="M30 225C111 190 173 211 250 198c77-14 140-59 227-38 43 10 71 31 91 52" fill="none" stroke={accent} strokeOpacity="0.22" strokeWidth="2" />
       {!highlightsAntarctica && (
         <>
           <circle cx={x} cy={y} r="24" fill={accent} opacity="0.18" />
