@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "vitest run",
+    "test": "TZ=America/Los_Angeles vitest run",
     "test:watch": "vitest",
     "verify": "npm test && npm run check:knowledge-visual-contract && npm run build",
     "agentci:record": "node scripts/agentci.js record",
@@ -20,6 +20,7 @@
     "eval:report": "node openclaw/eval/report.js",
     "agentci:gate": "node scripts/agentci.js gate",
     "audit:clawpatch": "bash scripts/clawpatch-audit.sh",
+    "knowledge:promote-asset": "node scripts/promote-curated-knowledge-asset.mjs",
     "check:knowledge-visual-contract": "node scripts/check-knowledge-visual-contract.mjs",
     "check:knowledge-visual-contract:live": "node scripts/check-knowledge-visual-contract.mjs --live"
   },

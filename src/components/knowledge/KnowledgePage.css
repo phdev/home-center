@@ -151,7 +151,26 @@
   grid-template-columns: minmax(0, 0.86fr) minmax(360px, 0.86fr);
 }
 
-.knowledge-hero-composition-abstract-concept,
+.knowledge-hero-composition-archival-event-scene,
+.knowledge-hero-composition-object-or-artifact-focus {
+  grid-template-columns: minmax(0, 0.84fr) minmax(350px, 0.86fr);
+}
+
+.knowledge-hero-composition-species-closeup-with-environment,
+.knowledge-hero-composition-multi-subject-fauna-family {
+  grid-template-columns: minmax(0, 0.86fr) minmax(360px, 0.86fr);
+}
+
+.knowledge-hero-composition-place-scenic-wide {
+  grid-template-columns: minmax(0, 0.82fr) minmax(380px, 0.9fr);
+}
+
+.knowledge-hero-composition-tall-subject-forest-depth {
+  grid-template-columns: minmax(0, 0.9fr) minmax(330px, 0.8fr);
+}
+
+.knowledge-hero-composition-abstract-concept-orbital,
+.knowledge-hero-composition-concept-layered-diagram-like,
 .knowledge-hero-composition-fallback-graphic {
   grid-template-columns: minmax(0, 1fr) minmax(300px, 0.72fr);
 }
@@ -222,7 +241,11 @@
 
 .knowledge-hero-motif-contour-map-lines,
 .knowledge-hero-motif-habitat-rings,
-.knowledge-hero-motif-growth-rings {
+.knowledge-hero-motif-growth-rings,
+.knowledge-hero-motif-island-contour,
+.knowledge-hero-motif-snow-habitat-rings,
+.knowledge-hero-motif-wave-field-lines,
+.knowledge-hero-motif-botanical-lineart {
   background:
     repeating-radial-gradient(circle at 68% 46%, color-mix(in srgb, var(--knowledge-accent) 28%, transparent) 0 1px, transparent 1px 22px),
     linear-gradient(135deg, transparent, rgba(255, 255, 255, 0.08));
@@ -230,7 +253,10 @@
 
 .knowledge-hero-motif-network-linework,
 .knowledge-hero-motif-systems-linework,
-.knowledge-hero-motif-process-flow-linework {
+.knowledge-hero-motif-process-flow-linework,
+.knowledge-hero-motif-node-mesh,
+.knowledge-hero-motif-paired-field,
+.knowledge-hero-motif-process-orbital {
   background:
     linear-gradient(90deg, transparent 0 28%, color-mix(in srgb, var(--knowledge-accent) 22%, transparent) 28.2% 28.4%, transparent 28.7% 100%),
     linear-gradient(145deg, transparent 0 46%, color-mix(in srgb, var(--knowledge-accent) 18%, transparent) 46.2% 46.5%, transparent 46.8% 100%),
@@ -238,10 +264,20 @@
 }
 
 .knowledge-hero-motif-orbital-trajectory-lines,
-.knowledge-hero-motif-timeline-arc {
+.knowledge-hero-motif-timeline-arc,
+.knowledge-hero-motif-orbital,
+.knowledge-hero-motif-civic-arc {
   background:
     repeating-radial-gradient(ellipse at 60% 52%, transparent 0 30px, color-mix(in srgb, var(--knowledge-accent) 25%, transparent) 31px 32px),
     linear-gradient(180deg, rgba(255, 255, 255, 0.08), transparent);
+}
+
+.knowledge-hero-motif-technical-sketch,
+.knowledge-hero-motif-manuscript-linework,
+.knowledge-hero-motif-street-grid-linework {
+  background:
+    repeating-linear-gradient(100deg, transparent 0 18px, color-mix(in srgb, var(--knowledge-accent) 18%, transparent) 19px 20px),
+    linear-gradient(145deg, transparent, rgba(255, 255, 255, 0.08));
 }
 
 .knowledge-hero-visual img {
@@ -289,7 +325,8 @@
     linear-gradient(90deg, rgba(3, 8, 20, 0.72), rgba(3, 8, 20, 0.26) 42%, rgba(3, 8, 20, 0.2));
 }
 
-.knowledge-hero-composition-abstract-concept .knowledge-hero-visual::after,
+.knowledge-hero-composition-abstract-concept-orbital .knowledge-hero-visual::after,
+.knowledge-hero-composition-concept-layered-diagram-like .knowledge-hero-visual::after,
 .knowledge-hero-composition-fallback-graphic .knowledge-hero-visual::after {
   background:
     radial-gradient(circle at 68% 38%, color-mix(in srgb, var(--knowledge-accent) 16%, transparent), transparent 34%),

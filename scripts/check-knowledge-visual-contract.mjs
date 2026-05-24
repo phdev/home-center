@@ -186,6 +186,10 @@ function validate(query, body) {
   if (!body.visualPlan?.compositionPattern) failures.push("missing composition pattern");
   if (!body.visualPlan?.heroStrategy) failures.push("missing hero strategy");
   if (!body.heroComposition?.pattern) failures.push("missing hero composition package");
+  if (!body.heroComposition?.composition?.textSafeZone && !body.heroComposition?.textSafeZone) failures.push("missing text safe zone");
+  if (body.heroComposition?.mode && !["pinned", "retrieved", "generated", "composited", "fallback"].includes(body.heroComposition.mode)) {
+    failures.push(`invalid hero composition mode ${body.heroComposition.mode}`);
+  }
   const assetMode = body.curatedAsset?.mode || body.visual?.assetMode || body.image?.assetMode || body.image?.mode || body.visual?.mode || "";
   if (assetMode && !["pinned", "retrieved", "generated", "fallback", "none", "rendered"].includes(assetMode)) {
     failures.push(`invalid asset mode ${assetMode}`);

@@ -1,5 +1,5 @@
 import { curatedKnowledgeAssetsFromEnv, curatedTopicKey } from "./curatedKnowledgeAssets.js";
-import { buildHeroCompositionPackage, buildKnowledgeVisualPlan } from "./knowledgeVisualPlanner.js";
+import { artDirectedHeroPrompt, buildHeroCompositionPackage, buildKnowledgeVisualPlan } from "./knowledgeVisualPlanner.js";
 
 export default {
   async fetch(request, env, ctx) {
@@ -473,9 +473,9 @@ async function handleAskQuery(request, env, ctx) {
   }
   const textModel = answerResult.modelInfo || classificationResult.modelInfo || { provider: "fallback", model };
 
-  const generationPrompt = parsed.imagePrompt || "";
-  const shouldGenerateImage = parsed.imageSourceType === "generated" && !!generationPrompt;
-  const retrievedImage = !shouldGenerateImage && parsed.imageSourceType === "known" && retrieved.image?.url
+  const explicitGenerationPrompt = parsed.imagePrompt || "";
+  const explicitShouldGenerateImage = parsed.imageSourceType === "generated" && !!explicitGenerationPrompt;
+  const retrievedImage = !explicitShouldGenerateImage && parsed.imageSourceType === "known" && retrieved.image?.url
     ? normalizeKnowledgeAsset(retrieved.image, "hero")
     : null;
   const visualPlan = buildKnowledgeVisualPlan({
@@ -490,6 +490,13 @@ async function handleAskQuery(request, env, ctx) {
     classification,
     retrieved,
   });
+  const artDirectedFallbackGeneration = !retrievedImage
+    && parsed.imageSourceType === "known"
+    && env.ENABLE_ART_DIRECTED_HERO_GENERATION === "true";
+  const generationPrompt = explicitGenerationPrompt || (artDirectedFallbackGeneration
+    ? artDirectedHeroPrompt({ title: parsed.title || classification.title || subject, visualPlan })
+    : "");
+  const shouldGenerateImage = explicitShouldGenerateImage || artDirectedFallbackGeneration;
   const heroComposition = buildHeroCompositionPackage(visualPlan, retrievedImage);
   const startedAt = Date.now();
   const response = {

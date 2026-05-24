@@ -1,125 +1,286 @@
 const VISUAL_FAMILY = "editorial-knowledge-v1";
 const DEFAULT_TONE = "home-center-dark";
 
-const TYPE_CONFIG = {
-  location: {
-    subType: "place-geography",
-    compositionPattern: "landscape-right-text-left",
-    motifStrategy: "contour-map-lines",
-    supportingPanelStyle: "map-geography",
-    mapStyle: "locator-glass",
-    badgeStyle: "blue-location",
-    atAGlanceStyle: "geo-pillars",
+export const COMPOSITION_PATTERNS = {
+  "portrait-right-text-left": {
+    subjectPlacement: "right-center",
+    textSafeZone: "left",
+    cropRatio: "16:10",
+    overlayIntensity: "medium-high",
+    motifPlacement: "right-background",
+    secondaryImageBlending: false,
+    subjectMaskHelpful: true,
+    echoMotifInInsight: true,
   },
-  person: {
-    subType: "historical-figure",
-    compositionPattern: "portrait-right-text-left",
-    motifStrategy: "archive-linework",
-    supportingPanelStyle: "timeline-history",
-    mapStyle: "none",
-    badgeStyle: "gold-person",
-    atAGlanceStyle: "legacy-pillars",
+  "landscape-right-text-left": {
+    subjectPlacement: "right-center",
+    textSafeZone: "left",
+    cropRatio: "16:9",
+    overlayIntensity: "medium",
+    motifPlacement: "upper-right",
+    secondaryImageBlending: false,
+    subjectMaskHelpful: false,
+    echoMotifInInsight: true,
   },
-  fauna: {
-    subType: "organism-animal",
-    compositionPattern: "environmental-depth-scene",
-    motifStrategy: "habitat-rings",
-    supportingPanelStyle: "habitat-lifecycle",
-    mapStyle: "habitat-range",
-    badgeStyle: "green-fauna",
-    atAGlanceStyle: "life-pattern",
+  "centered-subject-soft-vignette": {
+    subjectPlacement: "center",
+    textSafeZone: "left",
+    cropRatio: "16:9",
+    overlayIntensity: "high",
+    motifPlacement: "orbital-center",
+    secondaryImageBlending: true,
+    subjectMaskHelpful: false,
+    echoMotifInInsight: true,
   },
-  flora: {
-    subType: "organism-plant",
-    compositionPattern: "environmental-depth-scene",
-    motifStrategy: "growth-rings",
-    supportingPanelStyle: "habitat-lifecycle",
-    mapStyle: "range-glass",
-    badgeStyle: "emerald-flora",
-    atAGlanceStyle: "growth-pattern",
+  "environmental-depth-scene": {
+    subjectPlacement: "right-depth",
+    textSafeZone: "left",
+    cropRatio: "16:9",
+    overlayIntensity: "medium-high",
+    motifPlacement: "habitat-field",
+    secondaryImageBlending: false,
+    subjectMaskHelpful: true,
+    echoMotifInInsight: true,
   },
-  event: {
-    subType: "historical-event",
-    compositionPattern: "centered-subject-soft-vignette",
-    motifStrategy: "timeline-arc",
-    supportingPanelStyle: "timeline-history",
-    mapStyle: "event-place",
-    badgeStyle: "amber-event",
-    atAGlanceStyle: "event-pillars",
+  "archival-event-scene": {
+    subjectPlacement: "center-right",
+    textSafeZone: "left",
+    cropRatio: "16:9",
+    overlayIntensity: "high",
+    motifPlacement: "timeline-arc",
+    secondaryImageBlending: true,
+    subjectMaskHelpful: false,
+    echoMotifInInsight: true,
   },
-  concept: {
-    subType: "abstract-concept",
-    compositionPattern: "abstract-concept",
-    motifStrategy: "systems-linework",
-    supportingPanelStyle: "process-concept",
-    mapStyle: "none",
-    badgeStyle: "violet-concept",
-    atAGlanceStyle: "three-pillars",
+  "object-or-artifact-focus": {
+    subjectPlacement: "right-center",
+    textSafeZone: "left",
+    cropRatio: "4:3",
+    overlayIntensity: "medium-high",
+    motifPlacement: "technical-frame",
+    secondaryImageBlending: false,
+    subjectMaskHelpful: true,
+    echoMotifInInsight: true,
   },
+  "abstract-concept-orbital": {
+    subjectPlacement: "center",
+    textSafeZone: "balanced",
+    cropRatio: "16:9",
+    overlayIntensity: "high",
+    motifPlacement: "full-field",
+    secondaryImageBlending: true,
+    subjectMaskHelpful: false,
+    echoMotifInInsight: true,
+  },
+  "concept-layered-diagram-like": {
+    subjectPlacement: "center-right",
+    textSafeZone: "left",
+    cropRatio: "16:9",
+    overlayIntensity: "high",
+    motifPlacement: "diagram-field",
+    secondaryImageBlending: false,
+    subjectMaskHelpful: false,
+    echoMotifInInsight: true,
+  },
+  "species-closeup-with-environment": {
+    subjectPlacement: "right-center",
+    textSafeZone: "left",
+    cropRatio: "16:9",
+    overlayIntensity: "medium-high",
+    motifPlacement: "habitat-field",
+    secondaryImageBlending: false,
+    subjectMaskHelpful: true,
+    echoMotifInInsight: true,
+  },
+  "place-scenic-wide": {
+    subjectPlacement: "right-depth",
+    textSafeZone: "left",
+    cropRatio: "21:9",
+    overlayIntensity: "medium",
+    motifPlacement: "contour-corner",
+    secondaryImageBlending: false,
+    subjectMaskHelpful: false,
+    echoMotifInInsight: true,
+  },
+  "tall-subject-forest-depth": {
+    subjectPlacement: "right-vertical",
+    textSafeZone: "left",
+    cropRatio: "16:9",
+    overlayIntensity: "medium-high",
+    motifPlacement: "growth-rings",
+    secondaryImageBlending: false,
+    subjectMaskHelpful: true,
+    echoMotifInInsight: true,
+  },
+  "multi-subject-fauna-family": {
+    subjectPlacement: "right-depth",
+    textSafeZone: "left",
+    cropRatio: "16:9",
+    overlayIntensity: "medium-high",
+    motifPlacement: "habitat-field",
+    secondaryImageBlending: false,
+    subjectMaskHelpful: false,
+    echoMotifInInsight: true,
+  },
+  "fallback-graphic": {
+    subjectPlacement: "center",
+    textSafeZone: "balanced",
+    cropRatio: "16:9",
+    overlayIntensity: "high",
+    motifPlacement: "full-field",
+    secondaryImageBlending: false,
+    subjectMaskHelpful: false,
+    echoMotifInInsight: true,
+  },
+};
+
+const SUBTYPE_RULES = [
+  { type: "location", subType: "location/island", words: ["island", "madagascar", "iceland", "archipelago"], pattern: "place-scenic-wide", motif: "island-contour" },
+  { type: "location", subType: "location/country", words: ["country", "nation", "capital", "border"], pattern: "landscape-right-text-left", motif: "contour-map-lines" },
+  { type: "location", subType: "location/city", words: ["city", "town", "metropolis", "rome", "kyoto"], pattern: "place-scenic-wide", motif: "street-grid-linework" },
+  { type: "person", subType: "person/historical-scientist", words: ["scientist", "mathematician", "engineer", "inventor", "programmer", "lovelace", "curie", "berners-lee"], pattern: "portrait-right-text-left", motif: "technical-sketch" },
+  { type: "person", subType: "person/artist", words: ["artist", "writer", "composer", "poet", "painter"], pattern: "portrait-right-text-left", motif: "manuscript-linework" },
+  { type: "person", subType: "person/political-figure", words: ["president", "prime minister", "king", "queen", "leader", "political"], pattern: "portrait-right-text-left", motif: "civic-arc" },
+  { type: "fauna", subType: "fauna/polar-animal", words: ["penguin", "polar", "arctic", "antarctic", "seal"], pattern: "species-closeup-with-environment", motif: "snow-habitat-rings" },
+  { type: "fauna", subType: "fauna/ocean-animal", words: ["whale", "shark", "dolphin", "ocean", "marine"], pattern: "multi-subject-fauna-family", motif: "wave-field-lines" },
+  { type: "flora", subType: "flora/tree", words: ["tree", "redwood", "sequoia", "oak", "forest"], pattern: "tall-subject-forest-depth", motif: "growth-rings" },
+  { type: "flora", subType: "flora/flowering-plant", words: ["flower", "orchid", "rose", "flytrap", "plant"], pattern: "species-closeup-with-environment", motif: "botanical-lineart" },
+  { type: "event", subType: "event/space-mission", words: ["apollo", "moon", "space", "nasa", "mission", "rocket"], pattern: "archival-event-scene", motif: "orbital" },
+  { type: "event", subType: "event/war", words: ["war", "battle", "invasion", "revolution"], pattern: "archival-event-scene", motif: "timeline-arc" },
+  { type: "event", subType: "event/discovery", words: ["discovery", "discovered", "invention", "breakthrough"], pattern: "object-or-artifact-focus", motif: "technical-sketch" },
+  { type: "concept", subType: "concept/network", words: ["internet", "network", "protocol", "web", "packet"], pattern: "abstract-concept-orbital", motif: "node-mesh" },
+  { type: "concept", subType: "concept/physical-process", words: ["photosynthesis", "cycle", "process", "gravity", "weathering"], pattern: "concept-layered-diagram-like", motif: "process-orbital" },
+  { type: "concept", subType: "concept/abstract-scientific", words: ["quantum", "entanglement", "relativity", "field", "wave"], pattern: "abstract-concept-orbital", motif: "paired-field" },
+  { type: "concept", subType: "concept/invention", words: ["invention", "invented", "machine", "engine", "technology"], pattern: "object-or-artifact-focus", motif: "technical-sketch" },
+];
+
+const TYPE_DEFAULTS = {
+  location: { subType: "location/country", pattern: "landscape-right-text-left", motif: "contour-map-lines", supportingPanelStyle: "map-geography", mapStyle: "locator-glass", badgeStyle: "blue-location", atAGlanceStyle: "geo-pillars" },
+  person: { subType: "person/historical-scientist", pattern: "portrait-right-text-left", motif: "technical-sketch", supportingPanelStyle: "timeline-history", mapStyle: "none", badgeStyle: "gold-person", atAGlanceStyle: "legacy-pillars" },
+  fauna: { subType: "fauna/polar-animal", pattern: "species-closeup-with-environment", motif: "habitat-rings", supportingPanelStyle: "habitat-lifecycle", mapStyle: "habitat-range", badgeStyle: "green-fauna", atAGlanceStyle: "life-pattern" },
+  flora: { subType: "flora/tree", pattern: "tall-subject-forest-depth", motif: "growth-rings", supportingPanelStyle: "habitat-lifecycle", mapStyle: "range-glass", badgeStyle: "emerald-flora", atAGlanceStyle: "growth-pattern" },
+  event: { subType: "event/discovery", pattern: "archival-event-scene", motif: "timeline-arc", supportingPanelStyle: "timeline-history", mapStyle: "event-place", badgeStyle: "amber-event", atAGlanceStyle: "event-pillars" },
+  concept: { subType: "concept/abstract-scientific", pattern: "abstract-concept-orbital", motif: "node-mesh", supportingPanelStyle: "process-concept", mapStyle: "none", badgeStyle: "violet-concept", atAGlanceStyle: "three-pillars" },
 };
 
 function cleanText(value, max = 120) {
   return String(value || "").replace(/\s+/g, " ").trim().slice(0, max);
 }
 
+function searchText(query, title, summary = "") {
+  return `${query} ${title} ${summary}`.toLowerCase();
+}
+
 function includesAny(value, words) {
-  const text = cleanText(value, 500).toLowerCase();
+  const text = cleanText(value, 900).toLowerCase();
   return words.some((word) => text.includes(word));
 }
 
-function visualContextFor(type, query, title) {
-  const text = `${query} ${title}`.toLowerCase();
-  if (type === "person") {
-    if (includesAny(text, ["scientist", "mathematician", "engineer", "inventor", "programmer"])) {
-      return { subType: "historical-scientist", motifStrategy: "analytical-linework" };
-    }
-    if (includesAny(text, ["artist", "writer", "composer", "poet"])) {
-      return { subType: "cultural-figure", motifStrategy: "archive-paper-linework" };
-    }
-  }
-  if (type === "event") {
-    if (includesAny(text, ["apollo", "moon", "space", "nasa", "mission"])) {
-      return { subType: "space-history", motifStrategy: "orbital-trajectory-lines", mapStyle: "mission-place" };
-    }
-  }
-  if (type === "concept") {
-    if (includesAny(text, ["internet", "network", "protocol", "web", "computer", "quantum"])) {
-      return { subType: "systems-concept", motifStrategy: "network-linework" };
-    }
-    if (includesAny(text, ["photosynthesis", "cycle", "process", "how"])) {
-      return { subType: "process-concept", motifStrategy: "process-flow-linework" };
-    }
-  }
-  return {};
+export function inferKnowledgeSubtype({ type = "concept", query = "", title = "", summary = "" } = {}) {
+  const queryType = TYPE_DEFAULTS[type] ? type : "concept";
+  const text = searchText(query, title, summary);
+  const rule = SUBTYPE_RULES.find((candidate) => candidate.type === queryType && includesAny(text, candidate.words));
+  const fallback = TYPE_DEFAULTS[queryType];
+  return {
+    queryType,
+    subType: rule?.subType || fallback.subType,
+    compositionPattern: rule?.pattern || fallback.pattern,
+    motifType: rule?.motif || fallback.motif,
+    supportingPanelStyle: fallback.supportingPanelStyle,
+    mapStyle: fallback.mapStyle,
+    badgeStyle: fallback.badgeStyle,
+    atAGlanceStyle: fallback.atAGlanceStyle,
+  };
 }
 
-function patternFor(type, image, imageSourceType) {
+function imageAspect(image) {
+  const width = Number(image?.width || 0);
+  const height = Number(image?.height || 0);
+  return width > 0 && height > 0 ? width / height : null;
+}
+
+function subjectBehindTextRisk(pattern, image) {
+  const x = Number(image?.focalPoint?.x);
+  if (!Number.isFinite(x)) return 8;
+  const textSafeZone = COMPOSITION_PATTERNS[pattern]?.textSafeZone;
+  if (textSafeZone === "left" && x < 0.46) return 24;
+  if (textSafeZone === "right" && x > 0.54) return 24;
+  return 0;
+}
+
+export function scoreHeroCompositionQuality({ image = null, visualPlan = null, candidateScore = null, fallbackReason = "" } = {}) {
+  const reasons = [];
+  let score = 56;
+  const pattern = visualPlan?.compositionPattern || "fallback-graphic";
+  const patternData = COMPOSITION_PATTERNS[pattern] || COMPOSITION_PATTERNS["fallback-graphic"];
+
+  if (image?.url) {
+    score += 12;
+    reasons.push("base_image_present");
+    const width = Number(image.width || 0);
+    const height = Number(image.height || 0);
+    const aspect = imageAspect(image);
+    if (width >= 900 && height >= 500) score += 10;
+    else {
+      score -= 16;
+      reasons.push("dimensions_low_or_unknown");
+    }
+    if (aspect && aspect >= 1.2 && aspect <= 2.4) score += 8;
+    else if (aspect) {
+      score -= 10;
+      reasons.push("awkward_crop_ratio");
+    }
+    if (image.focalPoint) score += 8;
+    else reasons.push("missing_focal_point");
+    if (image.tone === DEFAULT_TONE) score += 8;
+    else reasons.push("tone_not_confirmed");
+    if (Number.isFinite(Number(candidateScore))) {
+      const normalized = Math.max(-20, Math.min(18, (Number(candidateScore) - 55) / 2));
+      score += normalized;
+      if (candidateScore < 55) reasons.push("candidate_score_low");
+    }
+    const textRisk = subjectBehindTextRisk(pattern, image);
+    score -= textRisk;
+    if (textRisk) reasons.push("subject_may_conflict_with_text_safe_zone");
+  } else if (visualPlan?.heroStrategy === "abstract-concept" || visualPlan?.heroStrategy === "fallback-graphic") {
+    score += 4;
+    reasons.push("intentional_native_fallback");
+  } else {
+    score -= 18;
+    reasons.push(fallbackReason || "missing_base_image");
+  }
+
+  if (visualPlan?.motifStrategy && visualPlan.motifStrategy !== "none") {
+    score += 9;
+    reasons.push("supporting_motif_enriches_composition");
+  }
+  if (patternData.echoMotifInInsight) score += 3;
+  if (patternData.overlayIntensity === "high" || patternData.overlayIntensity === "medium-high") score += 4;
+
+  const finalScore = Math.max(0, Math.min(100, Math.round(score)));
+  if (finalScore < 60) reasons.push("below_art_direction_threshold");
+  return { score: finalScore, reasons };
+}
+
+function patternFor(subtypePlan, image, imageSourceType, visualNeed) {
   if (!image?.url) {
-    return type === "concept" || imageSourceType === "diagram"
-      ? "abstract-concept"
-      : "fallback-graphic";
+    if (imageSourceType === "diagram" || visualNeed === "none") return subtypePlan.compositionPattern;
+    return "fallback-graphic";
   }
   if (image.cropHint === "right-subject") return "portrait-right-text-left";
-  if (image.cropHint === "center-subject") return "centered-subject-soft-vignette";
-  if (type === "fauna" || type === "flora") return "environmental-depth-scene";
-  if (type === "location") return "landscape-right-text-left";
-  return TYPE_CONFIG[type]?.compositionPattern || "landscape-right-text-left";
+  if (image.cropHint === "center-subject" && subtypePlan.queryType === "event") return "archival-event-scene";
+  return subtypePlan.compositionPattern;
 }
 
-function heroStrategyFor(image, imageSourceType, visualNeed) {
+function heroStrategyFor(image, imageSourceType, visualNeed, quality = null) {
   if (image?.url) {
     if (image.assetMode === "generated" || image.mode === "generated") return "generated-hero";
+    if (quality?.score < 62) return "retrieved-plus-generated-motif";
     return "retrieved-single-subject";
   }
   if (imageSourceType === "generated") return "generated-hero";
   if (imageSourceType === "diagram" || visualNeed === "none") return "abstract-concept";
   return "fallback-graphic";
-}
-
-function textSafeZoneFor(pattern) {
-  if (pattern.endsWith("text-left")) return "left";
-  if (pattern === "centered-subject-soft-vignette") return "left";
-  return "balanced";
 }
 
 function focalRegionFor(pattern, image) {
@@ -128,9 +289,7 @@ function focalRegionFor(pattern, image) {
     const y = image.focalPoint.y < 0.42 ? "top" : (image.focalPoint.y > 0.62 ? "bottom" : "center");
     return `${x}-${y}`;
   }
-  if (pattern === "portrait-right-text-left") return "right-center";
-  if (pattern === "centered-subject-soft-vignette") return "center-center";
-  return "right-center";
+  return COMPOSITION_PATTERNS[pattern]?.subjectPlacement || "right-center";
 }
 
 function candidateSummary(retrieved = {}) {
@@ -154,42 +313,68 @@ export function buildKnowledgeVisualPlan({
   classification = {},
   retrieved = {},
 } = {}) {
-  const queryType = TYPE_CONFIG[type] ? type : "concept";
-  const base = TYPE_CONFIG[queryType];
-  const context = visualContextFor(queryType, query, title || classification.title);
-  const compositionPattern = patternFor(queryType, image, imageSourceType);
-  const heroStrategy = heroStrategyFor(image, imageSourceType, visualNeed);
-  const candidates = candidateSummary(retrieved);
-  const concrete = queryType !== "concept" || imageSourceType === "known";
+  const subtype = inferKnowledgeSubtype({ type, query, title: title || classification.title, summary });
   const hasMaps = Array.isArray(profile?.maps) && profile.maps.length > 0;
+  const initialPattern = patternFor(subtype, image, imageSourceType, visualNeed);
+  const provisionalPlan = {
+    compositionPattern: initialPattern,
+    motifStrategy: subtype.motifType,
+    heroStrategy: image?.url ? "retrieved-single-subject" : "fallback-graphic",
+  };
+  const candidateScore = image?.score ?? retrieved?.diagnostics?.final?.image?.score ?? null;
+  const quality = scoreHeroCompositionQuality({
+    image,
+    visualPlan: provisionalPlan,
+    candidateScore,
+    fallbackReason: retrieved?.diagnostics?.final?.fallbackReason,
+  });
+  const heroStrategy = heroStrategyFor(image, imageSourceType, visualNeed, quality);
+  const pattern = heroStrategy === "fallback-graphic" ? "fallback-graphic" : initialPattern;
+  const patternData = COMPOSITION_PATTERNS[pattern] || COMPOSITION_PATTERNS["fallback-graphic"];
+  const candidates = candidateSummary(retrieved);
+  const concrete = subtype.queryType !== "concept" || imageSourceType === "known";
 
   return {
     visualFamily: VISUAL_FAMILY,
-    queryType,
-    subType: context.subType || base.subType,
-    compositionPattern,
+    queryType: subtype.queryType,
+    subType: subtype.subType,
+    compositionPattern: pattern,
     heroStrategy,
-    textSafeZone: textSafeZoneFor(compositionPattern),
-    focalRegion: focalRegionFor(compositionPattern, image),
+    textSafeZone: patternData.textSafeZone,
+    focalRegion: focalRegionFor(pattern, image),
     tone: image?.tone || DEFAULT_TONE,
-    contrastLevel: image?.url ? "medium-high" : "high",
-    motifStrategy: context.motifStrategy || base.motifStrategy,
-    supportingPanelStyle: base.supportingPanelStyle,
-    mapStyle: context.mapStyle || (hasMaps ? base.mapStyle : "none"),
-    badgeStyle: base.badgeStyle,
-    atAGlanceStyle: base.atAGlanceStyle,
+    contrastLevel: image?.url ? patternData.overlayIntensity : "high",
+    motifStrategy: subtype.motifType,
+    motifPlacement: patternData.motifPlacement,
+    supportingPanelStyle: subtype.supportingPanelStyle,
+    mapStyle: hasMaps ? subtype.mapStyle : "none",
+    badgeStyle: subtype.badgeStyle,
+    atAGlanceStyle: subtype.atAGlanceStyle,
     backgroundTreatment: image?.url ? "navy-glass-vignette" : "navy-abstract-linework",
     concrete,
     contentDensity: cleanText(summary).length > 260 ? "dense" : "standard",
     candidateSummary: candidates,
+    compositionConstraints: patternData,
+    quality,
     retryPolicy: { maxAttempts: image?.url || visualNeed === "none" ? 1 : 3 },
   };
 }
 
+function objectPositionFor(image, pattern) {
+  if (image?.focalPoint) {
+    return `${Math.round(image.focalPoint.x * 100)}% ${Math.round(image.focalPoint.y * 100)}%`;
+  }
+  const placement = COMPOSITION_PATTERNS[pattern]?.subjectPlacement || "right-center";
+  if (placement.includes("right")) return "66% 48%";
+  if (placement.includes("center")) return "50% 50%";
+  return "58% 50%";
+}
+
 export function buildHeroCompositionPackage(visualPlan, image = null) {
   const plan = visualPlan || buildKnowledgeVisualPlan({ image });
+  const patternData = COMPOSITION_PATTERNS[plan.compositionPattern] || COMPOSITION_PATTERNS["fallback-graphic"];
+  const mode = image?.assetMode || image?.mode || (plan.heroStrategy === "fallback-graphic" || plan.heroStrategy === "abstract-concept" ? "fallback" : "retrieved");
   return {
-    visualFamily: plan.visualFamily,
     pattern: plan.compositionPattern,
     strategy: plan.heroStrategy,
     textSafeZone: plan.textSafeZone,
@@ -197,7 +382,66 @@ export function buildHeroCompositionPackage(visualPlan, image = null) {
     tone: plan.tone,
     motifStrategy: plan.motifStrategy,
     backgroundTreatment: plan.backgroundTreatment,
-    cropHint: image?.cropHint || null,
-    focalPoint: image?.focalPoint || null,
+    mode,
+    visualPlan: plan,
+    baseImage: image?.url ? {
+      url: image.url,
+      source: image.source || null,
+      sourceUrl: image.sourceUrl || null,
+      width: image.width || null,
+      height: image.height || null,
+      focalPoint: image.focalPoint || null,
+      cropHint: image.cropHint || null,
+    } : null,
+    overlays: {
+      leftGradient: patternData.textSafeZone === "left",
+      navyTone: true,
+      vignette: patternData.overlayIntensity === "high" ? "strong" : "soft",
+      noiseTexture: false,
+    },
+    motif: {
+      type: motifRenderType(plan.motifStrategy),
+      assetKey: plan.motifStrategy || "none",
+      placement: plan.motifPlacement || patternData.motifPlacement,
+      opacity: image?.url ? 0.34 : 0.52,
+      echoInInsight: patternData.echoMotifInInsight,
+    },
+    subjectMask: {
+      enabled: false,
+      helpful: patternData.subjectMaskHelpful,
+    },
+    composition: {
+      pattern: plan.compositionPattern,
+      objectPosition: objectPositionFor(image, plan.compositionPattern),
+      textSafeZone: plan.textSafeZone,
+      negativeSpaceScore: plan.textSafeZone === "left" && image?.focalPoint?.x < 0.46 ? 42 : 82,
+      preferredCropRatio: patternData.cropRatio,
+      secondaryImageBlending: patternData.secondaryImageBlending,
+    },
+    quality: plan.quality || scoreHeroCompositionQuality({ image, visualPlan: plan }),
   };
+}
+
+function motifRenderType(strategy = "") {
+  if (/node|network|field/.test(strategy)) return "lineart";
+  if (/orbital|arc/.test(strategy)) return "orbital";
+  if (/botanical|growth|leaf/.test(strategy)) return "botanical";
+  if (/technical|manuscript|sketch/.test(strategy)) return "technical-sketch";
+  if (/snow|habitat|wave|contour|island/.test(strategy)) return "halo";
+  if (!strategy || strategy === "none") return "none";
+  return "diagrammatic";
+}
+
+export function artDirectedHeroPrompt({ title = "", visualPlan = null } = {}) {
+  const plan = visualPlan || buildKnowledgeVisualPlan({ title });
+  const subject = cleanText(title || "this topic", 120);
+  const subtype = plan.subType || "knowledge topic";
+  return [
+    `Create a wide editorial no-text hero visual for "${subject}".`,
+    `Topic subtype: ${subtype}.`,
+    `Composition: ${plan.compositionPattern}; subject/focus in ${plan.focalRegion}; text-safe area on ${plan.textSafeZone}.`,
+    `Use ${plan.motifStrategy} as a subtle supporting visual motif.`,
+    "Use a dark navy cinematic Home Center palette with readable negative space.",
+    "No text. No labels. No UI. No poster. No infographic panels. No logos.",
+  ].join("\n");
 }

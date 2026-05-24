@@ -4,13 +4,16 @@ import { heroCompositionClassNames } from "../../knowledge/visualPlanUtils";
 export function KnowledgeHeroCard({ knowledge, config }) {
   const Icon = config.icon;
   const visualPlan = knowledge.visualPlan;
+  const heroComposition = knowledge.heroComposition;
   const focalPoint = knowledge.heroImage?.focalPoint;
-  const objectPosition = focalPoint
+  const objectPosition = heroComposition?.composition?.objectPosition || (focalPoint
     ? `${Math.round(focalPoint.x * 100)}% ${Math.round(focalPoint.y * 100)}%`
-    : undefined;
+    : undefined);
   const cropHint = knowledge.heroImage?.cropHint || "wide-landscape";
   const tone = knowledge.heroImage?.tone || "home-center-dark";
   const compositionClasses = heroCompositionClassNames(visualPlan);
+  const motifKey = heroComposition?.motif?.assetKey || visualPlan.motifStrategy;
+  const motifOpacity = heroComposition?.motif?.opacity;
   return (
     <section className={`knowledge-card knowledge-hero ${compositionClasses}`}>
       <div className="knowledge-hero-copy">
@@ -22,7 +25,10 @@ export function KnowledgeHeroCard({ knowledge, config }) {
         <div className="knowledge-source">{knowledge.sourceLabel}</div>
       </div>
       <div className={`knowledge-hero-visual knowledge-hero-visual-${cropHint} knowledge-hero-tone-${tone}`}>
-        <div className={`knowledge-hero-motif knowledge-hero-motif-${visualPlan.motifStrategy}`} />
+        <div
+          className={`knowledge-hero-motif knowledge-hero-motif-${motifKey}`}
+          style={Number.isFinite(Number(motifOpacity)) ? { opacity: Number(motifOpacity) } : undefined}
+        />
         {knowledge.heroImage?.url ? (
           <img
             src={knowledge.heroImage.url}

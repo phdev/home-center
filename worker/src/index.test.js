@@ -1,6 +1,12 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import worker from "./index.js";
-import { buildKnowledgeVisualPlan } from "./knowledgeVisualPlanner.js";
+import {
+  artDirectedHeroPrompt,
+  buildHeroCompositionPackage,
+  buildKnowledgeVisualPlan,
+  inferKnowledgeSubtype,
+  scoreHeroCompositionQuality,
+} from "./knowledgeVisualPlanner.js";
 
 const originalFetch = global.fetch;
 
@@ -1198,9 +1204,16 @@ describe("knowledge image pipeline", () => {
       tone: "home-center-dark",
     });
     expect(body.heroComposition).toMatchObject({
+      mode: "pinned",
       pattern: "portrait-right-text-left",
       strategy: "retrieved-single-subject",
-      textSafeZone: "left",
+      composition: {
+        pattern: "portrait-right-text-left",
+        textSafeZone: "left",
+      },
+      motif: {
+        type: "technical-sketch",
+      },
     });
   });
 
@@ -1340,12 +1353,119 @@ describe("knowledge image pipeline", () => {
     })).toMatchObject({
       visualFamily: "editorial-knowledge-v1",
       queryType: "concept",
-      subType: "systems-concept",
-      compositionPattern: "abstract-concept",
+      subType: "concept/abstract-scientific",
+      compositionPattern: "abstract-concept-orbital",
       heroStrategy: "abstract-concept",
-      motifStrategy: "network-linework",
+      motifStrategy: "paired-field",
       backgroundTreatment: "navy-abstract-linework",
     });
+  });
+
+  it("infers topic subtypes and composition patterns from arbitrary topics", () => {
+    expect(inferKnowledgeSubtype({
+      type: "location",
+      query: "Where is Madagascar?",
+      title: "Madagascar",
+    })).toMatchObject({
+      subType: "location/island",
+      compositionPattern: "place-scenic-wide",
+      motifType: "island-contour",
+    });
+    expect(inferKnowledgeSubtype({
+      type: "flora",
+      query: "Tell me about coast redwoods.",
+      title: "Coast Redwood",
+    })).toMatchObject({
+      subType: "flora/tree",
+      compositionPattern: "tall-subject-forest-depth",
+    });
+  });
+
+  it("scores low-quality hero packages with debug reasons", () => {
+    const plan = buildKnowledgeVisualPlan({
+      query: "Who was Ada Lovelace?",
+      title: "Ada Lovelace",
+      type: "person",
+      image: {
+        url: "https://example.test/ada-small.jpg",
+        width: 180,
+        height: 140,
+        focalPoint: { x: 0.2, y: 0.5 },
+        tone: "unknown",
+        score: 38,
+      },
+      imageSourceType: "known",
+      visualNeed: "useful",
+    });
+    const quality = scoreHeroCompositionQuality({
+      image: {
+        url: "https://example.test/ada-small.jpg",
+        width: 180,
+        height: 140,
+        focalPoint: { x: 0.2, y: 0.5 },
+        tone: "unknown",
+      },
+      visualPlan: plan,
+      candidateScore: 38,
+    });
+    expect(quality.score).toBeLessThan(60);
+    expect(quality.reasons).toContain("dimensions_low_or_unknown");
+    expect(quality.reasons).toContain("subject_may_conflict_with_text_safe_zone");
+  });
+
+  it("creates a rich hero composition package", () => {
+    const plan = buildKnowledgeVisualPlan({
+      query: "Tell me about emperor penguins.",
+      title: "Emperor Penguin",
+      type: "fauna",
+      image: {
+        url: "https://example.test/penguin.jpg",
+        source: "Wikimedia Commons",
+        width: 1400,
+        height: 900,
+        focalPoint: { x: 0.68, y: 0.48 },
+        cropHint: "right-subject",
+        tone: "home-center-dark",
+        score: 84,
+      },
+      imageSourceType: "known",
+      visualNeed: "useful",
+    });
+    expect(buildHeroCompositionPackage(plan, {
+      url: "https://example.test/penguin.jpg",
+      source: "Wikimedia Commons",
+      width: 1400,
+      height: 900,
+      focalPoint: { x: 0.68, y: 0.48 },
+      cropHint: "right-subject",
+      tone: "home-center-dark",
+      score: 84,
+    })).toMatchObject({
+      mode: "retrieved",
+      baseImage: { url: "https://example.test/penguin.jpg" },
+      overlays: { leftGradient: true, navyTone: true },
+      motif: { assetKey: "snow-habitat-rings" },
+      composition: {
+        pattern: "portrait-right-text-left",
+        objectPosition: "68% 48%",
+      },
+    });
+  });
+
+  it("keeps art-directed generation gated and produces constrained prompts", async () => {
+    const plan = buildKnowledgeVisualPlan({
+      query: "Tell me about obscure test animals.",
+      title: "Obscure Test Animal",
+      type: "fauna",
+      imageSourceType: "known",
+      visualNeed: "required",
+    });
+    const prompt = artDirectedHeroPrompt({ title: "Obscure Test Animal", visualPlan: plan });
+    expect(prompt).toContain("No text");
+    expect(prompt).toContain("No labels");
+    expect(prompt).toContain("No UI");
+    expect(prompt).toContain("No poster");
+    expect(prompt).toContain("text-safe area");
   });
 
   it("canonicalizes smallest-country and World Wide Web inventor queries for retrieval", async () => {

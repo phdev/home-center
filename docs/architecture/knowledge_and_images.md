@@ -71,12 +71,12 @@ For images, the knowledge page now uses a curated hero asset pipeline:
 
 After content and image retrieval, the worker also builds a deterministic
 `visualPlan` and `heroComposition` package. This is the art-direction layer for
-arbitrary queries: it chooses a reusable composition pattern, text-safe zone,
-focal region, dark tone, motif strategy, supporting panel style, map style, and
-retry policy from the query type, topic, available image, and retrieved
-candidate diagnostics. The plan is data, not a generated screenshot, so the
-dashboard can keep facts, maps, timelines, process diagrams, cards, and chips as
-native React/SVG UI.
+arbitrary queries: it infers a subtype, chooses a reusable composition pattern,
+scores the overall visual package, assigns a text-safe zone, focal region, dark
+tone, motif strategy, supporting panel style, map style, and retry policy from
+the query type, topic, available image, and retrieved candidate diagnostics. The
+plan is data, not a generated screenshot, so the dashboard can keep facts, maps,
+timelines, process diagrams, cards, and chips as native React/SVG UI.
 
 Current composition patterns:
 
@@ -84,8 +84,21 @@ Current composition patterns:
 - `landscape-right-text-left`
 - `centered-subject-soft-vignette`
 - `environmental-depth-scene`
-- `abstract-concept`
+- `archival-event-scene`
+- `object-or-artifact-focus`
+- `abstract-concept-orbital`
+- `concept-layered-diagram-like`
+- `species-closeup-with-environment`
+- `place-scenic-wide`
+- `tall-subject-forest-depth`
+- `multi-subject-fauna-family`
 - `fallback-graphic`
+
+Current subtypes include location islands/countries/cities, historical
+scientists/artists/political figures, polar and ocean fauna, trees and flowering
+plants, space missions/wars/discoveries, and network/process/abstract-scientific
+concepts. Concept pages can intentionally use native abstract motifs without a
+retrieved hero image.
 
 The pinned manifest lives in `worker/src/curatedKnowledgeAssets.js`. The
 canonical topics are present with crop/tone metadata even when no manually
@@ -111,20 +124,34 @@ approved URL is pinned yet. To add an override without code changes, set
 }
 ```
 
+To promote a good selected visual into a pinned override, generate a reviewed
+manifest entry with:
+
+```bash
+npm run knowledge:promote-asset -- --topicKey=ada-lovelace --title="Ada Lovelace" --type=person --url=https://example.com/ada.jpg --sourceUrl=https://example.com/source --focalPoint=0.72,0.42 --cropHint=right-subject
+```
+
+Paste the JSON into `CURATED_KNOWLEDGE_ASSETS_JSON` or the curated manifest
+after checking source, credit, license, crop, and focal point.
+
 Generated visual prompts are still constrained to raw hero assets: no text, no
 labels, no UI, no posters, no infographic panels, and no logos. Displayed
 generated knowledge images are pinned to `gpt-image-2`, low quality,
 `1536x1024`, JPEG output, and a 120-second timeout. High quality is blocked
-unless `IMAGE_GENERATION_ALLOW_HIGH_QUALITY=true`.
+unless `IMAGE_GENERATION_ALLOW_HIGH_QUALITY=true`. The second-tier art-directed
+fallback gate is `ENABLE_ART_DIRECTED_HERO_GENERATION`; it defaults off and
+only uses visual-plan prompts when retrieval has not produced a usable hero.
 
 ## UI Consumption
 
 Knowledge responses are stored with both legacy fields (`imageUrl`, `image`) and
-the richer `visual` / `curatedAsset` objects. The richer objects identify
-source, asset mode (`pinned`, `retrieved`, `generated`, or `fallback`),
-generation status, model, retrieval metadata, focal point, crop hint, tone,
-score, and fallback reason so the UI can make retrieved images feel art-directed
-without turning images into the final UI.
+the richer `visual`, `curatedAsset`, `visualPlan`, and `heroComposition`
+objects. The richer objects identify source, asset mode (`pinned`, `retrieved`,
+`generated`, `composited`, or `fallback`), generation status, model, retrieval
+metadata, focal point, crop hint, tone, score, composition pattern, overlays,
+motif, subject-mask guidance, quality score/reasons, and fallback reason so the
+UI can make retrieved images feel art-directed without turning images into the
+final UI.
 
 The hero card applies focal-point object positioning, dark navy toning, and a
 left-side readability gradient. Facts, maps, timelines, process diagrams,
