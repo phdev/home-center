@@ -248,7 +248,7 @@ describe("FullKnowledgePage", () => {
     expect(screen.getByText("Result")).toBeTruthy();
     expect(screen.getByText("At a Glance")).toBeTruthy();
     expect(screen.getByText("Lunar Landing")).toBeTruthy();
-    expect(container.querySelector(".knowledge-insight-earth")).toBeTruthy();
+    expect(container.querySelector('.knowledge-insight-earth[src="/home-center/knowledge-assets/earth-blue-marble.jpg"]')).toBeTruthy();
     expect(container.querySelectorAll(".knowledge-us-state-highlight")).toHaveLength(2);
     expect(container.querySelector(".knowledge-module-horizontal-mission-timeline")).toBeTruthy();
     expect(screen.getByAltText("Apollo 11 Moon Landing").style.objectPosition).toBe("50% 50%");
