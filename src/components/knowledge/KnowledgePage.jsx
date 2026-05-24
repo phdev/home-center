@@ -15,7 +15,7 @@ import "./KnowledgePage.css";
 function MiddleCard({ knowledge, config }) {
   const moduleStyle = knowledge.visualPlan.moduleStyles?.middle;
   if (knowledge.type === "person") {
-    return <TimelineCard timeline={knowledge.timeline} moduleStyle={moduleStyle} fallback={<AtAGlanceCard glance={knowledge.glance} moduleStyle={knowledge.visualPlan.moduleStyles?.lower} />} />;
+    return <TimelineCard timeline={knowledge.timeline} moduleStyle={moduleStyle} fallback={<AtAGlanceCard glance={knowledge.glance} type={knowledge.type} accent={config.accent} moduleStyle={knowledge.visualPlan.moduleStyles?.lower} />} />;
   }
   if (knowledge.type === "event") {
     return <PlacesCard maps={knowledge.maps} accent={config.accent} moduleStyle={moduleStyle} />;
@@ -36,10 +36,10 @@ function LowerCard({ knowledge, config }) {
   }
   if (knowledge.type === "fauna" || knowledge.type === "flora") {
     return knowledge.glance.metrics.length
-      ? <AtAGlanceCard glance={knowledge.glance} moduleStyle={moduleStyle} />
-      : <ProcessDiagramCard type={knowledge.type} glance={knowledge.glance} accent={config.accent} moduleStyle={moduleStyle} />;
+        ? <AtAGlanceCard glance={knowledge.glance} type={knowledge.type} accent={config.accent} moduleStyle={moduleStyle} />
+        : <ProcessDiagramCard type={knowledge.type} glance={knowledge.glance} accent={config.accent} moduleStyle={moduleStyle} />;
   }
-  return <AtAGlanceCard glance={knowledge.glance} moduleStyle={moduleStyle} />;
+  return <AtAGlanceCard glance={knowledge.glance} type={knowledge.type} accent={config.accent} moduleStyle={moduleStyle} />;
 }
 
 export function KnowledgePage({ response, onBack, handControllerConnected, lastGesture }) {

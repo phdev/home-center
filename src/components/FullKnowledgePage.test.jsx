@@ -152,7 +152,7 @@ describe("FullKnowledgePage", () => {
     const cases = [
       {
         type: "location",
-        expected: ["Map", "At a Glance"],
+        expected: ["On the Map", "At a Glance"],
         data: { profile: { maps: [{ scope: "world", label: "World", value: "Madagascar" }] } },
       },
       {
@@ -162,17 +162,17 @@ describe("FullKnowledgePage", () => {
       },
       {
         type: "fauna",
-        expected: ["Map", "Lifecycle"],
+        expected: ["On the Map", "Lifecycle"],
         data: { profile: { maps: [{ scope: "world", label: "Habitat", value: "Antarctica" }] } },
       },
       {
         type: "flora",
-        expected: ["Map", "Lifecycle"],
+        expected: ["On the Map", "Lifecycle"],
         data: { profile: { maps: [{ scope: "world", label: "Range", value: "California coast" }] } },
       },
       {
         type: "event",
-        expected: ["Map", "Timeline"],
+        expected: ["On the Map", "Timeline"],
         data: { timeline: [{ date: "1969", label: "Landing", description: "Apollo 11 touched down." }] },
       },
       {
