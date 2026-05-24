@@ -125,3 +125,12 @@ npm run verify
 npm run check:knowledge-visual-contract
 WORKER_TOKEN=<token> npm run check:knowledge-visual-contract:live
 ```
+
+## Current Status
+
+- v1: liquid-glass knowledge page design system.
+- v1.5: curated hero asset pipeline with pinned manifest support, scored
+  retrieval, focal-point crops, dark hero toning, and selected-asset caching.
+- `npm run verify` protects the local visual contract.
+- Generated hero fallback remains gated off by default.
+- Live Worker validation remains manual unless `WORKER_TOKEN` is added to CI.

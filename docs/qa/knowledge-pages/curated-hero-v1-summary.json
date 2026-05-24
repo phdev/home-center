@@ -1,0 +1,110 @@
+{
+  "pipelineVersion": "curated-hero-v1",
+  "commit": "6c87f4e",
+  "dashboardBundle": {
+    "js": "assets/index-Zxhi9T-b.js",
+    "css": "assets/index-Dm8vP0dh.css"
+  },
+  "piTargetsVerified": [
+    {
+      "host": "homecenter.local",
+      "dashboardLocalService": "active",
+      "kioskWatchdogService": "active"
+    },
+    {
+      "host": "homecenter2.local",
+      "dashboardLocalService": "active",
+      "kioskWatchdogService": "active"
+    }
+  ],
+  "validation": {
+    "localVisualContract": "pass",
+    "liveVisualContract": "pass with existing Worker AUTH_TOKEN recovered from Pi settings",
+    "generatedHeroFallback": "gated off by default",
+    "notes": [
+      "Known visual topics use curated/retrieved hero assets with source metadata.",
+      "Concept or diagram topics use native UI fallback rather than generated poster-style assets.",
+      "Live CI validation remains manual unless WORKER_TOKEN is added to GitHub Actions secrets."
+    ]
+  },
+  "canonicalPages": [
+    {
+      "query": "Where is Madagascar?",
+      "type": "location",
+      "expectedAssetMode": "retrieved",
+      "homecenter": {
+        "screenshot": "location-madagascar-curated-hero-v1.png",
+        "pass": true
+      },
+      "homecenter2": {
+        "screenshot": "location-madagascar-homecenter2-curated-hero-v1.png",
+        "pass": true
+      }
+    },
+    {
+      "query": "Who was Ada Lovelace?",
+      "type": "person",
+      "expectedAssetMode": "retrieved",
+      "homecenter": {
+        "screenshot": "person-ada-lovelace-curated-hero-v1.png",
+        "pass": true
+      },
+      "homecenter2": {
+        "screenshot": "person-ada-lovelace-homecenter2-curated-hero-v1.png",
+        "pass": true
+      }
+    },
+    {
+      "query": "Tell me about emperor penguins.",
+      "type": "fauna",
+      "expectedAssetMode": "retrieved",
+      "homecenter": {
+        "screenshot": "fauna-emperor-penguin-curated-hero-v1.png",
+        "pass": true
+      },
+      "homecenter2": {
+        "screenshot": "fauna-emperor-penguin-homecenter2-curated-hero-v1.png",
+        "pass": true
+      }
+    },
+    {
+      "query": "Tell me about coast redwoods.",
+      "type": "flora",
+      "expectedAssetMode": "retrieved",
+      "homecenter": {
+        "screenshot": "flora-coast-redwood-curated-hero-v1.png",
+        "pass": true
+      },
+      "homecenter2": {
+        "screenshot": "flora-coast-redwood-homecenter2-curated-hero-v1.png",
+        "pass": true
+      }
+    },
+    {
+      "query": "What happened during Apollo 11?",
+      "type": "event",
+      "expectedAssetMode": "retrieved",
+      "homecenter": {
+        "screenshot": "event-apollo-11-curated-hero-v1.png",
+        "pass": true
+      },
+      "homecenter2": {
+        "screenshot": "event-apollo-11-homecenter2-curated-hero-v1.png",
+        "pass": true
+      }
+    },
+    {
+      "query": "What is the internet?",
+      "type": "concept",
+      "expectedAssetMode": "fallback",
+      "homecenter": {
+        "screenshot": "concept-internet-curated-hero-v1.png",
+        "pass": true
+      },
+      "homecenter2": {
+        "screenshot": "concept-internet-homecenter2-curated-hero-v1.png",
+        "pass": true
+      }
+    }
+  ]
+}
