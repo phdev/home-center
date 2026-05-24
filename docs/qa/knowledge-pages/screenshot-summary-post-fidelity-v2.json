@@ -2,10 +2,10 @@
   "workerVersion": "9b634928-1416-498f-83ba-c3e26fe61d4c",
   "workerUrl": "https://home-center-api.phhowell.workers.dev",
   "dashboardBundle": {
-    "css": "dist/assets/index-CCOBJuHU.css",
-    "js": "dist/assets/index-D-53cM2B.js"
+    "css": "dist/assets/index-DTlW9gDR.css",
+    "js": "dist/assets/index-E_4rI2le.js"
   },
-  "screenshotTimestamp": "2026-05-23T21:37:17Z",
+  "screenshotTimestamp": "2026-05-24T18:15:32Z",
   "captureMethod": {
     "browserViewport": {
       "width": 1920,
@@ -79,7 +79,7 @@
       "query": "Tell me about emperor penguins.",
       "type": "fauna",
       "imageSourceType": "known",
-      "source": "Wikipedia",
+      "source": "Wikimedia Commons",
       "heroImagePresent": true,
       "fallbackIntentional": false,
       "pass": true,
@@ -145,7 +145,7 @@
       "query": "Tell me about emperor penguins.",
       "type": "fauna",
       "imageSourceType": "known",
-      "source": "Wikipedia",
+      "source": "Wikimedia Commons",
       "heroImagePresent": true,
       "fallbackIntentional": false,
       "pass": true,
