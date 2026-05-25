@@ -1,7 +1,8 @@
-import { Snowflake, Sparkle, Sprout } from "lucide-react";
+import { Snowflake, Sparkle } from "lucide-react";
 
 const EARTH_LINE_GLOBE_URL = `${import.meta.env.BASE_URL}knowledge-assets/earth-line-globe.png`;
 const ADA_LEGACY_LINEART_URL = `${import.meta.env.BASE_URL}knowledge-assets/ada-lovelace-legacy-yellow-lineart.png`;
+const COAST_REDWOOD_ECOSYSTEM_SPRIG_URL = `${import.meta.env.BASE_URL}knowledge-assets/coast-redwood-ecosystem-sprig.png`;
 
 function EarthLineArt() {
   return (
@@ -72,7 +73,7 @@ function InsightOrnament({ type }) {
   if (type === "flora") {
     return (
       <div className="knowledge-insight-ornament knowledge-insight-ornament-flora" aria-hidden="true">
-        <Sprout className="knowledge-insight-sprout" size={112} />
+        <img className="knowledge-insight-flora-lineart" src={COAST_REDWOOD_ECOSYSTEM_SPRIG_URL} alt="" />
       </div>
     );
   }
