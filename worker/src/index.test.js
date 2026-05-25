@@ -1383,7 +1383,7 @@ describe("knowledge image pipeline", () => {
 
   it("applies canonical visual plans for the six benchmark knowledge pages", () => {
     const cases = [
-      ["What is the internet?", "The Internet", "concept", "concept/network", "abstract-concept-orbital", "native-concept-hero"],
+      ["What is the internet?", "The Internet", "concept", "concept/network", "concept-layered-diagram-like", "native-concept-hero"],
       ["Where is Madagascar?", "Madagascar", "location", "location/island", "place-scenic-wide", "scenic-location"],
       ["Who was Ada Lovelace?", "Ada Lovelace", "person", "person/historical-scientist", "portrait-right-text-left", "portrait-editorial"],
       ["Tell me about emperor penguins.", "Emperor Penguin", "fauna", "fauna/polar-animal", "species-closeup-with-environment", "species-closeup-with-environment"],

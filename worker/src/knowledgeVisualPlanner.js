@@ -215,7 +215,7 @@ export const TYPE_COMPOSITION_CONTRACTS = {
 const CANONICAL_VISUAL_OVERRIDES = {
   internet: {
     subType: "concept/network",
-    compositionPattern: "abstract-concept-orbital",
+    compositionPattern: "concept-layered-diagram-like",
     motifStrategy: "node-mesh",
     supportingPanelStyle: "process-flow",
     mapStyle: "none",

@@ -11,12 +11,12 @@ const CASES = [
     type: "concept",
     title: "The Internet",
     subType: "concept/network",
-    pattern: "abstract-concept-orbital",
-    heroMode: "fallback",
+    pattern: "concept-layered-diagram-like",
+    heroMode: "pinned",
     heroModule: "native-concept-hero",
     middle: "process-flow",
     lower: "icon-metric-columns",
-    imageSourceType: "none",
+    imageSourceType: "known",
   },
   {
     query: "Where is Madagascar?",
@@ -233,9 +233,12 @@ function validate(item, body) {
   fail(Array.isArray(body.profile?.facts) && body.profile.facts.length >= (item.minFacts || 3), "expected dense key facts", failures);
   fail(Array.isArray(body.profile?.relatedConcepts) && body.profile.relatedConcepts.length >= 3, "expected related chips", failures);
   fail(!/\.{3}|…/.test(body.summary || ""), "primary summary contains ellipsis", failures);
-  if (item.type === "concept") {
+  if (item.type === "concept" && item.heroMode !== "pinned") {
     fail(!body.imageUrl, "concept page should use native visual instead of raw hero image", failures);
     fail(body.visualPlan?.heroStrategy === "abstract-concept", "concept page should use abstract concept strategy", failures);
+  } else if (item.type === "concept") {
+    fail(body.imageUrl, "expected pinned concept hero image", failures);
+    fail(body.curatedAsset?.mode === "pinned", "expected canonical pinned concept asset", failures);
   } else {
     fail(body.imageUrl, "expected pinned hero image", failures);
     fail(body.curatedAsset?.mode === "pinned", "expected canonical pinned asset", failures);

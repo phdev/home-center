@@ -1887,8 +1887,9 @@ function deterministicKnowledgeAnswer(query, subject, classification = {}) {
           ],
         },
       ],
-      visualNeed: "none",
-      imageSourceType: "none",
+      visualNeed: "useful",
+      imageSourceType: "known",
+      imageQuery: "The Internet layered global network hero visual",
     };
   }
 
