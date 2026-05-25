@@ -39,6 +39,31 @@ queries from producing arbitrary layouts.
 | `flora` | `scenic-location` or `species-closeup-with-environment` | `range-glass` | `height-comparison` or `icon-metric-columns` |
 | `concept` | `native-concept-hero` or `fallback-graphic` | `process-flow` | `icon-metric-columns` |
 
+## People Pages
+
+Ada Lovelace is the People-page reference. People pages should read as a
+biographical profile first, with a recognizable portrait hero anchoring the
+page and supporting modules explaining why the person matters.
+
+- Keep the portrait hero. Do not replace the hero with the Legacy illustration,
+  manuscript art, or another supporting graphic. The hero should use
+  `portrait-editorial` with text on the safe side and the subject image visible
+  on the opposite side.
+- Use the standalone Legacy panel for modern relevance. Its copy should be
+  concise but complete, with no visual truncation or ellipsis in the accepted
+  1280x720 kiosk layout.
+- Treat Legacy art as an accent, not the subject. The feather/manuscript graphic
+  belongs in the Legacy panel, right-weighted and secondary to the text; it must
+  not crowd the copy or become the main visual identity of the page.
+- Facts should stay biographical and scannable: born date first, then known-for
+  or the strongest identity fact. Avoid overfilling the facts card with
+  secondary details that belong in the timeline or glance modules.
+- The timeline should explain the arc: birth/place, major contribution, then a
+  final `Legacy` item describing lasting influence. Do not force a death date
+  into the final slot when the better user-facing answer is impact.
+- At A Glance should summarize exactly three contribution concepts with icons.
+  These are conceptual handles, not trivia or duplicate timeline entries.
+
 ## Golden References
 
 - Apollo 11 validates the event contract: archival hero, blue Places map with
