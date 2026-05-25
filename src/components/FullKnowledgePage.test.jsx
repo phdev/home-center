@@ -317,7 +317,7 @@ describe("FullKnowledgePage", () => {
     expect(screen.getByText("Born date")).toBeTruthy();
     expect(screen.getAllByText("December 10, 1815").length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText("Known For")).toBeTruthy();
-    expect(screen.getByText("Analytical Engine notes and the first published computer program")).toBeTruthy();
+    expect(screen.getByText("Analytical Engine notes; first computer program")).toBeTruthy();
     expect(screen.getByText("Born in London")).toBeTruthy();
     expect(screen.getByText("Expanded the Analytical Engine")).toBeTruthy();
     expect(screen.getAllByText("Legacy").length).toBeGreaterThanOrEqual(1);

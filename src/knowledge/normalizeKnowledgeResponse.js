@@ -155,24 +155,24 @@ function applyCanonicalKnowledgePolish(knowledge) {
       ...knowledge,
       facts: [
         { label: "Born date", value: "December 10, 1815", icon: "calendar" },
-        { label: "Known For", value: "Analytical Engine notes and the first published computer program", icon: "code" },
+        { label: "Known For", value: "Analytical Engine notes; first computer program", icon: "code" },
       ],
       insight: {
         title: "Legacy",
-        body: "Ada Lovelace's legacy is the idea that computers can work with symbols, instructions, and patterns, not just arithmetic. That practical leap sits behind modern software: code, algorithms, simulations, creative tools, and general-purpose computing all depend on machines following structured instructions to transform information.",
+        body: "Ada Lovelace's legacy is the idea that computers can work with symbols, instructions, and patterns, not just arithmetic. That practical leap sits behind modern software: code, algorithms, simulations, creative tools, and general-purpose computing.",
       },
       timeline: [
-        { date: "December 10, 1815", label: "Born in London", description: "Born in London, England, into a family that encouraged mathematics and disciplined study." },
-        { date: "1843", label: "Expanded the Analytical Engine", description: "Translated Menabrea's paper on Babbage's machine and added extensive notes, including an algorithm and a broader vision for symbolic computation." },
-        { date: "Legacy", label: "Practical computing influence", description: "Her notes anticipated programmable machines that could manipulate more than numbers, a foundation for software, algorithms, and creative computing today." },
+        { date: "December 10, 1815", label: "Born in London", description: "London, England; raised with a strong emphasis on mathematics." },
+        { date: "1843", label: "Expanded the Analytical Engine", description: "Added notes to Menabrea's translation, including an algorithm and a vision of machines handling symbols." },
+        { date: "Legacy", label: "Practical computing influence", description: "Modern software follows this idea: instructions transform information." },
       ],
       glance: {
         title: "At A Glance",
         description: "Three core ideas Lovelace helped move into computing history.",
         metrics: [
-          { label: "Mathematics", value: "Used formal reasoning to describe machine operations.", icon: "calculator" },
-          { label: "Analytical Engine", value: "Saw Babbage's machine as a general symbol processor.", icon: "cog" },
-          { label: "First Programmer", value: "Published an algorithm intended for a mechanical computer.", icon: "code" },
+          { label: "Mathematics", value: "Machine reasoning", icon: "calculator" },
+          { label: "Analytical Engine", value: "Symbol machine", icon: "cog" },
+          { label: "First Programmer", value: "Computer algorithm", icon: "code" },
         ],
       },
     };
