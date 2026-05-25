@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 420" fill="none">
+  <g opacity="0.94" filter="url(#leafShadow)">
+    <path d="M189 388c36-105 84-215 168-335" stroke="#fff" stroke-width="16" stroke-linecap="round"/>
+    <path d="M217 321c-47-13-93-37-141-79" stroke="#fff" stroke-width="10" stroke-linecap="round"/>
+    <path d="M231 292c-55-7-108-25-161-57" stroke="#fff" stroke-width="10" stroke-linecap="round"/>
+    <path d="M247 258c-57-3-111-17-163-45" stroke="#fff" stroke-width="10" stroke-linecap="round"/>
+    <path d="M264 222c-55 1-106-11-153-35" stroke="#fff" stroke-width="10" stroke-linecap="round"/>
+    <path d="M283 184c-51 5-96-2-138-23" stroke="#fff" stroke-width="10" stroke-linecap="round"/>
+    <path d="M303 148c-43 6-82 1-117-18" stroke="#fff" stroke-width="10" stroke-linecap="round"/>
+    <path d="M323 116c-33 3-64-3-91-19" stroke="#fff" stroke-width="10" stroke-linecap="round"/>
+    <path d="M226 318c48-21 95-50 140-87" stroke="#fff" stroke-width="10" stroke-linecap="round"/>
+    <path d="M241 286c62-16 120-41 174-76" stroke="#fff" stroke-width="10" stroke-linecap="round"/>
+    <path d="M258 251c69-12 134-35 194-70" stroke="#fff" stroke-width="10" stroke-linecap="round"/>
+    <path d="M276 214c70-9 134-30 194-61" stroke="#fff" stroke-width="10" stroke-linecap="round"/>
+    <path d="M296 177c61-9 117-28 168-56" stroke="#fff" stroke-width="10" stroke-linecap="round"/>
+    <path d="M315 141c48-9 92-26 132-51" stroke="#fff" stroke-width="10" stroke-linecap="round"/>
+    <path d="M336 105c35-11 66-28 91-50" stroke="#fff" stroke-width="10" stroke-linecap="round"/>
+    <g stroke="#fff" stroke-width="7" stroke-linecap="round">
+      <path d="M92 240c14 4 27 3 38-5M116 260c17 3 31 1 43-7M143 280c17 3 32 1 45-7M173 302c15 1 29-1 41-8"/>
+      <path d="M80 215c16 4 30 2 42-6M109 195c18 5 34 3 49-6M140 171c16 5 32 3 46-6M180 139c14 3 27 1 38-6"/>
+      <path d="M366 231c-2-14 2-27 13-38M399 210c-1-14 3-27 13-38M431 188c0-14 5-27 15-38"/>
+      <path d="M382 151c0-14 4-27 13-38M419 120c2-13 8-25 19-35M403 75c6-12 15-22 27-30"/>
+      <path d="M270 300c-1-17 4-32 15-45M304 282c0-16 5-31 16-44M340 260c1-15 7-29 18-41"/>
+      <path d="M202 249c-18-2-34-9-49-21M217 218c-18-3-34-11-47-24M236 184c-16-4-31-12-43-25"/>
+    </g>
+  </g>
+  <defs>
+    <filter id="leafShadow" x="0" y="0" width="520" height="420" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="5" stdDeviation="7" flood-color="#000000" flood-opacity="0.26"/>
+      <feDropShadow dx="0" dy="0" stdDeviation="8" flood-color="#ffffff" flood-opacity="0.16"/>
+    </filter>
+  </defs>
+</svg>
