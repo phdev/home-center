@@ -23,6 +23,7 @@ export function TimelineCard({ timeline, fallback, moduleStyle = "vertical-timel
               <div className="knowledge-timeline-icon" aria-hidden="true">
                 <TimelineIcon label={item.label} index={index} />
               </div>
+              {moduleStyle === "horizontal-mission-timeline" && index < items.length - 1 && <span className="knowledge-timeline-connector" aria-hidden="true" />}
               <div className="knowledge-timeline-date">{item.date || item.label}</div>
               <div>
                 <div className="knowledge-timeline-label">{item.label}</div>

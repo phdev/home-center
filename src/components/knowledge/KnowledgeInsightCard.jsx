@@ -5,21 +5,27 @@ function EarthLineArt() {
     <svg className="knowledge-insight-earth" viewBox="0 0 160 160" aria-hidden="true">
       <defs>
         <radialGradient id="knowledge-earth-glow" cx="42%" cy="34%" r="68%">
-          <stop offset="0%" stopColor="currentColor" stopOpacity="0.18" />
-          <stop offset="58%" stopColor="currentColor" stopOpacity="0.07" />
+          <stop offset="0%" stopColor="currentColor" stopOpacity="0.16" />
+          <stop offset="58%" stopColor="currentColor" stopOpacity="0.05" />
           <stop offset="100%" stopColor="currentColor" stopOpacity="0" />
         </radialGradient>
+        <clipPath id="knowledge-earth-clip">
+          <circle cx="80" cy="80" r="66" />
+        </clipPath>
       </defs>
       <circle className="knowledge-earth-fill" cx="80" cy="80" r="68" />
       <circle className="knowledge-earth-outline" cx="80" cy="80" r="66" />
-      <path className="knowledge-earth-line" d="M23 77c15-7 29-8 43-2 13 5 24 4 36-3 12-8 24-9 36-5" />
-      <path className="knowledge-earth-line" d="M32 46c12 6 25 8 39 5 14-4 27-2 40 6 7 4 14 6 22 5" />
-      <path className="knowledge-earth-line" d="M42 111c12-7 25-8 39-3 15 6 31 4 47-7" />
-      <path className="knowledge-earth-land" d="M53 38c10-8 24-10 35-3 6 4 8 10 4 16-5 7-17 6-24 12-8 7-3 17-13 21-11 4-22-4-23-16-1-11 8-21 21-30Z" />
-      <path className="knowledge-earth-land" d="M94 70c9-5 23-3 30 5 6 7 5 17-2 22-8 6-19-1-26 5-5 4-5 13-13 14-8 1-15-6-14-15 2-13 13-25 25-31Z" />
-      <path className="knowledge-earth-line" d="M80 15c-15 18-23 40-23 65s8 47 23 65" />
-      <path className="knowledge-earth-line" d="M80 15c15 18 23 40 23 65s-8 47-23 65" />
-      <path className="knowledge-earth-line" d="M19 80h122" />
+      <g clipPath="url(#knowledge-earth-clip)">
+        <path className="knowledge-earth-grid" d="M14 80h132" />
+        <path className="knowledge-earth-grid" d="M24 51c35 10 73 10 112 0" />
+        <path className="knowledge-earth-grid" d="M24 109c35-10 73-10 112 0" />
+        <path className="knowledge-earth-grid" d="M80 14c-17 17-26 39-26 66s9 49 26 66" />
+        <path className="knowledge-earth-grid" d="M80 14c17 17 26 39 26 66s-9 49-26 66" />
+        <path className="knowledge-earth-grid knowledge-earth-grid-soft" d="M42 28c-9 34-9 70 0 104" />
+        <path className="knowledge-earth-grid knowledge-earth-grid-soft" d="M118 28c9 34 9 70 0 104" />
+        <path className="knowledge-earth-coast" d="M49 35c12-7 29-7 41 1 8 5 11 13 6 21-5 8-17 8-25 14-9 7-7 18-18 22-11 4-24-6-25-19-1-15 7-29 21-39Z" />
+        <path className="knowledge-earth-coast" d="M95 70c11-5 27-2 35 8 7 8 5 20-4 26-9 6-20-1-28 5-6 5-6 15-15 16-10 1-18-8-16-19 2-15 14-29 28-36Z" />
+      </g>
     </svg>
   );
 }
