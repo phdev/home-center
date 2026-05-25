@@ -25,6 +25,34 @@ cp "$SCRIPT_DIR/labwc-rc.xml" ~/.config/labwc/rc.xml
 echo "  -> ~/.config/labwc/autostart"
 echo "  -> ~/.config/labwc/rc.xml"
 
+# Raspberry Pi OS starts the normal desktop shell from the system labwc
+# autostart. Kiosk mode should not have pcmanfm, the panel, desktop icons, or a
+# wallpaper underneath Chromium.
+if [ -f /etc/xdg/labwc/autostart ]; then
+    echo "Disabling system desktop shell autostart..."
+    sudo cp /etc/xdg/labwc/autostart "/etc/xdg/labwc/autostart.home-center-backup.$(date +%Y%m%d-%H%M%S)"
+    sudo tee /etc/xdg/labwc/autostart >/dev/null <<'EOF'
+# Home Center kiosk session.
+# Do not start Raspberry Pi desktop shell, panel, icons, or wallpaper here.
+# The user autostart (~/.config/labwc/autostart) owns display setup,
+# solid no-wallpaper background, and Chromium kiosk launch.
+/usr/bin/kanshi &
+EOF
+fi
+
+# If pcmanfm ever starts manually, keep its desktop background empty.
+mkdir -p ~/.config/pcmanfm/LXDE-pi ~/.config/pcmanfm/default
+cat > ~/.config/pcmanfm/LXDE-pi/desktop-items-0.conf <<'EOF'
+[*]
+wallpaper_mode=none
+wallpaper=
+desktop_bg=#000000
+show_documents=0
+show_trash=0
+show_mounts=0
+EOF
+cp ~/.config/pcmanfm/LXDE-pi/desktop-items-0.conf ~/.config/pcmanfm/default/desktop-items-0.conf
+
 # 2. Disable screen blanking
 echo "Disabling screen blanking..."
 sudo raspi-config nonint do_blanking 1 2>/dev/null || true
