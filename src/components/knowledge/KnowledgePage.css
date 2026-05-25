@@ -740,7 +740,7 @@ body[data-design-system="v2"] .knowledge-page .hc-full-page-bg {
 .knowledge-related {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   min-width: 0;
   flex: 1;
   overflow: hidden;
@@ -760,13 +760,13 @@ body[data-design-system="v2"] .knowledge-page .hc-full-page-bg {
 
 .knowledge-chip {
   flex-shrink: 0;
-  min-width: 116px;
+  min-width: 86px;
   color: var(--knowledge-tab-accent);
   background: var(--knowledge-tab-accent-soft);
   border: 1px solid color-mix(in srgb, var(--knowledge-tab-accent) 38%, transparent);
-  border-radius: 8px;
-  padding: 8px 16px;
-  font-size: 15px;
+  border-radius: 7px;
+  padding: 6px 12px;
+  font-size: 13px;
   font-weight: 760;
   text-align: center;
 }
