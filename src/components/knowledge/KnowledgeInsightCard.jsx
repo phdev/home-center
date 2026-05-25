@@ -2,30 +2,41 @@ import { Snowflake, Sparkle, Sprout } from "lucide-react";
 
 function EarthLineArt() {
   return (
-    <svg className="knowledge-insight-earth" viewBox="0 0 160 160" aria-hidden="true">
+    <svg className="knowledge-insight-earth" viewBox="0 0 180 180" aria-hidden="true">
       <defs>
-        <radialGradient id="knowledge-earth-glow" cx="42%" cy="34%" r="68%">
-          <stop offset="0%" stopColor="currentColor" stopOpacity="0.16" />
-          <stop offset="58%" stopColor="currentColor" stopOpacity="0.05" />
+        <radialGradient id="knowledge-earth-glow" cx="36%" cy="31%" r="72%">
+          <stop offset="0%" stopColor="currentColor" stopOpacity="0.18" />
+          <stop offset="54%" stopColor="currentColor" stopOpacity="0.055" />
           <stop offset="100%" stopColor="currentColor" stopOpacity="0" />
         </radialGradient>
         <clipPath id="knowledge-earth-clip">
-          <circle cx="80" cy="80" r="66" />
+          <circle cx="90" cy="90" r="66" />
         </clipPath>
       </defs>
-      <circle className="knowledge-earth-fill" cx="80" cy="80" r="68" />
-      <circle className="knowledge-earth-outline" cx="80" cy="80" r="66" />
+      <circle className="knowledge-earth-halo" cx="90" cy="90" r="78" />
+      <circle className="knowledge-earth-fill" cx="90" cy="90" r="69" />
+      <circle className="knowledge-earth-outline" cx="90" cy="90" r="66" />
       <g clipPath="url(#knowledge-earth-clip)">
-        <path className="knowledge-earth-grid" d="M14 80h132" />
-        <path className="knowledge-earth-grid" d="M24 51c35 10 73 10 112 0" />
-        <path className="knowledge-earth-grid" d="M24 109c35-10 73-10 112 0" />
-        <path className="knowledge-earth-grid" d="M80 14c-17 17-26 39-26 66s9 49 26 66" />
-        <path className="knowledge-earth-grid" d="M80 14c17 17 26 39 26 66s-9 49-26 66" />
-        <path className="knowledge-earth-grid knowledge-earth-grid-soft" d="M42 28c-9 34-9 70 0 104" />
-        <path className="knowledge-earth-grid knowledge-earth-grid-soft" d="M118 28c9 34 9 70 0 104" />
-        <path className="knowledge-earth-coast" d="M49 35c12-7 29-7 41 1 8 5 11 13 6 21-5 8-17 8-25 14-9 7-7 18-18 22-11 4-24-6-25-19-1-15 7-29 21-39Z" />
-        <path className="knowledge-earth-coast" d="M95 70c11-5 27-2 35 8 7 8 5 20-4 26-9 6-20-1-28 5-6 5-6 15-15 16-10 1-18-8-16-19 2-15 14-29 28-36Z" />
+        <path className="knowledge-earth-grid" d="M24 90h132" />
+        <path className="knowledge-earth-grid" d="M31 64c36 10 78 10 118 0" />
+        <path className="knowledge-earth-grid" d="M32 116c36-10 77-10 116 0" />
+        <path className="knowledge-earth-grid knowledge-earth-grid-soft" d="M46 43c23 11 63 14 91 2" />
+        <path className="knowledge-earth-grid knowledge-earth-grid-soft" d="M45 137c24-11 65-14 91-2" />
+        <path className="knowledge-earth-grid" d="M90 24c-18 18-27 40-27 66s9 48 27 66" />
+        <path className="knowledge-earth-grid" d="M90 24c18 18 27 40 27 66s-9 48-27 66" />
+        <path className="knowledge-earth-grid knowledge-earth-grid-soft" d="M58 35c-8 34-8 76 0 110" />
+        <path className="knowledge-earth-grid knowledge-earth-grid-soft" d="M122 35c8 34 8 76 0 110" />
+        <path className="knowledge-earth-coast knowledge-earth-coast-major" d="M68 31c11-2 23 1 28 8 5 7 1 13 7 20 5 6 17 6 23 14 6 9 3 20-5 26-7 6-19 5-26 12-7 6-5 17-12 23-6 5-17 1-20-8-4-10 5-18 2-29-2-10-15-15-20-26-6-14 5-35 23-40Z" />
+        <path className="knowledge-earth-coast" d="M79 33c-9 9-12 18-8 27 3 8 12 12 13 21 1 8-6 14-6 23 0 9 8 18 5 29" />
+        <path className="knowledge-earth-coast" d="M98 69c7 5 12 12 13 21 1 8-3 14-11 18" />
+        <path className="knowledge-earth-coast" d="M70 121c9 6 19 8 30 5" />
+        <path className="knowledge-earth-coast knowledge-earth-coast-faint" d="M121 47c8 4 15 10 20 17" />
+        <path className="knowledge-earth-coast knowledge-earth-coast-faint" d="M130 108c8-1 14-5 19-11" />
       </g>
+      <circle className="knowledge-earth-dot" cx="36" cy="42" r="1.4" />
+      <circle className="knowledge-earth-dot" cx="145" cy="38" r="1.15" />
+      <circle className="knowledge-earth-dot" cx="152" cy="130" r="1.2" />
+      <circle className="knowledge-earth-dot knowledge-earth-dot-soft" cx="30" cy="123" r="0.95" />
     </svg>
   );
 }

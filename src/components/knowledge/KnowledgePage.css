@@ -619,14 +619,23 @@ body[data-design-system="v2"] .knowledge-page .hc-full-page-bg {
 
 .knowledge-insight-earth {
   position: absolute;
-  right: 54px;
-  top: 22px;
-  width: 132px;
+  right: 46px;
+  top: 14px;
+  width: 150px;
   aspect-ratio: 1;
   color: var(--knowledge-accent);
-  opacity: 0.72;
+  opacity: 0.82;
   overflow: visible;
-  filter: drop-shadow(0 0 16px color-mix(in srgb, var(--knowledge-accent) 24%, transparent));
+  filter: drop-shadow(0 0 18px color-mix(in srgb, var(--knowledge-accent) 30%, transparent));
+}
+
+.knowledge-earth-halo {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 0.8;
+  stroke-dasharray: 1.5 8;
+  stroke-linecap: round;
+  opacity: 0.24;
 }
 
 .knowledge-earth-fill {
@@ -635,7 +644,8 @@ body[data-design-system="v2"] .knowledge-page .hc-full-page-bg {
 
 .knowledge-earth-outline,
 .knowledge-earth-grid,
-.knowledge-earth-coast {
+.knowledge-earth-coast,
+.knowledge-earth-dot {
   fill: none;
   stroke: currentColor;
   stroke-linecap: round;
@@ -643,22 +653,41 @@ body[data-design-system="v2"] .knowledge-page .hc-full-page-bg {
 }
 
 .knowledge-earth-outline {
-  stroke-width: 1.45;
-  opacity: 0.82;
+  stroke-width: 1.2;
+  opacity: 0.9;
 }
 
 .knowledge-earth-grid {
-  stroke-width: 1;
-  opacity: 0.4;
+  stroke-width: 0.9;
+  opacity: 0.32;
 }
 
 .knowledge-earth-grid-soft {
-  opacity: 0.24;
+  opacity: 0.18;
 }
 
 .knowledge-earth-coast {
-  stroke-width: 1.18;
-  opacity: 0.36;
+  stroke-width: 1.25;
+  opacity: 0.5;
+}
+
+.knowledge-earth-coast-major {
+  stroke-width: 1.45;
+  opacity: 0.64;
+}
+
+.knowledge-earth-coast-faint {
+  opacity: 0.24;
+}
+
+.knowledge-earth-dot {
+  fill: currentColor;
+  stroke: none;
+  opacity: 0.68;
+}
+
+.knowledge-earth-dot-soft {
+  opacity: 0.38;
 }
 
 .knowledge-insight-star {
