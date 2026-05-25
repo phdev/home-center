@@ -190,7 +190,7 @@ function applyCanonicalKnowledgePolish(knowledge) {
     heroImage: knowledge.heroImage ? {
       ...knowledge.heroImage,
       url: "/home-center/knowledge-assets/apollo-11-aldrin.jpg",
-      focalPoint: { x: 0.5, y: 0.5 },
+      focalPoint: { x: 0.5, y: 0 },
       cropHint: knowledge.heroImage.cropHint || "center-subject",
     } : knowledge.heroImage,
   };
