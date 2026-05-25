@@ -782,9 +782,9 @@ body[data-design-system="v2"] .knowledge-page .hc-full-page-bg {
 .knowledge-chip {
   flex-shrink: 0;
   min-width: 86px;
-  color: var(--knowledge-tab-accent);
-  background: var(--knowledge-tab-accent-soft);
-  border: 1px solid color-mix(in srgb, var(--knowledge-tab-accent) 38%, transparent);
+  color: var(--knowledge-accent);
+  background: var(--knowledge-accent-soft);
+  border: 1px solid color-mix(in srgb, var(--knowledge-accent) 38%, transparent);
   border-radius: 7px;
   padding: 6px 12px;
   font-size: 13px;
