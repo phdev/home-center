@@ -71,7 +71,7 @@ const CANONICAL_CURATED_ASSETS = [
     focalPoint: { x: 0.66, y: 0.46 },
     tone: "home-center-dark",
     heroImage: {
-      url: "https://upload.wikimedia.org/wikipedia/commons/b/b2/Prairie_Creek_Redwoods_-_Coastal_Redwood_Forest.jpg",
+      url: "/home-center/knowledge-assets/coast-redwood-hero.jpg",
       source: "Wikimedia Commons",
       sourceUrl: "https://commons.wikimedia.org/wiki/File:Prairie_Creek_Redwoods_-_Coastal_Redwood_Forest.jpg",
       credit: "Owen Lloyd",

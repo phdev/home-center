@@ -372,9 +372,9 @@ const COAST_REDWOOD_KNOWLEDGE_RESPONSE = {
       { label: "Climate", value: "Fog belt", icon: "cloud" },
     ],
   }],
-  imageUrl: "https://upload.wikimedia.org/wikipedia/commons/b/b2/Prairie_Creek_Redwoods_-_Coastal_Redwood_Forest.jpg",
+  imageUrl: "/home-center/knowledge-assets/coast-redwood-hero.jpg",
   image: {
-    url: "https://upload.wikimedia.org/wikipedia/commons/b/b2/Prairie_Creek_Redwoods_-_Coastal_Redwood_Forest.jpg",
+    url: "/home-center/knowledge-assets/coast-redwood-hero.jpg",
     source: "Wikimedia Commons",
     mode: "pinned",
     sourceUrl: "https://commons.wikimedia.org/wiki/File:Prairie_Creek_Redwoods_-_Coastal_Redwood_Forest.jpg",
