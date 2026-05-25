@@ -47,6 +47,11 @@ queries from producing arbitrary layouts.
 - Emperor Penguin validates the fauna contract: closeup/environment hero,
   habitat range module, lifecycle-style glance module, and species-specific
   environmental ornamentation.
+- Ada Lovelace validates the person contract: key facts prioritize born date
+  and known-for, the vertical timeline starts with born date/place, contribution
+  detail expands in the middle, the final item is labeled Legacy instead of a
+  year, the standalone Legacy section explains practical modern relevance, and
+  At A Glance presents three icon-led contribution concepts.
 
 ## Implementation Hooks
 

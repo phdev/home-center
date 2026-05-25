@@ -1,4 +1,4 @@
-import { Footprints, Rocket, Satellite, Umbrella } from "lucide-react";
+import { Baby, Footprints, Rocket, Satellite, Sparkles, Umbrella } from "lucide-react";
 
 function TimelineIcon({ label = "", index }) {
   const value = label.toLowerCase();
@@ -6,6 +6,8 @@ function TimelineIcon({ label = "", index }) {
   if (value.includes("landing")) return <Satellite size={30} />;
   if (value.includes("moonwalk")) return <Footprints size={30} />;
   if (value.includes("return")) return <Umbrella size={30} />;
+  if (value.includes("born")) return <Baby size={30} />;
+  if (value.includes("legacy") || value.includes("influence")) return <Sparkles size={30} />;
   return String(index + 1).padStart(2, "0");
 }
 

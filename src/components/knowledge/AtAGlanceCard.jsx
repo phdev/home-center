@@ -1,10 +1,13 @@
-import { Dna, Ruler, Weight } from "lucide-react";
+import { Calculator, Code2, Cog, Dna, Ruler, Weight } from "lucide-react";
 import { LifecycleDiagram } from "./diagrams/LifecycleDiagram";
 
 function MetricIcon({ icon, fallback }) {
   if (icon === "ruler") return <Ruler size={24} />;
   if (icon === "weight") return <Weight size={24} />;
   if (icon === "dna") return <Dna size={24} />;
+  if (icon === "calculator") return <Calculator size={24} />;
+  if (icon === "cog") return <Cog size={24} />;
+  if (icon === "code") return <Code2 size={24} />;
   return fallback;
 }
 

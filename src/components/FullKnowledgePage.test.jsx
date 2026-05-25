@@ -287,6 +287,48 @@ describe("FullKnowledgePage", () => {
     expect(container.querySelectorAll(".knowledge-metric").length).toBeGreaterThanOrEqual(2);
   });
 
+  it("applies the Ada Lovelace person content contract", () => {
+    render(<FullKnowledgePage response={response({
+      query: "Who was Ada Lovelace?",
+      title: "Ada Lovelace",
+      type: "person",
+      summary: "Ada Lovelace wrote notes on the Analytical Engine.",
+      sections: [{ heading: "Who She Was", content: "Born in London." }],
+      profile: {
+        facts: [
+          { label: "Lifespan", value: "1815-1852" },
+          { label: "Legacy", value: "Computing pioneer" },
+        ],
+        maps: [],
+        relatedConcepts: ["Analytical Engine"],
+      },
+      timeline: [
+        { date: "1815", label: "Born", description: "London" },
+        { date: "1843", label: "Notes", description: "Analytical Engine notes" },
+        { date: "1852", label: "Died", description: "Legacy grew later" },
+      ],
+      infographics: [{
+        title: "Why She Is Famous",
+        kind: "metrics",
+        items: [{ label: "Programming", value: "Ideas" }],
+      }],
+    })} onBack={() => {}} />);
+
+    expect(screen.getByText("Born date")).toBeTruthy();
+    expect(screen.getAllByText("December 10, 1815").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText("Known For")).toBeTruthy();
+    expect(screen.getByText("Analytical Engine notes and the first published computer program")).toBeTruthy();
+    expect(screen.getByText("Born in London")).toBeTruthy();
+    expect(screen.getByText("Expanded the Analytical Engine")).toBeTruthy();
+    expect(screen.getAllByText("Legacy").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText("Practical computing influence")).toBeTruthy();
+    expect(screen.getByText("At A Glance")).toBeTruthy();
+    expect(screen.getByText("Mathematics")).toBeTruthy();
+    expect(screen.getAllByText("Analytical Engine").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText("First Programmer")).toBeTruthy();
+    expect(screen.queryByText("Why She Is Famous")).toBeNull();
+  });
+
   it("renders a native concept hero visual instead of the generic placeholder", () => {
     const { container } = render(<FullKnowledgePage response={response({
       imageUrl: null,

@@ -823,7 +823,7 @@ Response format:
 
 Dynamic page requirements:
 - location: profile.maps must include world and continent maps when possible, profile.facts must include area size, and infographics must include 1-2 quantifiable facts or comparisons.
-- person: profile.facts must include date born and notable for, and infographics must include 1-2 useful timelines, comparisons, or mechanism diagrams.
+- person: profile.facts must include only the strongest compact facts, prioritizing "Born date" and "Known For". The timeline should begin with the born date plus birthplace, use the middle item for expanded contributions, and use "Legacy" instead of a final year when explaining long-term impact. The main section should focus on practical legacy and relevance today, not repeat name and birthplace. Include an "At A Glance" infographic with exactly three major contributed concepts, each with a short text description and an icon hint.
 - fauna: profile.facts must include species and years on earth, profile.maps must include a world range/habitat map, and infographics must include 1-2 quantified habitat, size, life-cycle, or behavior facts.
 - flora: profile.facts must include species and years on earth, profile.maps must include a world range map, and infographics must include 1-2 quantified range, size, growth, or ecology facts.
 - event: profile.maps must include country and city maps when known, profile.facts must include date, and infographics must include 1-2 timeline, scale, participants, or outcome facts.
