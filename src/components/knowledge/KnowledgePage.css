@@ -608,15 +608,16 @@ body[data-design-system="v2"] .knowledge-page .hc-full-page-bg {
 
 .knowledge-insight-legacy-lineart {
   position: absolute;
-  right: 63px;
+  right: 0;
   top: 0;
-  width: 252px;
-  height: 170px;
+  width: 42%;
+  height: 100%;
   object-fit: contain;
   object-position: right center;
-  opacity: 0.74;
-  clip-path: inset(0 0 5% 30%);
+  opacity: 0.72;
   filter: drop-shadow(0 0 18px color-mix(in srgb, var(--knowledge-accent) 28%, transparent));
+  transform: scale(1.08);
+  transform-origin: right center;
 }
 
 .knowledge-insight-snowflake {
