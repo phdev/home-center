@@ -799,7 +799,7 @@ body[data-design-system="v2"] .knowledge-page .hc-full-page-bg {
   display: flex;
   align-items: center;
   gap: 9px;
-  color: var(--knowledge-tab-accent);
+  color: var(--knowledge-accent);
   font-family: "JetBrains Mono", ui-monospace, monospace;
   font-size: 14px;
   font-weight: 850;
