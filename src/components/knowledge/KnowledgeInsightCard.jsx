@@ -57,6 +57,13 @@ function InsightOrnament({ type }) {
       </div>
     );
   }
+  if (type === "person") {
+    return (
+      <div className="knowledge-insight-ornament knowledge-insight-ornament-person" aria-hidden="true">
+        <FeatherLineArt />
+      </div>
+    );
+  }
   if (type === "flora") {
     return (
       <div className="knowledge-insight-ornament knowledge-insight-ornament-flora" aria-hidden="true">

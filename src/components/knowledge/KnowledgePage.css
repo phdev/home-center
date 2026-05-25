@@ -549,7 +549,8 @@ body[data-design-system="v2"] .knowledge-page .hc-full-page-bg {
 }
 
 .knowledge-insight-card-fauna .knowledge-insight-body,
-.knowledge-insight-card-flora .knowledge-insight-body {
+.knowledge-insight-card-flora .knowledge-insight-body,
+.knowledge-insight-card-person .knowledge-insight-body {
   width: 72%;
 }
 
