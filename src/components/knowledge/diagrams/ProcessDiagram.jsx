@@ -8,7 +8,7 @@ export function ProcessDiagram({ items = [], accent = "#b993ff" }) {
   function StepIcon({ icon, x }) {
     if (icon === "devices") {
       return (
-        <g transform={`translate(${x - 28} 49)`}>
+        <g transform={`translate(${x - 28} 82)`}>
           <rect x="0" y="0" width="34" height="23" rx="2" fill="none" stroke="#dfe8ff" strokeWidth="3" />
           <path d="M-5 31h44" stroke="#dfe8ff" strokeWidth="3" strokeLinecap="round" />
           <rect x="39" y="8" width="14" height="25" rx="2" fill="none" stroke="#7fb8ff" strokeWidth="3" />
@@ -17,7 +17,7 @@ export function ProcessDiagram({ items = [], accent = "#b993ff" }) {
     }
     if (icon === "router") {
       return (
-        <g transform={`translate(${x - 28} 54)`}>
+        <g transform={`translate(${x - 28} 68)`}>
           <rect x="0" y="30" width="56" height="20" rx="4" fill="none" stroke="#dfe8ff" strokeWidth="3" />
           <circle cx="12" cy="40" r="2.5" fill={accent} />
           <circle cx="23" cy="40" r="2.5" fill={accent} />
@@ -27,7 +27,7 @@ export function ProcessDiagram({ items = [], accent = "#b993ff" }) {
     }
     if (icon === "packets") {
       return (
-        <g transform={`translate(${x - 25} 62)`}>
+        <g transform={`translate(${x - 25} 75)`}>
           {[0, 1, 2, 3].map((row) => [0, 1, 2, 3].map((col) => (
             <rect key={`${row}-${col}`} x={col * 13} y={row * 13} width="8" height="8" rx="1.5" fill={col % 2 === row % 2 ? accent : "#7fb8ff"} opacity="0.9" />
           )))}
@@ -36,7 +36,7 @@ export function ProcessDiagram({ items = [], accent = "#b993ff" }) {
     }
     if (icon === "servers") {
       return (
-        <g transform={`translate(${x - 19} 47)`}>
+        <g transform={`translate(${x - 19} 65)`}>
           {[0, 1, 2].map((row) => (
             <g key={row} transform={`translate(0 ${row * 24})`}>
               <rect x="0" y="0" width="38" height="18" rx="3" fill="none" stroke="#dfe8ff" strokeWidth="3" />
