@@ -177,7 +177,7 @@ body[data-design-system="v2"] .knowledge-page .hc-full-page-bg {
   position: relative;
   display: block;
   isolation: isolate;
-  background: linear-gradient(145deg, rgba(14, 30, 48, 0.1), rgba(5, 14, 28, 0.04));
+  background: linear-gradient(145deg, rgba(14, 30, 48, 0.055), rgba(5, 14, 28, 0.018));
 }
 
 .knowledge-hero-copy {
