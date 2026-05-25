@@ -97,6 +97,27 @@ function normalizeGlance(response, type) {
   };
 }
 
+function normalizeProcess(response) {
+  const modules = asArray(response?.infographics);
+  const preferred = modules.find((item) => item?.kind === "process") || null;
+  if (!preferred) return null;
+  const metrics = asArray(preferred?.items).map((item, index) => ({
+    label: text(item?.label, 42),
+    value: text(item?.value, 80),
+    sublabel: text(item?.sublabel || item?.detail, 80),
+    icon: text(item?.icon, 24),
+    originalIndex: index,
+  })).filter((metric) => metric.label && metric.value)
+    .sort((a, b) => a.originalIndex - b.originalIndex)
+    .map(({ originalIndex, ...metric }) => metric)
+    .slice(0, 4);
+  return {
+    title: titleFromHeading(preferred?.title || preferred?.type, "How It Works"),
+    description: text(preferred?.description, 180),
+    metrics,
+  };
+}
+
 function normalizeRelated(response) {
   return [
     ...asArray(response?.relatedTopics),
@@ -253,6 +274,7 @@ export function normalizeKnowledgeResponse(response = {}) {
     maps: normalizeMaps(response),
     timeline: normalizeTimeline(response),
     glance: normalizeGlance(response, type),
+    process: normalizeProcess(response),
     relatedTopics: normalizeRelated(response),
     heroImage,
     visualPlan,

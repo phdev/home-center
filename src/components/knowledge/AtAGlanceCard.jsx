@@ -1,4 +1,4 @@
-import { Calculator, Code2, Cog, Dna, Ruler, Weight } from "lucide-react";
+import { Calculator, Code2, Cog, Dna, Globe2, MessagesSquare, Ruler, ShieldCheck, Weight } from "lucide-react";
 import { LifecycleDiagram } from "./diagrams/LifecycleDiagram";
 
 function MetricIcon({ icon, fallback }) {
@@ -8,6 +8,9 @@ function MetricIcon({ icon, fallback }) {
   if (icon === "calculator") return <Calculator size={24} />;
   if (icon === "cog") return <Cog size={24} />;
   if (icon === "code") return <Code2 size={24} />;
+  if (icon === "globe") return <Globe2 size={24} />;
+  if (icon === "shield") return <ShieldCheck size={24} />;
+  if (icon === "services") return <MessagesSquare size={24} />;
   return fallback;
 }
 

@@ -21,7 +21,7 @@ function MiddleCard({ knowledge, config }) {
     return <PlacesCard maps={knowledge.maps} accent={config.accent} moduleStyle={moduleStyle} />;
   }
   if (knowledge.type === "concept") {
-    return <ProcessDiagramCard type={knowledge.type} glance={knowledge.glance} accent={config.accent} moduleStyle={moduleStyle} />;
+    return <ProcessDiagramCard type={knowledge.type} glance={knowledge.process || knowledge.glance} accent={config.accent} moduleStyle={moduleStyle} />;
   }
   return <KnowledgeMapCard maps={knowledge.maps} accent={config.accent} moduleStyle={moduleStyle} />;
 }

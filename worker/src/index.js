@@ -1857,7 +1857,7 @@ function deterministicKnowledgeAnswer(query, subject, classification = {}) {
       type: "concept",
       title: "The Internet",
       summary:
-        "The Internet is a global network of networks that lets computers move data by breaking information into packets, routing those packets across many connected systems, and reassembling them at the destination.",
+        "The Internet is a global network that lets connected devices exchange data using shared protocols.",
       sections: [
         {
           heading: "Key Idea",
@@ -1876,14 +1876,24 @@ function deterministicKnowledgeAnswer(query, subject, classification = {}) {
       },
       infographics: [
         {
-          title: "Packet Flow",
+          title: "How It Works",
           kind: "process",
-          description: "Requests move through shared protocols instead of one central path.",
+          description: "Data moves through routers as small packets, then servers respond.",
           items: [
-            { label: "Request", value: "Device asks", icon: "code" },
-            { label: "Address", value: "DNS/IP", icon: "network" },
-            { label: "Route", value: "Packets hop", icon: "cog" },
-            { label: "Rebuild", value: "Page loads", icon: "code" },
+            { label: "Devices", value: "Send data", icon: "devices" },
+            { label: "Routers", value: "Find path", icon: "router" },
+            { label: "Packets", value: "Small pieces", icon: "packets" },
+            { label: "Servers", value: "Respond", icon: "servers" },
+          ],
+        },
+        {
+          title: "At A Glance",
+          kind: "metrics",
+          description: "The Internet is bigger than the web.",
+          items: [
+            { label: "Global network", value: "Billions connected", icon: "globe" },
+            { label: "Shared protocols", value: "TCP/IP rules", icon: "shield" },
+            { label: "Many services", value: "Web, email, apps", icon: "services" },
           ],
         },
       ],
