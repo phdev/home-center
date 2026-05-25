@@ -202,7 +202,7 @@ const ADA_LOVELACE_KNOWLEDGE_RESPONSE = {
   sections: [
     {
       heading: "Legacy",
-      content: "Ada Lovelace's legacy is the idea that computers can work with symbols, instructions, and patterns, not just arithmetic. That practical leap sits behind modern software: code, algorithms, simulations, creative tools, and general-purpose computing.",
+      content: "Ada Lovelace showed that computers could work with symbols and instructions, not just arithmetic, laying a foundation for modern software.",
     },
   ],
   profile: {

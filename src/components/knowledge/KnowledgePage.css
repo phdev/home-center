@@ -554,7 +554,10 @@ body[data-design-system="v2"] .knowledge-page .hc-full-page-bg {
 }
 
 .knowledge-insight-card-person .knowledge-insight-body {
-  width: 47%;
+  width: 58%;
+  font-size: 16px;
+  line-height: 1.18;
+  -webkit-line-clamp: unset;
 }
 
 .knowledge-insight-card-event .knowledge-insight-body {
@@ -605,15 +608,16 @@ body[data-design-system="v2"] .knowledge-page .hc-full-page-bg {
 
 .knowledge-insight-legacy-lineart {
   position: absolute;
-  right: 8px;
+  right: 0;
   top: 0;
-  width: 55%;
+  width: 42%;
   height: 100%;
   object-fit: contain;
-  object-position: center;
-  opacity: 0.68;
+  object-position: right center;
+  opacity: 0.72;
   filter: drop-shadow(0 0 18px color-mix(in srgb, var(--knowledge-accent) 28%, transparent));
-  transform: scale(1.14);
+  transform: scale(1.08);
+  transform-origin: right center;
 }
 
 .knowledge-insight-snowflake {

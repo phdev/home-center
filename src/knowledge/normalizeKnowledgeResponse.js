@@ -159,7 +159,7 @@ function applyCanonicalKnowledgePolish(knowledge) {
       ],
       insight: {
         title: "Legacy",
-        body: "Ada Lovelace's legacy is the idea that computers can work with symbols, instructions, and patterns, not just arithmetic. That practical leap sits behind modern software: code, algorithms, simulations, creative tools, and general-purpose computing.",
+        body: "Ada Lovelace showed that computers could work with symbols and instructions, not just arithmetic, laying a foundation for modern software.",
       },
       timeline: [
         { date: "December 10, 1815", label: "Born in London", description: "London, England; raised with a strong emphasis on mathematics." },
