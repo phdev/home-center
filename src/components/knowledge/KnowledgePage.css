@@ -631,6 +631,8 @@ body[data-design-system="v2"] .knowledge-page .hc-full-page-bg {
 
 .knowledge-earth-source {
   color: inherit;
+  opacity: 0.86;
+  filter: brightness(0) saturate(100%) invert(70%) sepia(35%) saturate(1115%) hue-rotate(181deg) brightness(101%) contrast(101%);
 }
 
 .knowledge-insight-star {
