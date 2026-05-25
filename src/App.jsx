@@ -333,6 +333,83 @@ const APOLLO_11_KNOWLEDGE_RESPONSE = {
   timestamp: Date.now(),
 };
 
+const COAST_REDWOOD_KNOWLEDGE_RESPONSE = {
+  kind: "knowledge",
+  query: "Tell me about coast redwoods.",
+  title: "Coast Redwood",
+  type: "flora",
+  summary: "Coast redwoods are the tallest trees on Earth, thriving in the cool fog belt of coastal Northern California and southern Oregon. Their height, long lives, and dense forest communities make them one of the most dramatic examples of living architecture.",
+  sections: [
+    {
+      heading: "Ecosystem Role",
+      content: "A mature redwood forest stores immense carbon, creates shaded stream habitat, and captures coastal fog that helps sustain the understory through dry summers.",
+    },
+  ],
+  profile: {
+    facts: [
+      { label: "Species", value: "Sequoia sempervirens", icon: "dna" },
+      { label: "Height", value: "Up to 379 ft", icon: "ruler" },
+    ],
+    maps: [
+      {
+        scope: "world",
+        label: "Native range",
+        highlight: "Northern California and southern Oregon coast",
+        detail: "Cool, fog-influenced forests",
+        lat: 41.3,
+        lon: -124.0,
+      },
+    ],
+    relatedConcepts: ["old-growth forest", "fog drip", "carbon storage"],
+  },
+  infographics: [{
+    title: "Growth Pattern",
+    kind: "metrics",
+    description: "Scale, longevity, and climate niche define the coast redwood.",
+    items: [
+      { label: "Height", value: "Up to 379 ft", icon: "ruler" },
+      { label: "Age", value: "2,000+ yrs", icon: "calendar" },
+      { label: "Climate", value: "Fog belt", icon: "cloud" },
+    ],
+  }],
+  imageUrl: "https://upload.wikimedia.org/wikipedia/commons/b/b2/Prairie_Creek_Redwoods_-_Coastal_Redwood_Forest.jpg",
+  image: {
+    url: "https://upload.wikimedia.org/wikipedia/commons/b/b2/Prairie_Creek_Redwoods_-_Coastal_Redwood_Forest.jpg",
+    source: "Wikimedia Commons",
+    mode: "pinned",
+    sourceUrl: "https://commons.wikimedia.org/wiki/File:Prairie_Creek_Redwoods_-_Coastal_Redwood_Forest.jpg",
+    focalPoint: { x: 0.66, y: 0.46 },
+    cropHint: "right-subject",
+    tone: "home-center-dark",
+    alt: "Coast redwood forest",
+  },
+  visualPlan: {
+    visualFamily: "editorial-knowledge-v1",
+    queryType: "flora",
+    subType: "flora/tree",
+    compositionPattern: "tall-subject-forest-depth",
+    heroStrategy: "retrieved-single-subject",
+    textSafeZone: "left",
+    focalRegion: "right-center",
+    tone: "home-center-dark",
+    contrastLevel: "medium-high",
+    motifStrategy: "growth-rings",
+    supportingPanelStyle: "height-comparison",
+    mapStyle: "range-glass",
+    badgeStyle: "emerald-flora",
+    atAGlanceStyle: "height-comparison",
+    backgroundTreatment: "navy-glass-vignette",
+    moduleStyles: {
+      hero: "scenic-location",
+      facts: "compact-fact-rows",
+      middle: "range-glass",
+      lower: "height-comparison",
+    },
+  },
+  imageSourceType: "known",
+  timestamp: Date.now(),
+};
+
 const KNOWLEDGE_LOADING_RESPONSE = {
   kind: "knowledge",
   query: "Knowledge query in progress",
@@ -498,6 +575,8 @@ export default function App() {
           ? EMPEROR_PENGUIN_KNOWLEDGE_RESPONSE
           : urlParams.get("knowledgeFixture") === "ada-lovelace"
             ? ADA_LOVELACE_KNOWLEDGE_RESPONSE
+            : urlParams.get("knowledgeFixture") === "coast-redwood"
+              ? COAST_REDWOOD_KNOWLEDGE_RESPONSE
             : PREVIEW_KNOWLEDGE_RESPONSE)
       : requestedPage === "llm-response"
         ? PREVIEW_LLM_RESPONSE

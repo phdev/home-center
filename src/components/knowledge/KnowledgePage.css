@@ -1068,6 +1068,29 @@ body[data-design-system="v2"] .knowledge-page .hc-full-page-bg {
   border-left: 0;
 }
 
+.knowledge-module-height-comparison .knowledge-metrics {
+  gap: 8px;
+}
+
+.knowledge-module-height-comparison .knowledge-metric {
+  min-height: 74px;
+  padding: 9px 10px;
+}
+
+.knowledge-module-height-comparison .knowledge-metric-icon {
+  width: 24px;
+  height: 24px;
+  margin-bottom: 5px;
+}
+
+.knowledge-module-height-comparison .knowledge-metric-value {
+  font-size: 14px;
+}
+
+.knowledge-module-height-comparison .knowledge-metric-label {
+  font-size: 11px;
+}
+
 .knowledge-module-lifecycle-loop .knowledge-metric-icon {
   margin: 0 auto 7px;
   width: 34px;
