@@ -1,5 +1,9 @@
 #!/usr/bin/env node
 import worker from "../worker/src/index.js";
+import {
+  KNOWLEDGE_DESIGN_PRINCIPLES,
+  TYPE_COMPOSITION_CONTRACTS,
+} from "../worker/src/knowledgeVisualPlanner.js";
 
 const CASES = [
   {
@@ -214,6 +218,18 @@ function validate(item, body) {
   fail(body.visualPlan?.moduleStyles?.middle === item.middle, `expected middle module ${item.middle}`, failures);
   fail(body.visualPlan?.moduleStyles?.lower === item.lower, `expected lower module ${item.lower}`, failures);
   fail(body.visualPlan?.moduleStyles?.facts === "compact-fact-rows", "expected compact fact rows", failures);
+  fail(body.visualPlan?.designPrinciples?.version === KNOWLEDGE_DESIGN_PRINCIPLES.version, "expected encoded design principle version", failures);
+  fail(body.visualPlan?.designPrinciples?.panelStyle === "transparent-liquid-glass", "expected transparent liquid glass panel principle", failures);
+  fail(body.visualPlan?.designPrinciples?.mapLabelPlacement === "external-callouts", "expected external map callout principle", failures);
+  fail(body.visualPlan?.designPrinciples?.timelineConnectorStyle === "segmented-between-icons", "expected segmented timeline connector principle", failures);
+  fail(body.visualPlan?.designPrinciples?.relatedChipScale === "compact-secondary-nav", "expected compact related chip principle", failures);
+  const contract = TYPE_COMPOSITION_CONTRACTS[item.type] || TYPE_COMPOSITION_CONTRACTS.concept;
+  fail(contract.hero.includes(body.visualPlan?.moduleStyles?.hero), `hero module outside ${item.type} contract`, failures);
+  fail(contract.facts.includes(body.visualPlan?.moduleStyles?.facts), `facts module outside ${item.type} contract`, failures);
+  fail(contract.middle.includes(body.visualPlan?.moduleStyles?.middle), `middle module outside ${item.type} contract`, failures);
+  fail(contract.lower.includes(body.visualPlan?.moduleStyles?.lower), `lower module outside ${item.type} contract`, failures);
+  fail(body.visualPlan?.typeCompositionContract?.hero?.join("|") === contract.hero.join("|"), "response hero contract does not match query type", failures);
+  fail(body.visualPlan?.typeCompositionContract?.middle?.join("|") === contract.middle.join("|"), "response middle contract does not match query type", failures);
   fail(Array.isArray(body.profile?.facts) && body.profile.facts.length >= (item.minFacts || 3), "expected dense key facts", failures);
   fail(Array.isArray(body.profile?.relatedConcepts) && body.profile.relatedConcepts.length >= 3, "expected related chips", failures);
   fail(!/\.{3}|…/.test(body.summary || ""), "primary summary contains ellipsis", failures);

@@ -1,6 +1,16 @@
 const VISUAL_FAMILY = "editorial-knowledge-v1";
 const DEFAULT_TONE = "home-center-dark";
 
+export const KNOWLEDGE_DESIGN_PRINCIPLES = {
+  version: "apollo-penguin-reference-v1",
+  panelStyle: "transparent-liquid-glass",
+  heroTransparency: "match-supporting-panels",
+  mapLabelPlacement: "external-callouts",
+  timelineConnectorStyle: "segmented-between-icons",
+  ornamentStyle: "topic-specific-line-art",
+  relatedChipScale: "compact-secondary-nav",
+};
+
 export const COMPOSITION_PATTERNS = {
   "portrait-right-text-left": {
     subjectPlacement: "right-center",
@@ -161,6 +171,45 @@ const TYPE_DEFAULTS = {
   flora: { subType: "flora/tree", pattern: "tall-subject-forest-depth", motif: "growth-rings", supportingPanelStyle: "height-comparison", mapStyle: "range-glass", badgeStyle: "emerald-flora", atAGlanceStyle: "height-comparison" },
   event: { subType: "event/discovery", pattern: "archival-event-scene", motif: "timeline-arc", supportingPanelStyle: "horizontal-mission-timeline", mapStyle: "us-places-map", badgeStyle: "amber-event", atAGlanceStyle: "timeline-icons" },
   concept: { subType: "concept/abstract-scientific", pattern: "abstract-concept-orbital", motif: "node-mesh", supportingPanelStyle: "process-flow", mapStyle: "none", badgeStyle: "violet-concept", atAGlanceStyle: "icon-metric-columns" },
+};
+
+export const TYPE_COMPOSITION_CONTRACTS = {
+  location: {
+    hero: ["scenic-location"],
+    facts: ["compact-fact-rows"],
+    middle: ["world-map-pin", "map-geography"],
+    lower: ["island-shape-stats", "icon-metric-columns"],
+  },
+  person: {
+    hero: ["portrait-editorial"],
+    facts: ["compact-fact-rows"],
+    middle: ["vertical-timeline"],
+    lower: ["icon-metric-columns"],
+  },
+  fauna: {
+    hero: ["species-closeup-with-environment"],
+    facts: ["compact-fact-rows"],
+    middle: ["habitat-range"],
+    lower: ["lifecycle-loop", "icon-metric-columns"],
+  },
+  flora: {
+    hero: ["scenic-location", "species-closeup-with-environment"],
+    facts: ["compact-fact-rows"],
+    middle: ["range-glass"],
+    lower: ["height-comparison", "icon-metric-columns"],
+  },
+  event: {
+    hero: ["archival-event-scene"],
+    facts: ["compact-fact-rows"],
+    middle: ["us-places-map", "world-map-pin"],
+    lower: ["horizontal-mission-timeline", "icon-metric-columns"],
+  },
+  concept: {
+    hero: ["native-concept-hero", "fallback-graphic"],
+    facts: ["compact-fact-rows"],
+    middle: ["process-flow"],
+    lower: ["icon-metric-columns"],
+  },
 };
 
 const CANONICAL_VISUAL_OVERRIDES = {
@@ -455,6 +504,8 @@ export function buildKnowledgeVisualPlan({
 
   return {
     visualFamily: VISUAL_FAMILY,
+    designPrinciples: KNOWLEDGE_DESIGN_PRINCIPLES,
+    typeCompositionContract: TYPE_COMPOSITION_CONTRACTS[plannedSubtype.queryType] || TYPE_COMPOSITION_CONTRACTS.concept,
     queryType: plannedSubtype.queryType,
     subType: plannedSubtype.subType,
     compositionPattern: pattern,

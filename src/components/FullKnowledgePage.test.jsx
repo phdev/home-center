@@ -250,7 +250,10 @@ describe("FullKnowledgePage", () => {
     expect(screen.getByText("Lunar Landing")).toBeTruthy();
     expect(container.querySelector("svg.knowledge-insight-earth")).toBeTruthy();
     expect(container.querySelectorAll(".knowledge-us-state-highlight")).toHaveLength(2);
+    expect(container.querySelectorAll(".knowledge-place-callout:not(.knowledge-place-callout-empty)")).toHaveLength(2);
+    expect(container.querySelectorAll(".knowledge-us-poi-label")).toHaveLength(0);
     expect(container.querySelector(".knowledge-module-horizontal-mission-timeline")).toBeTruthy();
+    expect(container.querySelectorAll(".knowledge-timeline-connector")).toHaveLength(3);
     expect(screen.getByAltText("Apollo 11 Moon Landing").style.objectPosition).toBe("50% 0%");
   });
 

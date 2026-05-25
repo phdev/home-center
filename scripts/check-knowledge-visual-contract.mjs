@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import worker from "../worker/src/index.js";
+import { KNOWLEDGE_DESIGN_PRINCIPLES } from "../worker/src/knowledgeVisualPlanner.js";
 
 const QUERIES = [
   "Where is Madagascar?",
@@ -183,6 +184,9 @@ function validate(query, body) {
   if (!body.type) failures.push("missing type");
   if (!body.title) failures.push("missing title");
   if (body.visualPlan?.visualFamily !== "editorial-knowledge-v1") failures.push("missing visual plan");
+  if (body.visualPlan?.designPrinciples?.version !== KNOWLEDGE_DESIGN_PRINCIPLES.version) failures.push("missing reference design principles");
+  if (body.visualPlan?.designPrinciples?.panelStyle !== "transparent-liquid-glass") failures.push("missing glass panel principle");
+  if (!body.visualPlan?.typeCompositionContract?.hero?.length) failures.push("missing type composition contract");
   if (!body.visualPlan?.compositionPattern) failures.push("missing composition pattern");
   if (!body.visualPlan?.heroStrategy) failures.push("missing hero strategy");
   if (!body.heroComposition?.pattern) failures.push("missing hero composition package");

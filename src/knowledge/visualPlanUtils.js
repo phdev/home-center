@@ -2,7 +2,9 @@ import {
   COMPOSITION_PATTERNS,
   DEFAULT_VISUAL_PLAN,
   HERO_STRATEGIES,
+  KNOWLEDGE_DESIGN_PRINCIPLES,
   TEXT_SAFE_ZONES,
+  TYPE_COMPOSITION_CONTRACTS,
   VISUAL_FAMILIES,
 } from "./visualPlanTypes";
 
@@ -28,15 +30,37 @@ function normalizeModuleStyles(value = {}, fallback = DEFAULT_VISUAL_PLAN.module
   };
 }
 
+function normalizeDesignPrinciples(value = {}) {
+  return {
+    ...KNOWLEDGE_DESIGN_PRINCIPLES,
+    ...Object.fromEntries(
+      Object.entries(value || {}).map(([key, entry]) => [key, text(entry, 64)]),
+    ),
+  };
+}
+
+function normalizeCompositionContract(queryType, value = {}) {
+  const fallback = TYPE_COMPOSITION_CONTRACTS[queryType] || TYPE_COMPOSITION_CONTRACTS.concept;
+  return {
+    hero: Array.isArray(value.hero) && value.hero.length ? value.hero.map((item) => text(item, 48)) : fallback.hero,
+    facts: Array.isArray(value.facts) && value.facts.length ? value.facts.map((item) => text(item, 48)) : fallback.facts,
+    middle: Array.isArray(value.middle) && value.middle.length ? value.middle.map((item) => text(item, 48)) : fallback.middle,
+    lower: Array.isArray(value.lower) && value.lower.length ? value.lower.map((item) => text(item, 48)) : fallback.lower,
+  };
+}
+
 export function normalizeVisualPlan(response = {}) {
   const raw = response?.visualPlan || response?.visual?.plan || {};
   const fallback = {
     ...DEFAULT_VISUAL_PLAN,
     queryType: response?.type || DEFAULT_VISUAL_PLAN.queryType,
   };
+  const queryType = text(raw.queryType || fallback.queryType, 32);
   return {
     visualFamily: valueIn(raw.visualFamily, VISUAL_FAMILIES, fallback.visualFamily),
-    queryType: text(raw.queryType || fallback.queryType, 32),
+    designPrinciples: normalizeDesignPrinciples(raw.designPrinciples),
+    typeCompositionContract: normalizeCompositionContract(queryType, raw.typeCompositionContract),
+    queryType,
     subType: text(raw.subType || fallback.subType, 48),
     compositionPattern: valueIn(raw.compositionPattern, COMPOSITION_PATTERNS, fallback.compositionPattern),
     heroStrategy: valueIn(raw.heroStrategy, HERO_STRATEGIES, fallback.heroStrategy),
