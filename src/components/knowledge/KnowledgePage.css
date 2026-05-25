@@ -630,16 +630,12 @@ body[data-design-system="v2"] .knowledge-page .hc-full-page-bg {
 .knowledge-insight-snowflake-b { right: 34px; top: 76px; }
 .knowledge-insight-snowflake-c { right: 104px; bottom: 28px; }
 
-.knowledge-insight-redwood-leaf {
+.knowledge-insight-sprout {
   position: absolute;
-  right: 18px;
-  top: 4px;
-  width: 43%;
-  height: calc(100% - 8px);
-  object-fit: contain;
-  object-position: right center;
-  opacity: 0.72;
-  filter: drop-shadow(0 0 18px color-mix(in srgb, var(--knowledge-accent) 25%, transparent));
+  right: 92px;
+  top: 42px;
+  opacity: 0.42;
+  stroke-width: 1.35;
 }
 
 .knowledge-insight-earth {
