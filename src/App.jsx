@@ -193,6 +193,80 @@ const EMPEROR_PENGUIN_KNOWLEDGE_RESPONSE = {
   timestamp: Date.now(),
 };
 
+const ADA_LOVELACE_KNOWLEDGE_RESPONSE = {
+  kind: "knowledge",
+  query: "Who was Ada Lovelace?",
+  title: "Ada Lovelace",
+  type: "person",
+  summary: "Ada Lovelace was an English mathematician and writer best known for her work on Charles Babbage's Analytical Engine. Her notes described how a machine could manipulate symbols, which is why she is often called the first computer programmer.",
+  sections: [
+    {
+      heading: "Who She Was",
+      content: "Ada Lovelace, full name Augusta Ada King, Countess of Lovelace, lived from 1815 to 1852. She translated and expanded an article about Babbage's proposed mechanical computer, adding notes that imagined uses beyond calculation.",
+    },
+  ],
+  profile: {
+    facts: [
+      { label: "Date born", value: "1815", icon: "calendar" },
+      { label: "Lifespan", value: "1815-1852", icon: "timeline" },
+      { label: "Notable for", value: "First computer programmer", icon: "lightbulb" },
+      { label: "Legacy", value: "Computing pioneer", icon: "spark" },
+    ],
+    maps: [],
+    relatedConcepts: ["Analytical Engine", "computer programming", "Charles Babbage"],
+  },
+  timeline: [
+    { date: "1815", label: "Born", description: "London, England" },
+    { date: "1840s", label: "Wrote Notes", description: "Expanded Menabrea's Analytical Engine paper" },
+    { date: "1852", label: "Died", description: "Her computing legacy grew much later" },
+  ],
+  infographics: [{
+    title: "Why She Is Famous",
+    kind: "metrics",
+    description: "Compare calculation only versus computation with broader applications.",
+    items: [
+      { label: "Calculation", value: "Numbers", icon: "calculator" },
+      { label: "Programming", value: "Ideas", icon: "network" },
+    ],
+  }],
+  imageUrl: "https://upload.wikimedia.org/wikipedia/commons/a/a4/Ada_Lovelace_portrait.jpg",
+  image: {
+    url: "https://upload.wikimedia.org/wikipedia/commons/a/a4/Ada_Lovelace_portrait.jpg",
+    source: "Wikimedia Commons",
+    mode: "pinned",
+    sourceUrl: "https://commons.wikimedia.org/wiki/File:Ada_Lovelace_portrait.jpg",
+    focalPoint: { x: 0.58, y: 0.34 },
+    cropHint: "right-subject",
+    tone: "home-center-dark",
+    alt: "Ada Lovelace portrait",
+  },
+  visualPlan: {
+    visualFamily: "editorial-knowledge-v1",
+    queryType: "person",
+    subType: "person/historical-scientist",
+    compositionPattern: "portrait-right-text-left",
+    heroStrategy: "retrieved-single-subject",
+    textSafeZone: "left",
+    focalRegion: "right-top",
+    tone: "home-center-dark",
+    contrastLevel: "medium-high",
+    motifStrategy: "technical-sketch",
+    supportingPanelStyle: "vertical-timeline",
+    mapStyle: "none",
+    badgeStyle: "gold-person",
+    atAGlanceStyle: "icon-metric-columns",
+    backgroundTreatment: "navy-glass-vignette",
+    moduleStyles: {
+      hero: "portrait-editorial",
+      facts: "compact-fact-rows",
+      middle: "vertical-timeline",
+      lower: "icon-metric-columns",
+    },
+  },
+  imageSourceType: "known",
+  timestamp: Date.now(),
+};
+
 const APOLLO_11_KNOWLEDGE_RESPONSE = {
   kind: "knowledge",
   query: "What happened during Apollo 11?",
@@ -423,7 +497,9 @@ export default function App() {
         ? APOLLO_11_KNOWLEDGE_RESPONSE
         : urlParams.get("knowledgeFixture") === "emperor-penguin"
           ? EMPEROR_PENGUIN_KNOWLEDGE_RESPONSE
-          : PREVIEW_KNOWLEDGE_RESPONSE)
+          : urlParams.get("knowledgeFixture") === "ada-lovelace"
+            ? ADA_LOVELACE_KNOWLEDGE_RESPONSE
+            : PREVIEW_KNOWLEDGE_RESPONSE)
       : requestedPage === "llm-response"
         ? PREVIEW_LLM_RESPONSE
         : null;
