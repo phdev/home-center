@@ -64,6 +64,31 @@ page and supporting modules explaining why the person matters.
 - At A Glance should summarize exactly three contribution concepts with icons.
   These are conceptual handles, not trivia or duplicate timeline entries.
 
+## Flora Pages
+
+Coast Redwood is the Flora-page reference. Flora pages should read as living
+systems in place: a plant specimen or forest environment anchored by a hero,
+then supporting modules that explain range, scale, growth, and ecological role.
+
+- Keep the scenic/species hero. Do not replace the hero with the Ecosystem Role
+  ornament, leaf art, or another supporting graphic. For tree-scale subjects,
+  prefer `scenic-location` with `tall-subject-forest-depth`; for smaller plants,
+  use `species-closeup-with-environment`.
+- Treat supporting plant art as secondary line art. Ecosystem ornaments should
+  stay in the topic-specific accent family, preserve their source proportions,
+  and sit behind or beside text without crowding it.
+- Use the Flora accent consistently across non-white UI text, icon art, bottom
+  labels, and related chips. Do not leave older green tab accents on Flora pages
+  when the accepted design uses the yellow/orange Flora accent.
+- Facts should lead with species identity and the strongest scale fact. Range,
+  climate niche, and ecology details belong in the map/glance/insight modules
+  unless they are the most important scannable fact.
+- The middle module should explain range or habitat using `range-glass`; keep map
+  labels clear and avoid overloading the hero with map information.
+- The lower module should make plant scale and growth legible through
+  `height-comparison` or compact icon metrics, not a generic lifecycle diagram
+  unless lifecycle is the actual subject of the query.
+
 ## Golden References
 
 - Apollo 11 validates the event contract: archival hero, blue Places map with
@@ -77,6 +102,12 @@ page and supporting modules explaining why the person matters.
   detail expands in the middle, the final item is labeled Legacy instead of a
   year, the standalone Legacy section explains practical modern relevance, and
   At A Glance presents three icon-led contribution concepts.
+- Coast Redwood validates the flora contract: scenic forest hero stays primary,
+  facts emphasize species and exceptional height, the middle range module keeps
+  habitat separate from the hero, the Ecosystem Role ornament is accent-tinted
+  supporting line art, related chips and bottom label use the Flora accent, and
+  accepted remote hero imagery should be pinned locally before screenshots or Pi
+  deployment are treated as final.
 
 ## Implementation Hooks
 

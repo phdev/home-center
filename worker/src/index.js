@@ -1852,6 +1852,46 @@ function deterministicKnowledgeAnswer(query, subject, classification = {}) {
     };
   }
 
+  if (/\binternet\b/i.test(`${subject} ${query}`)) {
+    return {
+      type: "concept",
+      title: "The Internet",
+      summary:
+        "The Internet is a global network of networks that lets computers move data by breaking information into packets, routing those packets across many connected systems, and reassembling them at the destination.",
+      sections: [
+        {
+          heading: "Key Idea",
+          content:
+            "No single machine is the Internet. It works because many independent networks agree on shared protocols for addressing, routing, and delivering data.",
+        },
+      ],
+      profile: {
+        facts: [
+          { label: "Started", value: "1960s-1980s", icon: "calendar" },
+          { label: "Core method", value: "Packet switching", icon: "network" },
+          { label: "Scale", value: "Global network", icon: "globe" },
+        ],
+        maps: [],
+        relatedConcepts: ["packet switching", "TCP/IP", "World Wide Web"],
+      },
+      infographics: [
+        {
+          title: "Packet Flow",
+          kind: "process",
+          description: "Requests move through shared protocols instead of one central path.",
+          items: [
+            { label: "Request", value: "Device asks", icon: "code" },
+            { label: "Address", value: "DNS/IP", icon: "network" },
+            { label: "Route", value: "Packets hop", icon: "cog" },
+            { label: "Rebuild", value: "Page loads", icon: "code" },
+          ],
+        },
+      ],
+      visualNeed: "none",
+      imageSourceType: "none",
+    };
+  }
+
   if (/\bsun\b/i.test(subject) && /\bhow\s+(?:big|large|wide)\b/i.test(query)) {
     return {
       type: "concept",

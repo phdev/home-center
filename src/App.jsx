@@ -410,6 +410,68 @@ const COAST_REDWOOD_KNOWLEDGE_RESPONSE = {
   timestamp: Date.now(),
 };
 
+const INTERNET_KNOWLEDGE_RESPONSE = {
+  kind: "knowledge",
+  query: "What is the internet?",
+  title: "The Internet",
+  type: "concept",
+  summary: "The Internet is a global network of networks that lets computers move data by breaking information into packets, routing those packets across many connected systems, and reassembling them at the destination.",
+  sections: [
+    {
+      heading: "Key Idea",
+      content: "No single machine is the Internet. It works because many independent networks agree on shared protocols for addressing, routing, and delivering data.",
+    },
+  ],
+  profile: {
+    facts: [
+      { label: "Started", value: "1960s-1980s", icon: "calendar" },
+      { label: "Core method", value: "Packet switching", icon: "network" },
+      { label: "Scale", value: "Global network", icon: "globe" },
+    ],
+    maps: [],
+    relatedConcepts: ["packet switching", "TCP/IP", "World Wide Web"],
+  },
+  infographics: [{
+    title: "Packet Flow",
+    kind: "process",
+    description: "Requests move through shared protocols instead of one central path.",
+    items: [
+      { label: "Request", value: "Device asks", icon: "code" },
+      { label: "Address", value: "DNS/IP", icon: "network" },
+      { label: "Route", value: "Packets hop", icon: "cog" },
+      { label: "Rebuild", value: "Page loads", icon: "code" },
+    ],
+  }],
+  imageUrl: null,
+  image: null,
+  imageSourceType: "none",
+  visualNeed: "none",
+  visualPlan: {
+    visualFamily: "editorial-knowledge-v1",
+    queryType: "concept",
+    subType: "concept/network",
+    compositionPattern: "abstract-concept-orbital",
+    heroStrategy: "abstract-concept",
+    textSafeZone: "balanced",
+    focalRegion: "center-center",
+    tone: "home-center-dark",
+    contrastLevel: "high",
+    motifStrategy: "node-mesh",
+    supportingPanelStyle: "process-flow",
+    mapStyle: "none",
+    badgeStyle: "violet-concept",
+    atAGlanceStyle: "icon-metric-columns",
+    backgroundTreatment: "navy-abstract-linework",
+    moduleStyles: {
+      hero: "native-concept-hero",
+      facts: "compact-fact-rows",
+      middle: "process-flow",
+      lower: "icon-metric-columns",
+    },
+  },
+  timestamp: Date.now(),
+};
+
 const KNOWLEDGE_LOADING_RESPONSE = {
   kind: "knowledge",
   query: "Knowledge query in progress",
@@ -577,6 +639,8 @@ export default function App() {
             ? ADA_LOVELACE_KNOWLEDGE_RESPONSE
             : urlParams.get("knowledgeFixture") === "coast-redwood"
               ? COAST_REDWOOD_KNOWLEDGE_RESPONSE
+              : urlParams.get("knowledgeFixture") === "internet"
+                ? INTERNET_KNOWLEDGE_RESPONSE
             : PREVIEW_KNOWLEDGE_RESPONSE)
       : requestedPage === "llm-response"
         ? PREVIEW_LLM_RESPONSE

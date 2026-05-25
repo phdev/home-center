@@ -9,7 +9,8 @@ function FactIcon({ icon, fallback }) {
 }
 
 export function KeyFactsCard({ facts, moduleStyle = "compact-fact-rows" }) {
-  const items = Array.isArray(facts) ? facts.filter((fact) => fact.label && fact.value).slice(0, 6) : [];
+  const visibleFactCount = moduleStyle === "compact-fact-rows" ? 2 : 6;
+  const items = Array.isArray(facts) ? facts.filter((fact) => fact.label && fact.value).slice(0, visibleFactCount) : [];
   return (
     <section className={`knowledge-card knowledge-card-pad knowledge-facts-card knowledge-module-${moduleStyle}`}>
       <h2 className="knowledge-card-title">Key Facts</h2>
