@@ -1,4 +1,5 @@
 export function ProcessDiagram({ items = [], accent = "#b993ff" }) {
+  const secondaryAccent = accent;
   const steps = items.length ? items.slice(0, 4) : [
     { label: "Input", value: "Start" },
     { label: "Process", value: "Change" },
@@ -9,19 +10,19 @@ export function ProcessDiagram({ items = [], accent = "#b993ff" }) {
     if (icon === "devices") {
       return (
         <g transform={`translate(${x - 28} 82)`}>
-          <rect x="0" y="0" width="34" height="23" rx="2" fill="none" stroke="#dfe8ff" strokeWidth="3" />
-          <path d="M-5 31h44" stroke="#dfe8ff" strokeWidth="3" strokeLinecap="round" />
-          <rect x="39" y="8" width="14" height="25" rx="2" fill="none" stroke="#7fb8ff" strokeWidth="3" />
+          <rect x="0" y="0" width="34" height="23" rx="2" fill="none" stroke={accent} strokeWidth="3" />
+          <path d="M-5 31h44" stroke={accent} strokeWidth="3" strokeLinecap="round" />
+          <rect x="39" y="8" width="14" height="25" rx="2" fill="none" stroke={secondaryAccent} strokeWidth="3" />
         </g>
       );
     }
     if (icon === "router") {
       return (
         <g transform={`translate(${x - 28} 68)`}>
-          <rect x="0" y="30" width="56" height="20" rx="4" fill="none" stroke="#dfe8ff" strokeWidth="3" />
+          <rect x="0" y="30" width="56" height="20" rx="4" fill="none" stroke={accent} strokeWidth="3" />
           <circle cx="12" cy="40" r="2.5" fill={accent} />
           <circle cx="23" cy="40" r="2.5" fill={accent} />
-          <path d="M16 18c7-7 17-7 24 0M9 10c11-11 31-11 42 0" fill="none" stroke="#dfe8ff" strokeWidth="3" strokeLinecap="round" />
+          <path d="M16 18c7-7 17-7 24 0M9 10c11-11 31-11 42 0" fill="none" stroke={accent} strokeWidth="3" strokeLinecap="round" />
         </g>
       );
     }
@@ -29,7 +30,7 @@ export function ProcessDiagram({ items = [], accent = "#b993ff" }) {
       return (
         <g transform={`translate(${x - 25} 75)`}>
           {[0, 1, 2, 3].map((row) => [0, 1, 2, 3].map((col) => (
-            <rect key={`${row}-${col}`} x={col * 13} y={row * 13} width="8" height="8" rx="1.5" fill={col % 2 === row % 2 ? accent : "#7fb8ff"} opacity="0.9" />
+            <rect key={`${row}-${col}`} x={col * 13} y={row * 13} width="8" height="8" rx="1.5" fill={col % 2 === row % 2 ? accent : secondaryAccent} opacity={col % 2 === row % 2 ? "0.9" : "0.68"} />
           )))}
         </g>
       );
@@ -39,7 +40,7 @@ export function ProcessDiagram({ items = [], accent = "#b993ff" }) {
         <g transform={`translate(${x - 19} 65)`}>
           {[0, 1, 2].map((row) => (
             <g key={row} transform={`translate(0 ${row * 24})`}>
-              <rect x="0" y="0" width="38" height="18" rx="3" fill="none" stroke="#dfe8ff" strokeWidth="3" />
+              <rect x="0" y="0" width="38" height="18" rx="3" fill="none" stroke={accent} strokeWidth="3" />
               <circle cx="28" cy="9" r="2.5" fill={accent} />
             </g>
           ))}
