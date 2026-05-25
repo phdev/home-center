@@ -620,74 +620,17 @@ body[data-design-system="v2"] .knowledge-page .hc-full-page-bg {
 .knowledge-insight-earth {
   position: absolute;
   right: 42px;
-  top: 12px;
-  width: 156px;
+  top: 4px;
+  width: 170px;
   aspect-ratio: 1;
   color: var(--knowledge-accent);
-  opacity: 0.86;
+  opacity: 0.92;
   overflow: visible;
-  filter: drop-shadow(0 0 20px color-mix(in srgb, var(--knowledge-accent) 34%, transparent));
+  filter: drop-shadow(0 0 18px color-mix(in srgb, var(--knowledge-accent) 38%, transparent));
 }
 
-.knowledge-earth-halo {
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 0.8;
-  stroke-dasharray: 1.5 8;
-  stroke-linecap: round;
-  opacity: 0.24;
-}
-
-.knowledge-earth-fill {
-  fill: url(#knowledge-earth-glow);
-}
-
-.knowledge-earth-outline,
-.knowledge-earth-grid,
-.knowledge-earth-coast,
-.knowledge-earth-dot {
-  fill: none;
-  stroke: currentColor;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-
-.knowledge-earth-outline {
-  stroke-width: 1.05;
-  opacity: 0.9;
-}
-
-.knowledge-earth-grid {
-  stroke-width: 0.75;
-  opacity: 0.38;
-}
-
-.knowledge-earth-grid-soft {
-  opacity: 0.24;
-}
-
-.knowledge-earth-coast {
-  stroke-width: 0.95;
-  opacity: 0.52;
-}
-
-.knowledge-earth-coast-major {
-  stroke-width: 1.15;
-  opacity: 0.7;
-}
-
-.knowledge-earth-coast-faint {
-  opacity: 0.24;
-}
-
-.knowledge-earth-dot {
-  fill: currentColor;
-  stroke: none;
-  opacity: 0.68;
-}
-
-.knowledge-earth-dot-soft {
-  opacity: 0.38;
+.knowledge-earth-source {
+  color: inherit;
 }
 
 .knowledge-insight-star {
