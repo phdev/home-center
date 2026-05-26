@@ -119,10 +119,14 @@ describe("FullKnowledgePage", () => {
         ],
         relatedConcepts: [],
       },
+      visualPlan: {
+        moduleStyles: { facts: "compact-fact-rows", middle: "world-map-pin", lower: "island-shape-stats" },
+      },
       infographics: [{
         title: "Island scale",
         kind: "comparison",
         description: "Compare Madagascar with nearby land areas.",
+        visual: { url: "/home-center/knowledge-assets/madagascar-island-relief.svg", alt: "Madagascar relief map" },
         items: [{ label: "Area", value: "587,041 km²" }],
       }],
     })} onBack={() => {}} />);
@@ -131,6 +135,7 @@ describe("FullKnowledgePage", () => {
     expect(screen.getAllByText("587,041 km²").length).toBeGreaterThan(0);
     expect(screen.getByLabelText("World map")).toBeTruthy();
     expect(screen.getByText("Island scale")).toBeTruthy();
+    expect(screen.getByAltText("Madagascar relief map")).toBeTruthy();
   });
 
   it("renders every knowledge type with the expected category label", () => {

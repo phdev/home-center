@@ -1138,6 +1138,28 @@ describe("knowledge image pipeline", () => {
     });
   });
 
+  it("returns the curated Madagascar facts and glance visual", async () => {
+    const currentEnv = env();
+    global.fetch = defaultFetchMock();
+
+    const body = await askAndRead(currentEnv, "Where is Madagascar?");
+
+    expect(body.profile.facts).toEqual(expect.arrayContaining([
+      expect.objectContaining({ label: "Area", value: "587,041 sq km" }),
+      expect.objectContaining({ label: "Capital", value: "Antananarivo" }),
+    ]));
+    expect(body.infographics[0]).toMatchObject({
+      title: "At A Glance",
+      visual: {
+        url: "/home-center/knowledge-assets/madagascar-island-relief.svg",
+      },
+    });
+    expect(body.infographics[0].items).toEqual(expect.arrayContaining([
+      expect.objectContaining({ label: "Species", value: "200,000+" }),
+      expect.objectContaining({ label: "Endemic", value: "90%+" }),
+    ]));
+  });
+
   it("uses a pinned curated asset before retrieved candidates", async () => {
     const currentEnv = env({
       CURATED_KNOWLEDGE_ASSETS_JSON: JSON.stringify([{

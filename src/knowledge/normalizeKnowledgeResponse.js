@@ -93,6 +93,12 @@ function normalizeGlance(response, type) {
   return {
     title: titleFromHeading(preferred?.title || preferred?.type, defaultTitle),
     description: text(preferred?.description, 180),
+    visual: preferred?.visual && typeof preferred.visual === "object"
+      ? {
+        url: text(preferred.visual.url, 180),
+        alt: text(preferred.visual.alt, 120),
+      }
+      : null,
     metrics,
   };
 }

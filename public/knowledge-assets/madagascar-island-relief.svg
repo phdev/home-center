@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 300" role="img" aria-labelledby="title desc">
+  <title id="title">Madagascar relief silhouette</title>
+  <desc id="desc">A teal and violet relief-style silhouette of Madagascar for the At A Glance panel.</desc>
+  <defs>
+    <linearGradient id="madagascarFill" x1="36" y1="26" x2="184" y2="274" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#9cffd9"/>
+      <stop offset="0.44" stop-color="#48e0d5"/>
+      <stop offset="0.72" stop-color="#7d6bff"/>
+      <stop offset="1" stop-color="#271950"/>
+    </linearGradient>
+    <radialGradient id="madagascarGlow" cx="48%" cy="36%" r="62%">
+      <stop offset="0" stop-color="#e7fff4" stop-opacity="0.82"/>
+      <stop offset="0.42" stop-color="#58f0da" stop-opacity="0.42"/>
+      <stop offset="1" stop-color="#4b2a9d" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="softLift" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="12" stdDeviation="10" flood-color="#020817" flood-opacity="0.48"/>
+      <feDropShadow dx="0" dy="0" stdDeviation="5" flood-color="#4de9e0" flood-opacity="0.28"/>
+    </filter>
+    <clipPath id="islandClip">
+      <path d="M126.6 8.8c-11.9 4.9-22.1 12.9-25.6 24.7-2.7 8.9-1.9 18.8-7.4 26.7-8.8 12.9-20.7 22.5-23.2 39.1-2.1 14.1 1.7 28.5-2.9 42.3-3.2 9.6-11 17.1-13.9 26.8-4.5 14.8.9 31.4 9.1 44.2 7.6 11.9 19.5 21.6 24.3 35.1 5.1 14.4.6 30.9 9.4 44.3 8.8 2.5 18.5-3.2 24.2-9.9 8.8-10.2 8.4-24.6 12.8-36.7 5.5-15.2 17.7-27.3 24.2-42.1 6.2-14.2 4.9-30.8 10.7-45.2 5.6-13.8 17.2-25.5 18.9-40.6 1.9-16.4-8.5-30.7-12.6-46.2-4.5-17.1-2.5-35.7-11.6-51.6-7-12.3-20.7-23.2-36.4-20.9z"/>
+    </clipPath>
+  </defs>
+  <path filter="url(#softLift)" fill="url(#madagascarFill)" d="M126.6 8.8c-11.9 4.9-22.1 12.9-25.6 24.7-2.7 8.9-1.9 18.8-7.4 26.7-8.8 12.9-20.7 22.5-23.2 39.1-2.1 14.1 1.7 28.5-2.9 42.3-3.2 9.6-11 17.1-13.9 26.8-4.5 14.8.9 31.4 9.1 44.2 7.6 11.9 19.5 21.6 24.3 35.1 5.1 14.4.6 30.9 9.4 44.3 8.8 2.5 18.5-3.2 24.2-9.9 8.8-10.2 8.4-24.6 12.8-36.7 5.5-15.2 17.7-27.3 24.2-42.1 6.2-14.2 4.9-30.8 10.7-45.2 5.6-13.8 17.2-25.5 18.9-40.6 1.9-16.4-8.5-30.7-12.6-46.2-4.5-17.1-2.5-35.7-11.6-51.6-7-12.3-20.7-23.2-36.4-20.9z"/>
+  <g clip-path="url(#islandClip)">
+    <rect width="220" height="300" fill="url(#madagascarGlow)"/>
+    <path fill="none" stroke="#eafffb" stroke-opacity="0.42" stroke-width="2.4" d="M102 33c25 8 45 28 51 53 5 20-1 41 8 60 5 12 16 22 14 36-2 19-23 27-30 44-5 12-3 27-13 37"/>
+    <path fill="none" stroke="#061a2a" stroke-opacity="0.32" stroke-width="1.6" d="M86 91c24 4 43 15 55 32 14 20 13 46 23 68M72 157c17 11 33 15 49 13 20-2 33-13 53-10M90 212c20 8 38 8 55-3M105 52c10 21 9 43 0 65-8 20-20 36-20 58 0 23 17 39 24 59"/>
+    <path fill="none" stroke="#a8fff0" stroke-opacity="0.52" stroke-width="1.2" d="M117 25c9 36 5 73-11 107-13 28-23 58-9 88M139 51c-8 17-10 34-5 52 5 19 19 35 18 56-1 22-18 39-24 59"/>
+    <circle cx="132" cy="63" r="18" fill="#e5fff5" opacity="0.16"/>
+    <circle cx="105" cy="138" r="28" fill="#d9fff0" opacity="0.1"/>
+    <circle cx="134" cy="210" r="24" fill="#b993ff" opacity="0.16"/>
+  </g>
+  <path fill="none" stroke="#d9fff8" stroke-opacity="0.74" stroke-width="2.2" d="M126.6 8.8c-11.9 4.9-22.1 12.9-25.6 24.7-2.7 8.9-1.9 18.8-7.4 26.7-8.8 12.9-20.7 22.5-23.2 39.1-2.1 14.1 1.7 28.5-2.9 42.3-3.2 9.6-11 17.1-13.9 26.8-4.5 14.8.9 31.4 9.1 44.2 7.6 11.9 19.5 21.6 24.3 35.1 5.1 14.4.6 30.9 9.4 44.3 8.8 2.5 18.5-3.2 24.2-9.9 8.8-10.2 8.4-24.6 12.8-36.7 5.5-15.2 17.7-27.3 24.2-42.1 6.2-14.2 4.9-30.8 10.7-45.2 5.6-13.8 17.2-25.5 18.9-40.6 1.9-16.4-8.5-30.7-12.6-46.2-4.5-17.1-2.5-35.7-11.6-51.6-7-12.3-20.7-23.2-36.4-20.9z"/>
+</svg>

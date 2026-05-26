@@ -505,9 +505,10 @@ const MADAGASCAR_KNOWLEDGE_RESPONSE = {
   ],
   profile: {
     facts: [
+      { label: "Area", value: "587,041 sq km", icon: "map" },
+      { label: "Capital", value: "Antananarivo", icon: "city" },
       { label: "Region", value: "Indian Ocean", icon: "globe" },
       { label: "Nearest mainland", value: "Southeast Africa", icon: "map" },
-      { label: "Capital", value: "Antananarivo", icon: "city" },
     ],
     maps: [
       {
@@ -524,11 +525,15 @@ const MADAGASCAR_KNOWLEDGE_RESPONSE = {
   infographics: [{
     title: "At A Glance",
     kind: "metrics",
-    description: "Island scale, position, and identity.",
+    description: "A world of its own: most wildlife here is found nowhere else on Earth.",
+    visual: {
+      url: "/home-center/knowledge-assets/madagascar-island-relief.svg",
+      alt: "Relief silhouette of Madagascar",
+    },
     items: [
-      { label: "Island country", value: "4th largest island", icon: "globe" },
-      { label: "Separation", value: "Mozambique Channel", icon: "map" },
-      { label: "Capital", value: "Antananarivo", icon: "city" },
+      { label: "Species", value: "200,000+", icon: "paw" },
+      { label: "Endemic", value: "90%+", icon: "flora" },
+      { label: "Unique biomes", value: "5", icon: "globe" },
     ],
   }],
   imageUrl: "/home-center/knowledge-assets/madagascar-baobabs.jpg",

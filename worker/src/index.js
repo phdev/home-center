@@ -1710,6 +1710,7 @@ function sanitizeKnowledgeProfile(rawProfile, type = "concept", subject = "") {
           label: compactText(fact?.label, 42),
           value: compactText(fact?.value, 80),
           detail: compactText(fact?.detail, 140),
+          icon: compactText(fact?.icon, 24),
         }))
         .filter((fact) => fact.label && fact.value)
         .slice(0, 6)
@@ -1751,10 +1752,18 @@ function sanitizeKnowledgeInfographics(rawInfographics, legacyInfographic) {
             .map((entry) => ({
               label: compactText(entry?.label, 44),
               value: compactText(entry?.value, 80),
+              detail: compactText(entry?.detail || entry?.sublabel, 80),
+              icon: compactText(entry?.icon, 24),
             }))
             .filter((entry) => entry.label && entry.value)
             .slice(0, 6)
         : [],
+      visual: item?.visual && typeof item.visual === "object"
+        ? {
+          url: compactText(item.visual.url, 180),
+          alt: compactText(item.visual.alt, 120),
+        }
+        : null,
     }))
     .filter((item) => item.title || item.items.length)
     .slice(0, 2);
@@ -1900,6 +1909,52 @@ function deterministicKnowledgeAnswer(query, subject, classification = {}) {
       visualNeed: "useful",
       imageSourceType: "known",
       imageQuery: "The Internet layered global network hero visual",
+    };
+  }
+
+  if (/\bmadagascar\b/i.test(`${subject} ${query}`)) {
+    return {
+      type: "location",
+      title: "Madagascar",
+      summary:
+        "Madagascar is a large island country in the Indian Ocean off the southeastern coast of Africa.",
+      sections: [
+        {
+          heading: "Key Idea",
+          content:
+            "It sits east of Mozambique across the Mozambique Channel. Its long isolation helped create distinctive landscapes and species found nowhere else.",
+        },
+      ],
+      profile: {
+        facts: [
+          { label: "Area", value: "587,041 sq km", icon: "map" },
+          { label: "Capital", value: "Antananarivo", icon: "city" },
+          { label: "Region", value: "Indian Ocean", icon: "globe" },
+        ],
+        maps: [
+          { scope: "world", label: "Madagascar", value: "East of Mozambique" },
+        ],
+        relatedConcepts: ["Indian Ocean", "Mozambique Channel", "biodiversity"],
+      },
+      infographics: [
+        {
+          title: "At A Glance",
+          kind: "metrics",
+          description: "A world of its own: most wildlife here is found nowhere else on Earth.",
+          visual: {
+            url: "/home-center/knowledge-assets/madagascar-island-relief.svg",
+            alt: "Relief silhouette of Madagascar",
+          },
+          items: [
+            { label: "Species", value: "200,000+", icon: "paw" },
+            { label: "Endemic", value: "90%+", icon: "flora" },
+            { label: "Unique biomes", value: "5", icon: "globe" },
+          ],
+        },
+      ],
+      visualNeed: "useful",
+      imageSourceType: "known",
+      imageQuery: "Madagascar map Indian Ocean off southeastern coast of Africa",
     };
   }
 
