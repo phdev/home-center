@@ -177,7 +177,7 @@ body[data-design-system="v2"] .knowledge-page .hc-full-page-bg {
   position: relative;
   display: block;
   isolation: isolate;
-  background: linear-gradient(145deg, rgba(14, 30, 48, 0.055), rgba(5, 14, 28, 0.018));
+  background: linear-gradient(145deg, rgba(14, 30, 48, 0.035), rgba(5, 14, 28, 0.01));
 }
 
 .knowledge-hero-copy {
@@ -188,8 +188,8 @@ body[data-design-system="v2"] .knowledge-page .hc-full-page-bg {
   padding: 28px 28px 28px;
   display: flex;
   flex-direction: column;
-  justify-content: center;
-  gap: 18px;
+  justify-content: flex-start;
+  gap: 14px;
   min-width: 0;
 }
 
@@ -379,9 +379,9 @@ body[data-design-system="v2"] .knowledge-page .hc-full-page-bg {
   position: absolute;
   inset: 0;
   background:
-    linear-gradient(90deg, rgba(3, 8, 20, 0.62), rgba(3, 8, 20, 0.36) 34%, rgba(3, 8, 20, 0.02) 66%),
-    linear-gradient(0deg, rgba(2, 6, 23, 0.24), rgba(2, 6, 23, 0.02) 52%),
-    radial-gradient(circle at 14% 18%, color-mix(in srgb, var(--knowledge-accent) 22%, transparent), transparent 44%);
+    linear-gradient(90deg, rgba(3, 8, 20, 0.46), rgba(3, 8, 20, 0.25) 34%, rgba(3, 8, 20, 0.01) 66%),
+    linear-gradient(0deg, rgba(2, 6, 23, 0.16), rgba(2, 6, 23, 0.01) 52%),
+    radial-gradient(circle at 14% 18%, color-mix(in srgb, var(--knowledge-accent) 16%, transparent), transparent 44%);
   pointer-events: none;
   z-index: 2;
 }
