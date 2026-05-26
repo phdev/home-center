@@ -126,7 +126,7 @@ describe("FullKnowledgePage", () => {
         title: "Island scale",
         kind: "comparison",
         description: "Compare Madagascar with nearby land areas.",
-        visual: { url: "/home-center/knowledge-assets/madagascar-geography-teal.jpg", alt: "Madagascar satellite map" },
+        visual: { url: "/home-center/knowledge-assets/madagascar-relief-teal.png", alt: "Teal relief map of Madagascar" },
         items: [{ label: "Area", value: "587,041 km²" }],
       }],
     })} onBack={() => {}} />);
@@ -135,7 +135,7 @@ describe("FullKnowledgePage", () => {
     expect(screen.getAllByText("587,041 km²").length).toBeGreaterThan(0);
     expect(screen.getByLabelText("World map")).toBeTruthy();
     expect(screen.getByText("Island scale")).toBeTruthy();
-    expect(screen.getByAltText("Madagascar satellite map")).toBeTruthy();
+    expect(screen.getByAltText("Teal relief map of Madagascar")).toBeTruthy();
   });
 
   it("renders every knowledge type with the expected category label", () => {
