@@ -1151,7 +1151,7 @@ describe("knowledge image pipeline", () => {
     expect(body.infographics[0]).toMatchObject({
       title: "At A Glance",
       visual: {
-        url: "/home-center/knowledge-assets/madagascar-relief-teal.png",
+        url: "/home-center/knowledge-assets/madagascar-island-relief.svg",
       },
     });
     expect(body.infographics[0].items).toEqual(expect.arrayContaining([

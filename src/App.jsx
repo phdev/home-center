@@ -527,7 +527,7 @@ const MADAGASCAR_KNOWLEDGE_RESPONSE = {
     kind: "metrics",
     description: "A world of its own: most wildlife here is found nowhere else on Earth.",
     visual: {
-      url: "/home-center/knowledge-assets/madagascar-relief-teal.png",
+      url: "/home-center/knowledge-assets/madagascar-island-relief.svg",
       alt: "Teal relief map of Madagascar",
     },
     items: [
