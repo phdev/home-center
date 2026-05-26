@@ -69,7 +69,7 @@ export function KnowledgePage({ response, onBack, handControllerConnected, lastG
         <main className="knowledge-grid">
           <div className="knowledge-left">
             <KnowledgeHeroCard knowledge={knowledge} config={config} />
-            <KnowledgeInsightCard insight={knowledge.insight} type={knowledge.type} />
+            <KnowledgeInsightCard insight={knowledge.insight} type={knowledge.type} title={knowledge.title} />
           </div>
           <div className="knowledge-right">
             <KeyFactsCard facts={knowledge.facts} moduleStyle={knowledge.visualPlan.moduleStyles?.facts} />

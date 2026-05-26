@@ -3,6 +3,7 @@ import { Snowflake, Sparkle } from "lucide-react";
 const EARTH_LINE_GLOBE_URL = `${import.meta.env.BASE_URL}knowledge-assets/earth-line-globe.png`;
 const ADA_LEGACY_LINEART_URL = `${import.meta.env.BASE_URL}knowledge-assets/ada-lovelace-legacy-yellow-lineart.png`;
 const COAST_REDWOOD_ECOSYSTEM_SPRIG_URL = `${import.meta.env.BASE_URL}knowledge-assets/coast-redwood-ecosystem-sprig.png`;
+const INTERNET_WWW_ORNAMENT_URL = `${import.meta.env.BASE_URL}knowledge-assets/internet-key-idea-www.svg`;
 
 function EarthLineArt() {
   return (
@@ -38,7 +39,14 @@ function FeatherLineArt() {
   );
 }
 
-function InsightOrnament({ type }) {
+function InsightOrnament({ type, title }) {
+  if (type === "concept" && /\binternet\b/i.test(title || "")) {
+    return (
+      <div className="knowledge-insight-ornament knowledge-insight-ornament-concept" aria-hidden="true">
+        <img className="knowledge-insight-internet-www" src={INTERNET_WWW_ORNAMENT_URL} alt="" />
+      </div>
+    );
+  }
   if (type === "event") {
     return (
       <div className="knowledge-insight-ornament knowledge-insight-ornament-event" aria-hidden="true">
@@ -80,13 +88,13 @@ function InsightOrnament({ type }) {
   return null;
 }
 
-export function KnowledgeInsightCard({ insight, type }) {
+export function KnowledgeInsightCard({ insight, type, title }) {
   if (!insight?.body) return null;
   return (
     <section className={`knowledge-card knowledge-card-pad knowledge-insight-card knowledge-insight-card-${type || "default"}`}>
       <h2 className="knowledge-card-title">{insight.title}</h2>
       <p className="knowledge-insight-body">{insight.body}</p>
-      <InsightOrnament type={type} />
+      <InsightOrnament type={type} title={title} />
     </section>
   );
 }

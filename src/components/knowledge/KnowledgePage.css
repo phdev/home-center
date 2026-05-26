@@ -564,6 +564,10 @@ body[data-design-system="v2"] .knowledge-page .hc-full-page-bg {
   width: 72%;
 }
 
+.knowledge-insight-card-concept .knowledge-insight-body {
+  width: 60%;
+}
+
 .knowledge-insight-ornament {
   position: absolute;
   inset: 0;
@@ -639,6 +643,19 @@ body[data-design-system="v2"] .knowledge-page .hc-full-page-bg {
   object-fit: contain;
   opacity: 0.56;
   filter: drop-shadow(0 0 18px color-mix(in srgb, var(--knowledge-accent) 34%, transparent));
+}
+
+.knowledge-insight-internet-www {
+  position: absolute;
+  right: 30px;
+  top: 50%;
+  width: 184px;
+  height: 184px;
+  object-fit: contain;
+  transform: translateY(-50%);
+  opacity: 0.72;
+  mix-blend-mode: screen;
+  filter: saturate(1.08) hue-rotate(4deg) drop-shadow(0 0 20px color-mix(in srgb, var(--knowledge-accent) 36%, transparent));
 }
 
 .knowledge-insight-earth {
