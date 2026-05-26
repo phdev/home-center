@@ -39,6 +39,29 @@ function FeatherLineArt() {
   );
 }
 
+function LeafSprigLineArt() {
+  return (
+    <svg className="knowledge-insight-location-sprig" viewBox="0 0 220 180" aria-hidden="true">
+      <path
+        className="knowledge-location-sprig-stem"
+        d="M112 168C116 132 113 98 98 67C91 52 82 39 70 27"
+      />
+      <path className="knowledge-location-sprig-stem" d="M112 168C137 130 154 92 162 48" />
+      <path className="knowledge-location-sprig-stem" d="M112 168C89 135 68 106 40 84" />
+      <path className="knowledge-location-sprig-leaf" d="M88 52C92 31 105 18 127 12C132 35 119 51 88 52Z" />
+      <path className="knowledge-location-sprig-leaf" d="M124 84C132 60 150 45 178 40C180 69 161 85 124 84Z" />
+      <path className="knowledge-location-sprig-leaf" d="M126 126C140 102 160 91 188 92C181 119 161 132 126 126Z" />
+      <path className="knowledge-location-sprig-leaf" d="M83 96C59 93 44 80 36 57C63 52 81 66 83 96Z" />
+      <path className="knowledge-location-sprig-leaf" d="M74 132C51 129 36 116 27 93C54 87 72 102 74 132Z" />
+      <path className="knowledge-location-sprig-vein" d="M94 49C106 40 116 30 124 15" />
+      <path className="knowledge-location-sprig-vein" d="M132 80C149 69 163 57 176 42" />
+      <path className="knowledge-location-sprig-vein" d="M134 122C154 116 171 106 186 94" />
+      <path className="knowledge-location-sprig-vein" d="M78 91C63 81 50 70 39 58" />
+      <path className="knowledge-location-sprig-vein" d="M69 128C55 118 42 107 30 94" />
+    </svg>
+  );
+}
+
 function InsightOrnament({ type, title }) {
   if (type === "concept" && /\binternet\b/i.test(title || "")) {
     return (
@@ -82,6 +105,13 @@ function InsightOrnament({ type, title }) {
     return (
       <div className="knowledge-insight-ornament knowledge-insight-ornament-flora" aria-hidden="true">
         <img className="knowledge-insight-flora-lineart" src={COAST_REDWOOD_ECOSYSTEM_SPRIG_URL} alt="" />
+      </div>
+    );
+  }
+  if (type === "location" && /\bmadagascar\b/i.test(title || "")) {
+    return (
+      <div className="knowledge-insight-ornament knowledge-insight-ornament-location" aria-hidden="true">
+        <LeafSprigLineArt />
       </div>
     );
   }

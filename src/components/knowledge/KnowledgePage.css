@@ -549,7 +549,8 @@ body[data-design-system="v2"] .knowledge-page .hc-full-page-bg {
 }
 
 .knowledge-insight-card-fauna .knowledge-insight-body,
-.knowledge-insight-card-flora .knowledge-insight-body {
+.knowledge-insight-card-flora .knowledge-insight-body,
+.knowledge-insight-card-location .knowledge-insight-body {
   width: 72%;
 }
 
@@ -643,6 +644,44 @@ body[data-design-system="v2"] .knowledge-page .hc-full-page-bg {
   object-fit: contain;
   opacity: 0.56;
   filter: drop-shadow(0 0 18px color-mix(in srgb, var(--knowledge-accent) 34%, transparent));
+}
+
+.knowledge-insight-location-sprig {
+  position: absolute;
+  right: 30px;
+  top: 20px;
+  width: 176px;
+  height: 148px;
+  color: var(--knowledge-accent);
+  opacity: 0.34;
+  overflow: visible;
+  filter: drop-shadow(0 0 16px color-mix(in srgb, var(--knowledge-accent) 30%, transparent));
+  transform: rotate(-7deg);
+  transform-origin: center;
+}
+
+.knowledge-location-sprig-stem,
+.knowledge-location-sprig-vein {
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.knowledge-location-sprig-stem {
+  stroke-width: 3.2;
+}
+
+.knowledge-location-sprig-vein {
+  stroke-width: 1.45;
+  opacity: 0.72;
+}
+
+.knowledge-location-sprig-leaf {
+  fill: color-mix(in srgb, var(--knowledge-accent) 18%, transparent);
+  stroke: currentColor;
+  stroke-width: 2.15;
+  stroke-linejoin: round;
 }
 
 .knowledge-insight-internet-www {
