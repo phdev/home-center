@@ -186,6 +186,9 @@ function validate(query, body) {
   if (body.visualPlan?.visualFamily !== "editorial-knowledge-v1") failures.push("missing visual plan");
   if (body.visualPlan?.designPrinciples?.version !== KNOWLEDGE_DESIGN_PRINCIPLES.version) failures.push("missing reference design principles");
   if (body.visualPlan?.designPrinciples?.panelStyle !== "transparent-liquid-glass") failures.push("missing glass panel principle");
+  if (body.visualPlan?.designPrinciples?.conceptHeroTreatment !== "layered-native-or-pinned-hero") failures.push("missing concept hero treatment principle");
+  if (body.visualPlan?.designPrinciples?.conceptModuleOrder !== "process-then-glance") failures.push("missing concept module order principle");
+  if (body.visualPlan?.designPrinciples?.conceptInsightOrnament !== "accent-line-art-secondary") failures.push("missing concept insight ornament principle");
   if (!body.visualPlan?.typeCompositionContract?.hero?.length) failures.push("missing type composition contract");
   if (!body.visualPlan?.compositionPattern) failures.push("missing composition pattern");
   if (!body.visualPlan?.heroStrategy) failures.push("missing hero strategy");

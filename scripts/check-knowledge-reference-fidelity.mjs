@@ -223,6 +223,9 @@ function validate(item, body) {
   fail(body.visualPlan?.designPrinciples?.mapLabelPlacement === "external-callouts", "expected external map callout principle", failures);
   fail(body.visualPlan?.designPrinciples?.timelineConnectorStyle === "segmented-between-icons", "expected segmented timeline connector principle", failures);
   fail(body.visualPlan?.designPrinciples?.relatedChipScale === "compact-secondary-nav", "expected compact related chip principle", failures);
+  fail(body.visualPlan?.designPrinciples?.conceptHeroTreatment === "layered-native-or-pinned-hero", "expected concept hero treatment principle", failures);
+  fail(body.visualPlan?.designPrinciples?.conceptModuleOrder === "process-then-glance", "expected concept module order principle", failures);
+  fail(body.visualPlan?.designPrinciples?.conceptInsightOrnament === "accent-line-art-secondary", "expected concept insight ornament principle", failures);
   const contract = TYPE_COMPOSITION_CONTRACTS[item.type] || TYPE_COMPOSITION_CONTRACTS.concept;
   fail(contract.hero.includes(body.visualPlan?.moduleStyles?.hero), `hero module outside ${item.type} contract`, failures);
   fail(contract.facts.includes(body.visualPlan?.moduleStyles?.facts), `facts module outside ${item.type} contract`, failures);

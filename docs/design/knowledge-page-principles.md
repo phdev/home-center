@@ -1,9 +1,9 @@
 # Knowledge Page Design Principles
 
-The corrected Apollo 11 and Emperor Penguin pages are the reference designs for
-`editorial-knowledge-v1`. New arbitrary knowledge queries should reuse these
-principles through visual-plan data and named module variants rather than
-inventing one-off layouts.
+The corrected Apollo 11, Emperor Penguin, and Internet pages are the reference
+designs for `editorial-knowledge-v1`. New arbitrary knowledge queries should
+reuse these principles through visual-plan data and named module variants rather
+than inventing one-off layouts.
 
 ## Core Contract
 
@@ -24,6 +24,16 @@ inventing one-off layouts.
   low-noise, accent-tinted family as the rest of the dashboard.
 - `relatedChipScale`: `compact-secondary-nav`
   Related topic pills are compact secondary navigation, not primary actions.
+- `conceptHeroTreatment`: `layered-native-or-pinned-hero`
+  Concept pages should feel explanatory, not like generic stock art. Use a
+  native layered diagram hero by default, or a pinned/generated hero only when it
+  clearly explains the concept and preserves the left-side text safe zone.
+- `conceptModuleOrder`: `process-then-glance`
+  Concept pages lead supporting content with a How It Works/process module and
+  reserve the lower module for compact At A Glance ideas.
+- `conceptInsightOrnament`: `accent-line-art-secondary`
+  Concept insight art should be a secondary accent that reinforces the idea
+  without replacing the hero, crowding copy, or changing the accepted accent.
 
 ## Query-Type Composition
 
@@ -38,6 +48,28 @@ queries from producing arbitrary layouts.
 | `person` | `portrait-editorial` | `vertical-timeline` | `icon-metric-columns` |
 | `flora` | `scenic-location` or `species-closeup-with-environment` | `range-glass` | `height-comparison` or `icon-metric-columns` |
 | `concept` | `native-concept-hero` or `fallback-graphic` | `process-flow` | `icon-metric-columns` |
+
+## Concept Pages
+
+The Internet is the Concept-page reference. Concept pages should read as a
+working explanation: the hero establishes the abstract system, the middle module
+shows the mechanism, and the lower module gives three scannable handles.
+
+- Keep hero copy short. The first hero sentence carries the answer; additional
+  explanation belongs in the Key Idea and How It Works sections.
+- Use a diagram-like hero treatment for abstract systems. For network concepts,
+  prefer layered paths, nodes, and depth cues over decorative orbit art; pin the
+  accepted hero locally before treating screenshots or Pi deployment as final.
+- The middle module is `How It Works` / `process-flow`. Use concrete steps with
+  consistent icons and short verbs so the mechanism is legible at kiosk distance.
+- The lower module is `At A Glance` / `icon-metric-columns`. It should summarize
+  exactly three conceptual handles, not repeat the process steps.
+- Keep icon hue and related chips aligned to the Concept accent. Do not leave
+  older cyan/green/purple mismatches between process icons, glance icons, and
+  the bottom navigation.
+- Key Idea art is supporting line art. It can echo a known symbol for the
+  concept, but it must stay accent-tinted, secondary to the text, and visually
+  separate from the hero.
 
 ## People Pages
 
@@ -108,6 +140,10 @@ then supporting modules that explain range, scale, growth, and ecological role.
   supporting line art, related chips and bottom label use the Flora accent, and
   accepted remote hero imagery should be pinned locally before screenshots or Pi
   deployment are treated as final.
+- The Internet validates the concept contract: concise hero copy, pinned
+  layered network hero, How It Works as the middle process module, At A Glance as
+  the lower conceptual-summary module, matching Concept accent hue across icons
+  and chips, and secondary WWW line art in the Key Idea panel.
 
 ## Implementation Hooks
 

@@ -1,13 +1,16 @@
 export const VISUAL_FAMILIES = ["editorial-knowledge-v1"];
 
 export const KNOWLEDGE_DESIGN_PRINCIPLES = {
-  version: "apollo-penguin-reference-v1",
+  version: "apollo-penguin-internet-reference-v1",
   panelStyle: "transparent-liquid-glass",
   heroTransparency: "match-supporting-panels",
   mapLabelPlacement: "external-callouts",
   timelineConnectorStyle: "segmented-between-icons",
   ornamentStyle: "topic-specific-line-art",
   relatedChipScale: "compact-secondary-nav",
+  conceptHeroTreatment: "layered-native-or-pinned-hero",
+  conceptModuleOrder: "process-then-glance",
+  conceptInsightOrnament: "accent-line-art-secondary",
 };
 
 export const TYPE_COMPOSITION_CONTRACTS = {

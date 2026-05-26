@@ -491,6 +491,90 @@ const INTERNET_KNOWLEDGE_RESPONSE = {
   timestamp: Date.now(),
 };
 
+const MADAGASCAR_KNOWLEDGE_RESPONSE = {
+  kind: "knowledge",
+  query: "Where is Madagascar?",
+  title: "Madagascar",
+  type: "location",
+  summary: "Madagascar is a large island country in the Indian Ocean off the southeastern coast of Africa.",
+  sections: [
+    {
+      heading: "Key Idea",
+      content: "It sits east of Mozambique across the Mozambique Channel. Its long isolation helped create distinctive landscapes and species found nowhere else.",
+    },
+  ],
+  profile: {
+    facts: [
+      { label: "Region", value: "Indian Ocean", icon: "globe" },
+      { label: "Nearest mainland", value: "Southeast Africa", icon: "map" },
+      { label: "Capital", value: "Antananarivo", icon: "city" },
+    ],
+    maps: [
+      {
+        scope: "world",
+        label: "Madagascar",
+        highlight: "East of Mozambique",
+        detail: "Indian Ocean island country",
+        lat: -18.7669,
+        lon: 46.8691,
+      },
+    ],
+    relatedConcepts: ["Indian Ocean", "Mozambique Channel", "biodiversity"],
+  },
+  infographics: [{
+    title: "At A Glance",
+    kind: "metrics",
+    description: "Island scale, position, and identity.",
+    items: [
+      { label: "Island country", value: "4th largest island", icon: "globe" },
+      { label: "Separation", value: "Mozambique Channel", icon: "map" },
+      { label: "Capital", value: "Antananarivo", icon: "city" },
+    ],
+  }],
+  imageUrl: "/home-center/knowledge-assets/madagascar-baobabs.jpg",
+  image: {
+    url: "/home-center/knowledge-assets/madagascar-baobabs.jpg",
+    source: "Wikimedia Commons",
+    sourceUrl: "https://commons.wikimedia.org/wiki/File:Avenue_of_Baobabs,_Madagascar_(22558139260).jpg",
+    credit: "Rod Waddington",
+    license: "CC BY-SA 2.0",
+    width: 4739,
+    height: 3454,
+    focalPoint: { x: 0.7, y: 0.46 },
+    cropHint: "right-subject",
+    tone: "home-center-dark",
+    mode: "pinned",
+    assetMode: "pinned",
+    alt: "Avenue of the Baobabs in Madagascar",
+  },
+  imageSourceType: "known",
+  visualNeed: "useful",
+  visualPlan: {
+    visualFamily: "editorial-knowledge-v1",
+    queryType: "location",
+    subType: "location/island",
+    compositionPattern: "place-scenic-wide",
+    heroStrategy: "retrieved-single-subject",
+    textSafeZone: "left",
+    focalRegion: "right-center",
+    tone: "home-center-dark",
+    contrastLevel: "medium",
+    motifStrategy: "island-contour",
+    supportingPanelStyle: "map-geography",
+    mapStyle: "world-map-pin",
+    badgeStyle: "blue-location",
+    atAGlanceStyle: "island-shape-stats",
+    backgroundTreatment: "navy-glass-vignette",
+    moduleStyles: {
+      hero: "scenic-location",
+      facts: "compact-fact-rows",
+      middle: "world-map-pin",
+      lower: "island-shape-stats",
+    },
+  },
+  timestamp: Date.now(),
+};
+
 const KNOWLEDGE_LOADING_RESPONSE = {
   kind: "knowledge",
   query: "Knowledge query in progress",
@@ -660,6 +744,8 @@ export default function App() {
               ? COAST_REDWOOD_KNOWLEDGE_RESPONSE
               : urlParams.get("knowledgeFixture") === "internet"
                 ? INTERNET_KNOWLEDGE_RESPONSE
+                : urlParams.get("knowledgeFixture") === "madagascar"
+                  ? MADAGASCAR_KNOWLEDGE_RESPONSE
             : PREVIEW_KNOWLEDGE_RESPONSE)
       : requestedPage === "llm-response"
         ? PREVIEW_LLM_RESPONSE

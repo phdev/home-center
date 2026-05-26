@@ -1111,6 +1111,36 @@ body[data-design-system="v2"] .knowledge-page .hc-full-page-bg {
   font-size: 11px;
 }
 
+.knowledge-module-island-shape-stats .knowledge-metrics {
+  gap: 8px;
+}
+
+.knowledge-module-island-shape-stats .knowledge-metric {
+  min-height: 78px;
+  padding: 8px 9px;
+}
+
+.knowledge-module-island-shape-stats .knowledge-metric-icon {
+  width: 24px;
+  height: 24px;
+  margin-bottom: 5px;
+}
+
+.knowledge-module-island-shape-stats .knowledge-metric-label {
+  font-size: 10px;
+  line-height: 1.1;
+  margin-bottom: 4px;
+}
+
+.knowledge-module-island-shape-stats .knowledge-metric-value {
+  display: -webkit-box;
+  font-size: 13px;
+  line-height: 1.08;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
 .knowledge-module-lifecycle-loop .knowledge-metric-icon {
   margin: 0 auto 7px;
   width: 34px;

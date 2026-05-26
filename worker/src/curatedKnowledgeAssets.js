@@ -8,7 +8,7 @@ const CANONICAL_CURATED_ASSETS = [
     focalPoint: { x: 0.7, y: 0.46 },
     tone: "home-center-dark",
     heroImage: {
-      url: "https://upload.wikimedia.org/wikipedia/commons/e/e5/Avenue_of_Baobabs%2C_Madagascar_%2822558139260%29.jpg",
+      url: "/home-center/knowledge-assets/madagascar-baobabs.jpg",
       source: "Wikimedia Commons",
       sourceUrl: "https://commons.wikimedia.org/wiki/File:Avenue_of_Baobabs,_Madagascar_(22558139260).jpg",
       credit: "Rod Waddington",

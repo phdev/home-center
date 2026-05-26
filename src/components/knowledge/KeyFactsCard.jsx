@@ -1,8 +1,10 @@
-import { Calendar, Code2, Globe2, PawPrint } from "lucide-react";
+import { Building2, Calendar, Code2, Globe2, Map, PawPrint } from "lucide-react";
 
 function FactIcon({ icon, fallback }) {
   if (icon === "paw") return <PawPrint size={20} />;
   if (icon === "globe") return <Globe2 size={20} />;
+  if (icon === "map") return <Map size={20} />;
+  if (icon === "city") return <Building2 size={20} />;
   if (icon === "calendar") return <Calendar size={20} />;
   if (icon === "code") return <Code2 size={20} />;
   return fallback;
