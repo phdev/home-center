@@ -30,7 +30,9 @@ export function AtAGlanceCard({ glance, moduleStyle = "icon-metric-columns", typ
       {metrics.length ? (
         showIslandVisual ? (
           <div className="knowledge-island-glance">
-            <img className="knowledge-island-glance-visual" src={visualUrl} alt={glance?.visual?.alt || ""} />
+            <div className="knowledge-island-glance-visual-wrap">
+              <img className="knowledge-island-glance-visual" src={visualUrl} alt={glance?.visual?.alt || ""} />
+            </div>
             <div className="knowledge-island-glance-body">
               {glance?.description && <p className="knowledge-island-glance-copy">{glance.description}</p>}
               <div className="knowledge-metrics">

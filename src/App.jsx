@@ -527,8 +527,8 @@ const MADAGASCAR_KNOWLEDGE_RESPONSE = {
     kind: "metrics",
     description: "A world of its own: most wildlife here is found nowhere else on Earth.",
     visual: {
-      url: "/home-center/knowledge-assets/madagascar-island-relief.svg",
-      alt: "Relief silhouette of Madagascar",
+      url: "/home-center/knowledge-assets/madagascar-geography-teal.jpg",
+      alt: "Satellite view of Madagascar and the Indian Ocean",
     },
     items: [
       { label: "Species", value: "200,000+", icon: "paw" },
