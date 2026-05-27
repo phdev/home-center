@@ -1116,9 +1116,16 @@ class RecordingManager:
         with self._lock:
             if page:
                 self._navigation["page"] = page
-            if view:
+                if page == "dashboard" and view is None:
+                    self._navigation["view"] = None
+            if view is not None:
                 self._navigation["view"] = view
             self._navigation["timestamp"] = int(time.time() * 1000)
+
+    def turn_on_dashboard(self):
+        """Show the main dashboard whenever the TV is explicitly turned on."""
+        self.navigate("dashboard")
+        self.run_tv_action_async("on")
 
     def set_design_system(self, version: str | None = None):
         """Update dashboard design-system state."""
@@ -1719,7 +1726,7 @@ class RecordingManager:
                     threading.Thread(target=_play_chime, daemon=True).start()
 
                 elif self.path == "/api/tv/on":
-                    mgr.run_tv_action_async("on")
+                    mgr.turn_on_dashboard()
                     self._respond_json({"ok": True, "queued": True, "action": "on"})
 
                 elif self.path == "/api/tv/off":

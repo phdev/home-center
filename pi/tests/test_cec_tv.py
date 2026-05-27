@@ -1,5 +1,6 @@
 import importlib.util
 import sys
+import threading
 import types
 from pathlib import Path
 
@@ -47,6 +48,35 @@ def test_turn_on_tv_still_selects_source_if_power_command_is_not_needed(monkeypa
 
     assert service.turn_on_tv()
     assert commands == ["on 0", "as"]
+
+
+def test_turn_on_dashboard_resets_stale_knowledge_navigation_before_cec(monkeypatch):
+    service = load_wake_word_service()
+    mgr = service.RecordingManager.__new__(service.RecordingManager)
+    mgr._lock = threading.Lock()
+    mgr._navigation = {"page": "knowledge", "view": "debug", "timestamp": 1}
+    actions = []
+
+    monkeypatch.setattr(service.time, "time", lambda: 1234.5)
+    monkeypatch.setattr(mgr, "run_tv_action_async", lambda action: actions.append(action))
+
+    mgr.turn_on_dashboard()
+
+    assert mgr._navigation == {"page": "dashboard", "view": None, "timestamp": 1_234_500}
+    assert actions == ["on"]
+
+
+def test_dashboard_navigation_clears_stale_view(monkeypatch):
+    service = load_wake_word_service()
+    mgr = service.RecordingManager.__new__(service.RecordingManager)
+    mgr._lock = threading.Lock()
+    mgr._navigation = {"page": "knowledge", "view": "debug", "timestamp": 1}
+
+    monkeypatch.setattr(service.time, "time", lambda: 5678.9)
+
+    mgr.navigate("dashboard")
+
+    assert mgr._navigation == {"page": "dashboard", "view": None, "timestamp": 5_678_900}
 
 
 def test_parse_command_matches_negative_knowledge_feedback_phrases():
