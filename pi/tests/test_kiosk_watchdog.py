@@ -68,6 +68,33 @@ def test_evaluate_page_health_rejects_empty_root(monkeypatch):
     )
 
 
+def test_evaluate_page_health_rejects_windowed_chromium(monkeypatch):
+    watchdog = load_watchdog()
+    monkeypatch.setattr(watchdog, "_websocket_request", lambda *args, **kwargs: {
+        "id": 1,
+        "result": {
+            "result": {
+                "value": {
+                    "title": "Home Center",
+                    "readyState": "complete",
+                    "innerWidth": 500,
+                    "innerHeight": 129,
+                    "devicePixelRatio": 2,
+                    "screenWidth": 3840,
+                    "screenHeight": 2160,
+                    "rootChildren": 2,
+                    "bodyText": "The Howell Hub",
+                    "hasViteErrorOverlay": False,
+                },
+            },
+        },
+    })
+
+    ok, reason = watchdog.evaluate_page_health({"webSocketDebuggerUrl": "ws://test"})
+    assert not ok
+    assert reason.startswith("chromium viewport is windowed: 500x129 css")
+
+
 def test_evaluate_page_health_accepts_rendered_dashboard(monkeypatch):
     watchdog = load_watchdog()
     monkeypatch.setattr(watchdog, "_websocket_request", lambda *args, **kwargs: {
@@ -77,6 +104,11 @@ def test_evaluate_page_health_accepts_rendered_dashboard(monkeypatch):
                 "value": {
                     "title": "Home Center",
                     "readyState": "complete",
+                    "innerWidth": 1920,
+                    "innerHeight": 1080,
+                    "devicePixelRatio": 2,
+                    "screenWidth": 3840,
+                    "screenHeight": 2160,
                     "rootChildren": 1,
                     "bodyText": "Calendar Weather Photos",
                     "hasViteErrorOverlay": False,

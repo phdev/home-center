@@ -27,6 +27,7 @@ CHECK_INTERVAL_SECONDS = 30
 FAILURES_BEFORE_RESTART = 3
 RESTART_COOLDOWN_SECONDS = 180
 RENDERER_EVALUATION_TIMEOUT_SECONDS = 3.0
+MIN_VIEWPORT_SCREEN_COVERAGE = 0.8
 
 
 HEALTH_EXPRESSION = r"""
@@ -37,6 +38,11 @@ HEALTH_EXPRESSION = r"""
     title: document.title || "",
     href: location.href || "",
     readyState: document.readyState || "",
+    innerWidth: window.innerWidth || 0,
+    innerHeight: window.innerHeight || 0,
+    devicePixelRatio: window.devicePixelRatio || 1,
+    screenWidth: window.screen?.width || 0,
+    screenHeight: window.screen?.height || 0,
     rootChildren: root ? root.childElementCount : 0,
     rootTextLength: root ? (root.innerText || "").trim().length : 0,
     bodyText: bodyText.slice(0, 500),
@@ -179,6 +185,11 @@ def evaluate_page_health(page: dict, timeout: float = RENDERER_EVALUATION_TIMEOU
     body_text = str(value.get("bodyText", "")).lower()
     ready_state = value.get("readyState")
     root_children = int(value.get("rootChildren") or 0)
+    inner_width = float(value.get("innerWidth") or 0)
+    inner_height = float(value.get("innerHeight") or 0)
+    dpr = float(value.get("devicePixelRatio") or 1)
+    screen_width = float(value.get("screenWidth") or 0)
+    screen_height = float(value.get("screenHeight") or 0)
 
     if "aw, snap" in title or "sad tab" in title or "aw, snap" in body_text:
         return False, "chromium aw snap page visible"
@@ -188,6 +199,17 @@ def evaluate_page_health(page: dict, timeout: float = RENDERER_EVALUATION_TIMEOU
         return False, f"document not ready: {ready_state}"
     if root_children <= 0:
         return False, "home center root is empty"
+    if screen_width > 0 and screen_height > 0:
+        viewport_width = inner_width * dpr
+        viewport_height = inner_height * dpr
+        min_width = screen_width * MIN_VIEWPORT_SCREEN_COVERAGE
+        min_height = screen_height * MIN_VIEWPORT_SCREEN_COVERAGE
+        if viewport_width < min_width or viewport_height < min_height:
+            return False, (
+                "chromium viewport is windowed: "
+                f"{inner_width:.0f}x{inner_height:.0f} css at {dpr:.2f}x "
+                f"on {screen_width:.0f}x{screen_height:.0f} screen"
+            )
 
     return True, "ok"
 
