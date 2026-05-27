@@ -16,6 +16,12 @@ than inventing one-off layouts.
 - `mapLabelPlacement`: `external-callouts`
   Dense maps should keep geography clear. For the Apollo-style Places module,
   point-of-interest labels sit beside the map, not over the SVG geography.
+- `solarMapForSpaceLocations`: `on-the-map-solar-system`
+  For place/location queries whose subject is in the solar system, the On The
+  Map section should use a solar-system map instead of an Earth geography map.
+  Keep it as low-noise line art with orbital context, a clear subject marker,
+  and external callouts so planets, dwarf planets, moons, or belts stay legible
+  at kiosk distance.
 - `timelineConnectorStyle`: `segmented-between-icons`
   Horizontal timelines use individual connectors between adjacent icons. Lines
   must not run behind or protrude into the circular icon nodes.
@@ -44,7 +50,7 @@ queries from producing arbitrary layouts.
 | --- | --- | --- | --- |
 | `event` | `archival-event-scene` | `us-places-map` or `world-map-pin` | `horizontal-mission-timeline` or `icon-metric-columns` |
 | `fauna` | `species-closeup-with-environment` | `habitat-range` | `lifecycle-loop` or `icon-metric-columns` |
-| `location` | `scenic-location` | `world-map-pin` or `map-geography` | `island-shape-stats` or `icon-metric-columns` |
+| `location` | `scenic-location` | `world-map-pin`, `map-geography`, or `solar-system-map` | `island-shape-stats` or `icon-metric-columns` |
 | `person` | `portrait-editorial` | `vertical-timeline` | `icon-metric-columns` |
 | `flora` | `scenic-location` or `species-closeup-with-environment` | `range-glass` | `height-comparison` or `icon-metric-columns` |
 | `concept` | `native-concept-hero` or `fallback-graphic` | `process-flow` | `icon-metric-columns` |
