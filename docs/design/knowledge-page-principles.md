@@ -19,9 +19,9 @@ than inventing one-off layouts.
 - `solarMapForSpaceLocations`: `on-the-map-solar-system`
   For place/location queries whose subject is in the solar system, the On The
   Map section should use a solar-system map instead of an Earth geography map.
-  Keep it as low-noise line art with orbital context, a clear subject marker,
-  and external callouts so planets, dwarf planets, moons, or belts stay legible
-  at kiosk distance.
+  Keep it as low-noise teal-green line art with orbital context, a clear
+  subject marker, and external callouts so planets, dwarf planets, moons, or
+  belts stay legible at kiosk distance.
 - `timelineConnectorStyle`: `segmented-between-icons`
   Horizontal timelines use individual connectors between adjacent icons. Lines
   must not run behind or protrude into the circular icon nodes.
