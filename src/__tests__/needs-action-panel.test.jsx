@@ -30,4 +30,18 @@ describe("NeedsActionPanel", () => {
       expect(within(list).getByText(item.title)).toBeTruthy();
     }
   });
+
+  it("shows suggested-action detail for event-toned items", () => {
+    render(<NeedsActionPanel actions={[{
+      id: "school-event",
+      kind: "Event",
+      tone: "event",
+      meta: "School",
+      title: "Walking Field Trip to Franklin Park",
+      detail: "Note the June 5 field trip on your calendar.",
+    }]} />);
+
+    expect(screen.getByText("Walking Field Trip to Franklin Park")).toBeTruthy();
+    expect(screen.getByText("Note the June 5 field trip on your calendar.")).toBeTruthy();
+  });
 });

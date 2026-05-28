@@ -1257,7 +1257,7 @@ export function NeedsActionPanel({ actions }) {
             <div style={{ minWidth: 0, flex: 1 }}>
               {action.meta && <div style={v2ActionMetaStyle}>{action.meta}</div>}
               <div style={v2ActionTitleStyle}>{action.title}</div>
-              {action.tone !== "event" && <div style={v2ActionDetailStyle}>{action.detail}</div>}
+              {action.detail && <div style={v2ActionDetailStyle}>{action.detail}</div>}
             </div>
             <span style={v2ChevronStyle}>›</span>
           </button>
