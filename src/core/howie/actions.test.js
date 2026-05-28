@@ -52,6 +52,20 @@ describe("buildHowieActions", () => {
     ]);
   });
 
+  it("adds a suggested action for birthday gifts", () => {
+    const actions = buildHowieActions({
+      birthdayGiftNeeded: true,
+      birthdaysRanked: [{ id: "kate", name: "Kate", daysUntil: 1, giftStatus: "needed" }],
+    }, at(10));
+
+    expect(actions[0]).toMatchObject({
+      id: "gift-kate",
+      title: "Order Kate's gift",
+      detailLabel: "Suggested action",
+      detail: "Order birthday present",
+    });
+  });
+
   it("returns every pending action sorted by urgency across categories", () => {
     const actions = buildHowieActions({
       rankedSchoolItems: [

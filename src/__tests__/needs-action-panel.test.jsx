@@ -46,4 +46,28 @@ describe("NeedsActionPanel", () => {
     expect(screen.getByText("Suggested action:", { exact: false })).toBeTruthy();
     expect(screen.getByText("Note the June 5 field trip on your calendar.")).toBeTruthy();
   });
+
+  it("does not render kind pills in action cards", () => {
+    render(<NeedsActionPanel actions={[{
+      id: "school-event",
+      kind: "Event",
+      tone: "event",
+      meta: "School",
+      title: "Walking Field Trip to Franklin Park",
+      detailLabel: "Suggested action",
+      detail: "Note the June 5 field trip on your calendar.",
+    }, {
+      id: "gift-kate",
+      kind: "Gift",
+      tone: "gift",
+      meta: "Birthday in 1 days",
+      title: "Order Kate's gift",
+      detailLabel: "Suggested action",
+      detail: "Order birthday present",
+    }]} />);
+
+    expect(screen.queryByText("Event")).toBeNull();
+    expect(screen.queryByText("Gift")).toBeNull();
+    expect(screen.getByText("Order birthday present")).toBeTruthy();
+  });
 });

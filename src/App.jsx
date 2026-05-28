@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import {
+  AudioLines,
   Cake,
   CalendarDays,
   CloudSun,
@@ -1253,14 +1254,14 @@ export function NeedsActionPanel({ actions }) {
       <div style={v2ActionListStyle} data-testid="needs-action-list">
         {actions.map((action) => (
           <button key={action.id} style={v2ActionItemStyle(action.tone)}>
-            <span style={v2ActionBadgeStyle(action.tone)}>{action.kind}</span>
             <div style={{ minWidth: 0, flex: 1 }}>
               {action.meta && <div style={v2ActionMetaStyle}>{action.meta}</div>}
               <div style={v2ActionTitleStyle}>{action.title}</div>
               {action.detail && (
-                <div style={v2ActionDetailStyle}>
+                <div style={v2SuggestedActionButtonStyle(action.tone)}>
+                  <AudioLines size={14} strokeWidth={2.4} aria-hidden="true" />
                   {action.detailLabel && <span style={v2ActionDetailLabelStyle}>{action.detailLabel}: </span>}
-                  {action.detail}
+                  <span style={v2ActionDetailTextStyle}>{action.detail}</span>
                 </div>
               )}
             </div>
@@ -1653,8 +1654,8 @@ const v2ActionCountStyle = { width: 23, height: 23, borderRadius: 999, display: 
 const v2ActionListStyle = { display: "flex", flexDirection: "column", gap: 8, marginTop: 10, flex: 1, minHeight: 0, overflowY: "auto", paddingRight: 2 };
 const v2ActionMetaStyle = { fontFamily: "'Geist','Inter',system-ui,sans-serif", fontSize: 10.5, fontWeight: 850, color: "rgba(255,255,255,0.58)", marginBottom: 3 };
 const v2ActionTitleStyle = { fontFamily: "'Geist','Inter',system-ui,sans-serif", fontSize: 15.5, fontWeight: 850, color: "#FFFFFF", lineHeight: 1.12, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" };
-const v2ActionDetailStyle = { fontFamily: "'Geist','Inter',system-ui,sans-serif", fontSize: 12.5, fontWeight: 650, color: "rgba(255,255,255,0.68)", lineHeight: 1.25, marginTop: 3 };
-const v2ActionDetailLabelStyle = { color: "rgba(255,255,255,0.86)", fontWeight: 850 };
+const v2ActionDetailLabelStyle = { flexShrink: 0, color: "rgba(255,255,255,0.9)", fontWeight: 850 };
+const v2ActionDetailTextStyle = { minWidth: 0 };
 const v2ChevronStyle = { color: "rgba(255,255,255,0.72)", fontSize: 28, lineHeight: 1 };
 const v2HowiePromptStyle = { display: "flex", flexDirection: "column", gap: 6 };
 const v2HowieGreetingStyle = { fontFamily: "'Geist','Inter',system-ui,sans-serif", fontSize: 12.5, lineHeight: 1.28, color: "rgba(255,255,255,0.72)", fontWeight: 650 };
@@ -1685,18 +1686,28 @@ function v2ActionItemStyle(tone) {
   };
 }
 
-function v2ActionBadgeStyle(tone) {
-  const color = tone === "urgent" ? "#EF4444" : tone === "event" ? "#60A5FA" : tone === "gift" ? "#F59E0B" : "rgba(255,255,255,0.24)";
+function v2SuggestedActionButtonStyle(tone) {
+  const urgent = tone === "urgent";
+  const event = tone === "event";
+  const gift = tone === "gift";
+  const accent = urgent ? "#EF4444" : event ? "#60A5FA" : gift ? "#F59E0B" : "#FFFFFF";
   return {
-    flexShrink: 0,
-    borderRadius: 5,
-    background: color,
-    color: tone === "event" || tone === "gift" ? "#0A0A0A" : "#FFFFFF",
-    padding: "3px 7px",
+    display: "inline-flex",
+    alignItems: "center",
+    flexWrap: "wrap",
+    maxWidth: "100%",
+    minHeight: 30,
+    gap: 7,
+    marginTop: 7,
+    borderRadius: 999,
+    border: `1px solid ${accent}66`,
+    background: `${accent}24`,
+    color: "#FFFFFF",
+    padding: "0 11px",
     fontFamily: "'Geist','Inter',system-ui,sans-serif",
-    fontSize: 11,
-    fontWeight: 900,
-    textTransform: "uppercase",
+    fontSize: 12.5,
+    fontWeight: 700,
+    lineHeight: 1.18,
   };
 }
 

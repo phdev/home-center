@@ -61,7 +61,8 @@ export function buildHowieActions(derived, now = new Date()) {
       tone: "gift",
       meta: `Birthday in ${birthday.daysUntil} days`,
       title: `Order ${birthday.name}'s gift`,
-      detail: `Birthday in ${birthday.daysUntil} days.`,
+      detailLabel: "Suggested action",
+      detail: "Order birthday present",
     }, Math.max(0, Math.min(1, 1 - daysUntil / GIFT_DAYS_HORIZON)), -daysUntil);
   }
 
