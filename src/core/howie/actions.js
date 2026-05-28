@@ -32,6 +32,19 @@ export function buildHowieActions(derived, now = new Date()) {
   const withPriority = (action, urgencyScore, tiebreaker) => {
     actions.push({ ...action, urgencyScore, tiebreaker });
   };
+  const formatDate = (value, prefix) => {
+    if (!value) return null;
+    let date;
+    const md = /^(\d{2})-(\d{2})$/.exec(value);
+    if (md) {
+      date = new Date(now.getFullYear(), Number(md[1]) - 1, Number(md[2]));
+      if (date < now) date = new Date(now.getFullYear() + 1, Number(md[1]) - 1, Number(md[2]));
+    } else {
+      date = new Date(`${value}T00:00:00`);
+    }
+    if (!Number.isFinite(date.getTime())) return null;
+    return `${prefix} ${date.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`;
+  };
 
   for (const item of derived?.rankedSchoolItems ?? []) {
     const tiebreaker = item.dueDate
@@ -43,7 +56,7 @@ export function buildHowieActions(derived, now = new Date()) {
       id: `school-${item.id}`,
       kind: item.kind === "event" ? "Event" : "Action",
       tone: item.urgency >= 0.7 ? "urgent" : item.kind === "event" ? "event" : "neutral",
-      meta: item.dueLabel || item.dateLabel || item.child || "School",
+      meta: item.dueLabel || item.dateLabel || formatDate(item.dueDate, "Due") || formatDate(item.eventDate, "Date") || item.child || "School",
       title: item.title,
       detailLabel: item.suggestedAction ? "Suggested action" : null,
       detail: item.suggestedAction || item.summary || item.child || "School update",
@@ -59,7 +72,7 @@ export function buildHowieActions(derived, now = new Date()) {
       id: `gift-${birthday.id}`,
       kind: "Gift",
       tone: "gift",
-      meta: `Birthday in ${birthday.daysUntil} days`,
+      meta: formatDate(birthday.nextDate || birthday.date, "Birthday") || `Birthday in ${birthday.daysUntil} days`,
       title: `Order ${birthday.name}'s gift`,
       detailLabel: "Suggested action",
       detail: "Order birthday present",

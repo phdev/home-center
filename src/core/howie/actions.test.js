@@ -14,12 +14,14 @@ describe("buildHowieActions", () => {
         title: "Permission slip",
         summary: "A field trip slip is due.",
         suggestedAction: "Sign the waiver tonight",
+        dueDate: "2026-05-29",
         urgency: 0.8,
       }],
     }, at(10));
 
     expect(actions[0]).toMatchObject({
       id: "school-slip",
+      meta: "Due May 29",
       detailLabel: "Suggested action",
       detail: "Sign the waiver tonight",
     });
@@ -55,11 +57,12 @@ describe("buildHowieActions", () => {
   it("adds a suggested action for birthday gifts", () => {
     const actions = buildHowieActions({
       birthdayGiftNeeded: true,
-      birthdaysRanked: [{ id: "kate", name: "Kate", daysUntil: 1, giftStatus: "needed" }],
+      birthdaysRanked: [{ id: "kate", name: "Kate", date: "05-29", daysUntil: 1, giftStatus: "needed" }],
     }, at(10));
 
     expect(actions[0]).toMatchObject({
       id: "gift-kate",
+      meta: "Birthday May 29",
       title: "Order Kate's gift",
       detailLabel: "Suggested action",
       detail: "Order birthday present",

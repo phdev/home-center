@@ -31,8 +31,8 @@ export function useBirthdays(workerSettings) {
 
   useEffect(() => {
     load();
-    // Refresh every 6 hours (birthdays don't change often)
-    const interval = setInterval(load, 6 * 60 * 60 * 1000);
+    // Gift status can change from voice commands on the Pi.
+    const interval = setInterval(load, 30 * 1000);
     return () => clearInterval(interval);
   }, [load]);
 

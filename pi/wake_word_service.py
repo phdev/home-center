@@ -665,8 +665,8 @@ def parse_command(text: str) -> dict:
     log.info("Transcribed: '%s'", text)
 
     # Strip wake word prefix — user says "Hey Homer open calendar" as one phrase.
-    # Whisper mangles the legacy "hey jarvis" and current "hey homer" variants.
-    text = re.sub(r'^(hey|hi|hay|in|a|the|and)?\s*(homer|hommer|jarvis|jervis|service|travis|jarvis,)\s*[,.]?\s*', '', text).strip()
+    # Whisper mangles the legacy "hey jarvis" and current "hey homer/howie" variants.
+    text = re.sub(r'^(hey|hi|hay|in|a|the|and)?\s*(homer|hommer|howie|howey|jarvis|jervis|service|travis|jarvis,)\s*[,.]?\s*', '', text).strip()
     log.info("After wake word strip: '%s'", text)
 
     if not text:
@@ -684,6 +684,14 @@ def parse_command(text: str) -> dict:
         return {"action": "design_system", "version": "v1"}
     if re.search(r"\b(show|switch(?:\s+to)?|use)\s+(version\s+)?(two|to|too|2|v2)\b", text):
         return {"action": "design_system", "version": "v2"}
+
+    ordered_gift_match = re.search(r"\b(?:i\s+)?(?:just\s+)?ordered\s+(.+?)(?:'?s)?\s+gift\b", text)
+    if not ordered_gift_match:
+        ordered_gift_match = re.search(r"\bmark\s+(.+?)(?:'?s)?\s+gift\s+as\s+ordered\b", text)
+    if ordered_gift_match:
+        name = ordered_gift_match.group(1).strip(" .,'\"")
+        if name:
+            return {"action": "birthday_gift_ordered", "name": name.title()}
 
     # Enroll — start enrollment flow (navigate to enrollment page)
     if re.search(r'\benroll(ment)?\b', text):
@@ -795,6 +803,27 @@ def worker_post(url: str, token: str | None, path: str, data: dict | None = None
     return None
 
 
+def worker_patch(url: str, token: str | None, path: str, data: dict | None = None) -> dict | None:
+    """PATCH to worker API. Returns parsed JSON or None on failure."""
+    import requests
+    headers = {"Content-Type": "application/json"}
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    try:
+        resp = requests.patch(
+            f"{url}{path}",
+            headers=headers,
+            json=data or {},
+            timeout=10,
+        )
+        if resp.ok:
+            return resp.json()
+        log.warning("Worker PATCH %s failed: %d %s", path, resp.status_code, resp.text[:200])
+    except Exception as e:
+        log.warning("Worker PATCH %s error: %s", path, e)
+    return None
+
+
 def worker_get(url: str, token: str | None, path: str) -> dict | None:
     """GET from worker API. Returns parsed JSON or None on failure."""
     import requests
@@ -808,6 +837,39 @@ def worker_get(url: str, token: str | None, path: str) -> dict | None:
     except Exception as e:
         log.debug("Worker GET %s error: %s", path, e)
     return None
+
+
+def normalize_birthday_name(value: str) -> str:
+    return re.sub(r"[^a-z0-9]+", " ", (value or "").lower()).strip()
+
+
+def mark_birthday_gift_ordered(worker_url: str, worker_token: str | None, name: str) -> dict:
+    """Find a birthday by spoken name and mark its gift ordered in the worker."""
+    birthdays = (worker_get(worker_url, worker_token, "/api/birthdays") or {}).get("birthdays") or []
+    target = normalize_birthday_name(name)
+    matches = []
+    for birthday in birthdays:
+        birthday_name = normalize_birthday_name(str(birthday.get("name", "")))
+        first = birthday_name.split(" ", 1)[0] if birthday_name else ""
+        if birthday_name == target or first == target or target in birthday_name.split():
+            matches.append(birthday)
+    if not matches:
+        return {"ok": False, "reason": "not_found", "name": name}
+    matches.sort(key=lambda b: b.get("daysUntil", 9999))
+    birthday = matches[0]
+    birthday_id = birthday.get("id") or birthday.get("uid") or birthday.get("name")
+    if not birthday_id:
+        return {"ok": False, "reason": "missing_id", "name": name, "birthday": birthday}
+    from urllib.parse import quote
+    result = worker_patch(
+        worker_url,
+        worker_token,
+        f"/api/birthdays/{quote(str(birthday_id), safe='')}",
+        {"giftStatus": "ordered", "giftNotes": "Marked ordered by voice command."},
+    )
+    if not result:
+        return {"ok": False, "reason": "patch_failed", "name": name, "birthday": birthday}
+    return {"ok": True, "name": birthday.get("name", name), "id": birthday_id, "result": result}
 
 
 # ---------------------------------------------------------------------------
@@ -2369,6 +2431,19 @@ def main() -> None:
                         else:
                             rec_mgr.set_design_system(version)
                             log.info("Design system: %s", version)
+
+                    elif action == "birthday_gift_ordered":
+                        name = command.get("name", "")
+                        if args.dry_run:
+                            log.info("[DRY RUN] Would mark %s gift ordered", name)
+                        elif args.worker_url:
+                            result = mark_birthday_gift_ordered(args.worker_url, args.worker_token, name)
+                            if result.get("ok"):
+                                log.info("Marked birthday gift ordered: %s (%s)", result.get("name"), result.get("id"))
+                            else:
+                                log.info("Birthday gift voice command failed: %s", result)
+                        else:
+                            log.info("Birthday gift voice command ignored: no worker URL configured")
 
                     elif action in ("debug_hide", "debug_show"):
                         debug_post(action, {"message": action.replace("_", " ")})

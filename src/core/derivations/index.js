@@ -218,6 +218,7 @@ export function birthdayNeedsGift(rawData, context) {
     .map((birthday) => ({
       id: birthday.id,
       name: birthday.name,
+      date: birthday.date,
       daysUntil: daysUntilMMDD(birthday.date, context.now),
       giftStatus: birthday.giftStatus,
     }))
