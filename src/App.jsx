@@ -1673,7 +1673,6 @@ const v2MemberPillStyle = { borderRadius: 999, background: "rgba(255,255,255,0.0
 const v2VersionPillStyle = { borderRadius: 999, background: "rgba(255,255,255,0.08)", color: "#FFFFFF", padding: "7px 13px", fontFamily: "'JetBrains Mono',ui-monospace,monospace", fontSize: 11, fontWeight: 900 };
 
 function v2ActionItemStyle(tone) {
-  const urgent = tone === "urgent";
   return {
     display: "flex",
     alignItems: "center",
@@ -1682,17 +1681,17 @@ function v2ActionItemStyle(tone) {
     minHeight: 68,
     border: 0,
     borderRadius: 12,
-    background: urgent ? "rgba(239,68,68,0.2)" : "rgba(255,255,255,0.06)",
+    background: v2ActionSurface(tone),
     padding: "8px 12px",
     textAlign: "left",
   };
 }
 
+function v2ActionSurface(tone) {
+  return tone === "urgent" ? "rgba(239,68,68,0.2)" : "rgba(255,255,255,0.06)";
+}
+
 function v2SuggestedActionButtonStyle(tone) {
-  const urgent = tone === "urgent";
-  const event = tone === "event";
-  const gift = tone === "gift";
-  const accent = urgent ? "#EF4444" : event ? "#60A5FA" : gift ? "#F59E0B" : "#FFFFFF";
   return {
     display: "inline-flex",
     alignItems: "center",
@@ -1702,8 +1701,8 @@ function v2SuggestedActionButtonStyle(tone) {
     gap: 5,
     marginTop: 7,
     borderRadius: 999,
-    border: `1px solid ${accent}66`,
-    background: `${accent}24`,
+    border: "1px solid rgba(255,255,255,0.16)",
+    background: v2ActionSurface(tone),
     color: "#FFFFFF",
     padding: "0 11px",
     fontFamily: "'Geist','Inter',system-ui,sans-serif",
