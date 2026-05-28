@@ -49,6 +49,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 SEEN_PATH = Path(SCRIPT_DIR) / "seen.json"
+SYSTEM_ERROR_IDS = {"school-email-sync-error", "gmail-auth-invalid-grant"}
 running = True
 
 
@@ -169,19 +170,21 @@ def publish_updates(items, cfg):
         )
         if res.ok:
             logger.info("Posted %d items to /api/school-updates", len(items))
+            return True
         else:
             logger.error(
                 "POST /api/school-updates failed (%d): %s",
                 res.status_code,
                 res.text[:200],
             )
+            return False
     except requests.RequestException as e:
         logger.error("Failed to post updates: %s", e)
+        return False
 
 
-def clear_published_sync_errors(cfg):
-    """Remove stale system sync-error items after a healthy Gmail fetch."""
-    system_error_ids = {"school-email-sync-error", "gmail-auth-invalid-grant"}
+def fetch_published_updates(cfg):
+    """Read the currently published dashboard items."""
     try:
         res = requests.get(
             f"{cfg['worker_url']}/api/school-updates",
@@ -190,18 +193,41 @@ def clear_published_sync_errors(cfg):
         )
         if not res.ok:
             logger.warning(
-                "Could not inspect current school updates before clearing sync errors (%d): %s",
+                "Could not fetch current school updates (%d): %s",
                 res.status_code,
                 res.text[:200],
             )
+            return []
+        return res.json().get("updates", []) or []
+    except (requests.RequestException, ValueError) as e:
+        logger.warning("Could not fetch current school updates: %s", e)
+        return []
+
+
+def merge_updates(new_items, current_items):
+    """Merge new extraction results into the existing published pending set."""
+    merged = []
+    seen_ids = set()
+
+    for item in [*new_items, *current_items]:
+        item_id = item.get("id") or item.get("sourceEmailId")
+        if not item_id or item_id in SYSTEM_ERROR_IDS or item_id in seen_ids:
+            continue
+        merged.append(item)
+        seen_ids.add(item_id)
+    return merged
+
+
+def clear_published_sync_errors(cfg):
+    """Remove stale system sync-error items after a healthy Gmail fetch."""
+    try:
+        current = fetch_published_updates(cfg)
+        if not any(item.get("id") in SYSTEM_ERROR_IDS for item in current):
             return
-        current = res.json().get("updates", []) or []
-        if not any(item.get("id") in system_error_ids for item in current):
-            return
-        remaining = [item for item in current if item.get("id") not in system_error_ids]
+        remaining = [item for item in current if item.get("id") not in SYSTEM_ERROR_IDS]
         publish_updates(remaining, cfg)
         logger.info("Cleared stale school email sync error item.")
-    except (requests.RequestException, ValueError) as e:
+    except Exception as e:
         logger.warning("Could not clear stale school email sync error item: %s", e)
 
 
@@ -305,7 +331,9 @@ def run_once(cfg, seen):
 
     if relevant_items:
         logger.info("Relevant items: %d", len(relevant_items))
-        publish_updates(relevant_items, cfg)
+        current_items = fetch_published_updates(cfg)
+        merged_items = merge_updates(relevant_items, current_items)
+        publish_updates(merged_items, cfg)
         for item in relevant_items:
             notify_telegram(item, cfg)
     else:
