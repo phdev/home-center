@@ -1,10 +1,13 @@
 # Home Center
 
-Family TV dashboard for a Raspberry Pi kiosk on a Samsung 4K TV, with local
-voice control, household notifications, OpenClaw assistant features, and a
-Cloudflare-backed API layer. The dashboard is built with React + Vite.
+Open source family assistant that proactively turns on your TV using HDMI-CEC
+and surfaces timely family needs that your OpenClaw can act upon. Full voice
+interface with educational knowledge query support. Runs on Raspberry Pi with
+mic.
 
 ![Dashboard](public/pencil-screenshots/family-tv-dashboard.png)
+
+![Knowledge Query Example](public/readme/knowledge-query-ada-lovelace.jpg)
 
 ## Features
 
@@ -17,8 +20,6 @@ Cloudflare-backed API layer. The dashboard is built with React + Vite.
 - **Knowledge answers** — voice and dashboard Q&A with image-source safeguards
 - **OpenClaw** — family Telegram assistant and dashboard enhancement layer
 - **Design Claw** — daily design exploration and feedback capture
-- **Themes** — Midnight Observatory, Morning Paper, Retro Terminal, Soft
-  Playroom, and Glass Noir
 
 ## Architecture
 
