@@ -2184,7 +2184,6 @@ def main() -> None:
                         "Dispatching %d confirmed commands from one transcript.",
                         len(dispatch_items),
                     )
-                threading.Thread(target=dispatcher.chime, args=(1.0,), daemon=True).start()
                 for index, item in enumerate(dispatch_items, start=1):
                     item_body = item["body"]
                     item_command = item["command"]
