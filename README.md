@@ -20,19 +20,6 @@ Cloudflare-backed API layer. The dashboard is built with React + Vite.
 - **Themes** — Midnight Observatory, Morning Paper, Retro Terminal, Soft
   Playroom, and Glass Noir
 
-## Pages
-
-| Page | Screenshot |
-|------|-----------|
-| Full Calendar | ![Calendar](public/pencil-screenshots/full-calendar-page.png) |
-| Weekly Calendar | ![Weekly](public/pencil-screenshots/weekly-calendar-design.png) |
-| Daily Calendar | ![Daily](public/pencil-screenshots/daily-calendar-design.png) |
-| Weather | ![Weather](public/pencil-screenshots/full-weather-page.png) |
-| Photos | ![Photos](public/pencil-screenshots/full-photos-page.png) |
-| Knowledge Response | ![Knowledge](public/pencil-screenshots/full-llm-response-page.png) |
-| History | ![History](public/pencil-screenshots/full-history-page.png) |
-| Transcription Overlay | ![Transcription](public/pencil-screenshots/transcription-overlay.png) |
-
 ## Architecture
 
 | Machine | Role |
