@@ -1145,7 +1145,6 @@ function V2HomeDashboard({ now, calendar, weather, birthdays, derived }) {
           <div style={v2BirthdayRowStyle}>
             {birthdayItems.slice(0, 3).map((birthday, index) => (
               <div key={birthday.id ?? birthday.name ?? index} style={v2BirthdayItemStyle}>
-                <span style={v2BirthdayAvatarStyle}>{birthday.avatar ?? "🎂"}</span>
                 <div style={{ minWidth: 0 }}>
                   <div style={v2ItemTitleStyle}>{birthday.name}</div>
                   <div style={v2MutedStyle}>{formatBirthdayDate(birthday, now)}</div>
@@ -1663,8 +1662,7 @@ const v2HowiePromptStyle = { display: "flex", flexDirection: "column", gap: 6 };
 const v2HowieGreetingStyle = { fontFamily: "'Geist','Inter',system-ui,sans-serif", fontSize: 12.5, lineHeight: 1.28, color: "rgba(255,255,255,0.72)", fontWeight: 650 };
 const v2HowieCommandStyle = { minHeight: 28, borderRadius: 999, border: "1px solid rgba(255,255,255,0.18)", background: "rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.78)", display: "flex", alignItems: "center", gap: 9, padding: "0 13px", fontFamily: "'Geist','Inter',system-ui,sans-serif", fontSize: 11.5, fontWeight: 750, textAlign: "left" };
 const v2BirthdayRowStyle = { display: "grid", gridTemplateColumns: "repeat(3, minmax(0,1fr))", gap: 12 };
-const v2BirthdayItemStyle = { display: "grid", gridTemplateColumns: "32px minmax(0,1fr) auto", alignItems: "center", gap: 9, minWidth: 0 };
-const v2BirthdayAvatarStyle = { fontSize: 24, lineHeight: 1 };
+const v2BirthdayItemStyle = { display: "grid", gridTemplateColumns: "minmax(0,1fr) auto", alignItems: "center", gap: 9, minWidth: 0 };
 const v2HolidayRowStyle = { display: "grid", gridTemplateColumns: "repeat(2, minmax(0,1fr))", gap: 12 };
 const v2HolidayItemStyle = { display: "grid", gridTemplateColumns: "54px minmax(0,1fr)", alignItems: "center", gap: 12, minWidth: 0 };
 const v2TrayDividerStyle = { background: "rgba(255,255,255,0.16)" };
