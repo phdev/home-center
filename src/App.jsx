@@ -1091,7 +1091,7 @@ function V2HomeDashboard({ now, calendar, weather, birthdays, derived }) {
   const current = normalizeV2Weather(weather?.data ?? weather);
   const birthdayItems = birthdays?.birthdays?.length ? birthdays.birthdays : NO_OUTLINE_DASHBOARD_PREVIEW.birthdays.birthdays;
   const holidays = useMemo(() => getUpcomingHolidays(now, { max: 2, daysAhead: 45 }), [now]);
-  const actions = buildHowieActions(derived);
+  const actions = buildHowieActions(derived, now);
   const time = now.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true });
   const [hourMinute, meridiem] = time.split(" ");
 
@@ -1249,7 +1249,7 @@ function NeedsActionPanel({ actions }) {
         <span style={v2ActionCountStyle}>{actions.length}</span>
       </div>
       <div style={v2ActionListStyle}>
-        {actions.slice(0, 2).map((action) => (
+        {actions.map((action) => (
           <button key={action.id} style={v2ActionItemStyle(action.tone)}>
             <span style={v2ActionBadgeStyle(action.tone)}>{action.kind}</span>
             <div style={{ minWidth: 0, flex: 1 }}>
@@ -1390,50 +1390,95 @@ function normalizeV2Weather(source) {
   };
 }
 
-function buildHowieActions(derived) {
+function buildHowieActions(derived, now = new Date()) {
+  const SCHOOL_TIEBREAKER_FALLBACK = -Number.MAX_SAFE_INTEGER;
+  const GIFT_DAYS_HORIZON = 14;
+  const TAKEOUT_CUTOFF_MINUTES = 16.5 * 60;
+  const LUNCH_CUTOFF_MINUTES = 18 * 60;
+  const CUTOFF_PAST_SCORE = 0.95;
+  const CUTOFF_30_MIN_SCORE = 0.8;
+  const CUTOFF_90_MIN_SCORE = 0.55;
+  const CUTOFF_240_MIN_SCORE = 0.3;
+  const CUTOFF_DEFAULT_SCORE = 0.1;
+
   const actions = [];
-  for (const item of (derived?.rankedSchoolItems ?? []).slice(0, 3)) {
-    actions.push({
+
+  const clamp01 = (value) => {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return 0;
+    return Math.max(0, Math.min(1, n));
+  };
+  const dateTiebreaker = (value) => {
+    if (!value) return SCHOOL_TIEBREAKER_FALLBACK;
+    const ts = new Date(value).getTime();
+    return Number.isFinite(ts) ? -ts : SCHOOL_TIEBREAKER_FALLBACK;
+  };
+  const cutoffScore = (minutesToCutoff) => {
+    if (minutesToCutoff <= 0) return CUTOFF_PAST_SCORE;
+    if (minutesToCutoff <= 30) return CUTOFF_30_MIN_SCORE;
+    if (minutesToCutoff <= 90) return CUTOFF_90_MIN_SCORE;
+    if (minutesToCutoff <= 240) return CUTOFF_240_MIN_SCORE;
+    return CUTOFF_DEFAULT_SCORE;
+  };
+  const minutesSinceMidnight = now.getHours() * 60 + now.getMinutes();
+  const withPriority = (action, urgencyScore, tiebreaker) => {
+    actions.push({ ...action, urgencyScore, tiebreaker });
+  };
+
+  for (const item of (derived?.rankedSchoolItems ?? [])) {
+    const tiebreaker = item.dueDate
+      ? dateTiebreaker(item.dueDate)
+      : item.eventDate
+        ? dateTiebreaker(item.eventDate)
+        : SCHOOL_TIEBREAKER_FALLBACK;
+    withPriority({
       id: `school-${item.id}`,
       kind: item.kind === "event" ? "Event" : "Action",
       tone: item.urgency >= 0.7 ? "urgent" : item.kind === "event" ? "event" : "neutral",
       meta: item.dueLabel || item.dateLabel || item.child || "School",
       title: item.title,
       detail: item.suggestedAction || item.summary || item.child || "School update",
-    });
+    }, clamp01(item.urgency), tiebreaker);
   }
-  if (derived?.birthdayGiftNeeded && derived.birthdaysRanked?.[0]) {
-    const birthday = derived.birthdaysRanked[0];
-    actions.push({
+  if (derived?.birthdayGiftNeeded && derived.birthdaysRanked?.length) {
+    const birthday = derived.birthdaysRanked.find((item) =>
+      item.giftStatus === "needed" || item.giftStatus === "unknown"
+    ) ?? derived.birthdaysRanked[0];
+    const daysUntil = Math.max(0, Number(birthday.daysUntil) || 0);
+    withPriority({
       id: `gift-${birthday.id}`,
       kind: "Gift",
       tone: "gift",
       meta: `Birthday in ${birthday.daysUntil} days`,
       title: `Order ${birthday.name}'s gift`,
       detail: `Birthday in ${birthday.daysUntil} days.`,
-    });
+    }, Math.max(0, Math.min(1, 1 - daysUntil / GIFT_DAYS_HORIZON)), -daysUntil);
   }
   if (derived?.takeoutDecisionPending) {
-    actions.push({
+    const minutesToCutoff = TAKEOUT_CUTOFF_MINUTES - minutesSinceMidnight;
+    withPriority({
       id: "takeout",
       kind: "Dinner",
       tone: "neutral",
       meta: "Tonight",
       title: "Lock in dinner",
       detail: derived.takeoutState?.suggestedVendors?.slice(0, 2).join(" or ") || "Pick a dinner plan.",
-    });
+    }, cutoffScore(minutesToCutoff), -minutesToCutoff);
   }
   if (derived?.lunchDecisionNeeded) {
-    actions.push({
+    const minutesToCutoff = LUNCH_CUTOFF_MINUTES - minutesSinceMidnight;
+    withPriority({
       id: "lunch",
       kind: "Lunch",
       tone: "neutral",
       meta: "Tomorrow",
       title: "Pick tomorrow's lunch",
       detail: derived.lunchContext?.menu?.[0] || "Choose school or home lunch.",
-    });
+    }, cutoffScore(minutesToCutoff), -minutesToCutoff);
   }
-  return actions.length ? actions.slice(0, 3) : [
+  return actions.length ? actions
+    .sort((a, b) => b.urgencyScore - a.urgencyScore || b.tiebreaker - a.tiebreaker)
+    .map(({ urgencyScore, tiebreaker, ...action }) => action) : [
     {
       id: "fallback",
       kind: "Ready",
@@ -1698,7 +1743,7 @@ const v2NeedsHeaderStyle = { display: "flex", alignItems: "center", justifyConte
 const v2NeedsTitleStyle = { fontFamily: "'JetBrains Mono',ui-monospace,monospace", fontSize: 15, fontWeight: 900, color: "rgba(255,255,255,0.78)", textTransform: "uppercase", letterSpacing: 2.4 };
 const v2HowieHeaderStyle = { display: "flex", alignItems: "center", gap: 8, fontFamily: "'Geist','Inter',system-ui,sans-serif", fontSize: 17, fontWeight: 850, color: "#FFFFFF", textTransform: "uppercase", letterSpacing: 1.8 };
 const v2ActionCountStyle = { width: 23, height: 23, borderRadius: 999, display: "inline-flex", alignItems: "center", justifyContent: "center", background: "#EF4444", color: "#FFFFFF", fontSize: 12, fontWeight: 900 };
-const v2ActionListStyle = { display: "flex", flexDirection: "column", gap: 8, marginTop: 10 };
+const v2ActionListStyle = { display: "flex", flexDirection: "column", gap: 8, marginTop: 10, flex: 1, minHeight: 0, overflowY: "auto", paddingRight: 2 };
 const v2ActionMetaStyle = { fontFamily: "'Geist','Inter',system-ui,sans-serif", fontSize: 10.5, fontWeight: 850, color: "rgba(255,255,255,0.58)", marginBottom: 3 };
 const v2ActionTitleStyle = { fontFamily: "'Geist','Inter',system-ui,sans-serif", fontSize: 15.5, fontWeight: 850, color: "#FFFFFF", lineHeight: 1.12, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" };
 const v2ActionDetailStyle = { fontFamily: "'Geist','Inter',system-ui,sans-serif", fontSize: 12.5, fontWeight: 650, color: "rgba(255,255,255,0.68)", lineHeight: 1.25, marginTop: 3 };
