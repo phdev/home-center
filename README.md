@@ -57,6 +57,7 @@ Supported command shapes include:
 - **"Hey Homer, go back"** or **"Hey Homer, go home"** — return to dashboard
 - **"Hey Homer, set a timer for 5 minutes"** — create a timer
 - **"Hey Homer, ask/tell me/explain/describe ..."** — ask a knowledge question
+- **"Hey Homer, suggest gift ideas for Kate"** — ask Howie for birthday gift ideas via Telegram
 - **"Hey Homer, turn off"** — put the TV in standby
 
 Bare **"Hey Homer"** intentionally does nothing. Live reliability notes and

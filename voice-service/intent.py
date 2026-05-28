@@ -23,7 +23,7 @@ HOWIE_WAKE_PHRASE_RE = re.compile(
 COMMAND_KEYWORD_RE = re.compile(
     r"\b(open|show|go\s+(to|back|home)|calendar|weather|photos?|pictures?|gallery|"
     r"turn(ed|s)?\s*(it\s+)?(on|off|of|up|down|f)|set\s+(a\s+)?timer|"
-    r"remind\s+me|ordered|mark|done|gift|stop|dismiss|cancel|quiet|shut\s+up|like|don't\s+like|"
+    r"remind\s+me|ordered|mark|done|suggest|ideas?|gift|stop|dismiss|cancel|quiet|shut\s+up|like|don't\s+like|"
     r"do\s+not\s+like|what|who|where|when|"
     r"version\s+(one|two)|v[12]|"
     r"why|how|do|does|did|is|are|can|could|should|would|will|tell\s+me|"
@@ -192,6 +192,19 @@ def _parse_birthday_gift_ordered(text: str) -> dict:
     return {"action": "birthday_gift_ordered", "name": name.title()}
 
 
+def _parse_birthday_gift_ideas(text: str) -> dict:
+    match = re.search(
+        r"\bsuggest\s+(?:birthday\s+)?gift\s+ideas\s+for\s+(.+?)\s*$",
+        text,
+    )
+    if not match:
+        return {"action": "none"}
+    name = match.group(1).strip(" .,'\"")
+    if not name:
+        return {"action": "none"}
+    return {"action": "birthday_gift_ideas", "name": name.title()}
+
+
 def _parse_needs_action_done(text: str) -> dict:
     match = re.search(
         rf"\bmark\s+(?:needs\s+action\s+)?item\s+(\d+|{_NUMBER_PATTERN})\s+as\s+done\b",
@@ -222,6 +235,10 @@ def parse_command(text: str, allow_bare_ask: bool = True, allow_wake_knowledge: 
     needs_action_command = _parse_needs_action_done(text)
     if needs_action_command["action"] != "none":
         return needs_action_command
+
+    gift_ideas_command = _parse_birthday_gift_ideas(text)
+    if gift_ideas_command["action"] != "none":
+        return gift_ideas_command
 
     gift_command = _parse_birthday_gift_ordered(text)
     if gift_command["action"] != "none":
@@ -318,6 +335,9 @@ def is_dispatchable_command(command: dict) -> bool:
         message = str(command.get("message", "")).strip()
         return len(message.split()) >= 1
     if action == "birthday_gift_ordered":
+        name = str(command.get("name", "")).strip()
+        return len(name.split()) >= 1
+    if action == "birthday_gift_ideas":
         name = str(command.get("name", "")).strip()
         return len(name.split()) >= 1
     if action == "needs_action_done":

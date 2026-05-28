@@ -63,11 +63,11 @@ describe("NeedsActionPanel", () => {
       meta: "Birthday in 1 days",
       title: "Order Kate's gift",
       detailLabel: "Suggested action",
-      detail: "Order birthday present",
+      detail: "Suggest gift ideas",
     }]} />);
 
     expect(screen.queryByText("Event")).toBeNull();
     expect(screen.queryByText("Gift")).toBeNull();
-    expect(screen.getByText("Order birthday present")).toBeTruthy();
+    expect(screen.getByText("Suggest gift ideas")).toBeTruthy();
   });
 });

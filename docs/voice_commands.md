@@ -46,3 +46,11 @@ The voice service records these through `scripts/record_design_feedback.py`,
 which merges the current daily concept into accepted or rejected design memory
 without requiring a model call. Free-form Telegram replies still go through the
 Design Claw listener and parser.
+
+Birthday gift planning is a Telegram-bound Howie command:
+
+- `Hey Homer, suggest gift ideas for <name>`
+
+The Mac voice service sends this to OpenClaw as a research request. Howie should
+use the available Facebook session for context when possible, then send Peter
+gift ideas or follow-up questions through Telegram.

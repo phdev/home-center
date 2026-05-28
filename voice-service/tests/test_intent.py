@@ -121,6 +121,19 @@ def test_birthday_gift_ordered_intent():
     assert not is_dispatchable_command({"action": "birthday_gift_ordered", "name": ""})
 
 
+def test_birthday_gift_ideas_intent():
+    assert parse_command("Hey Homer, suggest gift ideas for Kate.") == {
+        "action": "birthday_gift_ideas",
+        "name": "Kate",
+    }
+    assert parse_command("Hey Homer, suggest birthday gift ideas for Andrew Howell") == {
+        "action": "birthday_gift_ideas",
+        "name": "Andrew Howell",
+    }
+    assert is_dispatchable_command({"action": "birthday_gift_ideas", "name": "Kate"})
+    assert not is_dispatchable_command({"action": "birthday_gift_ideas", "name": ""})
+
+
 def test_needs_action_done_intent():
     assert parse_command("Hey Homer, mark item 1 as done.") == {
         "action": "needs_action_done",

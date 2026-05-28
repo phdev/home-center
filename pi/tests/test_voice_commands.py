@@ -28,6 +28,15 @@ def test_hey_homer_mark_birthday_as_ordered_command_marks_birthday_gift_ordered(
     }
 
 
+def test_hey_homer_suggest_gift_ideas_command_asks_howie():
+    service = load_wake_word_service()
+
+    assert service.parse_command("Hey Homer, suggest gift ideas for Kate.") == {
+        "action": "birthday_gift_ideas",
+        "name": "Kate",
+    }
+
+
 def test_hey_homer_mark_needs_action_item_done():
     service = load_wake_word_service()
 

@@ -101,7 +101,7 @@ describe("buildHowieActions", () => {
       meta: "Birthday May 29",
       title: "Order Kate's gift",
       detailLabel: "Suggested action",
-      detail: "Order birthday present",
+      detail: "Suggest gift ideas",
     });
   });
 

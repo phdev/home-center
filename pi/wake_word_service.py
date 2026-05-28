@@ -707,6 +707,12 @@ def parse_command(text: str) -> dict:
         index = int(raw_index) if raw_index.isdigit() else word_numbers[raw_index]
         return {"action": "needs_action_done", "index": index}
 
+    gift_ideas_match = re.search(r"\bsuggest\s+(?:birthday\s+)?gift\s+ideas\s+for\s+(.+?)\s*$", text)
+    if gift_ideas_match:
+        name = gift_ideas_match.group(1).strip(" .,'\"")
+        if name:
+            return {"action": "birthday_gift_ideas", "name": name.title()}
+
     ordered_gift_match = re.search(r"\b(?:i\s+)?(?:just\s+)?ordered\s+(.+?)(?:'?s)?\s+(?:gift|birthday)\b", text)
     if not ordered_gift_match:
         ordered_gift_match = re.search(r"\bmark\s+(.+?)(?:'?s)?\s+(?:gift|birthday)\s+as\s+ordered\b", text)
@@ -861,6 +867,19 @@ def worker_get(url: str, token: str | None, path: str) -> dict | None:
     return None
 
 
+def openclaw_post(url: str, path: str, data: dict | None = None) -> dict | None:
+    """POST to the local OpenClaw bridge. Returns parsed JSON or None on failure."""
+    import requests
+    try:
+        resp = requests.post(f"{url}{path}", json=data or {}, timeout=10)
+        if resp.ok:
+            return resp.json()
+        log.warning("OpenClaw POST %s failed: %d %s", path, resp.status_code, resp.text[:200])
+    except Exception as e:
+        log.warning("OpenClaw POST %s error: %s", path, e)
+    return None
+
+
 def normalize_birthday_name(value: str) -> str:
     return re.sub(r"[^a-z0-9]+", " ", (value or "").lower()).strip()
 
@@ -900,6 +919,15 @@ def mark_needs_action_done(worker_url: str, worker_token: str | None, index: int
     if not result:
         return {"ok": False, "reason": "worker_request_failed", "index": index}
     return result
+
+
+def birthday_gift_ideas_message(name: str) -> str:
+    """Build the OpenClaw request for birthday gift idea research."""
+    return (
+        f"Suggest birthday gift ideas for {name}. "
+        "Use the Facebook session you have access to for context about that person if available. "
+        "Send Peter gift suggestions via Telegram, or ask Peter for more context via Telegram if you cannot find enough useful context."
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -2105,11 +2133,19 @@ def main() -> None:
                         help="Worker API base URL (e.g., https://your-worker.workers.dev)")
     parser.add_argument("--worker-token", type=str, default=None,
                         help="Worker API auth token")
+    parser.add_argument("--openclaw-bridge-url", type=str, default=None,
+                        help="OpenClaw bridge base URL for Telegram-bound voice tasks")
+    parser.add_argument("--openclaw-chat-id", type=str, default=None,
+                        help="Telegram chat ID for OpenClaw voice task delivery")
     parser.add_argument("--no-wake-detection", action="store_true",
                         help="Run only HTTP endpoints, chimes, timers, and gestures.")
     args = parser.parse_args()
     if not args.worker_token:
         args.worker_token = os.environ.get("WORKER_TOKEN")
+    if not args.openclaw_bridge_url:
+        args.openclaw_bridge_url = os.environ.get("OPENCLAW_BRIDGE_URL")
+    if not args.openclaw_chat_id:
+        args.openclaw_chat_id = os.environ.get("OPENCLAW_CHAT_ID")
 
     if args.debug:
         logging.getLogger().setLevel(logging.DEBUG)
@@ -2490,6 +2526,23 @@ def main() -> None:
                                 log.info("Needs Action voice command failed: %s", result)
                         else:
                             log.info("Needs Action voice command ignored: no worker URL configured")
+
+                    elif action == "birthday_gift_ideas":
+                        name = str(command.get("name", "")).strip()
+                        if args.dry_run:
+                            log.info("[DRY RUN] Would ask Howie for birthday gift ideas for %s", name)
+                        elif args.openclaw_bridge_url and args.openclaw_chat_id and name:
+                            result = openclaw_post(
+                                args.openclaw_bridge_url,
+                                "/voice-inbound",
+                                {"chatId": args.openclaw_chat_id, "message": birthday_gift_ideas_message(name)},
+                            )
+                            if result:
+                                log.info("Queued birthday gift ideas request for %s via OpenClaw", name)
+                            else:
+                                log.info("Birthday gift ideas voice command failed for %s", name)
+                        else:
+                            log.info("Birthday gift ideas voice command ignored: OpenClaw bridge/chat not configured")
 
                     elif action in ("debug_hide", "debug_show"):
                         debug_post(action, {"message": action.replace("_", " ")})

@@ -103,7 +103,7 @@ export function buildHowieActions(derived, now = new Date()) {
       meta: formatDate(birthday.nextDate || birthday.date, "Birthday") || `Birthday in ${birthday.daysUntil} days`,
       title: `Order ${birthday.name}'s gift`,
       detailLabel: "Suggested action",
-      detail: "Order birthday present",
+      detail: "Suggest gift ideas",
     }, Math.max(0, Math.min(1, 1 - daysUntil / GIFT_DAYS_HORIZON)), -daysUntil);
   }
 

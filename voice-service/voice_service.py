@@ -102,6 +102,7 @@ STT_PROMPT = (
     "Hey Homer, show the weather. Hey Homer, set a timer for ten seconds. "
     "Hey Homer, go back. Hey Homer, go home. Hey Homer, stop. "
     "Hey Homer, I like this design. Hey Homer, I don't like this design. "
+    "Hey Homer, suggest gift ideas for Kate. "
     "Hey Howie, send a message to OpenClaw. Turn off."
 )
 
@@ -957,6 +958,8 @@ class Dispatcher:
             self.send_howie_message(command)
         elif action == "birthday_gift_ordered":
             self.mark_birthday_gift_ordered(str(command.get("name", "")))
+        elif action == "birthday_gift_ideas":
+            self.suggest_birthday_gift_ideas(str(command.get("name", "")))
         elif action == "needs_action_done":
             self.mark_needs_action_done(int(command.get("index", 0) or 0))
 
@@ -1007,6 +1010,19 @@ class Dispatcher:
             log.warning("Needs Action voice command has invalid index: %s", index)
             return
         self._worker_post("/api/needs-action/done", {"index": index})
+
+    def suggest_birthday_gift_ideas(self, name: str) -> None:
+        name = name.strip()
+        if not name:
+            log.warning("Gift ideas voice command has no birthday name.")
+            return
+        self.send_howie_message({
+            "message": (
+                f"Suggest birthday gift ideas for {name}. "
+                "Use the Facebook session you have access to for context about that person if available. "
+                "Send Peter gift suggestions via Telegram, or ask Peter for more context via Telegram if you cannot find enough useful context."
+            )
+        })
 
     def record_design_feedback(self, command: dict) -> None:
         if not self.design_feedback_script:
