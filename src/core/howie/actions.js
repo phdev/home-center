@@ -21,6 +21,31 @@ export function buildHowieActions(derived, now = new Date()) {
     const ts = new Date(value).getTime();
     return Number.isFinite(ts) ? -ts : SCHOOL_TIEBREAKER_FALLBACK;
   };
+  const parseActionDate = (value) => {
+    if (!value) return null;
+    const md = /^(\d{2})-(\d{2})$/.exec(value);
+    if (md) {
+      let date = new Date(now.getFullYear(), Number(md[1]) - 1, Number(md[2]));
+      if (date < startOfDay(now)) date = new Date(now.getFullYear() + 1, Number(md[1]) - 1, Number(md[2]));
+      return date;
+    }
+    const ymd = /^(\d{4}-\d{2}-\d{2})/.exec(value);
+    const date = new Date(`${ymd ? ymd[1] : value}T00:00:00`);
+    return Number.isFinite(date.getTime()) ? date : null;
+  };
+  const startOfDay = (date) => new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const daysUntilDate = (value) => {
+    const date = parseActionDate(value);
+    if (!date) return null;
+    return Math.floor((startOfDay(date) - startOfDay(now)) / 86_400_000);
+  };
+  const datedTone = (value, fallbackTone) => {
+    const days = daysUntilDate(value);
+    if (days == null) return fallbackTone;
+    if (days <= 2) return "urgent";
+    if (days <= 5) return "warning";
+    return fallbackTone;
+  };
   const cutoffScore = (minutesToCutoff) => {
     if (minutesToCutoff <= 0) return CUTOFF_PAST_SCORE;
     if (minutesToCutoff <= 30) return CUTOFF_30_MIN_SCORE;
@@ -55,7 +80,10 @@ export function buildHowieActions(derived, now = new Date()) {
     withPriority({
       id: `school-${item.id}`,
       kind: item.kind === "event" ? "Event" : "Action",
-      tone: item.urgency >= 0.7 ? "urgent" : item.kind === "event" ? "event" : "neutral",
+      tone: datedTone(
+        item.dueDate || item.eventDate,
+        item.urgency >= 0.7 ? "urgent" : item.kind === "event" ? "event" : "neutral"
+      ),
       meta: item.dueLabel || item.dateLabel || formatDate(item.dueDate, "Due") || formatDate(item.eventDate, "Date") || item.child || "School",
       title: item.title,
       detailLabel: item.suggestedAction ? "Suggested action" : null,
@@ -71,7 +99,7 @@ export function buildHowieActions(derived, now = new Date()) {
     withPriority({
       id: `gift-${birthday.id}`,
       kind: "Gift",
-      tone: "gift",
+      tone: daysUntil <= 2 ? "urgent" : daysUntil <= 5 ? "warning" : "gift",
       meta: formatDate(birthday.nextDate || birthday.date, "Birthday") || `Birthday in ${birthday.daysUntil} days`,
       title: `Order ${birthday.name}'s gift`,
       detailLabel: "Suggested action",

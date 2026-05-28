@@ -21,10 +21,46 @@ describe("buildHowieActions", () => {
 
     expect(actions[0]).toMatchObject({
       id: "school-slip",
+      tone: "urgent",
       meta: "Due May 29",
       detailLabel: "Suggested action",
       detail: "Sign the waiver tonight",
     });
+  });
+
+  it("colors Needs Action items red within two days and yellow within five days", () => {
+    const actions = buildHowieActions({
+      rankedSchoolItems: [
+        {
+          id: "red",
+          kind: "action",
+          title: "Due soon",
+          summary: "Due soon",
+          dueDate: "2026-05-30",
+          urgency: 0.2,
+        },
+        {
+          id: "yellow",
+          kind: "action",
+          title: "Due this week",
+          summary: "Due this week",
+          dueDate: "2026-06-02",
+          urgency: 0.2,
+        },
+        {
+          id: "neutral",
+          kind: "action",
+          title: "Due later",
+          summary: "Due later",
+          dueDate: "2026-06-03",
+          urgency: 0.2,
+        },
+      ],
+    }, at(10));
+
+    expect(actions.find((action) => action.id === "school-red")).toMatchObject({ tone: "urgent" });
+    expect(actions.find((action) => action.id === "school-yellow")).toMatchObject({ tone: "warning" });
+    expect(actions.find((action) => action.id === "school-neutral")).toMatchObject({ tone: "neutral" });
   });
 
   it("interleaves takeout, gift, and school by urgency at dinner cutoff", () => {

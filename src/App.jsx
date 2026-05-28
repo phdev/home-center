@@ -1682,7 +1682,9 @@ function v2ActionItemStyle(tone) {
 }
 
 function v2ActionSurface(tone) {
-  return tone === "urgent" ? "rgba(239,68,68,0.2)" : "rgba(255,255,255,0.06)";
+  if (tone === "urgent") return "rgba(239,68,68,0.2)";
+  if (tone === "warning") return "rgba(234,179,8,0.2)";
+  return "rgba(255,255,255,0.06)";
 }
 
 function v2SuggestedActionButtonStyle(tone) {
