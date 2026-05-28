@@ -11,12 +11,13 @@
 // ─── Kind classification ─────────────────────────────────────────────────
 
 const ACTION_PATTERNS = [
-  /\bplease (sign|return|bring|pay|rsvp|submit|complete)\b/i,
-  /\b(sign|bring|rsvp|submit|pay)\b[^.]{0,40}\b(by|before|due)\b/i,
+  /\bplease (sign|return|bring|pay|rsvp|submit|complete|volunteer)\b/i,
+  /\b(sign|bring|rsvp|submit|pay|volunteer)\b[^.]{0,40}\b(by|before|due|for)\b/i,
   /\brsvp\b/i,
   /\bplease pay\b/i,
   /\bbring (a |an )/i,
   /\bsign (the |a |and )/i,
+  /\bvolunteer\b/i,
 ];
 const EVENT_PATTERNS = [
   /\b(book fair|field trip|picture day|parent-?teacher|conference|assembly|concert|dance|open house|performance)\b/i,

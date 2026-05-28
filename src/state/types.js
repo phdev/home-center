@@ -96,6 +96,7 @@
  * @property {string} [class]
  * @property {string} [teacher]
  * @property {string} [location]
+ * @property {'sign'|'bring'|'rsvp'|'pay'|'volunteer'|'other'} [requiredActionType]
  * @property {number} urgency             0..1
  * @property {'regex'|'openclaw'|'both'} extractionSource
  * @property {string} [rawSnippet]

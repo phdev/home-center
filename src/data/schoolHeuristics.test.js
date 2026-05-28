@@ -7,11 +7,12 @@ import {
 } from "./schoolHeuristics";
 
 describe("guessKind (pre-LLM)", () => {
-  it("returns 'action' for sign/bring/rsvp/pay verbs", () => {
+  it("returns 'action' for sign/bring/rsvp/pay/volunteer verbs", () => {
     expect(guessKind("Please sign the permission slip and return it.")).toBe("action");
     expect(guessKind("Bring a snack for class party")).toBe("action");
     expect(guessKind("RSVP for the field trip")).toBe("action");
     expect(guessKind("Lunch account balance — please pay $12")).toBe("action");
+    expect(guessKind("Please volunteer for the book fair")).toBe("action");
   });
 
   it("returns 'event' for dated social happenings", () => {

@@ -34,6 +34,7 @@ export function normalizeOneSchoolUpdate(item, index = 0, now = new Date()) {
     class: item.class,
     teacher: item.teacher,
     location: item.location,
+    requiredActionType: item.requiredActionType,
     urgency,
     suggestedAction: item.suggestedAction ?? defaultSuggestedAction(kind, item.title ?? item.subject),
     extractionSource: item.extractionSource ?? (item.classifier === "llm" ? "openclaw" : "regex"),

@@ -71,18 +71,20 @@ describe("normalizeSchoolItems", () => {
     expect(r[1].extractionSource).toBe("regex");
   });
 
-  it("preserves class, teacher, and receivedAt metadata", () => {
+  it("preserves class, teacher, required action type, and receivedAt metadata", () => {
     const r = normalizeSchoolItems({
       items: [{
         title: "Permission slip",
         class: "4th Grade",
         teacher: "Ms. Rivera",
+        requiredActionType: "sign",
         receivedAt: "2026-05-27T15:00:00Z",
       }],
     });
     expect(r[0]).toMatchObject({
       class: "4th Grade",
       teacher: "Ms. Rivera",
+      requiredActionType: "sign",
       receivedAt: "2026-05-27T15:00:00Z",
     });
   });

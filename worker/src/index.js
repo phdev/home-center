@@ -3132,7 +3132,8 @@ const CLAW_ENHANCERS = {
   // state:  { subject, from, snippet, receivedAt }
   // output: {
   //   isRelevant, kind, title, summary, dueDate?, eventDate?,
-  //   child?, class?, teacher?, location?, urgency, suggestedAction?
+  //   child?, class?, teacher?, location?, urgency, suggestedAction?,
+  //   requiredActionType?
   // }
   //
   // Policy (matches the family's explicit ask: "only flag actionable"):
@@ -3150,7 +3151,8 @@ const CLAW_ENHANCERS = {
         '{"isRelevant": bool, "kind": "action"|"event"|"reminder"|"info", "title": str, ' +
         '"summary": str, "dueDate": "YYYY-MM-DD"|null, "eventDate": "YYYY-MM-DD"|null, ' +
         '"child": str|null, "class": str|null, "teacher": str|null, "location": str|null, ' +
-        '"urgency": 0..1, "suggestedAction": str|null}. ' +
+        '"urgency": 0..1, "suggestedAction": str|null, ' +
+        '"requiredActionType": "sign"|"bring"|"rsvp"|"pay"|"volunteer"|"other"|null}. ' +
         'Only return isRelevant=true if the email contains: (a) a concrete action the family must take ' +
         '(sign/return/RSVP/pay/bring/volunteer) OR (b) a dated school event affecting the family schedule. ' +
         'Newsletters, fundraising, and informational blurbs without dates or actions → isRelevant=false. ' +
@@ -3178,6 +3180,9 @@ const CLAW_ENHANCERS = {
           return Math.max(0, Math.min(1, n));
         })();
         const dateRe = /^\d{4}-\d{2}-\d{2}$/;
+        const requiredActionType = ["sign", "bring", "rsvp", "pay", "volunteer", "other"].includes(fields?.requiredActionType)
+          ? fields.requiredActionType
+          : null;
         return {
           isRelevant: true,
           kind,
@@ -3191,6 +3196,7 @@ const CLAW_ENHANCERS = {
           location: clampStr(fields?.location, 80) || null,
           urgency,
           suggestedAction: clampStr(fields?.suggestedAction, 140) || null,
+          requiredActionType,
         };
       },
     };
