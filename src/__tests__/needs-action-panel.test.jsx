@@ -38,10 +38,12 @@ describe("NeedsActionPanel", () => {
       tone: "event",
       meta: "School",
       title: "Walking Field Trip to Franklin Park",
+      detailLabel: "Suggested action",
       detail: "Note the June 5 field trip on your calendar.",
     }]} />);
 
     expect(screen.getByText("Walking Field Trip to Franklin Park")).toBeTruthy();
+    expect(screen.getByText("Suggested action:", { exact: false })).toBeTruthy();
     expect(screen.getByText("Note the June 5 field trip on your calendar.")).toBeTruthy();
   });
 });

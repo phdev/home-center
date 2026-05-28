@@ -45,6 +45,7 @@ export function buildHowieActions(derived, now = new Date()) {
       tone: item.urgency >= 0.7 ? "urgent" : item.kind === "event" ? "event" : "neutral",
       meta: item.dueLabel || item.dateLabel || item.child || "School",
       title: item.title,
+      detailLabel: item.suggestedAction ? "Suggested action" : null,
       detail: item.suggestedAction || item.summary || item.child || "School update",
     }, clamp01(item.urgency), tiebreaker);
   }

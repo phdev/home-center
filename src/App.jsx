@@ -1257,7 +1257,12 @@ export function NeedsActionPanel({ actions }) {
             <div style={{ minWidth: 0, flex: 1 }}>
               {action.meta && <div style={v2ActionMetaStyle}>{action.meta}</div>}
               <div style={v2ActionTitleStyle}>{action.title}</div>
-              {action.detail && <div style={v2ActionDetailStyle}>{action.detail}</div>}
+              {action.detail && (
+                <div style={v2ActionDetailStyle}>
+                  {action.detailLabel && <span style={v2ActionDetailLabelStyle}>{action.detailLabel}: </span>}
+                  {action.detail}
+                </div>
+              )}
             </div>
             <span style={v2ChevronStyle}>›</span>
           </button>
@@ -1649,6 +1654,7 @@ const v2ActionListStyle = { display: "flex", flexDirection: "column", gap: 8, ma
 const v2ActionMetaStyle = { fontFamily: "'Geist','Inter',system-ui,sans-serif", fontSize: 10.5, fontWeight: 850, color: "rgba(255,255,255,0.58)", marginBottom: 3 };
 const v2ActionTitleStyle = { fontFamily: "'Geist','Inter',system-ui,sans-serif", fontSize: 15.5, fontWeight: 850, color: "#FFFFFF", lineHeight: 1.12, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" };
 const v2ActionDetailStyle = { fontFamily: "'Geist','Inter',system-ui,sans-serif", fontSize: 12.5, fontWeight: 650, color: "rgba(255,255,255,0.68)", lineHeight: 1.25, marginTop: 3 };
+const v2ActionDetailLabelStyle = { color: "rgba(255,255,255,0.86)", fontWeight: 850 };
 const v2ChevronStyle = { color: "rgba(255,255,255,0.72)", fontSize: 28, lineHeight: 1 };
 const v2HowiePromptStyle = { display: "flex", flexDirection: "column", gap: 6 };
 const v2HowieGreetingStyle = { fontFamily: "'Geist','Inter',system-ui,sans-serif", fontSize: 12.5, lineHeight: 1.28, color: "rgba(255,255,255,0.72)", fontWeight: 650 };

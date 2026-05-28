@@ -20,6 +20,7 @@ describe("buildHowieActions", () => {
 
     expect(actions[0]).toMatchObject({
       id: "school-slip",
+      detailLabel: "Suggested action",
       detail: "Sign the waiver tonight",
     });
   });
