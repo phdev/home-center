@@ -3186,8 +3186,8 @@ const CLAW_ENHANCERS = {
         return {
           isRelevant: true,
           kind,
-          title: clampStr(fields?.title, 80),
-          summary: clampStr(fields?.summary, 200),
+          title: clampStr(fields?.title, 60),
+          summary: clampStr(fields?.summary, 160),
           dueDate: dateRe.test(fields?.dueDate ?? "") ? fields.dueDate : null,
           eventDate: dateRe.test(fields?.eventDate ?? "") ? fields.eventDate : null,
           child: clampStr(fields?.child, 60) || null,
@@ -3195,7 +3195,7 @@ const CLAW_ENHANCERS = {
           teacher: clampStr(fields?.teacher, 80) || null,
           location: clampStr(fields?.location, 80) || null,
           urgency,
-          suggestedAction: clampStr(fields?.suggestedAction, 140) || null,
+          suggestedAction: clampStr(fields?.suggestedAction, 100) || null,
           requiredActionType,
         };
       },

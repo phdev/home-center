@@ -149,6 +149,34 @@ async function askAndRead(currentEnv, query, bodyOverrides = {}) {
   return response.json();
 }
 
+async function enhanceSchoolEmail(modelFields, state = {}) {
+  const currentEnv = env({ NOTIFICATIONS: null });
+  global.fetch = vi.fn(async (url) => {
+    expect(String(url)).toBe("https://api.openai.com/v1/chat/completions");
+    return jsonResponse({
+      choices: [{ message: { content: JSON.stringify(modelFields) } }],
+    });
+  });
+
+  const response = await worker.fetch(new Request("https://worker.test/api/claw/enhance", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      feature: "schoolUpdates",
+      state: {
+        from: "teacher@rbusd.org",
+        subject: "School update",
+        snippet: "School update",
+        receivedAt: "2026-05-27T15:00:00Z",
+        ...state,
+      },
+    }),
+  }), currentEnv);
+
+  expect(response.status).toBe(200);
+  return response.json();
+}
+
 afterEach(() => {
   vi.useRealTimers();
   vi.restoreAllMocks();
@@ -156,6 +184,156 @@ afterEach(() => {
 });
 
 describe("claw school updates enhancer", () => {
+  it("filters newsletters and shipping while accepting sign-and-return school emails", async () => {
+    let body = await enhanceSchoolEmail(
+      { isRelevant: false },
+      { subject: "Weekly classroom newsletter", snippet: "This week we learned about fractions." },
+    );
+    expect(body.fields).toEqual({ isRelevant: false });
+
+    body = await enhanceSchoolEmail(
+      { isRelevant: false },
+      { from: "ship@example.com", subject: "Your package shipped", snippet: "Tracking number 123." },
+    );
+    expect(body.fields).toEqual({ isRelevant: false });
+
+    body = await enhanceSchoolEmail({
+      isRelevant: true,
+      kind: "action",
+      title: "Return permission slip",
+      summary: "Permission slip is due Friday.",
+      dueDate: "2026-05-29",
+      eventDate: null,
+      child: "Olivia",
+      urgency: 0.8,
+      suggestedAction: "Sign and return the permission slip.",
+      requiredActionType: "sign",
+    }, {
+      subject: "Permission slip",
+      snippet: "Please sign and return Olivia's permission slip by Friday.",
+    });
+    expect(body.fields).toMatchObject({
+      isRelevant: true,
+      kind: "action",
+      suggestedAction: "Sign and return the permission slip.",
+      requiredActionType: "sign",
+    });
+  });
+
+  it.each([
+    ["action", "Please sign and return the waiver."],
+    ["event", "Book fair is on Friday."],
+    ["reminder", "Reminder: library books are due Monday."],
+    ["info", "School schedule update."],
+  ])("preserves %s classification from model output", async (kind, snippet) => {
+    const body = await enhanceSchoolEmail({
+      isRelevant: true,
+      kind,
+      title: `${kind} title`,
+      summary: `${kind} summary`,
+      dueDate: kind === "action" || kind === "reminder" ? "2026-05-29" : null,
+      eventDate: kind === "event" ? "2026-05-29" : null,
+      urgency: 0.4,
+      suggestedAction: kind === "action" ? "Handle the school action." : null,
+    }, { snippet });
+
+    expect(body.fields.kind).toBe(kind);
+  });
+
+  it("extracts hidden action items with a concrete suggested action", async () => {
+    const body = await enhanceSchoolEmail({
+      isRelevant: true,
+      kind: "action",
+      title: "Return classroom waiver",
+      summary: "A long class update includes a waiver due Friday.",
+      dueDate: "2026-05-29",
+      eventDate: null,
+      child: "Olivia",
+      urgency: 0.75,
+      suggestedAction: "Sign the classroom waiver by Friday.",
+      requiredActionType: "sign",
+    }, {
+      snippet: `${"Class notes. ".repeat(80)} Buried near the end: please sign by Friday.`,
+    });
+
+    expect(body.fields).toMatchObject({
+      isRelevant: true,
+      kind: "action",
+      suggestedAction: "Sign the classroom waiver by Friday.",
+    });
+  });
+
+  it("validates structured dates and optional school metadata", async () => {
+    const body = await enhanceSchoolEmail({
+      isRelevant: true,
+      kind: "event",
+      title: "Open house",
+      summary: "Open house is scheduled.",
+      dueDate: "next Friday",
+      eventDate: "2026-06-10",
+      child: "Olivia",
+      class: "4th Grade",
+      teacher: "Ms. Rivera",
+      location: "Room 12",
+      urgency: 0.35,
+      suggestedAction: null,
+      requiredActionType: "email",
+    });
+
+    expect(body.fields).toMatchObject({
+      dueDate: null,
+      eventDate: "2026-06-10",
+      child: "Olivia",
+      class: "4th Grade",
+      teacher: "Ms. Rivera",
+      location: "Room 12",
+      requiredActionType: null,
+    });
+  });
+
+  it("preserves urgency extremes for near deadlines and distant events", async () => {
+    const urgent = await enhanceSchoolEmail({
+      isRelevant: true,
+      kind: "action",
+      title: "Form due tomorrow",
+      summary: "The form is due tomorrow.",
+      dueDate: "2026-05-29",
+      eventDate: null,
+      urgency: 0.85,
+      suggestedAction: "Return the form tomorrow.",
+    });
+    const distant = await enhanceSchoolEmail({
+      isRelevant: true,
+      kind: "event",
+      title: "Assembly in three weeks",
+      summary: "The assembly is in three weeks.",
+      dueDate: null,
+      eventDate: "2026-06-18",
+      urgency: 0.35,
+      suggestedAction: null,
+    });
+
+    expect(urgent.fields.urgency).toBeGreaterThanOrEqual(0.7);
+    expect(distant.fields.urgency).toBeLessThanOrEqual(0.4);
+  });
+
+  it("clamps TV summary copy lengths", async () => {
+    const body = await enhanceSchoolEmail({
+      isRelevant: true,
+      kind: "action",
+      title: "T".repeat(90),
+      summary: "S".repeat(220),
+      dueDate: "2026-05-29",
+      eventDate: null,
+      urgency: 0.8,
+      suggestedAction: "A".repeat(130),
+    });
+
+    expect(body.fields.title).toHaveLength(60);
+    expect(body.fields.summary).toHaveLength(160);
+    expect(body.fields.suggestedAction).toHaveLength(100);
+  });
+
   it("preserves class and teacher extraction fields", async () => {
     const currentEnv = env();
     global.fetch = vi.fn(async (url) => {

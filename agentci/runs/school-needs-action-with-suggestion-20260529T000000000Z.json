@@ -1,0 +1,228 @@
+{
+  "agentRuns": [],
+  "cards": [
+    {
+      "agent": {
+        "feature": "schoolUpdatesSummary",
+        "state": [
+          {
+            "dueDate": "2026-05-29",
+            "eventDate": "2026-06-04",
+            "id": "school-action-waiver",
+            "kind": "action",
+            "summary": "The museum field trip waiver is due tomorrow.",
+            "title": "Return field trip waiver",
+            "urgency": 0.85
+          }
+        ]
+      },
+      "data": {
+        "hasAction": true,
+        "items": [
+          {
+            "child": "Olivia",
+            "class": "4th Grade",
+            "dueDate": "2026-05-29",
+            "eventDate": "2026-06-04",
+            "extractionSource": "openclaw",
+            "id": "school-action-waiver",
+            "kind": "action",
+            "location": "Museum",
+            "rawSnippet": "Please sign and return the museum field trip waiver by tomorrow.",
+            "sourceEmailId": "fake-email-waiver-001",
+            "suggestedAction": "Sign the waiver tonight",
+            "summary": "The museum field trip waiver is due tomorrow.",
+            "teacher": "Ms. Rivera",
+            "title": "Return field trip waiver",
+            "urgency": 0.85
+          }
+        ],
+        "urgent": true
+      },
+      "id": "school-updates",
+      "placement": "main",
+      "priority": "urgent",
+      "reason": {
+        "priorityReason": "Urgent school item is due soon or high urgency.",
+        "suppressedBy": [],
+        "triggeredBy": [
+          "hasSchoolActionItems",
+          "hasUrgentSchoolItem",
+          "rankedSchoolItems"
+        ]
+      },
+      "shouldDisplay": true,
+      "timeContext": {
+        "now": "2026-05-29T00:00:00.000Z"
+      },
+      "type": "SchoolUpdatesCard"
+    }
+  ],
+  "commandEvents": [
+    {
+      "confidenceBucket": "high",
+      "deviceType": "agentci-fixture",
+      "locale": "en-US",
+      "source": "fixture",
+      "transcript": "show school updates",
+      "wakewordDetected": true
+    }
+  ],
+  "derivedState": {
+    "bedtimeReminderActive": false,
+    "bedtimeWindow": null,
+    "birthdayGiftNeeded": false,
+    "birthdayNeedsGift": false,
+    "birthdaysRanked": [],
+    "checklist": {
+      "items": [],
+      "variant": {
+        "highTempF": 72,
+        "hotDay": false,
+        "needsJacket": false,
+        "rain": false
+      }
+    },
+    "clawSuggestions": [
+      {
+        "accent": "red",
+        "actionKind": "openSchoolItem",
+        "detail": "The museum field trip waiver is due tomorrow.",
+        "iconName": "alert-triangle",
+        "id": "school-school-action-waiver",
+        "targetRef": {
+          "schoolItemId": "school-action-waiver"
+        },
+        "tier": 1,
+        "title": "Return field trip waiver"
+      }
+    ],
+    "conflicts": [],
+    "hasMorningConflict": false,
+    "hasMorningOverlap": false,
+    "hasSchoolActionItems": true,
+    "hasSchoolEventUpcoming": false,
+    "hasUrgentSchoolItem": true,
+    "hasWorkConflictForPeter": false,
+    "lunchContext": {
+      "dateISO": "2026-05-29",
+      "dateLabel": "Fri, May 29",
+      "isSchoolDay": true,
+      "menu": []
+    },
+    "lunchDecisionNeeded": false,
+    "needsSchoolActionToday": true,
+    "nextMeaningfulTransition": "2026-05-29T01:00:00.000Z",
+    "peter0800_0900Events": [],
+    "peter0800_0900Risk": false,
+    "rankedSchoolItems": [
+      {
+        "child": "Olivia",
+        "class": "4th Grade",
+        "dueDate": "2026-05-29",
+        "eventDate": "2026-06-04",
+        "extractionSource": "openclaw",
+        "id": "school-action-waiver",
+        "kind": "action",
+        "location": "Museum",
+        "rawSnippet": "Please sign and return the museum field trip waiver by tomorrow.",
+        "sourceEmailId": "fake-email-waiver-001",
+        "suggestedAction": "Sign the waiver tonight",
+        "summary": "The museum field trip waiver is due tomorrow.",
+        "teacher": "Ms. Rivera",
+        "title": "Return field trip waiver",
+        "urgency": 0.85
+      }
+    ],
+    "showClawSuggestions": true,
+    "showMorningChecklist": false,
+    "takeoutDecisionPending": false,
+    "takeoutState": {
+      "decision": "home",
+      "suggestedVendors": [
+        "California Chicken Cafe",
+        "Mickey's Deli",
+        "Rascals",
+        "Chipotle"
+      ]
+    },
+    "takeoutUndecided": false,
+    "tomorrowNeedsPrep": false,
+    "tomorrowPrepReasons": [],
+    "upcomingSchoolEvents": []
+  },
+  "metadata": {
+    "scenarioId": "school-needs-action-with-suggestion",
+    "timeContext": {
+      "now": "2026-05-29T00:00:00.000Z",
+      "user": {
+        "email": "peter@example.test",
+        "isPeter": true
+      }
+    },
+    "version": "agentci.v1"
+  },
+  "rawData": {
+    "bedtime": [],
+    "birthdays": [],
+    "calendar": {
+      "events": []
+    },
+    "checklist": {
+      "items": []
+    },
+    "lunchDecisions": {},
+    "schoolItems": [
+      {
+        "child": "Olivia",
+        "class": "4th Grade",
+        "dueDate": "2026-05-29",
+        "eventDate": "2026-06-04",
+        "extractionSource": "openclaw",
+        "id": "school-action-waiver",
+        "kind": "action",
+        "location": "Museum",
+        "rawSnippet": "Please sign and return the museum field trip waiver by tomorrow.",
+        "sourceEmailId": "fake-email-waiver-001",
+        "suggestedAction": "Sign the waiver tonight",
+        "summary": "The museum field trip waiver is due tomorrow.",
+        "teacher": "Ms. Rivera",
+        "title": "Return field trip waiver",
+        "urgency": 0.85
+      }
+    ],
+    "schoolLunchMenu": [],
+    "schoolUpdates": [
+      {
+        "child": "Olivia",
+        "dueDate": "2026-05-29",
+        "eventDate": "2026-06-04",
+        "extractionSource": "openclaw",
+        "id": "school-action-waiver",
+        "kind": "action",
+        "sourceEmailId": "fake-email-waiver-001",
+        "suggestedAction": "Sign the waiver tonight",
+        "summary": "The museum field trip waiver is due tomorrow.",
+        "title": "Return field trip waiver",
+        "urgency": 0.85
+      }
+    ],
+    "settings": {},
+    "takeout": {
+      "today": {
+        "date": "2026-05-28",
+        "decision": "home"
+      }
+    },
+    "weather": {
+      "today": {
+        "highTempF": 72,
+        "lowTempF": 58,
+        "precipProb": 0.1,
+        "summary": "Clear"
+      }
+    }
+  },
+  "runId": "school-needs-action-with-suggestion-20260529T000000000Z",
+  "timestamp": "2026-05-29T00:00:00.000Z"
+}

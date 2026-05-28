@@ -53,7 +53,7 @@ import { FullModelHealthPage } from "./modules/model-health/FullModelHealthPage"
 import { createStateSnapshot } from "./core/state/store";
 import { runInterventionEngine } from "./core/interventions/engine";
 import { useClawAugmentedCards } from "./core/agents/clawAdapter";
-import { buildHowieActions } from "./core/needsAction";
+import { buildHowieActions } from "./core/howie/actions";
 import { normalizeCalendar } from "./data/calendar";
 import { normalizeBirthdays } from "./data/birthdays";
 import { normalizeWeather } from "./data/weather";
@@ -67,6 +67,7 @@ import { useSchoolLunchMenu } from "./data/useSchoolLunch";
 import { ContextualSlot, RightColumnCards, OverlayCards } from "./cards/ContextualSlot";
 
 const V2_AGENDA_DAYS = 7;
+export { buildHowieActions };
 export const WEEKDAY_MORNING_TASKS = [
   "Put on Glow Stick",
   "Pack waterbottles",

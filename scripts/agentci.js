@@ -12,11 +12,13 @@ const DEFAULT_FIXTURE = "agentci/fixtures/school-updates-digest.json";
 const DEFAULT_AGENT_FIXTURE = "agentci/fixtures/school-updates-digest-with-agent.json";
 const DEFAULT_MORNING_RUNWAY_FIXTURE = "agentci/fixtures/morning-runway.json";
 const DEFAULT_MORNING_SCHOOL_PRIORITY_FIXTURE = "agentci/fixtures/morning-school-priority.json";
+const DEFAULT_SCHOOL_NEEDS_ACTION_FIXTURE = "agentci/fixtures/school-needs-action-with-suggestion.json";
 const DEFAULT_GATE_FIXTURES = [
   DEFAULT_FIXTURE,
   DEFAULT_AGENT_FIXTURE,
   DEFAULT_MORNING_RUNWAY_FIXTURE,
   DEFAULT_MORNING_SCHOOL_PRIORITY_FIXTURE,
+  DEFAULT_SCHOOL_NEEDS_ACTION_FIXTURE,
 ];
 const DEFAULT_RUN = "agentci/runs/school-updates-digest-20260501T190000000Z.json";
 const DEFAULT_CARD = "school-updates";

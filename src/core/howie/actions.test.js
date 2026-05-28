@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildHowieActions } from "./needsAction";
+import { buildHowieActions } from "./actions";
 
 function at(hour, minute = 0) {
   return new Date(2026, 4, 28, hour, minute, 0, 0);
@@ -13,15 +13,42 @@ describe("buildHowieActions", () => {
         kind: "action",
         title: "Permission slip",
         summary: "A field trip slip is due.",
-        suggestedAction: "Sign and return the field trip slip.",
+        suggestedAction: "Sign the waiver tonight",
         urgency: 0.8,
       }],
     }, at(10));
 
     expect(actions[0]).toMatchObject({
       id: "school-slip",
-      detail: "Sign and return the field trip slip.",
+      detail: "Sign the waiver tonight",
     });
+  });
+
+  it("interleaves takeout, gift, and school by urgency at dinner cutoff", () => {
+    const derived = {
+      rankedSchoolItems: [{
+        id: "school",
+        kind: "action",
+        title: "School form",
+        summary: "Later",
+        urgency: 0.3,
+      }],
+      birthdayGiftNeeded: true,
+      birthdaysRanked: [{ id: "mom", name: "Mom", daysUntil: 2, giftStatus: "needed" }],
+      takeoutDecisionPending: true,
+      takeoutState: { suggestedVendors: ["Rascals"] },
+    };
+
+    expect(buildHowieActions(derived, at(17)).map((action) => action.id)).toEqual([
+      "takeout",
+      "gift-mom",
+      "school-school",
+    ]);
+    expect(buildHowieActions(derived, at(10)).map((action) => action.id)).toEqual([
+      "gift-mom",
+      "school-school",
+      "takeout",
+    ]);
   });
 
   it("returns every pending action sorted by urgency across categories", () => {
