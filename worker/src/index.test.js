@@ -60,6 +60,8 @@ function bridgePayloads() {
 
 describe("Needs Action completion", () => {
   it("marks the selected school Needs Action item dismissed", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-05-28T10:00:00-07:00"));
     const notifications = createKv({
       school_updates: JSON.stringify({
         updates: [
@@ -108,6 +110,8 @@ describe("Needs Action completion", () => {
   });
 
   it("returns a clear error when the Needs Action index is not visible", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-05-28T10:00:00-07:00"));
     const currentEnv = env({
       NOTIFICATIONS: createKv({
         school_updates: JSON.stringify({ updates: [], updatedAt: 1 }),
@@ -125,7 +129,75 @@ describe("Needs Action completion", () => {
     expect(body).toMatchObject({ ok: false, reason: "index_out_of_range", index: 1, count: 0 });
   });
 
+  it("marks a Needs Action item dismissed by visible name", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-05-28T10:00:00-07:00"));
+    const notifications = createKv({
+      school_updates: JSON.stringify({
+        updates: [
+          {
+            id: "park-day-form",
+            kind: "action",
+            title: "Park day form",
+            summary: "Return the form.",
+            dueDate: "2026-05-29",
+            urgency: 0.9,
+          },
+        ],
+        updatedAt: 1,
+      }),
+    });
+    const currentEnv = env({ NOTIFICATIONS: notifications });
+
+    const res = await worker.fetch(new Request("https://worker.test/api/needs-action/done", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: "park day form" }),
+    }), currentEnv, {});
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body).toMatchObject({
+      ok: true,
+      index: 1,
+      action: {
+        id: "school-park-day-form",
+        type: "school",
+        sourceId: "park-day-form",
+      },
+    });
+    const stored = JSON.parse(notifications.store.get("school_updates"));
+    expect(stored.updates.find((item) => item.id === "park-day-form").dismissedAt).toEqual(expect.any(String));
+  });
+
+  it("marks Lock in dinner complete by name so it leaves Needs Action", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-05-28T17:00:00-07:00"));
+    const notifications = createKv();
+    const currentEnv = env({ NOTIFICATIONS: notifications });
+
+    const res = await worker.fetch(new Request("https://worker.test/api/needs-action/done", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: "Lock In Dinner" }),
+    }), currentEnv, {});
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body).toMatchObject({
+      ok: true,
+      action: { id: "takeout", type: "takeout", title: "Lock in dinner" },
+      result: { record: { decision: "home", decidedBy: "voice" } },
+    });
+    expect(JSON.parse(notifications.store.get("hc:takeout:2026-05-28"))).toMatchObject({
+      decision: "home",
+      decidedBy: "voice",
+    });
+  });
+
   it("skips school event items already covered by a loose calendar match", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-05-28T10:00:00-07:00"));
     global.fetch = vi.fn(async () => new Response(`BEGIN:VCALENDAR
 BEGIN:VEVENT
 UID:franklin

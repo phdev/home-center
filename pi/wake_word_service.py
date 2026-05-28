@@ -687,7 +687,7 @@ def parse_command(text: str) -> dict:
         return {"action": "design_system", "version": "v2"}
 
     item_done_match = re.search(
-        r"\bmark\s+(?:needs\s+action\s+)?item\s+(\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+as\s+done\b",
+        r"\bmark\s+(?:needs\s+action\s+)?item\s+(\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+as\s+(?:done|complete|completed)\b",
         text,
     )
     if item_done_match:
@@ -706,6 +706,17 @@ def parse_command(text: str) -> dict:
         raw_index = item_done_match.group(1)
         index = int(raw_index) if raw_index.isdigit() else word_numbers[raw_index]
         return {"action": "needs_action_done", "index": index}
+
+    item_name_done_match = re.search(
+        r"\bmark\s+(?:the\s+)?(.+?)\s+as\s+(?:done|complete|completed)\b",
+        text,
+    )
+    if item_name_done_match:
+        name = item_name_done_match.group(1).strip(" .,'\"")
+        name = re.sub(r"^(?:needs\s+action\s+)?(?:item\s+)?", "", name).strip(" .,'\"")
+        if name:
+            return {"action": "needs_action_done", "name": name.title()}
+
 
     gift_ideas_match = re.search(r"\bsuggest\s+(?:birthday\s+)?gift\s+ideas\s+for\s+(.+?)\s*$", text)
     if gift_ideas_match:
@@ -913,11 +924,12 @@ def mark_birthday_gift_ordered(worker_url: str, worker_token: str | None, name: 
     return {"ok": True, "name": birthday.get("name", name), "id": birthday_id, "result": result}
 
 
-def mark_needs_action_done(worker_url: str, worker_token: str | None, index: int) -> dict:
-    """Mark the 1-based Needs Action item done through the worker."""
-    result = worker_post(worker_url, worker_token, "/api/needs-action/done", {"index": index})
+def mark_needs_action_done(worker_url: str, worker_token: str | None, index: int = 0, name: str = "") -> dict:
+    """Mark a Needs Action item done through the worker by index or visible name."""
+    body = {"index": index} if index >= 1 else {"name": name}
+    result = worker_post(worker_url, worker_token, "/api/needs-action/done", body)
     if not result:
-        return {"ok": False, "reason": "worker_request_failed", "index": index}
+        return {"ok": False, "reason": "worker_request_failed", **body}
     return result
 
 
@@ -2515,13 +2527,14 @@ def main() -> None:
 
                     elif action == "needs_action_done":
                         index = int(command.get("index", 0) or 0)
+                        name = str(command.get("name", "") or "").strip()
                         if args.dry_run:
-                            log.info("[DRY RUN] Would mark Needs Action item %s done", index)
+                            log.info("[DRY RUN] Would mark Needs Action item done: index=%s name=%s", index, name)
                         elif args.worker_url:
-                            result = mark_needs_action_done(args.worker_url, args.worker_token, index)
+                            result = mark_needs_action_done(args.worker_url, args.worker_token, index, name)
                             if result.get("ok"):
                                 action_title = (result.get("action") or {}).get("title")
-                                log.info("Marked Needs Action item %s done: %s", index, action_title or result)
+                                log.info("Marked Needs Action item done: %s", action_title or result)
                             else:
                                 log.info("Needs Action voice command failed: %s", result)
                         else:

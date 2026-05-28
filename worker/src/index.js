@@ -3489,22 +3489,32 @@ async function handleNeedsActionDone(request, env) {
   } catch {
     return json({ error: "Invalid JSON" }, 400);
   }
+  const hasName = typeof body?.name === "string" && body.name.trim();
   const index = Number(body?.index);
-  if (!Number.isInteger(index) || index < 1) {
-    return json({ error: "index must be a 1-based integer" }, 400);
+  if (!hasName && (!Number.isInteger(index) || index < 1)) {
+    return json({ error: "index must be a 1-based integer or name must be a non-empty string" }, 400);
   }
 
   const now = new Date();
   const actions = await buildCurrentNeedsActions(env, now);
-  const action = actions[index - 1];
-  if (!action) {
-    return json({ ok: false, reason: "index_out_of_range", index, count: actions.length }, 404);
+  const match = hasName
+    ? findNeedsActionByName(actions, body.name)
+    : { action: actions[index - 1], index };
+  if (match.reason === "ambiguous_name") {
+    return json({ ok: false, reason: "ambiguous_name", name: body.name, matches: match.matches }, 409);
   }
+  const action = match.action;
+  if (!action) {
+    return json(hasName
+      ? { ok: false, reason: "name_not_found", name: body.name, count: actions.length }
+      : { ok: false, reason: "index_out_of_range", index, count: actions.length }, 404);
+  }
+  const matchedIndex = match.index;
 
   if (action.type === "school") {
     const result = await dismissSchoolUpdate(env, action.sourceId, now.toISOString());
     if (!result.ok) return json({ ok: false, action, ...result }, 404);
-    return json({ ok: true, index, action, result });
+    return json({ ok: true, index: matchedIndex, action, result });
   }
 
   if (action.type === "birthday_gift") {
@@ -3522,15 +3532,63 @@ async function handleNeedsActionDone(request, env) {
     );
     const payload = await response.json();
     if (!response.ok) return json({ ok: false, action, result: payload }, response.status);
-    return json({ ok: true, index, action, result: payload });
+    return json({ ok: true, index: matchedIndex, action, result: payload });
+  }
+
+  if (action.type === "takeout") {
+    const date = localDateKey(now);
+    const record = {
+      date,
+      decision: "home",
+      decidedAt: now.toISOString(),
+      decidedBy: "voice",
+    };
+    await env.NOTIFICATIONS.put(takeoutKeyForDate(date), JSON.stringify(record), {
+      expirationTtl: 60 * 60 * 24 * 3,
+    });
+    return json({ ok: true, index: matchedIndex, action, result: { ok: true, record } });
   }
 
   return json({
     ok: false,
     reason: "unsupported_action_type",
-    index,
+    index: matchedIndex,
     action,
   }, 409);
+}
+
+function normalizeNeedsActionName(value) {
+  return String(value ?? "")
+    .toLowerCase()
+    .replace(/&/g, " and ")
+    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function findNeedsActionByName(actions, rawName) {
+  const query = normalizeNeedsActionName(rawName);
+  if (!query) return { action: null, index: null };
+  const candidates = actions.map((action, offset) => ({
+    action,
+    index: offset + 1,
+    names: [action.title, action.kind, action.id, ...(Array.isArray(action.aliases) ? action.aliases : [])]
+      .map(normalizeNeedsActionName)
+      .filter(Boolean),
+  }));
+  const exact = candidates.filter((candidate) => candidate.names.includes(query));
+  if (exact.length === 1) return exact[0];
+  if (exact.length > 1) {
+    return { reason: "ambiguous_name", matches: exact.map(({ action, index }) => ({ index, title: action.title })) };
+  }
+  const partial = candidates.filter((candidate) =>
+    candidate.names.some((name) => name.includes(query) || query.includes(name))
+  );
+  if (partial.length === 1) return partial[0];
+  if (partial.length > 1) {
+    return { reason: "ambiguous_name", matches: partial.map(({ action, index }) => ({ index, title: action.title })) };
+  }
+  return { action: null, index: null };
 }
 
 async function buildCurrentNeedsActions(env, now = new Date()) {
@@ -3554,6 +3612,7 @@ async function buildCurrentNeedsActions(env, now = new Date()) {
       type: "school",
       sourceId: item.id ?? item.sourceEmailId,
       title: item.title,
+      aliases: [item.suggestedAction, item.summary].filter(Boolean),
       urgencyScore: clamp01(item.urgency),
       tiebreaker,
     });
@@ -3567,6 +3626,7 @@ async function buildCurrentNeedsActions(env, now = new Date()) {
       type: "birthday_gift",
       sourceId: birthday.id,
       title: `Order ${birthday.name}'s gift`,
+      aliases: [`Suggest gift ideas for ${birthday.name}`, "Suggest gift ideas"],
       urgencyScore: Math.max(0, Math.min(1, 1 - daysUntil / 14)),
       tiebreaker: -daysUntil,
     });
@@ -3580,6 +3640,7 @@ async function buildCurrentNeedsActions(env, now = new Date()) {
       id: "takeout",
       type: "takeout",
       title: "Lock in dinner",
+      aliases: ["Lock In Dinner"],
       urgencyScore: cutoffScore(minutesToCutoff),
       tiebreaker: -minutesToCutoff,
     });

@@ -961,7 +961,10 @@ class Dispatcher:
         elif action == "birthday_gift_ideas":
             self.suggest_birthday_gift_ideas(str(command.get("name", "")))
         elif action == "needs_action_done":
-            self.mark_needs_action_done(int(command.get("index", 0) or 0))
+            self.mark_needs_action_done(
+                int(command.get("index", 0) or 0),
+                str(command.get("name", "") or ""),
+            )
 
     def dispatch_async(self, command: dict) -> None:
         threading.Thread(target=self.dispatch, args=(command,), daemon=True).start()
@@ -1005,11 +1008,13 @@ class Dispatcher:
         log.info("Marked birthday gift ordered: %s (%s)", ok["name"], ok["id"])
         return ok
 
-    def mark_needs_action_done(self, index: int) -> None:
-        if index < 1:
-            log.warning("Needs Action voice command has invalid index: %s", index)
+    def mark_needs_action_done(self, index: int = 0, name: str = "") -> None:
+        name = name.strip()
+        if index < 1 and not name:
+            log.warning("Needs Action voice command has no valid index or name: index=%s name=%r", index, name)
             return
-        self._worker_post("/api/needs-action/done", {"index": index})
+        body = {"index": index} if index >= 1 else {"name": name}
+        self._worker_post("/api/needs-action/done", body)
 
     def suggest_birthday_gift_ideas(self, name: str) -> None:
         name = name.strip()

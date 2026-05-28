@@ -143,7 +143,16 @@ def test_needs_action_done_intent():
         "action": "needs_action_done",
         "index": 2,
     }
+    assert parse_command("Hey Homer, mark Lock In Dinner as complete.") == {
+        "action": "needs_action_done",
+        "name": "Lock In Dinner",
+    }
+    assert parse_command("Hey Homer, mark park day form as done.") == {
+        "action": "needs_action_done",
+        "name": "Park Day Form",
+    }
     assert is_dispatchable_command({"action": "needs_action_done", "index": 2})
+    assert is_dispatchable_command({"action": "needs_action_done", "name": "Lock in dinner"})
     assert not is_dispatchable_command({"action": "needs_action_done", "index": 0})
 
 

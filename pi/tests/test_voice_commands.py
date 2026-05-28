@@ -48,3 +48,7 @@ def test_hey_homer_mark_needs_action_item_done():
         "action": "needs_action_done",
         "index": 3,
     }
+    assert service.parse_command("Hey Homer, mark Lock In Dinner as complete.") == {
+        "action": "needs_action_done",
+        "name": "Lock In Dinner",
+    }

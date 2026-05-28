@@ -207,13 +207,24 @@ def _parse_birthday_gift_ideas(text: str) -> dict:
 
 def _parse_needs_action_done(text: str) -> dict:
     match = re.search(
-        rf"\bmark\s+(?:needs\s+action\s+)?item\s+(\d+|{_NUMBER_PATTERN})\s+as\s+done\b",
+        rf"\bmark\s+(?:needs\s+action\s+)?item\s+(\d+|{_NUMBER_PATTERN})\s+as\s+(?:done|complete|completed)\b",
+        text,
+    )
+    if match:
+        index = _parse_amount(match.group(1))
+        return {"action": "needs_action_done", "index": index}
+
+    match = re.search(
+        r"\bmark\s+(?:the\s+)?(.+?)\s+as\s+(?:done|complete|completed)\b",
         text,
     )
     if not match:
         return {"action": "none"}
-    index = _parse_amount(match.group(1))
-    return {"action": "needs_action_done", "index": index}
+    name = match.group(1).strip(" .,'\"")
+    name = re.sub(r"^(?:needs\s+action\s+)?(?:item\s+)?", "", name).strip(" .,'\"")
+    if not name:
+        return {"action": "none"}
+    return {"action": "needs_action_done", "name": name.title()}
 
 
 def parse_command(text: str, allow_bare_ask: bool = True, allow_wake_knowledge: bool = False) -> dict:
@@ -342,7 +353,8 @@ def is_dispatchable_command(command: dict) -> bool:
         return len(name.split()) >= 1
     if action == "needs_action_done":
         index = command.get("index")
-        return isinstance(index, int) and index >= 1
+        name = str(command.get("name", "")).strip()
+        return (isinstance(index, int) and index >= 1) or len(name.split()) >= 1
     if action == "set_timer":
         duration = command.get("duration")
         return isinstance(duration, int) and 1 <= duration <= _MAX_TIMER_SECONDS
