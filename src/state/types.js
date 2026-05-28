@@ -99,6 +99,7 @@
  * @property {number} urgency             0..1
  * @property {'regex'|'openclaw'|'both'} extractionSource
  * @property {string} [rawSnippet]
+ * @property {string} [receivedAt]
  * @property {string} [dismissedAt]
  * @property {string} sourceEmailId
  */

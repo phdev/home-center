@@ -155,6 +155,58 @@ afterEach(() => {
   global.fetch = originalFetch;
 });
 
+describe("claw school updates enhancer", () => {
+  it("preserves class and teacher extraction fields", async () => {
+    const currentEnv = env();
+    global.fetch = vi.fn(async (url) => {
+      expect(String(url)).toBe("https://api.openai.com/v1/chat/completions");
+      return jsonResponse({
+        choices: [{
+          message: {
+            content: JSON.stringify({
+              isRelevant: true,
+              kind: "action",
+              title: "Return field trip slip",
+              summary: "Permission slip is due Friday.",
+              dueDate: "2026-05-29",
+              eventDate: null,
+              child: "Olivia",
+              class: "4th Grade",
+              teacher: "Ms. Rivera",
+              location: "Library",
+              urgency: 0.8,
+              suggestedAction: "Sign and return the permission slip.",
+            }),
+          },
+        }],
+      });
+    });
+
+    const response = await worker.fetch(new Request("https://worker.test/api/claw/enhance", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        feature: "schoolUpdates",
+        state: {
+          from: "teacher@rbusd.org",
+          subject: "Field trip slip",
+          snippet: "Ms. Rivera needs Olivia's 4th Grade permission slip by Friday.",
+          receivedAt: "2026-05-27T15:00:00Z",
+        },
+      }),
+    }), currentEnv);
+
+    const body = await response.json();
+    expect(response.status).toBe(200);
+    expect(body.fields).toMatchObject({
+      isRelevant: true,
+      class: "4th Grade",
+      teacher: "Ms. Rivera",
+      suggestedAction: "Sign and return the permission slip.",
+    });
+  });
+});
+
 describe("calendar", () => {
   it("expands recurring iCal events whose original start is before the fetch window", async () => {
     vi.useFakeTimers();

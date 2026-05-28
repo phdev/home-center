@@ -153,9 +153,12 @@ def publish_updates(items, cfg):
             "dueDate": it.get("dueDate"),
             "eventDate": it.get("eventDate"),
             "child": it.get("child"),
+            "class": it.get("class"),
+            "teacher": it.get("teacher"),
             "location": it.get("location"),
             "urgency": it.get("urgency", 0.5),
             "suggestedAction": it.get("suggestedAction"),
+            "receivedAt": it.get("receivedAt"),
             "classifier": it.get("classifier", "llm"),
             "sourceEmailId": it.get("sourceEmailId", it["id"]),
         } for it in items]}
@@ -327,6 +330,7 @@ def run_once(cfg, seen):
             continue
         item = dict(fields)
         item["id"] = eid
+        item["receivedAt"] = email.get("date")
         relevant_items.append(item)
 
     if relevant_items:

@@ -38,6 +38,7 @@ export function normalizeOneSchoolUpdate(item, index = 0, now = new Date()) {
     suggestedAction: item.suggestedAction ?? defaultSuggestedAction(kind, item.title ?? item.subject),
     extractionSource: item.extractionSource ?? (item.classifier === "llm" ? "openclaw" : "regex"),
     rawSnippet: item.rawSnippet ?? item.snippet,
+    receivedAt: item.receivedAt ?? item.dateReceived ?? item.received_at,
     dismissedAt: item.dismissedAt,
     sourceEmailId: item.sourceEmailId ?? item.emailId ?? item.id ?? "",
   };

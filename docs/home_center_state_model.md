@@ -43,7 +43,7 @@ implementation is wrong (refactor it).
 | School lunch menus | Worker `GET /api/school-lunch` (KV read-only) with localStorage fallback | `src/data/useSchoolLunch.js` | weekly | **Read live; ingestion (PDF → KV) still TODO** — stub in `worker/src/index.js` |
 | Bedtime settings | `useSettings()` + `src/data/useBedtime.js` default | `src/data/useBedtime.js` | on change | Per-child schedule `{weekday, weekend, reminderLeadMin}` |
 | Checklist config | `useSettings()` override + `src/data/useChecklist.js` default | `src/data/useChecklist.js` | on change | Base items + condition-gated items (`always` / `cold` / `hot` / `rain`) |
-| School emails | `email-triage` service → Worker `/api/school-updates` → derived ranking + `src/data/schoolHeuristics.js` (pre-LLM kind/urgency/dueDate/dedup) | `src/hooks/useSchoolUpdates.js` → `src/data/schoolUpdates.js` | 5 min | Live. Regex heuristics applied first; LLM classifier results (when present) override |
+| School emails | `school-updates` agent → Worker `/api/claw/enhance?feature=schoolUpdates` → Worker `/api/school-updates` → derived ranking + `src/data/schoolHeuristics.js` (pre-LLM kind/urgency/dueDate/dedup) | `src/hooks/useSchoolUpdates.js` → `src/data/schoolUpdates.js` | 5 min | Live. Agent merges new extracted items into the existing pending set; LLM classifier results (when present) carry `suggestedAction`, `class`, and `teacher` metadata, while regex heuristics fill kind/urgency/dueDate fallbacks |
 
 ## Normalization contracts
 
@@ -55,7 +55,7 @@ Examples:
 
 - `CalendarEvent = { id, start: ISO, end: ISO, title, attendees[], allDay }`
 - `Birthday = { id, name, relation, date: 'MM-DD', giftStatus: 'ready'|'ordered'|'needed'|'unknown', giftNotes? }`
-- `SchoolItem = { id, kind: 'action'|'event'|'reminder'|'info', title, summary, dueDate?, eventDate?, child?, class?, teacher?, location?, urgency: 0..1, source: 'emailId…', rawSnippet? }`
+- `SchoolItem = { id, kind: 'action'|'event'|'reminder'|'info', title, summary, dueDate?, eventDate?, child?, class?, teacher?, location?, urgency: 0..1, suggestedAction?, source: 'emailId…', rawSnippet?, receivedAt? }`
 
 Full catalog lives in `src/state/types.js`.
 

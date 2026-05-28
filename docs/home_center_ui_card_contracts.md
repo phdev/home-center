@@ -69,8 +69,8 @@ volume, tall affordances, one primary action per card.
 | **Purpose** | Surface only the school email items that matter this week |
 | **Location** | Mid-bottom grid slot (right of Photos) — already present as Email School Card; content swapped |
 | **Visibility** | Always mounted if `raw.schoolItems.length > 0`; tinted red if `derived.hasUrgentSchoolItem === true` |
-| **Required data** | `derived.rankedSchoolItems[] = {id, kind, title, summary, dueDate?, child?, urgency, hasAction}` |
-| **Optional OpenClaw fields** | per item: `enhanced.summary`, `enhanced.suggestedAction`; card-level `enhanced.intro` |
+| **Required data** | `derived.rankedSchoolItems[] = {id, kind, title, summary, suggestedAction?, dueDate?, eventDate?, child?, class?, teacher?, urgency}` |
+| **Optional OpenClaw fields** | per item: `suggestedAction`, `class`, `teacher`, `enhanced.summary`; card-level `enhanced.intro` |
 | **Deterministic fallback copy** | Item summary = first 120 chars of email snippet |
 | **Actions** | Tap an item → open fullscreen email view; inline `Done` to dismiss |
 | **Priority** | Tier 1 (urgent) · Tier 2 (others) |

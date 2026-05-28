@@ -71,6 +71,43 @@ describe("normalizeSchoolItems", () => {
     expect(r[1].extractionSource).toBe("regex");
   });
 
+  it("preserves class, teacher, and receivedAt metadata", () => {
+    const r = normalizeSchoolItems({
+      items: [{
+        title: "Permission slip",
+        class: "4th Grade",
+        teacher: "Ms. Rivera",
+        receivedAt: "2026-05-27T15:00:00Z",
+      }],
+    });
+    expect(r[0]).toMatchObject({
+      class: "4th Grade",
+      teacher: "Ms. Rivera",
+      receivedAt: "2026-05-27T15:00:00Z",
+    });
+  });
+
+  it("keeps the newest duplicate when receivedAt is available", () => {
+    const r = normalizeSchoolItems({
+      items: [
+        {
+          id: "old",
+          title: "Field trip permission slip",
+          summary: "Old copy",
+          receivedAt: "2026-05-26T15:00:00Z",
+        },
+        {
+          id: "new",
+          title: "Field trip permission slip",
+          summary: "Updated copy",
+          receivedAt: "2026-05-27T15:00:00Z",
+        },
+      ],
+    });
+    expect(r).toHaveLength(1);
+    expect(r[0].id).toBe("new");
+  });
+
   it("truncates body → summary when summary missing", () => {
     const body = "x".repeat(500);
     const r = normalizeSchoolItems({ items: [{ title: "t", body }] });

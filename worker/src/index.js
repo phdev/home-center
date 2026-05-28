@@ -3132,7 +3132,7 @@ const CLAW_ENHANCERS = {
   // state:  { subject, from, snippet, receivedAt }
   // output: {
   //   isRelevant, kind, title, summary, dueDate?, eventDate?,
-  //   child?, location?, urgency, suggestedAction?
+  //   child?, class?, teacher?, location?, urgency, suggestedAction?
   // }
   //
   // Policy (matches the family's explicit ask: "only flag actionable"):
@@ -3149,7 +3149,8 @@ const CLAW_ENHANCERS = {
         'You classify a single email for a family dashboard showing school items. Return strict JSON: ' +
         '{"isRelevant": bool, "kind": "action"|"event"|"reminder"|"info", "title": str, ' +
         '"summary": str, "dueDate": "YYYY-MM-DD"|null, "eventDate": "YYYY-MM-DD"|null, ' +
-        '"child": str|null, "location": str|null, "urgency": 0..1, "suggestedAction": str|null}. ' +
+        '"child": str|null, "class": str|null, "teacher": str|null, "location": str|null, ' +
+        '"urgency": 0..1, "suggestedAction": str|null}. ' +
         'Only return isRelevant=true if the email contains: (a) a concrete action the family must take ' +
         '(sign/return/RSVP/pay/bring/volunteer) OR (b) a dated school event affecting the family schedule. ' +
         'Newsletters, fundraising, and informational blurbs without dates or actions → isRelevant=false. ' +
@@ -3185,6 +3186,8 @@ const CLAW_ENHANCERS = {
           dueDate: dateRe.test(fields?.dueDate ?? "") ? fields.dueDate : null,
           eventDate: dateRe.test(fields?.eventDate ?? "") ? fields.eventDate : null,
           child: clampStr(fields?.child, 60) || null,
+          class: clampStr(fields?.class, 80) || null,
+          teacher: clampStr(fields?.teacher, 80) || null,
           location: clampStr(fields?.location, 80) || null,
           urgency,
           suggestedAction: clampStr(fields?.suggestedAction, 140) || null,
