@@ -1698,7 +1698,7 @@ function v2SuggestedActionButtonStyle(tone) {
     border: "1px solid rgba(255,255,255,0.16)",
     background: "transparent",
     color: "#FFFFFF",
-    padding: "0 11px",
+    padding: "6px 11px",
     fontFamily: "'Geist','Inter',system-ui,sans-serif",
     fontSize: 12.5,
     fontWeight: 700,
