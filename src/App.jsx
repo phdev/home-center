@@ -1242,14 +1242,14 @@ function V2Metric({ icon, text }) {
   );
 }
 
-function NeedsActionPanel({ actions }) {
+export function NeedsActionPanel({ actions }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12, height: "100%" }}>
       <div style={v2NeedsHeaderStyle}>
         <div style={v2NeedsTitleStyle}>Needs Action</div>
         <span style={v2ActionCountStyle}>{actions.length}</span>
       </div>
-      <div style={v2ActionListStyle}>
+      <div style={v2ActionListStyle} data-testid="needs-action-list">
         {actions.map((action) => (
           <button key={action.id} style={v2ActionItemStyle(action.tone)}>
             <span style={v2ActionBadgeStyle(action.tone)}>{action.kind}</span>
@@ -1673,7 +1673,7 @@ function v2ActionItemStyle(tone) {
     border: 0,
     borderRadius: 12,
     background: urgent ? "rgba(239,68,68,0.2)" : "rgba(255,255,255,0.06)",
-    padding: "10px 12px",
+    padding: "8px 12px",
     textAlign: "left",
   };
 }
