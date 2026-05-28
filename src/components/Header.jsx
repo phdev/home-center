@@ -112,7 +112,7 @@ export function Header({ now, isMobile, onHistory, handControllerConnected, last
             color: "#FFFFFF66",
           }}
         >
-          "Hey Dashboard..."
+          "Hey Homer..."
         </span>
         <div
           style={{

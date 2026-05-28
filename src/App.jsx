@@ -1275,7 +1275,7 @@ function HowieAssistantPanel() {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12, height: "100%" }}>
       <div style={v2HowieHeaderStyle}>
-        <span>Howie</span>
+        <span>Homer</span>
         <em>AI</em>
       </div>
       <div style={v2HowieGreetingStyle}>Hey Howell family! 👋<br />Here are a few things I can help with.</div>

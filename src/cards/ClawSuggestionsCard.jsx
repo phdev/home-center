@@ -67,7 +67,7 @@ export function ClawSuggestionsCard({ derived, enhanced = {}, selected, onAction
             <Bot size={17} color="#FFFFFF" />
           </span>
         }
-        label="Howie OpenClaw"
+        label="Homer OpenClaw"
         subtitle="Telegram"
         right={
           <span style={statusStyle}>{statusLabel(thread.status)}</span>
@@ -78,7 +78,7 @@ export function ClawSuggestionsCard({ derived, enhanced = {}, selected, onAction
           <MessageBubble
             key={message.id}
             tone={message.direction === "incoming" ? "voice" : "howie"}
-            name={message.sender || (message.direction === "incoming" ? "Peter" : "Howie")}
+            name={message.sender || (message.direction === "incoming" ? "Peter" : "Homer")}
             text={message.text}
             meta={message.meta || formatMessageTime(message.timestamp)}
           />
@@ -87,7 +87,7 @@ export function ClawSuggestionsCard({ derived, enhanced = {}, selected, onAction
 
       <div style={composerStyle}>
         <Mic size={14} color="#FFFFFF" />
-        <span style={composerTextStyle}>Say: Hey Howie, followed by your message</span>
+        <span style={composerTextStyle}>Say: Hey Homer, followed by your message</span>
         <Send size={14} color="#FFFFFFAA" />
       </div>
 
@@ -135,8 +135,8 @@ const fallbackMessages = [
   {
     id: "fallback:howie",
     direction: "outgoing",
-    sender: "Howie",
-    text: "I am here. Say Hey Howie and I will send your message into Telegram.",
+    sender: "Homer",
+    text: "I am here. Say Hey Homer and I will send your message into Telegram.",
     meta: "waiting for Telegram",
   },
 ];
@@ -145,7 +145,7 @@ function statusLabel(status) {
   if (status === "connected") return "Live";
   if (status === "starting") return "Starting";
   if (status === "offline") return "Offline";
-  return "Hey Howie";
+  return "Hey Homer";
 }
 
 function formatMessageTime(timestamp) {

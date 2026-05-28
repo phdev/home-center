@@ -306,7 +306,7 @@ export function SettingsModal({ t, settings, onSave, onClose }) {
               marginBottom: 8,
             }}
           >
-            Powers the Howie card from the local Telegram bridge instead of
+            Powers the Homer card from the local Telegram bridge instead of
             showing sample messages.
           </div>
           <label style={labelStyle}>Bridge URL</label>
@@ -320,7 +320,7 @@ export function SettingsModal({ t, settings, onSave, onClose }) {
           <input
             value={local.openclaw?.chatId ?? ""}
             onChange={(e) => update("openclaw", "chatId", e.target.value)}
-            placeholder="Leave blank to show latest direct Howie chat"
+            placeholder="Leave blank to show latest direct Homer chat"
             style={inputStyle}
           />
         </div>

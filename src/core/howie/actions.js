@@ -138,9 +138,9 @@ export function buildHowieActions(derived, now = new Date()) {
       id: "fallback",
       kind: "Ready",
       tone: "neutral",
-      meta: "Howie",
+      meta: "Homer",
       title: "No urgent family actions",
-      detail: "Howie will surface the next thing that needs attention.",
+      detail: "Homer will surface the next thing that needs attention.",
     },
   ];
 }
