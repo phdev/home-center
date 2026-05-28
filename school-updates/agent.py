@@ -322,8 +322,8 @@ def run_once(cfg, seen):
         if fields is None:
             # Worker unreachable — don't mark as seen so we retry next cycle.
             continue
-        seen.add(eid)
         if not fields.get("isRelevant"):
+            seen.add(eid)
             continue
         item = dict(fields)
         item["id"] = eid
@@ -333,9 +333,12 @@ def run_once(cfg, seen):
         logger.info("Relevant items: %d", len(relevant_items))
         current_items = fetch_published_updates(cfg)
         merged_items = merge_updates(relevant_items, current_items)
-        publish_updates(merged_items, cfg)
-        for item in relevant_items:
-            notify_telegram(item, cfg)
+        if publish_updates(merged_items, cfg):
+            seen.update(item["id"] for item in relevant_items)
+            for item in relevant_items:
+                notify_telegram(item, cfg)
+        else:
+            logger.warning("Leaving %d relevant items unseen so they retry next cycle.", len(relevant_items))
     else:
         clear_published_sync_errors(cfg)
         logger.info("No new relevant items this cycle.")
