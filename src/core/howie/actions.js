@@ -112,7 +112,7 @@ export function buildHowieActions(derived, now = new Date()) {
     withPriority({
       id: "takeout",
       kind: "Dinner",
-      tone: "neutral",
+      tone: "urgent",
       meta: "Tonight",
       title: "Lock in dinner",
       detail: derived.takeoutState?.suggestedVendors?.slice(0, 2).join(" or ") || "Pick a dinner plan.",

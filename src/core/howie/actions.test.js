@@ -63,6 +63,18 @@ describe("buildHowieActions", () => {
     expect(actions.find((action) => action.id === "school-neutral")).toMatchObject({ tone: "neutral" });
   });
 
+  it("always colors Lock in dinner red when it appears", () => {
+    const actions = buildHowieActions({
+      takeoutDecisionPending: true,
+      takeoutState: { suggestedVendors: ["Rascals", "Mickey's"] },
+    }, at(10));
+
+    expect(actions.find((action) => action.id === "takeout")).toMatchObject({
+      title: "Lock in dinner",
+      tone: "urgent",
+    });
+  });
+
   it("interleaves takeout, gift, and school by urgency at dinner cutoff", () => {
     const derived = {
       rankedSchoolItems: [{
