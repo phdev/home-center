@@ -1399,7 +1399,7 @@ function buildHowieActions(derived) {
       tone: item.urgency >= 0.7 ? "urgent" : item.kind === "event" ? "event" : "neutral",
       meta: item.dueLabel || item.dateLabel || item.child || "School",
       title: item.title,
-      detail: item.summary || item.child || "School update",
+      detail: item.suggestedAction || item.summary || item.child || "School update",
     });
   }
   if (derived?.birthdayGiftNeeded && derived.birthdaysRanked?.[0]) {
