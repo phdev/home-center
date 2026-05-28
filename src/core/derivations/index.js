@@ -94,7 +94,7 @@ export function hasWorkConflictForPeter(rawData, context) {
  * @param {import('../../state/types').DerivedContext} context
  */
 export function needsSchoolActionToday(rawData, context) {
-  const live = (rawData.schoolItems ?? []).filter((item) => !item.dismissedAt);
+  const live = liveSchoolItems(rawData);
   const actionItems = live.filter((item) => item.kind === "action");
   const todayEnd = endOfDay(context.now);
   const urgentItems = live.filter((item) => isUrgentSchoolItem(item, context.now));
@@ -123,8 +123,8 @@ export function needsSchoolActionToday(rawData, context) {
 export function hasSchoolEventUpcoming(rawData, context) {
   const nowStart = startOfDay(context.now);
   const horizon = endOfDay(addDays(context.now, 7));
-  const items = (rawData.schoolItems ?? [])
-    .filter((item) => !item.dismissedAt && item.kind === "event")
+  const items = liveSchoolItems(rawData)
+    .filter((item) => item.kind === "event")
     .filter((item) => {
       const iso = item.eventDate ?? item.dueDate;
       if (!iso) return false;
@@ -134,6 +134,58 @@ export function hasSchoolEventUpcoming(rawData, context) {
     .sort((a, b) => new Date(a.eventDate ?? a.dueDate) - new Date(b.eventDate ?? b.dueDate));
 
   return { value: items.length > 0, items };
+}
+
+function liveSchoolItems(rawData) {
+  const calendarEvents = rawData.calendar?.events ?? [];
+  return (rawData.schoolItems ?? []).filter((item) =>
+    !item.dismissedAt && !calendarEventAlreadyCoversSchoolItem(item, calendarEvents)
+  );
+}
+
+export function calendarEventAlreadyCoversSchoolItem(item, calendarEvents = []) {
+  if (item.kind !== "event") return false;
+  const schoolDate = parseSchoolItemDate(item.eventDate ?? item.dueDate);
+  if (!Number.isFinite(schoolDate.getTime())) return false;
+  const itemTokens = significantTitleTokens(`${item.title ?? ""} ${item.summary ?? ""} ${item.location ?? ""}`);
+  if (itemTokens.length === 0) return false;
+
+  return calendarEvents.some((event) => {
+    if (event.status === "declined") return false;
+    const eventStart = new Date(event.start ?? event.startDate ?? "");
+    if (!Number.isFinite(eventStart.getTime()) || !isSameDate(eventStart, schoolDate)) return false;
+    const eventTokens = significantTitleTokens(`${event.title ?? ""} ${event.summary ?? ""} ${event.location ?? ""}`);
+    return looseTokenMatch(itemTokens, eventTokens);
+  });
+}
+
+function parseSchoolItemDate(value) {
+  if (!value) return new Date("");
+  const ymd = /^(\d{4})-(\d{2})-(\d{2})/.exec(value);
+  if (ymd) return new Date(Number(ymd[1]), Number(ymd[2]) - 1, Number(ymd[3]));
+  return new Date(value);
+}
+
+function significantTitleTokens(value) {
+  const stop = new Set([
+    "a", "an", "and", "at", "by", "due", "event", "for", "form",
+    "in", "is", "of", "on", "school", "the", "to", "walking",
+  ]);
+  return Array.from(new Set(
+    String(value).toLowerCase()
+      .replace(/[^a-z0-9]+/g, " ")
+      .split(/\s+/)
+      .filter((token) => token.length >= 3 && !stop.has(token)),
+  ));
+}
+
+function looseTokenMatch(itemTokens, eventTokens) {
+  if (!itemTokens.length || !eventTokens.length) return false;
+  const eventSet = new Set(eventTokens);
+  const overlap = itemTokens.filter((token) => eventSet.has(token));
+  if (overlap.length >= 2) return true;
+  const shortest = Math.min(itemTokens.length, eventTokens.length);
+  return shortest <= 2 && overlap.length >= 1;
 }
 
 /**

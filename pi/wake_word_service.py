@@ -16,6 +16,7 @@ import collections
 import io
 import json
 import logging
+import os
 import re
 import subprocess
 import sys
@@ -685,9 +686,30 @@ def parse_command(text: str) -> dict:
     if re.search(r"\b(show|switch(?:\s+to)?|use)\s+(version\s+)?(two|to|too|2|v2)\b", text):
         return {"action": "design_system", "version": "v2"}
 
-    ordered_gift_match = re.search(r"\b(?:i\s+)?(?:just\s+)?ordered\s+(.+?)(?:'?s)?\s+gift\b", text)
+    item_done_match = re.search(
+        r"\bmark\s+(?:needs\s+action\s+)?item\s+(\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+as\s+done\b",
+        text,
+    )
+    if item_done_match:
+        word_numbers = {
+            "one": 1,
+            "two": 2,
+            "three": 3,
+            "four": 4,
+            "five": 5,
+            "six": 6,
+            "seven": 7,
+            "eight": 8,
+            "nine": 9,
+            "ten": 10,
+        }
+        raw_index = item_done_match.group(1)
+        index = int(raw_index) if raw_index.isdigit() else word_numbers[raw_index]
+        return {"action": "needs_action_done", "index": index}
+
+    ordered_gift_match = re.search(r"\b(?:i\s+)?(?:just\s+)?ordered\s+(.+?)(?:'?s)?\s+(?:gift|birthday)\b", text)
     if not ordered_gift_match:
-        ordered_gift_match = re.search(r"\bmark\s+(.+?)(?:'?s)?\s+gift\s+as\s+ordered\b", text)
+        ordered_gift_match = re.search(r"\bmark\s+(.+?)(?:'?s)?\s+(?:gift|birthday)\s+as\s+ordered\b", text)
     if ordered_gift_match:
         name = ordered_gift_match.group(1).strip(" .,'\"")
         if name:
@@ -870,6 +892,14 @@ def mark_birthday_gift_ordered(worker_url: str, worker_token: str | None, name: 
     if not result:
         return {"ok": False, "reason": "patch_failed", "name": name, "birthday": birthday}
     return {"ok": True, "name": birthday.get("name", name), "id": birthday_id, "result": result}
+
+
+def mark_needs_action_done(worker_url: str, worker_token: str | None, index: int) -> dict:
+    """Mark the 1-based Needs Action item done through the worker."""
+    result = worker_post(worker_url, worker_token, "/api/needs-action/done", {"index": index})
+    if not result:
+        return {"ok": False, "reason": "worker_request_failed", "index": index}
+    return result
 
 
 # ---------------------------------------------------------------------------
@@ -2078,6 +2108,8 @@ def main() -> None:
     parser.add_argument("--no-wake-detection", action="store_true",
                         help="Run only HTTP endpoints, chimes, timers, and gestures.")
     args = parser.parse_args()
+    if not args.worker_token:
+        args.worker_token = os.environ.get("WORKER_TOKEN")
 
     if args.debug:
         logging.getLogger().setLevel(logging.DEBUG)
@@ -2444,6 +2476,20 @@ def main() -> None:
                                 log.info("Birthday gift voice command failed: %s", result)
                         else:
                             log.info("Birthday gift voice command ignored: no worker URL configured")
+
+                    elif action == "needs_action_done":
+                        index = int(command.get("index", 0) or 0)
+                        if args.dry_run:
+                            log.info("[DRY RUN] Would mark Needs Action item %s done", index)
+                        elif args.worker_url:
+                            result = mark_needs_action_done(args.worker_url, args.worker_token, index)
+                            if result.get("ok"):
+                                action_title = (result.get("action") or {}).get("title")
+                                log.info("Marked Needs Action item %s done: %s", index, action_title or result)
+                            else:
+                                log.info("Needs Action voice command failed: %s", result)
+                        else:
+                            log.info("Needs Action voice command ignored: no worker URL configured")
 
                     elif action in ("debug_hide", "debug_show"):
                         debug_post(action, {"message": action.replace("_", " ")})

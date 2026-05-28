@@ -23,7 +23,7 @@ HOWIE_WAKE_PHRASE_RE = re.compile(
 COMMAND_KEYWORD_RE = re.compile(
     r"\b(open|show|go\s+(to|back|home)|calendar|weather|photos?|pictures?|gallery|"
     r"turn(ed|s)?\s*(it\s+)?(on|off|of|up|down|f)|set\s+(a\s+)?timer|"
-    r"remind\s+me|stop|dismiss|cancel|quiet|shut\s+up|like|don't\s+like|"
+    r"remind\s+me|ordered|mark|done|gift|stop|dismiss|cancel|quiet|shut\s+up|like|don't\s+like|"
     r"do\s+not\s+like|what|who|where|when|"
     r"version\s+(one|two)|v[12]|"
     r"why|how|do|does|did|is|are|can|could|should|would|will|tell\s+me|"
@@ -180,6 +180,29 @@ def _parse_howie_message(text: str) -> dict:
     return {"action": "howie_message", "message": message}
 
 
+def _parse_birthday_gift_ordered(text: str) -> dict:
+    match = re.search(r"\b(?:i\s+)?(?:just\s+)?ordered\s+(.+?)(?:'?s)?\s+(?:gift|birthday)\b", text)
+    if not match:
+        match = re.search(r"\bmark\s+(.+?)(?:'?s)?\s+(?:gift|birthday)\s+as\s+ordered\b", text)
+    if not match:
+        return {"action": "none"}
+    name = match.group(1).strip(" .,'\"")
+    if not name:
+        return {"action": "none"}
+    return {"action": "birthday_gift_ordered", "name": name.title()}
+
+
+def _parse_needs_action_done(text: str) -> dict:
+    match = re.search(
+        rf"\bmark\s+(?:needs\s+action\s+)?item\s+(\d+|{_NUMBER_PATTERN})\s+as\s+done\b",
+        text,
+    )
+    if not match:
+        return {"action": "none"}
+    index = _parse_amount(match.group(1))
+    return {"action": "needs_action_done", "index": index}
+
+
 def parse_command(text: str, allow_bare_ask: bool = True, allow_wake_knowledge: bool = False) -> dict:
     """Parse the command body after "Hey Homer" into a stable action dict."""
     original_text = text.strip()
@@ -195,6 +218,14 @@ def parse_command(text: str, allow_bare_ask: bool = True, allow_wake_knowledge: 
 
     if STOP_COMMAND_RE.fullmatch(text):
         return {"action": "stop"}
+
+    needs_action_command = _parse_needs_action_done(text)
+    if needs_action_command["action"] != "none":
+        return needs_action_command
+
+    gift_command = _parse_birthday_gift_ordered(text)
+    if gift_command["action"] != "none":
+        return gift_command
 
     knowledge_feedback_command = _parse_knowledge_feedback(text)
     if knowledge_feedback_command["action"] != "none":
@@ -286,6 +317,12 @@ def is_dispatchable_command(command: dict) -> bool:
     if action == "howie_message":
         message = str(command.get("message", "")).strip()
         return len(message.split()) >= 1
+    if action == "birthday_gift_ordered":
+        name = str(command.get("name", "")).strip()
+        return len(name.split()) >= 1
+    if action == "needs_action_done":
+        index = command.get("index")
+        return isinstance(index, int) and index >= 1
     if action == "set_timer":
         duration = command.get("duration")
         return isinstance(duration, int) and 1 <= duration <= _MAX_TIMER_SECONDS

@@ -104,6 +104,36 @@ def test_design_system_version_intent():
     }
 
 
+def test_birthday_gift_ordered_intent():
+    assert parse_command("Hey Homer, I ordered Kate's gift.") == {
+        "action": "birthday_gift_ordered",
+        "name": "Kate",
+    }
+    assert parse_command("Hey Homer, mark Kate's gift as ordered.") == {
+        "action": "birthday_gift_ordered",
+        "name": "Kate",
+    }
+    assert parse_command("Hey Homer, mark Kate's birthday as ordered.") == {
+        "action": "birthday_gift_ordered",
+        "name": "Kate",
+    }
+    assert is_dispatchable_command({"action": "birthday_gift_ordered", "name": "Kate"})
+    assert not is_dispatchable_command({"action": "birthday_gift_ordered", "name": ""})
+
+
+def test_needs_action_done_intent():
+    assert parse_command("Hey Homer, mark item 1 as done.") == {
+        "action": "needs_action_done",
+        "index": 1,
+    }
+    assert parse_command("Hey Homer, mark Needs Action item two as done.") == {
+        "action": "needs_action_done",
+        "index": 2,
+    }
+    assert is_dispatchable_command({"action": "needs_action_done", "index": 2})
+    assert not is_dispatchable_command({"action": "needs_action_done", "index": 0})
+
+
 def test_howie_message_intent():
     assert parse_command("Hey Howie, ask Devon if the second Pi is healthy") == {
         "action": "howie_message",

@@ -941,6 +941,75 @@ def test_dispatch_ask_uses_openclaw_router_bridge(monkeypatch):
     ]
 
 
+def test_dispatch_birthday_gift_ordered_patches_matching_birthday(monkeypatch):
+    calls = []
+
+    def fake_get(url, headers=None, timeout=None):
+        calls.append({"method": "GET", "url": url, "headers": headers, "timeout": timeout})
+        return SimpleNamespace(
+            ok=True,
+            status_code=200,
+            text="ok",
+            json=lambda: {"birthdays": [{"id": "bd/kate", "name": "Kate", "daysUntil": 1}]},
+        )
+
+    def fake_patch(url, json=None, headers=None, timeout=None):
+        calls.append({"method": "PATCH", "url": url, "json": json, "headers": headers, "timeout": timeout})
+        return SimpleNamespace(ok=True, status_code=200, text="ok", json=lambda: {"ok": True})
+
+    monkeypatch.setattr("voice_service.requests.get", fake_get)
+    monkeypatch.setattr("voice_service.requests.patch", fake_patch)
+
+    dispatcher = Dispatcher(
+        pi_base="http://pi.local",
+        worker_url="https://worker.example",
+        worker_token="secret",
+        dry_run=False,
+    )
+    dispatcher.dispatch({"action": "birthday_gift_ordered", "name": "Kate"})
+
+    assert calls == [
+        {
+            "method": "GET",
+            "url": "https://worker.example/api/birthdays",
+            "headers": {"Authorization": "Bearer secret"},
+            "timeout": 10,
+        },
+        {
+            "method": "PATCH",
+            "url": "https://worker.example/api/birthdays/bd%2Fkate",
+            "json": {"giftStatus": "ordered", "giftNotes": "Marked ordered by voice command."},
+            "headers": {"Content-Type": "application/json", "Authorization": "Bearer secret"},
+            "timeout": 10,
+        },
+    ]
+
+
+def test_dispatch_needs_action_done_posts_index_to_worker(monkeypatch):
+    calls = []
+
+    def fake_post(url, json=None, headers=None, timeout=None):
+        calls.append({"url": url, "json": json, "headers": headers, "timeout": timeout})
+        return SimpleNamespace(ok=True, status_code=200, text="ok")
+
+    monkeypatch.setattr("voice_service.requests.post", fake_post)
+
+    dispatcher = Dispatcher(
+        pi_base="http://pi.local",
+        worker_url="https://worker.example",
+        worker_token="secret",
+        dry_run=False,
+    )
+    dispatcher.dispatch({"action": "needs_action_done", "index": 2})
+
+    assert calls == [{
+        "url": "https://worker.example/api/needs-action/done",
+        "json": {"index": 2},
+        "headers": {"Content-Type": "application/json", "Authorization": "Bearer secret"},
+        "timeout": 10,
+    }]
+
+
 def test_command_from_transcript_allows_command_only_stt_after_candidate_wake():
     assert command_from_transcript("set a timer for ten seconds", fallback_text="Hey Homer") == (
         "set a timer for ten seconds",

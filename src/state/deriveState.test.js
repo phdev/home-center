@@ -312,6 +312,8 @@ describe("computeDerivedState — school flags", () => {
     summary: o.summary ?? "",
     urgency: o.urgency ?? 0,
     dueDate: o.dueDate,
+    eventDate: o.eventDate,
+    location: o.location,
     dismissedAt: o.dismissedAt,
     extractionSource: "regex",
     sourceEmailId: "e1",
@@ -375,6 +377,45 @@ describe("computeDerivedState — school flags", () => {
       "reminder",
       "info",
     ]);
+  });
+
+  it("removes school event items that are already represented on the calendar", () => {
+    const now = at(2026, 5, 28, 10);
+    const raw_ = raw({
+      calendar: {
+        events: [
+          ev(
+            "Peter on Field Trip",
+            at(2026, 6, 5, 9),
+            at(2026, 6, 5, 12),
+            { title: "Peter on Field Trip" },
+          ),
+        ],
+      },
+      schoolItems: [
+        mkItem({
+          id: "franklin",
+          kind: "event",
+          title: "Walking Field Trip to Franklin Park",
+          summary: "Class walks to Franklin Park.",
+          eventDate: "2026-06-05",
+          urgency: 0.5,
+        }),
+        mkItem({
+          id: "park-day-form",
+          kind: "action",
+          title: "1st Grade Park Day Forms Due",
+          summary: "Return the park day form.",
+          dueDate: "2026-05-29",
+          urgency: 0.9,
+        }),
+      ],
+    });
+
+    const d = computeDerivedState(raw_, { now, user: PETER });
+
+    expect(d.rankedSchoolItems.map((item) => item.id)).toEqual(["park-day-form"]);
+    expect(d.upcomingSchoolEvents.map((item) => item.id)).not.toContain("franklin");
   });
 });
 

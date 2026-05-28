@@ -23,6 +23,7 @@ from collections import deque
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
+from urllib.parse import quote
 
 import numpy as np
 import requests
@@ -829,6 +830,44 @@ class Dispatcher:
         except requests.RequestException as e:
             log.warning("Worker POST %s error: %s", path, e)
 
+    def _worker_get(self, path: str) -> dict | None:
+        if not self.worker_url:
+            return None
+        if self.dry_run:
+            log.info("[DRY RUN] Worker GET %s", path)
+            return None
+        headers = {}
+        if self.worker_token:
+            headers["Authorization"] = f"Bearer {self.worker_token}"
+        try:
+            r = requests.get(f"{self.worker_url}{path}", headers=headers, timeout=10)
+            if not r.ok:
+                log.warning("Worker GET %s -> %d %s", path, r.status_code, r.text[:200])
+                return None
+            return r.json()
+        except (requests.RequestException, ValueError) as e:
+            log.warning("Worker GET %s error: %s", path, e)
+            return None
+
+    def _worker_patch(self, path: str, payload: dict | None = None) -> dict | None:
+        if not self.worker_url:
+            return None
+        if self.dry_run:
+            log.info("[DRY RUN] Worker PATCH %s %s", path, payload or {})
+            return {"ok": True, "dryRun": True}
+        headers = {"Content-Type": "application/json"}
+        if self.worker_token:
+            headers["Authorization"] = f"Bearer {self.worker_token}"
+        try:
+            r = requests.patch(f"{self.worker_url}{path}", json=payload or {}, headers=headers, timeout=10)
+            if not r.ok:
+                log.warning("Worker PATCH %s -> %d %s", path, r.status_code, r.text[:200])
+                return None
+            return r.json()
+        except (requests.RequestException, ValueError) as e:
+            log.warning("Worker PATCH %s error: %s", path, e)
+            return None
+
     def _openclaw_post(self, path: str, payload: dict | None = None, timeout: float = 8) -> bool:
         if not self.openclaw_bridge_url:
             log.warning("OpenClaw bridge URL is not configured; dropping %s", payload or {})
@@ -916,9 +955,58 @@ class Dispatcher:
             self.record_design_feedback(command)
         elif action == "howie_message":
             self.send_howie_message(command)
+        elif action == "birthday_gift_ordered":
+            self.mark_birthday_gift_ordered(str(command.get("name", "")))
+        elif action == "needs_action_done":
+            self.mark_needs_action_done(int(command.get("index", 0) or 0))
 
     def dispatch_async(self, command: dict) -> None:
         threading.Thread(target=self.dispatch, args=(command,), daemon=True).start()
+
+    @staticmethod
+    def normalize_birthday_name(value: str) -> str:
+        return re.sub(r"[^a-z0-9]+", " ", (value or "").lower()).strip()
+
+    def mark_birthday_gift_ordered(self, name: str) -> dict:
+        if not name.strip():
+            return {"ok": False, "reason": "missing_name"}
+        payload = self._worker_get("/api/birthdays") or {}
+        birthdays = payload.get("birthdays") or []
+        target = self.normalize_birthday_name(name)
+        matches = []
+        for birthday in birthdays:
+            birthday_name = self.normalize_birthday_name(str(birthday.get("name", "")))
+            first = birthday_name.split(" ", 1)[0] if birthday_name else ""
+            if birthday_name == target or first == target or target in birthday_name.split():
+                matches.append(birthday)
+        if not matches:
+            result = {"ok": False, "reason": "not_found", "name": name}
+            log.info("Birthday gift voice command failed: %s", result)
+            return result
+        matches.sort(key=lambda b: b.get("daysUntil", 9999))
+        birthday = matches[0]
+        birthday_id = birthday.get("id") or birthday.get("uid") or birthday.get("name")
+        if not birthday_id:
+            result = {"ok": False, "reason": "missing_id", "name": name, "birthday": birthday}
+            log.info("Birthday gift voice command failed: %s", result)
+            return result
+        result = self._worker_patch(
+            f"/api/birthdays/{quote(str(birthday_id), safe='')}",
+            {"giftStatus": "ordered", "giftNotes": "Marked ordered by voice command."},
+        )
+        if not result:
+            failed = {"ok": False, "reason": "patch_failed", "name": name, "birthday": birthday}
+            log.info("Birthday gift voice command failed: %s", failed)
+            return failed
+        ok = {"ok": True, "name": birthday.get("name", name), "id": birthday_id, "result": result}
+        log.info("Marked birthday gift ordered: %s (%s)", ok["name"], ok["id"])
+        return ok
+
+    def mark_needs_action_done(self, index: int) -> None:
+        if index < 1:
+            log.warning("Needs Action voice command has invalid index: %s", index)
+            return
+        self._worker_post("/api/needs-action/done", {"index": index})
 
     def record_design_feedback(self, command: dict) -> None:
         if not self.design_feedback_script:

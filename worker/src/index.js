@@ -43,6 +43,9 @@ export default {
       if (path === "/api/school-updates" && request.method === "GET") {
         return corsResponse(env, await handleSchoolUpdatesGet(env));
       }
+      if (path === "/api/needs-action/done" && request.method === "POST") {
+        return corsResponse(env, await handleNeedsActionDone(request, env));
+      }
       if (path === "/api/photos") {
         return corsResponse(env, await handlePhotos(env));
       }
@@ -3457,6 +3460,317 @@ async function handleSchoolUpdatesGet(env) {
   }
 
   return json(data);
+}
+
+async function dismissSchoolUpdate(env, id, dismissedAt = new Date().toISOString()) {
+  if (!env.NOTIFICATIONS) return { ok: false, reason: "kv_not_configured" };
+  const data =
+    (await env.NOTIFICATIONS.get(SCHOOL_UPDATES_KEY, { type: "json" })) ??
+    { updates: [], updatedAt: null };
+  const updates = Array.isArray(data.updates) ? data.updates : [];
+  let found = false;
+  const nextUpdates = updates.map((item) => {
+    const itemId = item?.id ?? item?.sourceEmailId;
+    if (String(itemId) !== String(id)) return item;
+    found = true;
+    return { ...item, dismissedAt };
+  });
+  if (!found) return { ok: false, reason: "not_found", id };
+  const next = { ...data, updates: nextUpdates, updatedAt: Date.now() };
+  await env.NOTIFICATIONS.put(SCHOOL_UPDATES_KEY, JSON.stringify(next));
+  return { ok: true, id, dismissedAt };
+}
+
+async function handleNeedsActionDone(request, env) {
+  if (!env.NOTIFICATIONS) return json({ error: "KV not configured" }, 500);
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return json({ error: "Invalid JSON" }, 400);
+  }
+  const index = Number(body?.index);
+  if (!Number.isInteger(index) || index < 1) {
+    return json({ error: "index must be a 1-based integer" }, 400);
+  }
+
+  const now = new Date();
+  const actions = await buildCurrentNeedsActions(env, now);
+  const action = actions[index - 1];
+  if (!action) {
+    return json({ ok: false, reason: "index_out_of_range", index, count: actions.length }, 404);
+  }
+
+  if (action.type === "school") {
+    const result = await dismissSchoolUpdate(env, action.sourceId, now.toISOString());
+    if (!result.ok) return json({ ok: false, action, ...result }, 404);
+    return json({ ok: true, index, action, result });
+  }
+
+  if (action.type === "birthday_gift") {
+    const response = await handleBirthdayPatch(
+      action.sourceId,
+      new Request("https://worker.internal/api/birthdays", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          giftStatus: "ordered",
+          giftNotes: "Marked ordered by voice command.",
+        }),
+      }),
+      env,
+    );
+    const payload = await response.json();
+    if (!response.ok) return json({ ok: false, action, result: payload }, response.status);
+    return json({ ok: true, index, action, result: payload });
+  }
+
+  return json({
+    ok: false,
+    reason: "unsupported_action_type",
+    index,
+    action,
+  }, 409);
+}
+
+async function buildCurrentNeedsActions(env, now = new Date()) {
+  const actions = [];
+  const calendarEvents = await currentCalendarEvents(env, now);
+  const schoolData = env.NOTIFICATIONS
+    ? (await env.NOTIFICATIONS.get(SCHOOL_UPDATES_KEY, { type: "json" })) ?? {}
+    : {};
+  const schoolItems = Array.isArray(schoolData.updates)
+    ? schoolData.updates.filter((item) => !item?.dismissedAt && !workerCalendarEventAlreadyCoversSchoolItem(item, calendarEvents))
+    : [];
+  const rankedSchool = rankNeedsActionSchoolItems(schoolItems, now);
+  for (const item of rankedSchool) {
+    const tiebreaker = item.dueDate
+      ? dateTiebreaker(item.dueDate)
+      : item.eventDate
+        ? dateTiebreaker(item.eventDate)
+        : -Number.MAX_SAFE_INTEGER;
+    actions.push({
+      id: `school-${item.id}`,
+      type: "school",
+      sourceId: item.id ?? item.sourceEmailId,
+      title: item.title,
+      urgencyScore: clamp01(item.urgency),
+      tiebreaker,
+    });
+  }
+
+  const birthday = await firstNeedsActionBirthday(env, now);
+  if (birthday) {
+    const daysUntil = Math.max(0, Number(birthday.daysUntil) || 0);
+    actions.push({
+      id: `gift-${birthday.id}`,
+      type: "birthday_gift",
+      sourceId: birthday.id,
+      title: `Order ${birthday.name}'s gift`,
+      urgencyScore: Math.max(0, Math.min(1, 1 - daysUntil / 14)),
+      tiebreaker: -daysUntil,
+    });
+  }
+
+  const minutesSinceMidnight = localMinutesSinceMidnight(now);
+  const takeout = await currentTakeoutState(env, now);
+  if ((takeout?.decision ?? null) === null && minutesSinceMidnight >= 16.5 * 60 && minutesSinceMidnight < 20 * 60) {
+    const minutesToCutoff = 16.5 * 60 - minutesSinceMidnight;
+    actions.push({
+      id: "takeout",
+      type: "takeout",
+      title: "Lock in dinner",
+      urgencyScore: cutoffScore(minutesToCutoff),
+      tiebreaker: -minutesToCutoff,
+    });
+  }
+
+  return actions
+    .sort((a, b) => b.urgencyScore - a.urgencyScore || b.tiebreaker - a.tiebreaker)
+    .map(({ urgencyScore, tiebreaker, ...action }) => action);
+}
+
+async function currentCalendarEvents(env, now = new Date()) {
+  const events = [];
+  const calendarTimeZone = env.CALENDAR_TIME_ZONE || env.TZ || "America/Los_Angeles";
+  if (env.ICLOUD_APPLE_ID && env.ICLOUD_APP_PASSWORD) {
+    try {
+      const result = await fetchCalDAV(env.ICLOUD_APPLE_ID, env.ICLOUD_APP_PASSWORD, false, {
+        calendarNames: env.CALENDAR_NAMES || env.CALDAV_CALENDAR_NAMES || "Howell Family",
+        timeZone: calendarTimeZone,
+      });
+      events.push(...result.events.map(({ startDate, ...rest }) => ({ ...rest, start: startDate })));
+    } catch {
+      // Needs Action completion should still work if calendar fetch is briefly unavailable.
+    }
+  }
+  if (env.CALENDAR_URLS) {
+    const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const end = new Date(start.getTime() + 14 * 86_400_000);
+    for (const feedUrl of env.CALENDAR_URLS.split(",").map((u) => u.trim()).filter(Boolean)) {
+      try {
+        const res = await fetch(feedUrl.replace("webcal://", "https://"));
+        if (!res.ok) continue;
+        events.push(...parseIcalEvents(await res.text(), start, end, { timeZone: calendarTimeZone })
+          .map(({ startDate, ...rest }) => ({ ...rest, start: startDate })));
+      } catch {
+        // Ignore secondary calendar feed failures for this best-effort filter.
+      }
+    }
+  }
+  return events;
+}
+
+function clamp01(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return 0;
+  return Math.max(0, Math.min(1, n));
+}
+
+function dateTiebreaker(value) {
+  if (!value) return -Number.MAX_SAFE_INTEGER;
+  const ts = new Date(value).getTime();
+  return Number.isFinite(ts) ? -ts : -Number.MAX_SAFE_INTEGER;
+}
+
+function isUrgentNeedsActionSchoolItem(item, now) {
+  return (
+    (item.dueDate && (new Date(item.dueDate).getTime() - now.getTime()) / 3_600_000 <= 24) ||
+    Number(item.urgency ?? 0) >= 0.7
+  );
+}
+
+function rankNeedsActionSchoolItems(items, now) {
+  const tierOf = (item) => {
+    if (isUrgentNeedsActionSchoolItem(item, now)) return 0;
+    if (item.kind === "action") return 1;
+    if (item.kind === "event") return 2;
+    if (item.kind === "reminder") return 3;
+    return 4;
+  };
+  return [...items].sort((a, b) => {
+    const ta = tierOf(a);
+    const tb = tierOf(b);
+    if (ta !== tb) return ta - tb;
+    const da = a.dueDate ? new Date(a.dueDate).getTime() : Infinity;
+    const db = b.dueDate ? new Date(b.dueDate).getTime() : Infinity;
+    return da - db;
+  });
+}
+
+function workerCalendarEventAlreadyCoversSchoolItem(item, calendarEvents = []) {
+  if (item.kind !== "event") return false;
+  const schoolDate = parseWorkerSchoolItemDate(item.eventDate ?? item.dueDate);
+  if (!Number.isFinite(schoolDate.getTime())) return false;
+  const itemTokens = workerSignificantTitleTokens(`${item.title ?? ""} ${item.summary ?? ""} ${item.location ?? ""}`);
+  if (itemTokens.length === 0) return false;
+
+  return calendarEvents.some((event) => {
+    if (event.status === "declined") return false;
+    const eventStart = new Date(event.start ?? event.startDate ?? "");
+    if (!Number.isFinite(eventStart.getTime()) || localDateKey(eventStart) !== localDateKey(schoolDate)) return false;
+    const eventTokens = workerSignificantTitleTokens(`${event.title ?? ""} ${event.summary ?? ""} ${event.location ?? ""}`);
+    return workerLooseTokenMatch(itemTokens, eventTokens);
+  });
+}
+
+function parseWorkerSchoolItemDate(value) {
+  if (!value) return new Date("");
+  const ymd = /^(\d{4})-(\d{2})-(\d{2})/.exec(value);
+  if (ymd) return new Date(Number(ymd[1]), Number(ymd[2]) - 1, Number(ymd[3]));
+  return new Date(value);
+}
+
+function workerSignificantTitleTokens(value) {
+  const stop = new Set([
+    "a", "an", "and", "at", "by", "due", "event", "for", "form",
+    "in", "is", "of", "on", "school", "the", "to", "walking",
+  ]);
+  return Array.from(new Set(
+    String(value).toLowerCase()
+      .replace(/[^a-z0-9]+/g, " ")
+      .split(/\s+/)
+      .filter((token) => token.length >= 3 && !stop.has(token)),
+  ));
+}
+
+function workerLooseTokenMatch(itemTokens, eventTokens) {
+  if (!itemTokens.length || !eventTokens.length) return false;
+  const eventSet = new Set(eventTokens);
+  const overlap = itemTokens.filter((token) => eventSet.has(token));
+  if (overlap.length >= 2) return true;
+  const shortest = Math.min(itemTokens.length, eventTokens.length);
+  return shortest <= 2 && overlap.length >= 1;
+}
+
+async function firstNeedsActionBirthday(env, now) {
+  if (!env.ICLOUD_APPLE_ID || !env.ICLOUD_APP_PASSWORD) return null;
+  try {
+    const birthdays = await fetchBirthdays(env.ICLOUD_APPLE_ID, env.ICLOUD_APP_PASSWORD);
+    const overrides = env.NOTIFICATIONS
+      ? (await env.NOTIFICATIONS.get(BIRTHDAY_GIFTS_KEY, { type: "json" })) ?? {}
+      : {};
+    const ranked = birthdays
+      .map((b) => {
+        const id = b.id ?? b.uid ?? b.name;
+        const override = overrides[id];
+        const giftStatus = override?.giftStatus ?? b.giftStatus ?? "unknown";
+        const daysUntil = Number.isFinite(Number(b.daysUntil)) ? Number(b.daysUntil) : daysUntilMMDDWorker(b.date, now);
+        return { ...b, id, giftStatus, daysUntil };
+      })
+      .filter((b) => b.daysUntil <= 60)
+      .sort((a, b) => a.daysUntil - b.daysUntil);
+    return ranked.find((b) => b.daysUntil <= 30 && (b.giftStatus === "needed" || b.giftStatus === "unknown")) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+async function currentTakeoutState(env, now) {
+  if (!env.NOTIFICATIONS) return null;
+  return await env.NOTIFICATIONS.get(takeoutKeyForDate(localDateKey(now)), { type: "json" });
+}
+
+function cutoffScore(minutesToCutoff) {
+  if (minutesToCutoff <= 0) return 0.95;
+  if (minutesToCutoff <= 30) return 0.8;
+  if (minutesToCutoff <= 90) return 0.55;
+  if (minutesToCutoff <= 240) return 0.3;
+  return 0.1;
+}
+
+function localDateParts(date, timeZone = "America/Los_Angeles") {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).formatToParts(date);
+  return Object.fromEntries(parts.map((part) => [part.type, part.value]));
+}
+
+function localDateKey(date) {
+  const p = localDateParts(date);
+  return `${p.year}-${p.month}-${p.day}`;
+}
+
+function localMinutesSinceMidnight(date) {
+  const p = localDateParts(date);
+  const hour = Number(p.hour === "24" ? "0" : p.hour);
+  return hour * 60 + Number(p.minute);
+}
+
+function daysUntilMMDDWorker(mmdd, now) {
+  const [month, day] = String(mmdd ?? "").split("-").map(Number);
+  if (!month || !day) return Infinity;
+  const p = localDateParts(now);
+  const start = Date.UTC(Number(p.year), Number(p.month) - 1, Number(p.day));
+  let target = Date.UTC(Number(p.year), month - 1, day);
+  if (target < start) target = Date.UTC(Number(p.year) + 1, month - 1, day);
+  return Math.round((target - start) / 86_400_000);
 }
 
 // ── Takeout (tonight's dinner decision) ─────────────────────────────

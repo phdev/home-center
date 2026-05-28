@@ -159,6 +159,7 @@ def publish_updates(items, cfg):
             "urgency": it.get("urgency", 0.5),
             "suggestedAction": it.get("suggestedAction"),
             "receivedAt": it.get("receivedAt"),
+            "dismissedAt": it.get("dismissedAt"),
             "classifier": it.get("classifier", "llm"),
             "sourceEmailId": it.get("sourceEmailId", it["id"]),
         } for it in items]}
@@ -211,11 +212,19 @@ def merge_updates(new_items, current_items):
     """Merge new extraction results into the existing published pending set."""
     merged = []
     seen_ids = set()
+    current_by_id = {
+        item.get("id") or item.get("sourceEmailId"): item
+        for item in current_items
+        if item.get("id") or item.get("sourceEmailId")
+    }
 
     for item in [*new_items, *current_items]:
         item_id = item.get("id") or item.get("sourceEmailId")
         if not item_id or item_id in SYSTEM_ERROR_IDS or item_id in seen_ids:
             continue
+        current = current_by_id.get(item_id)
+        if current and current.get("dismissedAt") and not item.get("dismissedAt"):
+            item = {**item, "dismissedAt": current["dismissedAt"]}
         merged.append(item)
         seen_ids.add(item_id)
     return merged

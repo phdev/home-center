@@ -58,6 +58,127 @@ function bridgePayloads() {
     .map(([, options]) => JSON.parse(options.body));
 }
 
+describe("Needs Action completion", () => {
+  it("marks the selected school Needs Action item dismissed", async () => {
+    const notifications = createKv({
+      school_updates: JSON.stringify({
+        updates: [
+          {
+            id: "field-trip",
+            kind: "event",
+            title: "Field trip",
+            summary: "Field trip on Friday.",
+            eventDate: "2026-06-05",
+            urgency: 0.2,
+          },
+          {
+            id: "park-day-form",
+            kind: "action",
+            title: "Park day form",
+            summary: "Return the form.",
+            dueDate: "2026-05-29",
+            urgency: 0.9,
+          },
+        ],
+        updatedAt: 1,
+      }),
+    });
+    const currentEnv = env({ NOTIFICATIONS: notifications });
+
+    const res = await worker.fetch(new Request("https://worker.test/api/needs-action/done", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ index: 1 }),
+    }), currentEnv, {});
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body).toMatchObject({
+      ok: true,
+      index: 1,
+      action: {
+        id: "school-park-day-form",
+        type: "school",
+        sourceId: "park-day-form",
+      },
+    });
+    const stored = JSON.parse(notifications.store.get("school_updates"));
+    expect(stored.updates.find((item) => item.id === "park-day-form").dismissedAt).toEqual(expect.any(String));
+    expect(stored.updates.find((item) => item.id === "field-trip").dismissedAt).toBeUndefined();
+  });
+
+  it("returns a clear error when the Needs Action index is not visible", async () => {
+    const currentEnv = env({
+      NOTIFICATIONS: createKv({
+        school_updates: JSON.stringify({ updates: [], updatedAt: 1 }),
+      }),
+    });
+
+    const res = await worker.fetch(new Request("https://worker.test/api/needs-action/done", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ index: 1 }),
+    }), currentEnv, {});
+    const body = await res.json();
+
+    expect(res.status).toBe(404);
+    expect(body).toMatchObject({ ok: false, reason: "index_out_of_range", index: 1, count: 0 });
+  });
+
+  it("skips school event items already covered by a loose calendar match", async () => {
+    global.fetch = vi.fn(async () => new Response(`BEGIN:VCALENDAR
+BEGIN:VEVENT
+UID:franklin
+DTSTART:20260605T160000Z
+DTEND:20260605T190000Z
+SUMMARY:Peter on Field Trip
+END:VEVENT
+END:VCALENDAR`, {
+      headers: { "Content-Type": "text/calendar" },
+    }));
+    const notifications = createKv({
+      school_updates: JSON.stringify({
+        updates: [
+          {
+            id: "franklin",
+            kind: "event",
+            title: "Walking Field Trip to Franklin Park",
+            summary: "Class walks to Franklin Park.",
+            eventDate: "2026-06-05",
+            urgency: 0.8,
+          },
+          {
+            id: "park-day-form",
+            kind: "action",
+            title: "1st Grade Park Day Forms Due",
+            summary: "Return the park day form.",
+            dueDate: "2026-05-29",
+            urgency: 0.9,
+          },
+        ],
+        updatedAt: 1,
+      }),
+    });
+    const currentEnv = env({
+      NOTIFICATIONS: notifications,
+      CALENDAR_URLS: "https://calendar.test/howell.ics",
+    });
+
+    const res = await worker.fetch(new Request("https://worker.test/api/needs-action/done", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ index: 1 }),
+    }), currentEnv, {});
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body.action).toMatchObject({ id: "school-park-day-form" });
+    const stored = JSON.parse(notifications.store.get("school_updates"));
+    expect(stored.updates.find((item) => item.id === "park-day-form").dismissedAt).toEqual(expect.any(String));
+    expect(stored.updates.find((item) => item.id === "franklin").dismissedAt).toBeUndefined();
+  });
+});
+
 function defaultFetchMock({ classification, answer, wikipediaImage = "https://wiki.test/image.jpg", nasaImage = null } = {}) {
   const classificationData = classification || {
     type: "concept",
