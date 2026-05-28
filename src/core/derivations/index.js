@@ -21,6 +21,23 @@ const VENDOR_ROTATION = [
   "California Chicken Cafe",
 ];
 
+function rankedTakeoutVendors(today, context) {
+  const dayIdx = Math.floor(
+    (startOfDay(context.now) - startOfDay(new Date(context.now.getFullYear(), 0, 1))) /
+      MS_PER_DAY,
+  );
+  const fallback = [];
+  for (let i = 0; i < VENDOR_ROTATION.length; i++) {
+    fallback.push(VENDOR_ROTATION[(dayIdx + i) % VENDOR_ROTATION.length]);
+  }
+
+  const suggested = Array.isArray(today?.suggestedVendors)
+    ? today.suggestedVendors.filter((v) => typeof v === "string" && v.trim())
+    : [];
+  const merged = [...suggested, ...fallback];
+  return Array.from(new Set(merged)).slice(0, 4);
+}
+
 /**
  * @param {import('../../state/types').RawState} rawData
  * @param {import('../../state/types').DerivedContext} context
@@ -198,22 +215,23 @@ export function takeoutUndecided(rawData, context) {
   const cutoff = atClock(context.now, 16, 30);
   const h = context.now.getHours();
   const pending = decision === null && context.now >= cutoff && h < 20;
-  const dayIdx = Math.floor(
-    (startOfDay(context.now) - startOfDay(new Date(context.now.getFullYear(), 0, 1))) /
-      MS_PER_DAY,
-  );
-  const suggestedVendors = [];
-  for (let i = 0; i < 4; i++) {
-    suggestedVendors.push(VENDOR_ROTATION[(dayIdx + i) % VENDOR_ROTATION.length]);
+  const suggestedVendors = rankedTakeoutVendors(today, context);
+
+  const state = {
+    decision,
+    vendor: today?.vendor,
+    suggestedVendors,
+  };
+  if (Array.isArray(today?.recentVendors) && today.recentVendors.length) {
+    state.recentVendors = today.recentVendors;
+  }
+  if (today?.suggestionsSource) {
+    state.suggestionsSource = today.suggestionsSource;
   }
 
   return {
     value: pending,
-    state: {
-      decision,
-      vendor: today?.vendor,
-      suggestedVendors,
-    },
+    state,
   };
 }
 

@@ -152,6 +152,9 @@ export default {
       if (path === "/api/takeout/today" && request.method === "POST") {
         return corsResponse(env, await handleTakeoutPost(request, env));
       }
+      if (path === "/api/takeout/suggestions" && request.method === "POST") {
+        return corsResponse(env, await handleTakeoutSuggestionsPost(request, env));
+      }
       // ── Lunch decisions per date ──
       if (path === "/api/lunch/decisions" && request.method === "GET") {
         return corsResponse(env, await handleLunchGet(env));
@@ -3837,6 +3840,7 @@ function daysUntilMMDDWorker(mmdd, now) {
 // ── Takeout (tonight's dinner decision) ─────────────────────────────
 
 const VALID_TAKEOUT_DECISIONS = new Set(["takeout", "home"]);
+const TAKEOUT_SUGGESTIONS_KEY = "hc:takeout:suggestions";
 
 function takeoutKeyForDate(date) {
   return `hc:takeout:${date}`;
@@ -3854,8 +3858,22 @@ async function handleTakeoutGet(env) {
   if (!env.NOTIFICATIONS) return json(null);
   const today = todayKey();
   const raw = await env.NOTIFICATIONS.get(takeoutKeyForDate(today), { type: "json" });
-  if (!raw) return json(null);
-  return json(raw);
+  const suggestions = await currentTakeoutSuggestions(env);
+  if (!raw) {
+    if (!suggestions) return json(null);
+    return json({
+      date: today,
+      decision: null,
+      ...suggestions,
+    });
+  }
+  return json({
+    ...raw,
+    suggestedVendors: raw.suggestedVendors ?? suggestions?.suggestedVendors,
+    recentVendors: raw.recentVendors ?? suggestions?.recentVendors,
+    suggestionsSource: raw.suggestionsSource ?? suggestions?.suggestionsSource,
+    suggestionsUpdatedAt: raw.suggestionsUpdatedAt ?? suggestions?.suggestionsUpdatedAt,
+  });
 }
 
 async function handleTakeoutPost(request, env) {
@@ -3883,6 +3901,56 @@ async function handleTakeoutPost(request, env) {
   await env.NOTIFICATIONS.put(takeoutKeyForDate(date), JSON.stringify(record), {
     // Keep for ~3 days; cheap insurance against long-running stale keys.
     expirationTtl: 60 * 60 * 24 * 3,
+  });
+  return json({ ok: true, record });
+}
+
+async function currentTakeoutSuggestions(env) {
+  if (!env.NOTIFICATIONS) return null;
+  const raw = await env.NOTIFICATIONS.get(TAKEOUT_SUGGESTIONS_KEY, { type: "json" });
+  if (!raw || !Array.isArray(raw.suggestedVendors) || raw.suggestedVendors.length === 0) return null;
+  return {
+    suggestedVendors: asStringArray(raw.suggestedVendors, 80, 8),
+    recentVendors: Array.isArray(raw.recentVendors)
+      ? raw.recentVendors.slice(0, 12).map((item) => ({
+        name: clampStr(item?.name, 80),
+        lastOrderedDate: clampStr(item?.lastOrderedDate, 20),
+        count: Number.isFinite(Number(item?.count)) ? Number(item.count) : undefined,
+      })).filter((item) => item.name)
+      : [],
+    suggestionsSource: clampStr(raw.suggestionsSource, 80) || "gmail",
+    suggestionsUpdatedAt: clampStr(raw.suggestionsUpdatedAt, 40),
+  };
+}
+
+async function handleTakeoutSuggestionsPost(request, env) {
+  if (!env.NOTIFICATIONS) return json({ error: "KV not configured" }, 500);
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return json({ error: "Invalid JSON" }, 400);
+  }
+
+  const suggestedVendors = asStringArray(body?.suggestedVendors, 80, 8);
+  if (!suggestedVendors.length) {
+    return json({ error: "suggestedVendors must include at least one restaurant name" }, 400);
+  }
+  const recentVendors = Array.isArray(body?.recentVendors)
+    ? body.recentVendors.slice(0, 12).map((item) => ({
+      name: clampStr(item?.name, 80),
+      lastOrderedDate: clampStr(item?.lastOrderedDate, 20),
+      count: Number.isFinite(Number(item?.count)) ? Number(item.count) : undefined,
+    })).filter((item) => item.name)
+    : [];
+  const record = {
+    suggestedVendors,
+    recentVendors,
+    suggestionsSource: clampStr(body?.suggestionsSource, 80) || "gmail",
+    suggestionsUpdatedAt: new Date().toISOString(),
+  };
+  await env.NOTIFICATIONS.put(TAKEOUT_SUGGESTIONS_KEY, JSON.stringify(record), {
+    expirationTtl: 60 * 60 * 24 * 7,
   });
   return json({ ok: true, record });
 }

@@ -69,6 +69,9 @@
  * @property {string} [vendor]
  * @property {string} [decidedAt]                   ISO
  * @property {string} [decidedBy]
+ * @property {string[]} [suggestedVendors]
+ * @property {{name:string,lastOrderedDate?:string,count?:number}[]} [recentVendors]
+ * @property {string} [suggestionsSource]
  */
 
 /**

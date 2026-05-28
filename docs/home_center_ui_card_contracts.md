@@ -121,9 +121,9 @@ volume, tall affordances, one primary action per card.
 | **Purpose** | Prompt dinner decision by 16:30, surface habit-aware suggestions |
 | **Location** | Contextual slot (replaces Photos 16:30–20:00 if undecided) |
 | **Visibility** | `derived.takeoutDecisionPending === true` |
-| **Required data** | `derived.takeoutState = {decision, vendor?, suggestedVendors: string[]}` |
+| **Required data** | `derived.takeoutState = {decision, vendor?, suggestedVendors: string[], recentVendors?}` |
 | **Optional OpenClaw fields** | `enhanced.topPicks[]` w/ reasoning, `enhanced.intro` |
-| **Deterministic fallback copy** | Suggestions drawn from a 7-day rotation over: Mickey's Deli, Rascals, Chipotle, In-N-Out, Sushi, Chicken Maison, California Chicken Cafe |
+| **Deterministic fallback copy** | Suggestions prefer Worker-provided Gmail receipt history from `scripts/update-takeout-suggestions.py`, ranking restaurants not ordered recently; if unavailable, use the 7-day rotation over: Mickey's Deli, Rascals, Chipotle, In-N-Out, Sushi, Chicken Maison, California Chicken Cafe |
 | **Actions** | Tap vendor → sets `takeout.today.decision = 'takeout'` + `vendor`; `Cook tonight` sets `decision='home'` |
 | **Priority** | Tier 2 |
 

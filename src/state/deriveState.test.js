@@ -571,6 +571,25 @@ describe("computeDerivedState — takeout", () => {
     const d = computeDerivedState(emptyRawState(), { now, user: PETER });
     expect(d.takeoutState.suggestedVendors).toHaveLength(4);
   });
+
+  it("prefers email-derived takeout suggestions when available", () => {
+    const now = at(2026, 4, 23, 17, 0);
+    const d = computeDerivedState(raw({
+      takeout: {
+        today: {
+          date: today(now),
+          decision: null,
+          suggestedVendors: ["El Tarasco", "Thai Dishes"],
+          recentVendors: [{ name: "Rascals", lastOrderedDate: "2026-05-20", count: 2 }],
+          suggestionsSource: "gmail",
+        },
+      },
+    }), { now, user: PETER });
+
+    expect(d.takeoutState.suggestedVendors.slice(0, 2)).toEqual(["El Tarasco", "Thai Dishes"]);
+    expect(d.takeoutState.recentVendors).toEqual([{ name: "Rascals", lastOrderedDate: "2026-05-20", count: 2 }]);
+    expect(d.takeoutState.suggestionsSource).toBe("gmail");
+  });
 });
 
 // ─── lunch decision ─────────────────────────────────────────────────────

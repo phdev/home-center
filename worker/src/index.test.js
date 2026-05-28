@@ -251,6 +251,37 @@ END:VCALENDAR`, {
   });
 });
 
+describe("takeout suggestions", () => {
+  it("stores Gmail-derived restaurant suggestions and returns them with today's takeout state", async () => {
+    const notifications = createKv();
+    const currentEnv = env({ NOTIFICATIONS: notifications });
+
+    const post = await worker.fetch(new Request("https://worker.test/api/takeout/suggestions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        suggestedVendors: ["El Tarasco", "Thai Dishes", "Chicken Maison"],
+        recentVendors: [{ name: "Rascals", lastOrderedDate: "2026-05-20", count: 2 }],
+        suggestionsSource: "gmail:phhowell@gmail.com",
+      }),
+    }), currentEnv, {});
+    const posted = await post.json();
+
+    expect(post.status).toBe(200);
+    expect(posted.record.suggestedVendors).toEqual(["El Tarasco", "Thai Dishes", "Chicken Maison"]);
+
+    const get = await worker.fetch(new Request("https://worker.test/api/takeout/today"), currentEnv, {});
+    const body = await get.json();
+
+    expect(body).toMatchObject({
+      decision: null,
+      suggestedVendors: ["El Tarasco", "Thai Dishes", "Chicken Maison"],
+      recentVendors: [{ name: "Rascals", lastOrderedDate: "2026-05-20", count: 2 }],
+      suggestionsSource: "gmail:phhowell@gmail.com",
+    });
+  });
+});
+
 function defaultFetchMock({ classification, answer, wikipediaImage = "https://wiki.test/image.jpg", nasaImage = null } = {}) {
   const classificationData = classification || {
     type: "concept",

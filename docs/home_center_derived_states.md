@@ -200,6 +200,10 @@ items.some(i =>
 
 **Inputs** `raw.takeout.today`, `context.now`.
 
+`raw.takeout.today.suggestedVendors` may come from the Worker-backed Gmail
+receipt history feed. That feed is an input to suggestion ordering only; it does
+not decide whether the card appears.
+
 **Deterministic rule**
 ```
 decisionEmpty = !raw.takeout.today || raw.takeout.today.decision === null
@@ -208,6 +212,8 @@ flag = decisionEmpty && now >= reminderTime && now.getHours() < 20
 ```
 
 **Enhancement fields** `enhanced.suggested_vendors[]`, `enhanced.reasoning`.
+OpenClaw copy can explain the top two suggestions, but the deterministic
+fallback must still work from `takeoutState.suggestedVendors`.
 
 **Dependent cards** Takeout Decision card, Claw Suggestions.
 
