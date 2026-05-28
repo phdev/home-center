@@ -43,7 +43,7 @@ describe("NeedsActionPanel", () => {
     }]} />);
 
     expect(screen.getByText("Walking Field Trip to Franklin Park")).toBeTruthy();
-    expect(screen.getByText("Suggested action:", { exact: false })).toBeTruthy();
+    expect(screen.queryByText("Suggested action:", { exact: false })).toBeNull();
     expect(screen.getByText("Note the June 5 field trip on your calendar.")).toBeTruthy();
   });
 

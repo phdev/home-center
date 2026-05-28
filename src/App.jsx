@@ -1259,10 +1259,7 @@ export function NeedsActionPanel({ actions }) {
               {action.detail && (
                 <div style={v2SuggestedActionButtonStyle(action.tone)}>
                   <AudioLines size={14} strokeWidth={2.4} aria-hidden="true" />
-                  <span style={v2ActionDetailTextStyle}>
-                    {action.detailLabel && <span style={v2ActionDetailLabelStyle}>{action.detailLabel}: </span>}
-                    {action.detail}
-                  </span>
+                  <span style={v2ActionDetailTextStyle}>{action.detail}</span>
                 </div>
               )}
             </div>
@@ -1655,7 +1652,6 @@ const v2ActionCountStyle = { width: 23, height: 23, borderRadius: 999, display: 
 const v2ActionListStyle = { display: "flex", flexDirection: "column", gap: 8, marginTop: 10, flex: 1, minHeight: 0, overflowY: "auto", paddingRight: 2 };
 const v2ActionMetaStyle = { fontFamily: "'Geist','Inter',system-ui,sans-serif", fontSize: 10.5, fontWeight: 850, color: "rgba(255,255,255,0.58)", marginBottom: 3 };
 const v2ActionTitleStyle = { fontFamily: "'Geist','Inter',system-ui,sans-serif", fontSize: 15.5, fontWeight: 850, color: "#FFFFFF", lineHeight: 1.12, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" };
-const v2ActionDetailLabelStyle = { color: "rgba(255,255,255,0.9)", fontWeight: 850 };
 const v2ActionDetailTextStyle = { minWidth: 0 };
 const v2ChevronStyle = { color: "rgba(255,255,255,0.72)", fontSize: 28, lineHeight: 1 };
 const v2HowiePromptStyle = { display: "flex", flexDirection: "column", gap: 6 };
@@ -1691,16 +1687,16 @@ function v2ActionSurface(tone) {
 
 function v2SuggestedActionButtonStyle(tone) {
   return {
-    display: "inline-flex",
+    display: "inline-grid",
+    gridTemplateColumns: "auto minmax(0,1fr)",
     alignItems: "center",
-    flexWrap: "wrap",
     maxWidth: "100%",
     minHeight: 30,
     gap: 5,
     marginTop: 7,
     borderRadius: 999,
     border: "1px solid rgba(255,255,255,0.16)",
-    background: v2ActionSurface(tone),
+    background: "transparent",
     color: "#FFFFFF",
     padding: "0 11px",
     fontFamily: "'Geist','Inter',system-ui,sans-serif",
