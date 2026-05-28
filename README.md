@@ -137,9 +137,6 @@ canaries and judge criteria live in `openclaw/eval/`.
 
 ## Deploying
 
-Dashboard deploys automatically to GitHub Pages from `main` via GitHub
-Actions.
-
 Pi services are managed with systemd:
 
 ```bash
