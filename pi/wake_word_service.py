@@ -1004,6 +1004,9 @@ class RecordingManager:
             POST /api/timers/dismiss-all  → dismiss all expired
             POST /api/timers/<id>/dismiss  → dismiss specific timer
 
+        Tasks:
+            GET  /api/tasks  → {tasks: []}
+
         Gestures:
             GET  /gesture  → {gesture: ...}
             POST /gesture  → accept gesture from HandController
@@ -1578,6 +1581,8 @@ class RecordingManager:
                 elif path == "/api/timers":
                     timers = mgr.get_active_timers()
                     self._respond_json({"timers": timers, "serverTime": int(time.time() * 1000)})
+                elif path == "/api/tasks":
+                    self._respond_json({"tasks": []})
                 elif path == "/api/enrollments":
                     self._respond_json({"enrollments": mgr.list_enrollments()})
                 elif path.startswith("/api/enrollments/"):

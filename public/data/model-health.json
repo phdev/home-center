@@ -1,0 +1,59 @@
+{
+  "updated_at": "2026-05-16T17:47:35.525Z",
+  "tiers": {
+    "edge": {
+      "status": "disabled",
+      "color": "gray"
+    },
+    "cache": {
+      "status": "ok",
+      "hits_today": 0
+    },
+    "local": {
+      "status": "ok",
+      "queries_today": 1,
+      "avg_latency_ms": 36803,
+      "latency_p50_ms": 36803,
+      "latency_p90_ms": 36803,
+      "latency_p99_ms": 36803,
+      "latency_max_ms": 36803
+    },
+    "groq": {
+      "status": "disabled",
+      "queries_today": 0,
+      "cost_today_usd": 0,
+      "avg_latency_ms": 0,
+      "latency_p50_ms": 0,
+      "latency_p90_ms": 0,
+      "latency_p99_ms": 0,
+      "latency_max_ms": 0
+    },
+    "anthropic": {
+      "status": "disabled",
+      "queries_today": 0,
+      "cost_today_usd": 0,
+      "avg_latency_ms": 0,
+      "latency_p50_ms": 0,
+      "latency_p90_ms": 0,
+      "latency_p99_ms": 0,
+      "latency_max_ms": 0
+    }
+  },
+  "today": {
+    "total_queries": 1,
+    "cache_hit_rate": 0,
+    "total_cost_usd": 0,
+    "routing_pct": {
+      "cache": 0,
+      "local": 100,
+      "groq": 0,
+      "anthropic": 0
+    }
+  },
+  "last_query": {
+    "text": "i'm sure it will be the same",
+    "tier": "local",
+    "latency_ms": 36803,
+    "timestamp": "2026-05-16T02:24:56.490Z"
+  }
+}
