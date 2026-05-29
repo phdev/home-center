@@ -1535,7 +1535,7 @@ const v2AgendaGroupTitleStyle = {
 const v2TimelineStyle = { display: "flex", flexDirection: "column", gap: 7 };
 const v2AgendaItemStyle = {
   display: "grid",
-  gridTemplateColumns: "10px 62px minmax(0,1fr)",
+  gridTemplateColumns: "10px 82px minmax(0,1fr)",
   gap: 10,
   alignItems: "center",
   minHeight: 44,
@@ -1604,6 +1604,7 @@ const v2AgendaTimeStyle = {
   fontSize: 15,
   fontWeight: 800,
   color: "#FFFFFF",
+  whiteSpace: "nowrap",
 };
 const v2ItemTitleStyle = {
   fontFamily: "'Geist','Inter',system-ui,sans-serif",
