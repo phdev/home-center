@@ -994,7 +994,7 @@ export default function App() {
       >
         <Header now={appNow} isMobile={isMobile} onHistory={() => { llm.fetchHistory(); goTo("history"); }} handControllerConnected={hc.connected} lastGesture={hc.lastGesture} wakeRecord={wakeRecord} designSystem={designSystem} />
         <div className="hc-v2-version-chip" style={{ position: "fixed", right: 20, bottom: 18, zIndex: 80 }}>
-          LIQUID GLASS · VERSION TWO
+          VERSION TWO
         </div>
 
         {isMobile ? (
@@ -1176,7 +1176,7 @@ function V2HomeDashboard({ now, calendar, weather, birthdays, derived }) {
 
       <div style={v2FooterStyle}>
         <span style={v2MemberPillStyle}>Peter Howell</span>
-        <span style={v2VersionPillStyle}>LIQUID GLASS · VERSION TWO</span>
+        <span style={v2VersionPillStyle}>VERSION TWO</span>
       </div>
     </div>
   );
