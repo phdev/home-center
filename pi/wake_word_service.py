@@ -687,7 +687,7 @@ def parse_command(text: str) -> dict:
         return {"action": "design_system", "version": "v2"}
 
     item_done_match = re.search(
-        r"\bmark\s+(?:needs\s+action\s+)?item\s+(\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+as\s+(?:done|complete|completed)\b",
+        r"\bmark\s+(?:needs\s+action\s+)?item\s+(\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+(?:as|is)\s+(?:done|complete|completed)\b",
         text,
     )
     if item_done_match:
@@ -708,7 +708,7 @@ def parse_command(text: str) -> dict:
         return {"action": "needs_action_done", "index": index}
 
     item_name_done_match = re.search(
-        r"\bmark\s+(?:the\s+)?(.+?)\s+as\s+(?:done|complete|completed)\b",
+        r"\bmark\s+(?:the\s+)?(.+?)\s+(?:as|is)\s+(?:done|complete|completed)\b",
         text,
     )
     if item_name_done_match:

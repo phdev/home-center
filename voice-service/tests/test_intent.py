@@ -139,6 +139,14 @@ def test_needs_action_done_intent():
         "action": "needs_action_done",
         "index": 1,
     }
+    assert parse_command("Hey Homer, Mark item one is done.") == {
+        "action": "needs_action_done",
+        "index": 1,
+    }
+    assert parse_command("Hey Homer, Mark item one is complete.") == {
+        "action": "needs_action_done",
+        "index": 1,
+    }
     assert parse_command("Hey Homer, mark Needs Action item two as done.") == {
         "action": "needs_action_done",
         "index": 2,
