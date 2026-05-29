@@ -1224,7 +1224,6 @@ function V2AgendaGroup({ title, items }) {
               <div style={v2ItemTitleStyle}>{item.title}</div>
               {item.sub && <div style={v2MutedStyle}>{item.sub}</div>}
             </div>
-            <span style={v2AgendaIconStyle}>{item.icon}</span>
           </div>
         )) : (
           <div style={v2AgendaEmptyStyle}>No events scheduled</div>
@@ -1536,7 +1535,7 @@ const v2AgendaGroupTitleStyle = {
 const v2TimelineStyle = { display: "flex", flexDirection: "column", gap: 7 };
 const v2AgendaItemStyle = {
   display: "grid",
-  gridTemplateColumns: "10px 62px minmax(0,1fr) 18px",
+  gridTemplateColumns: "10px 62px minmax(0,1fr)",
   gap: 10,
   alignItems: "center",
   minHeight: 44,
@@ -1623,12 +1622,6 @@ const v2MutedStyle = {
   whiteSpace: "nowrap",
   overflow: "hidden",
   textOverflow: "ellipsis",
-};
-const v2AgendaIconStyle = {
-  justifySelf: "end",
-  color: "rgba(255,255,255,0.72)",
-  fontSize: 15,
-  lineHeight: 1,
 };
 const v2HeroTimeStyle = { display: "flex", alignItems: "baseline", gap: 10 };
 const v2HeroTimeNumberStyle = {
