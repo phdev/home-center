@@ -26,6 +26,8 @@
     <string>__TAKEOUT_GMAIL_ACCOUNTS__</string>
     <key>WORKER_URL</key>
     <string>https://home-center-api.phhowell.workers.dev</string>
+    <key>WORKER_TOKEN</key>
+    <string>__WORKER_TOKEN__</string>
   </dict>
 
   <key>StartInterval</key>

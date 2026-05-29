@@ -193,6 +193,7 @@ def post_worker(worker_url: str, token: str | None, payload: dict) -> dict:
         data=json.dumps(payload).encode("utf-8"),
         headers={
             "Content-Type": "application/json",
+            "User-Agent": "home-center-takeout-suggestions/1.0",
             **({"Authorization": f"Bearer {token}"} if token else {}),
         },
         method="POST",

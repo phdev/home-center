@@ -93,6 +93,7 @@ docs/status/*.log
 # Local backup snapshots created before one-off migrations.
 scripts/*.pre-*
 backups/
+logs/
 
 # OpenClaw isolated-agent workspace scaffolding. Devon's durable project
 # instructions live in docs/devon.md; these root files are local runtime context.
