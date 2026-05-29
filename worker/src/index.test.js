@@ -253,6 +253,8 @@ END:VCALENDAR`, {
 
 describe("takeout suggestions", () => {
   it("stores Gmail-derived restaurant suggestions and returns them with today's takeout state", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-05-28T17:15:00-07:00"));
     const notifications = createKv();
     const currentEnv = env({ NOTIFICATIONS: notifications });
 
@@ -274,6 +276,7 @@ describe("takeout suggestions", () => {
     const body = await get.json();
 
     expect(body).toMatchObject({
+      date: "2026-05-28",
       decision: null,
       suggestedVendors: ["El Tarasco", "Thai Dishes", "Chicken Maison"],
       recentVendors: [{ name: "Rascals", lastOrderedDate: "2026-05-20", count: 2 }],

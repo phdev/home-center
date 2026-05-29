@@ -3846,17 +3846,9 @@ function takeoutKeyForDate(date) {
   return `hc:takeout:${date}`;
 }
 
-function todayKey() {
-  const n = new Date();
-  const y = n.getUTCFullYear();
-  const m = String(n.getUTCMonth() + 1).padStart(2, "0");
-  const d = String(n.getUTCDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
-}
-
 async function handleTakeoutGet(env) {
   if (!env.NOTIFICATIONS) return json(null);
-  const today = todayKey();
+  const today = localDateKey(new Date());
   const raw = await env.NOTIFICATIONS.get(takeoutKeyForDate(today), { type: "json" });
   const suggestions = await currentTakeoutSuggestions(env);
   if (!raw) {
