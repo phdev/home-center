@@ -152,7 +152,9 @@ Every day at 7:00am, run the Home Center daily Devon leverage workflow.
 macOS LaunchAgent concept:
 
 If later automated through LaunchAgent, the job should invoke Devon/OpenClaw
-from the Mac mini and SSH into the MacBook Pro repo only as needed.
+from the Mac mini. Codex should use the Mac mini local Home Center clone, then
+sync accepted changes through GitHub push/pull; the MacBook Pro pulls from
+GitHub when it needs the update.
 
 ## Automation Note
 

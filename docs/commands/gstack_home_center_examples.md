@@ -8,24 +8,28 @@ unless gstack is installed and available in PATH. This repo does not currently
 include a local `gstack` executable in PATH; the workflow is still valid through
 OpenClaw/Codex orchestration.
 
-## SSH / Codex
+## Local Codex + GitHub Sync
 
-Start Codex inside the Home Center repo on the MacBook Pro:
+Start Codex inside the local Home Center clone on the Mac mini:
 
 ```bash
-ssh <macbook-pro-host>
-cd ~/path/to/home-center
-git status
+cd ~/home-center
+git status --short --branch
 git checkout main
-git pull
+git pull --ff-only
 git checkout -b chore/gstack-openclaw-devon-david
 codex
 ```
 
-Remote Codex launch from Devon on the Mac mini:
+When changes are accepted, commit and push from the Mac mini. Other machines,
+including the MacBook Pro, sync through GitHub pull. Do not use
+machine-to-machine SSH for Codex work.
 
 ```bash
-ssh <macbook-pro-host> 'cd ~/path/to/home-center && git status && codex'
+git status --short --branch
+git add <files>
+git commit -m "<clear message>"
+git push origin <branch>
 ```
 
 ## Devon Examples

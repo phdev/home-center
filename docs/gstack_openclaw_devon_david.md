@@ -57,28 +57,25 @@ presentation exploration, or treat presentation ideas as approved behavior.
 When meaningful visual exploration, kiosk UX refinement, or frontend
 presentation work is needed, Devon should intentionally invoke David.
 
-Devon may run on the Mac mini while the Home Center repo lives on a MacBook Pro
-available over SSH. Keep tasks repo-local and copy-pasteable so Devon can run
-Codex inside the checked-out repo wherever it lives.
+Devon and Codex run on the Mac mini against the local Home Center clone. Keep
+tasks repo-local and copy-pasteable; cross-machine sync happens through GitHub
+push/pull. The MacBook Pro is just another machine that pulls pushed changes
+from GitHub.
 
 ## Branch Workflow
 
 Prefer small branches from fresh `main`.
 
 ```bash
-ssh <macbook-pro-host>
-cd ~/path/to/home-center
+cd ~/home-center
 git checkout main
-git pull
+git pull --ff-only
 git checkout -b chore/gstack-openclaw-devon-david
 codex
 ```
 
-Devon can also launch a remote repo-local Codex session from the Mac mini:
-
-```bash
-ssh <macbook-pro-host> 'cd ~/path/to/home-center && git status && codex'
-```
+When changes are accepted, commit and push from the Mac mini. Other machines
+sync through GitHub pull. Do not use machine-to-machine SSH for Codex work.
 
 Before editing:
 
@@ -92,22 +89,23 @@ Generated artifact runs must publish atomically: stage the full output set
 first, then update visible paths, pointers, and logs only after the staged set is
 coherent.
 
-## Practical SSH + Codex Flow
+## Practical Local Codex + GitHub Flow
 
 1. Devon receives a task in OpenClaw.
-2. Devon checks repo location and dirty state, locally or over SSH.
+2. Devon checks the Mac mini local clone location, branch, and dirty state.
 3. Devon uses gstack to create a plan, QA prompt, design request, or Codex
    prompt.
 4. Codex runs in the repo checkout and performs scoped edits.
 5. Devon reviews checks, acceptance criteria, and branch readiness.
-6. David is pulled in intentionally for design/frontend tasks, meaningful
+6. Devon commits and pushes accepted changes; the MacBook Pro and other
+   machines pull from GitHub when they need the update.
+7. David is pulled in intentionally for design/frontend tasks, meaningful
    presentation exploration, kiosk UX refinement, visual QA, or browser review.
 
 Useful commands:
 
 ```bash
-ssh <macbook-pro-host>
-cd ~/path/to/home-center
+cd ~/home-center
 git status --short --branch
 npm test
 npm run build

@@ -1,9 +1,10 @@
 # Devon Gstack Operating Mode
 
-Devon is the Home Center PM / QA / eval manager. Devon may run from the Mac
-mini and may SSH into a MacBook Pro to run Codex inside the Home Center repo.
-Codex is Devon's harness for repo edits: Codex changes files, runs checks, and
-reports diffs from scoped prompts.
+Devon is the Home Center PM / QA / eval manager. Devon runs Codex locally on the
+Mac mini against the local Home Center clone. Cross-machine sync happens through
+GitHub push/pull; the MacBook Pro is just another machine that pulls from
+GitHub. Codex is Devon's harness for repo edits: Codex changes files, runs
+checks, and reports diffs from scoped prompts.
 
 Devon owns:
 
@@ -65,19 +66,24 @@ fallback copy, reminder timing, or a derived-state flag, Devon must run
 Generated artifact runs should publish atomically: stage the full output set
 first, then update visible paths, pointers, and logs after the set is coherent.
 
-## Remote Codex Pattern
+## Local Codex + GitHub Sync Pattern
 
 ```bash
-ssh <macbook-pro-host>
-cd ~/path/to/home-center
+cd ~/home-center
 git status --short --branch
+git pull --ff-only
 codex
 ```
 
-Or from Devon on the Mac mini:
+When changes are accepted, commit and push from the Mac mini. Other machines,
+including the MacBook Pro, sync through GitHub pull. Do not use
+machine-to-machine SSH for Codex work.
 
 ```bash
-ssh <macbook-pro-host> 'cd ~/path/to/home-center && git status && codex'
+git status --short --branch
+git add <files>
+git commit -m "<clear message>"
+git push origin <branch>
 ```
 
 ## Completion Checklist
