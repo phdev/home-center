@@ -108,6 +108,8 @@ CEC_DEVICE = "0"
 CEC_ON_CMD = "on {dev}"
 CEC_ACTIVE_CMD = "as"
 CEC_SOURCE_SETTLE_SECONDS = 1
+CEC_POWER_ON_WAIT_SECONDS = float(os.environ.get("CEC_POWER_ON_WAIT_SECONDS", "20"))
+CEC_POWER_ON_POLL_SECONDS = float(os.environ.get("CEC_POWER_ON_POLL_SECONDS", "2"))
 
 logging.basicConfig(
     level=logging.INFO,
@@ -162,6 +164,8 @@ def tv_power_status() -> str:
         return "on"
     if "power status: standby" in output:
         return "standby"
+    if "power status: in transition" in output:
+        return "transition"
     if "power status: unknown" in output:
         return "unknown"
     return "error"
@@ -171,15 +175,23 @@ def turn_on_tv() -> bool:
     """Power on the TV and select the Home Center Pi as the active HDMI source."""
     log.info("Turning TV ON via HDMI-CEC...")
     ok = cec_send(CEC_ON_CMD.format(dev=CEC_DEVICE))
-    time.sleep(CEC_SOURCE_SETTLE_SECONDS)
-    log.info("Selecting Home Center HDMI source via HDMI-CEC...")
-    ok = cec_send(CEC_ACTIVE_CMD) and ok
-    status = tv_power_status()
-    if status == "on":
-        log.info("TV is on and should be showing this Pi's HDMI output.")
-        return True
-    log.warning("TV on command did not verify via HDMI-CEC (status=%s).", status)
-    return ok and status != "unknown"
+    deadline = time.monotonic() + CEC_POWER_ON_WAIT_SECONDS
+    status = "unknown"
+
+    while time.monotonic() <= deadline:
+        time.sleep(CEC_SOURCE_SETTLE_SECONDS)
+        log.info("Selecting Home Center HDMI source via HDMI-CEC...")
+        ok = cec_send(CEC_ACTIVE_CMD) and ok
+        status = tv_power_status()
+        if status == "on":
+            log.info("TV is on and should be showing this Pi's HDMI output.")
+            return True
+        if status == "standby":
+            ok = cec_send(CEC_ON_CMD.format(dev=CEC_DEVICE)) and ok
+        time.sleep(CEC_POWER_ON_POLL_SECONDS)
+
+    log.warning("TV on command did not verify via HDMI-CEC after %.1fs (status=%s).", CEC_POWER_ON_WAIT_SECONDS, status)
+    return False
 
 
 def turn_off_tv() -> bool:

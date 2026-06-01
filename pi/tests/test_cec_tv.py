@@ -50,6 +50,20 @@ def test_turn_on_tv_still_selects_source_if_power_command_is_not_needed(monkeypa
     assert commands == ["on 0", "as"]
 
 
+def test_turn_on_tv_retries_active_source_while_tv_is_waking(monkeypatch):
+    service = load_wake_word_service()
+    commands = []
+    statuses = iter(["transition", "on"])
+
+    monkeypatch.setattr(service, "cec_send", lambda command: commands.append(command) or True)
+    monkeypatch.setattr(service, "tv_power_status", lambda: next(statuses))
+    monkeypatch.setattr(service.time, "sleep", lambda _: None)
+    monkeypatch.setattr(service.time, "monotonic", lambda: 0)
+
+    assert service.turn_on_tv()
+    assert commands == ["on 0", "as", "as"]
+
+
 def test_turn_on_dashboard_resets_stale_knowledge_navigation_before_cec(monkeypatch):
     service = load_wake_word_service()
     mgr = service.RecordingManager.__new__(service.RecordingManager)

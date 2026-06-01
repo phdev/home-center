@@ -40,6 +40,9 @@ printf 'curl %s\\n' "$*" >> "{log_path}"
         f"""#!/usr/bin/env bash
 payload="$(cat)"
 printf 'cec %s\\n' "$payload" >> "{log_path}"
+if [[ "$payload" == "pow 0" ]]; then
+  echo "power status: on"
+fi
 """,
     )
     write_executable(
@@ -51,6 +54,8 @@ printf 'cec %s\\n' "$payload" >> "{log_path}"
         **os.environ,
         "PATH": f"{bin_dir}:{os.environ['PATH']}",
         "TZ": "America/Los_Angeles",
+        "CEC_POWER_ON_WAIT_SECONDS": "0",
+        "CEC_POWER_ON_POLL_SECONDS": "0",
     }
 
 
@@ -69,7 +74,7 @@ def test_morning_dashboard_resets_to_dashboard_before_turning_on_tv(tmp_path):
     assert calls[0].startswith("curl ")
     assert "http://127.0.0.1:8765/api/navigate" in calls[0]
     assert '{"page":"dashboard","view":null}' in calls[0]
-    assert calls[1:] == ["cec on 0", "cec as"]
+    assert calls[1:] == ["cec on 0", "cec as", "cec pow 0"]
 
 
 def test_morning_dashboard_skips_reset_outside_weekday_window(tmp_path):
