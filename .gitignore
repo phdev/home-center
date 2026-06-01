@@ -115,3 +115,5 @@ logs/
 !/memory/household/routines.json
 !/memory/household/school.json
 !/memory/household/sources.jsonl
+
+docs/qa/knowledge-pages/*-latest-*-result.png
