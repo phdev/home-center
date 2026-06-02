@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from "react";
 import { readWithFallback, writeWithFallback } from "./_storage";
 
 const LOCAL_KEY = "hc:takeout";
+const POLL_MS = 15 * 1000;
 
 /**
  * Today's takeout decision.
@@ -18,7 +19,7 @@ export function useTakeout(workerSettings) {
 
   useEffect(() => {
     let cancelled = false;
-    (async () => {
+    const load = async () => {
       const data = await readWithFallback({
         workerSettings,
         path: "/api/takeout/today",
@@ -27,12 +28,15 @@ export function useTakeout(workerSettings) {
         parse: (d) => (d && typeof d === "object" && d.date === todayKey() ? d : null),
       });
       if (!cancelled && data) setToday(data);
-    })();
+    };
+    load();
+    const interval = setInterval(load, POLL_MS);
     // Listen for same-tab writes so multiple components stay in sync.
     const handler = (e) => setToday(e.detail);
     window.addEventListener("hc:takeout-updated", handler);
     return () => {
       cancelled = true;
+      clearInterval(interval);
       window.removeEventListener("hc:takeout-updated", handler);
     };
   }, [workerSettings?.url, workerSettings?.token]);

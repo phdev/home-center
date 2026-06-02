@@ -4,6 +4,7 @@ import { useTakeoutWriter, useTakeout } from "./useTakeout";
 
 afterEach(() => {
   vi.restoreAllMocks();
+  vi.useRealTimers();
   window.localStorage.clear();
 });
 
@@ -69,5 +70,33 @@ describe("useTakeout — read with fallback", () => {
     );
     // Initial render returns the local fallback synchronously.
     expect(result.current?.vendor).toBe("LocalFallback");
+  });
+
+  it("polls the worker so voice-updated dinner decisions appear without reload", async () => {
+    vi.useFakeTimers();
+    const today = new Date();
+    const key = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ date: key, decision: null }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ date: key, decision: "home", decidedBy: "voice" }),
+      });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { result } = renderHook(() => useTakeout({ url: "http://worker" }));
+    await act(async () => {});
+
+    await act(async () => {
+      vi.advanceTimersByTime(15 * 1000);
+    });
+    await act(async () => {});
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(result.current).toMatchObject({ decision: "home", decidedBy: "voice" });
   });
 });
