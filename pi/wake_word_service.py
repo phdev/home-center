@@ -110,6 +110,7 @@ CEC_ACTIVE_CMD = "as"
 CEC_SOURCE_SETTLE_SECONDS = 1
 CEC_POWER_ON_WAIT_SECONDS = float(os.environ.get("CEC_POWER_ON_WAIT_SECONDS", "20"))
 CEC_POWER_ON_POLL_SECONDS = float(os.environ.get("CEC_POWER_ON_POLL_SECONDS", "2"))
+CEC_ACTIVE_SOURCE_SETTLE_ATTEMPTS = int(os.environ.get("CEC_ACTIVE_SOURCE_SETTLE_ATTEMPTS", "3"))
 
 logging.basicConfig(
     level=logging.INFO,
@@ -184,6 +185,10 @@ def turn_on_tv() -> bool:
         ok = cec_send(CEC_ACTIVE_CMD) and ok
         status = tv_power_status()
         if status == "on":
+            for _ in range(CEC_ACTIVE_SOURCE_SETTLE_ATTEMPTS):
+                log.info("Reasserting Home Center HDMI source via HDMI-CEC...")
+                ok = cec_send(CEC_ACTIVE_CMD) and ok
+                time.sleep(CEC_POWER_ON_POLL_SECONDS)
             log.info("TV is on and should be showing this Pi's HDMI output.")
             return True
         if status == "standby":

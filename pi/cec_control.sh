@@ -16,6 +16,7 @@ set -euo pipefail
 CMD="${1:-status}"
 CEC_POWER_ON_WAIT_SECONDS="${CEC_POWER_ON_WAIT_SECONDS:-20}"
 CEC_POWER_ON_POLL_SECONDS="${CEC_POWER_ON_POLL_SECONDS:-2}"
+CEC_ACTIVE_SOURCE_SETTLE_ATTEMPTS="${CEC_ACTIVE_SOURCE_SETTLE_ATTEMPTS:-3}"
 
 cec_send() {
   echo "$1" | cec-client -s -d 1 2>/dev/null
@@ -46,6 +47,10 @@ case "$CMD" in
       cec_send "as"
       status="$(tv_power_status)"
       if [[ "$status" == "on" ]]; then
+        for (( i = 0; i < CEC_ACTIVE_SOURCE_SETTLE_ATTEMPTS; i++ )); do
+          cec_send "as"
+          sleep "$CEC_POWER_ON_POLL_SECONDS"
+        done
         echo "Done. TV is on and showing this Pi."
         exit 0
       fi
