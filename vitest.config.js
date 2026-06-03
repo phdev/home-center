@@ -6,7 +6,7 @@ export default defineConfig({
   test: {
     environment: "jsdom",
     globals: false,
-    include: ["src/**/*.test.{js,jsx}", "worker/src/**/*.test.js", "openclaw/eval/**/*.test.js"],
+    include: ["src/**/*.test.{js,jsx}", "worker/src/**/*.test.js", "openclaw/eval/**/*.test.js", "openclaw/mcp/**/*.test.js"],
     setupFiles: ["./src/__tests__/setup.js"],
   },
 });
