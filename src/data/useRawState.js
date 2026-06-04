@@ -8,6 +8,7 @@ import { useBedtimeSettings } from "./useBedtime";
 import { useChecklistConfig } from "./useChecklist";
 import { useLunchDecisions } from "./useLunch";
 import { useSchoolLunchMenu } from "./useSchoolLunch";
+import { useWakeTimes } from "./useWakeTimes";
 import { normalizeCalendar } from "./calendar";
 import { normalizeBirthdays } from "./birthdays";
 import { normalizeSchoolItems } from "./schoolUpdates";
@@ -29,6 +30,7 @@ export function useRawState(settings) {
   const checklist = useChecklistConfig(settings);
   const lunchDecisions = useLunchDecisions(settings?.worker);
   const lunchMenu = useSchoolLunchMenu(settings?.worker);
+  const wakeTimes = useWakeTimes(settings?.worker);
 
   return useMemo(() => {
     const schoolItems = normalizeSchoolItems(school);
@@ -41,9 +43,10 @@ export function useRawState(settings) {
       takeout: { today: takeout ?? null },
       lunchDecisions: lunchDecisions ?? {},
       schoolLunchMenu: lunchMenu ?? [],
+      wakeTimes: wakeTimes ?? null,
       schoolItems,
       schoolUpdates: schoolItems,
       settings: {},
     };
-  }, [cal, weather, birthdays, school, takeout, bedtime, checklist, lunchDecisions, lunchMenu]);
+  }, [cal, weather, birthdays, school, takeout, bedtime, checklist, lunchDecisions, lunchMenu, wakeTimes]);
 }

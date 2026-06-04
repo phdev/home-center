@@ -190,6 +190,33 @@ items.some(i =>
 
 **Edge cases**
 - Overlapping kids with different bedtimes: the earliest window controls; card lists all kids in range.
+
+## `wake_log_needed`
+
+**Description** True when today's wake log is missing either Lucy or Livy's wake time.
+
+**Inputs** `raw.wakeTimes`, `raw.bedtime`, `context.now`.
+
+**Rules**
+
+1. Match `raw.wakeTimes.date` to today's local date.
+2. For each configured child in `raw.bedtime`, check `wakeTimes.children[childId].wakeAt`.
+3. Emit `wakeLogStatus.children[]` with any logged `wakeAt` and derived `bedtimeAt`.
+4. Emit `wakeLogStatus.missing[]` for children without today's wake time.
+5. `wakeLogNeeded = missing.length > 0`.
+
+## `wake_derived_bedtimes`
+
+**Description** Per-child bedtime derived from actual wake time when available.
+
+**Inputs** `raw.wakeTimes`, `raw.bedtime`, `context.now`.
+
+**Rules**
+
+1. If a child has today's `wakeAt`, set `bedtimeAt = wakeAt + 13.5 hours`.
+2. Otherwise fall back to the configured weekday/weekend bedtime.
+3. `cleanupAt = earliest bedtimeAt - 1 hour`.
+4. Bedtime reminder windows use the wake-derived bedtime for children with a logged wake time.
 - Snooze: pushes `dismissedUntil` forward 10 min.
 
 ---

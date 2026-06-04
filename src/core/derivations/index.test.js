@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   bedtimeReminderActive,
   birthdayNeedsGift,
+  computeDerivedState,
   emptyRawState,
   hasMorningConflict,
   hasSchoolEventUpcoming,
@@ -9,6 +10,7 @@ import {
   needsSchoolActionToday,
   takeoutUndecided,
   tomorrowNeedsPrep,
+  wakeLogStatus,
 } from "./index";
 
 function at(y, m, d, h, min = 0) {
@@ -170,6 +172,71 @@ describe("core derivations", () => {
 
     expect(result.value).toBe(true);
     expect(result.window.minutesUntil).toBe(25);
+  });
+
+  it("wakeLogStatus asks for missing girl wake times", () => {
+    const result = wakeLogStatus(
+      raw({
+        bedtime: [
+          { childId: "lucy", childName: "Lucy", weekday: "20:30", weekend: "21:00", reminderLeadMin: 30 },
+          { childId: "livy", childName: "Livy", weekday: "21:00", weekend: "21:30", reminderLeadMin: 30 },
+        ],
+        wakeTimes: {
+          date: "2026-04-23",
+          children: { lucy: { wakeAt: "2026-04-23T06:45:00" } },
+        },
+      }),
+      { now: at(2026, 4, 23, 10), user: PETER },
+    );
+
+    expect(result.value).toBe(true);
+    expect(result.missing.map((child) => child.childId)).toEqual(["livy"]);
+    expect(result.children.find((child) => child.childId === "lucy").bedtimeAt).toBe("2026-04-24T03:15:00.000Z");
+  });
+
+  it("wake-derived bedtime uses wake time plus 13.5 hours", () => {
+    const result = bedtimeReminderActive(
+      raw({
+        bedtime: [
+          { childId: "lucy", childName: "Lucy", weekday: "20:30", weekend: "21:00", reminderLeadMin: 30 },
+        ],
+        wakeTimes: {
+          date: "2026-04-23",
+          children: { lucy: { wakeAt: "2026-04-23T06:45:00" } },
+        },
+      }),
+      { now: at(2026, 4, 23, 19, 50), user: PETER },
+    );
+
+    expect(result.value).toBe(true);
+    expect(result.window.minutesUntil).toBe(25);
+    expect(result.derivedBedtimes[0]).toMatchObject({
+      childId: "lucy",
+      source: "wake-log",
+    });
+  });
+
+  it("derived state exposes cleanup one hour before earliest wake-derived bedtime", () => {
+    const derived = computeDerivedState(
+      raw({
+        bedtime: [
+          { childId: "lucy", childName: "Lucy", weekday: "20:30", weekend: "21:00", reminderLeadMin: 30 },
+          { childId: "livy", childName: "Livy", weekday: "21:00", weekend: "21:30", reminderLeadMin: 30 },
+        ],
+        wakeTimes: {
+          date: "2026-04-23",
+          children: {
+            lucy: { wakeAt: "2026-04-23T06:45:00" },
+            livy: { wakeAt: "2026-04-23T07:10:00" },
+          },
+        },
+      }),
+      { now: at(2026, 4, 23, 10), user: PETER },
+    );
+
+    expect(derived.wakeLogNeeded).toBe(false);
+    expect(derived.wakeDerivedBedtimes.map((item) => item.source)).toEqual(["wake-log", "wake-log"]);
+    expect(derived.cleanupAt).toBe("2026-04-24T02:15:00.000Z");
   });
 
   it("birthdayNeedsGift flags upcoming unknown or needed gifts", () => {

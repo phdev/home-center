@@ -96,6 +96,21 @@ export function buildHowieActions(derived, now = new Date()) {
     }, clamp01(item.urgency), tiebreaker);
   }
 
+  if (derived?.wakeLogNeeded) {
+    const missing = derived.wakeLogStatus?.missing ?? [];
+    const names = missing.map((child) => child.childName).filter(Boolean);
+    withPriority({
+      id: "wake-log",
+      kind: "Wake",
+      tone: "warning",
+      meta: "Today",
+      title: "Log wake-up times",
+      detail: names.length >= 2
+        ? 'Say "Hey Homer, both girls woke up at 7:00."'
+        : `Say "Hey Homer, ${names[0] ?? "Lucy"} woke up at 7:00."`,
+    }, 0.72, -now.getTime());
+  }
+
   if (derived?.hasMorningOverlap && derived.conflicts?.[0]) {
     const conflict = derived.conflicts[0];
     const startsAt = new Date(conflict.at);

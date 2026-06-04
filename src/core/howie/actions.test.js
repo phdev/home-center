@@ -95,6 +95,25 @@ describe("buildHowieActions", () => {
     });
   });
 
+  it("adds a suggested action to log wake-up times", () => {
+    const actions = buildHowieActions({
+      wakeLogNeeded: true,
+      wakeLogStatus: {
+        missing: [
+          { childId: "lucy", childName: "Lucy" },
+          { childId: "livy", childName: "Livy" },
+        ],
+      },
+    }, at(7, 30));
+
+    expect(actions[0]).toMatchObject({
+      id: "wake-log",
+      kind: "Wake",
+      title: "Log wake-up times",
+      detail: 'Say "Hey Homer, both girls woke up at 7:00."',
+    });
+  });
+
   it("interleaves takeout, gift, and school by urgency at the dinner prompt", () => {
     const derived = {
       rankedSchoolItems: [{

@@ -1,13 +1,13 @@
 {
   "mode": "taxonomy-coverage",
-  "timestamp": "2026-06-04T03:30:13.900Z",
+  "timestamp": "2026-06-04T16:55:29.472Z",
   "source_spec": "docs/design/home-center-build-spec.md",
   "taxonomies": {
     "suggested_actions": {
-      "passed": 3,
-      "failed": 5,
+      "passed": 5,
+      "failed": 3,
       "total": 8,
-      "coverage": 0.375,
+      "coverage": 0.625,
       "by_type": {
         "Birthday gift": {
           "passed": 0,
@@ -55,19 +55,19 @@
           ]
         },
         "Sync on bedtime": {
-          "passed": 0,
-          "failed": 1,
+          "passed": 1,
+          "failed": 0,
           "total": 1,
-          "coverage": 0,
+          "coverage": 1,
           "rows": [
             "suggested_bedtime_sync_derived_chain"
           ]
         },
         "Clean up time": {
-          "passed": 0,
-          "failed": 1,
+          "passed": 1,
+          "failed": 0,
           "total": 1,
-          "coverage": 0,
+          "coverage": 1,
           "rows": [
             "suggested_cleanup_earliest_bedtime_minus_one_hour"
           ]
@@ -155,10 +155,10 @@
       }
     },
     "overall": {
-      "passed": 10,
-      "failed": 5,
+      "passed": 12,
+      "failed": 3,
       "total": 15,
-      "coverage": 0.6666666666666666,
+      "coverage": 0.8,
       "by_type": {
         "Birthday gift": {
           "passed": 0,
@@ -206,19 +206,19 @@
           ]
         },
         "Sync on bedtime": {
-          "passed": 0,
-          "failed": 1,
+          "passed": 1,
+          "failed": 0,
           "total": 1,
-          "coverage": 0,
+          "coverage": 1,
           "rows": [
             "suggested_bedtime_sync_derived_chain"
           ]
         },
         "Clean up time": {
-          "passed": 0,
-          "failed": 1,
+          "passed": 1,
+          "failed": 0,
           "total": 1,
-          "coverage": 0,
+          "coverage": 1,
           "rows": [
             "suggested_cleanup_earliest_bedtime_minus_one_hour"
           ]
@@ -433,7 +433,7 @@
         "reason": "voice_boundary_normalized_but_wake_to_bedtime_derivation_not_covered",
         "event": {
           "source": "voice",
-          "transcript": "Hey Homer, Jack woke up at 6:45 and Emma woke up at 7:10",
+          "transcript": "Hey Homer, Lucy woke up at 6:45 and Livy woke up at 7:10",
           "wakewordDetected": true,
           "confidenceBucket": "high",
           "locale": "en-US",
@@ -447,18 +447,34 @@
       "type": "Sync on bedtime",
       "coverage_dimension": "derived-state deterministic assert",
       "expected_guard": "advisory",
-      "pass": false,
+      "pass": true,
       "method": "deterministic",
-      "reason": "missing wake_time_to_13_5h_bedtime_derivation",
+      "reason": "wake_time_to_13_5h_bedtime_derivation_present",
       "evidence": {
-        "pass": false,
-        "reason": "missing wake_time_to_13_5h_bedtime_derivation",
+        "pass": true,
+        "reason": "wake_time_to_13_5h_bedtime_derivation_present",
         "expected": {
-          "jackWake": "2026-06-03T06:45:00-07:00",
-          "jackBedtime": "2026-06-03T20:15:00-07:00",
-          "emmaWake": "2026-06-03T07:10:00-07:00",
-          "emmaBedtime": "2026-06-03T20:40:00-07:00"
-        }
+          "lucyWake": "2026-06-03T06:45:00-07:00",
+          "lucyBedtime": "2026-06-03T20:15:00-07:00",
+          "livyWake": "2026-06-03T07:10:00-07:00",
+          "livyBedtime": "2026-06-03T20:40:00-07:00"
+        },
+        "derivedBedtimes": [
+          {
+            "childId": "lucy",
+            "childName": "Lucy",
+            "wakeAt": "2026-06-03T13:45:00.000Z",
+            "bedtimeAt": "2026-06-04T03:15:00.000Z",
+            "source": "wake-log"
+          },
+          {
+            "childId": "livy",
+            "childName": "Livy",
+            "wakeAt": "2026-06-03T14:10:00.000Z",
+            "bedtimeAt": "2026-06-04T03:40:00.000Z",
+            "source": "wake-log"
+          }
+        ]
       }
     },
     {
@@ -467,16 +483,17 @@
       "type": "Clean up time",
       "coverage_dimension": "derived-state deterministic assert",
       "expected_guard": "none",
-      "pass": false,
+      "pass": true,
       "method": "deterministic",
-      "reason": "missing_cleanup_trigger_from_earliest_derived_bedtime",
+      "reason": "cleanup_trigger_from_earliest_derived_bedtime_present",
       "evidence": {
-        "pass": false,
-        "reason": "missing_cleanup_trigger_from_earliest_derived_bedtime",
+        "pass": true,
+        "reason": "cleanup_trigger_from_earliest_derived_bedtime_present",
         "expected": {
           "earliestBedtime": "2026-06-03T20:15:00-07:00",
           "cleanupAt": "2026-06-03T19:15:00-07:00"
-        }
+        },
+        "cleanupAt": "2026-06-04T02:15:00.000Z"
       }
     },
     {

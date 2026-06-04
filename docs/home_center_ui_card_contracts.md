@@ -126,6 +126,29 @@ volume, tall affordances, one primary action per card.
 | **Actions** | `Snooze 10 min` (deterministic), `Start bedtime` (sets `bedtimeDismissedUntil`) |
 | **Priority** | Tier 1 while active |
 
+## Wake-Up Log Needs Action
+
+| Field | Value |
+|---|---|
+| **Purpose** | Capture Lucy/Livy wake times so bedtime is derived from the actual day |
+| **Location** | Needs Action panel and Worker `/api/wake-times/today` |
+| **Visibility** | `derived.wakeLogNeeded === true` while either child is missing today's wake time |
+| **Required data** | `derived.wakeLogStatus = {children, missing}`; Worker KV record `hc:wake-times:{date}` |
+| **Deterministic fallback copy** | Title: `Log wake-up times`. Detail: `Say "Hey Homer, both girls woke up at 7:00."` |
+| **Actions** | Voice command auto-records stated facts: `both girls woke up at <time>` or `Lucy woke up at <time> and Livy woke up at <time>` |
+| **Priority** | Tier 2 until both wake times are logged |
+
+## Wake-Derived Bedtime
+
+| Field | Value |
+|---|---|
+| **Purpose** | Compute bedtime from actual wake times rather than a fixed schedule when today's wake log exists |
+| **Visibility** | Feeds Bedtime Card; no standalone card |
+| **Required data** | `derived.wakeDerivedBedtimes[] = {childId, childName, wakeAt, bedtimeAt, source}` |
+| **Deterministic rule** | `bedtimeAt = wakeAt + 13.5 hours`; `cleanupAt = earliest bedtimeAt - 1 hour` |
+| **Actions** | None; presentation-only derived state |
+| **Priority** | Bedtime toast priority still comes from the Bedtime Card |
+
 ## Takeout Card
 
 | Field | Value |

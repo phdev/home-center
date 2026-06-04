@@ -116,6 +116,7 @@
  * @property {BedtimeSetting[]} bedtime
  * @property {ChecklistConfig} checklist
  * @property {{today: TakeoutDecision|null}} takeout
+ * @property {{date:string, children:Object.<string,{childId:string,childName:string,wakeAt:string}>}|null} [wakeTimes]
  * @property {Object.<string, LunchDecision>} lunchDecisions   date → decision
  * @property {SchoolMenuDay[]} schoolLunchMenu
  * @property {SchoolItem[]} schoolItems
@@ -184,7 +185,7 @@
  * @property {'red'|'amber'|'blue'|'green'|'neutral'} accent
  * @property {string} title
  * @property {string} detail
- * @property {'openEventDetail'|'orderGift'|'setTakeout'|'setLunch'|'openSchoolItem'|'snoozeBedtime'} actionKind
+ * @property {'openEventDetail'|'orderGift'|'setTakeout'|'setLunch'|'openSchoolItem'|'snoozeBedtime'|'logWakeTimes'} actionKind
  * @property {Object} [targetRef]
  */
 
@@ -208,6 +209,10 @@
  * @property {boolean} [birthdayNeedsGift]
  * @property {boolean} bedtimeReminderActive
  * @property {BedtimeWindow|null} bedtimeWindow
+ * @property {boolean} wakeLogNeeded
+ * @property {{children:any[], missing:any[]}} wakeLogStatus
+ * @property {{childId:string, childName:string, wakeAt:string|null, bedtimeAt:string, source:string}[]} wakeDerivedBedtimes
+ * @property {string|null} cleanupAt
  * @property {boolean} takeoutDecisionPending
  * @property {boolean} [takeoutUndecided]
  * @property {TakeoutView} takeoutState

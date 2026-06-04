@@ -65,6 +65,7 @@ import { useBedtimeSettings } from "./data/useBedtime";
 import { useChecklistConfig } from "./data/useChecklist";
 import { useLunchDecisions } from "./data/useLunch";
 import { useSchoolLunchMenu } from "./data/useSchoolLunch";
+import { useWakeTimes } from "./data/useWakeTimes";
 import { ContextualSlot, RightColumnCards, OverlayCards } from "./cards/ContextualSlot";
 
 const V2_AGENDA_DAYS = 7;
@@ -785,6 +786,7 @@ export default function App() {
   const checklist = useChecklistConfig(settings);
   const lunchDecisions = useLunchDecisions(settings.worker);
   const schoolLunchMenu = useSchoolLunchMenu(settings.worker);
+  const wakeTimes = useWakeTimes(settings.worker);
 
   const rawState = useMemo(() => {
     const schoolItems = normalizeSchoolItems(dashboardSchool);
@@ -797,13 +799,14 @@ export default function App() {
       takeout: { today: takeout ?? null },
       lunchDecisions: lunchDecisions ?? {},
       schoolLunchMenu: schoolLunchMenu ?? [],
+      wakeTimes: wakeTimes ?? null,
       schoolItems,
       schoolUpdates: schoolItems,
       settings: {},
     };
   }, [
     dashboardCalendar, dashboardWeather, dashboardBirthdays, bedtimeSettings, checklist,
-    takeout, lunchDecisions, schoolLunchMenu, dashboardSchool,
+    takeout, lunchDecisions, schoolLunchMenu, wakeTimes, dashboardSchool,
   ]);
   const stateSnapshot = useMemo(
     () => createStateSnapshot(rawState, { now: appNow, user: { isPeter: true } }),

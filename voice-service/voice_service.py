@@ -965,6 +965,8 @@ class Dispatcher:
                 int(command.get("index", 0) or 0),
                 str(command.get("name", "") or ""),
             )
+        elif action == "wake_log":
+            self.log_wake_times(command.get("children") or {})
 
     def dispatch_async(self, command: dict) -> None:
         threading.Thread(target=self.dispatch, args=(command,), daemon=True).start()
@@ -1016,6 +1018,12 @@ class Dispatcher:
         body = {"index": index} if index >= 1 else {"name": name}
         self._worker_post("/api/needs-action/done", body)
 
+    def log_wake_times(self, children: dict) -> None:
+        if not isinstance(children, dict) or not children:
+            log.warning("Wake log command has no child wake times: %s", children)
+            return
+        self._worker_post("/api/wake-times/today", {"children": children, "source": "voice"})
+
     def suggest_birthday_gift_ideas(self, name: str) -> None:
         name = name.strip()
         if not name:
@@ -1024,7 +1032,7 @@ class Dispatcher:
         self.send_howie_message({
             "message": (
                 f"Suggest birthday gift ideas for {name}. "
-                "Use the Facebook session you have access to for context about that person if available. "
+                "Use the birthday row facts and any explicit constraints already available. "
                 "Send Peter gift suggestions via Telegram, or ask Peter for more context via Telegram if you cannot find enough useful context."
             )
         })

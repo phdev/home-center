@@ -1010,6 +1010,31 @@ def test_dispatch_needs_action_done_posts_index_to_worker(monkeypatch):
     }]
 
 
+def test_dispatch_wake_log_posts_children_to_worker(monkeypatch):
+    calls = []
+
+    def fake_post(url, json=None, headers=None, timeout=None):
+        calls.append({"url": url, "json": json, "headers": headers, "timeout": timeout})
+        return SimpleNamespace(ok=True, status_code=200, text="ok")
+
+    monkeypatch.setattr("voice_service.requests.post", fake_post)
+
+    dispatcher = Dispatcher(
+        pi_base="http://pi.local",
+        worker_url="https://worker.example",
+        worker_token="secret",
+        dry_run=False,
+    )
+    dispatcher.dispatch({"action": "wake_log", "children": {"lucy": "06:45", "livy": "07:10"}})
+
+    assert calls == [{
+        "url": "https://worker.example/api/wake-times/today",
+        "json": {"children": {"lucy": "06:45", "livy": "07:10"}, "source": "voice"},
+        "headers": {"Content-Type": "application/json", "Authorization": "Bearer secret"},
+        "timeout": 10,
+    }]
+
+
 def test_dispatch_birthday_gift_ideas_queues_openclaw_voice_task(monkeypatch):
     calls = []
 
@@ -1036,7 +1061,7 @@ def test_dispatch_birthday_gift_ideas_queues_openclaw_voice_task(monkeypatch):
             "chatId": "8758309182",
             "message": (
                 "Suggest birthday gift ideas for Kate. "
-                "Use the Facebook session you have access to for context about that person if available. "
+                "Use the birthday row facts and any explicit constraints already available. "
                 "Send Peter gift suggestions via Telegram, or ask Peter for more context via Telegram if you cannot find enough useful context."
             ),
         },

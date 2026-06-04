@@ -24,6 +24,7 @@ const VENDOR_ROTATION = [
 const TAKEOUT_PROMPT_START_MINUTES = 16 * 60;
 const TAKEOUT_PROMPT_END_HOUR = 20;
 const TAKEOUT_MIN_DAYS_SINCE_ORDER = 3;
+const WAKE_TO_BEDTIME_HOURS = 13.5;
 
 function rankedTakeoutVendors(today, context) {
   const dayIdx = Math.floor(
@@ -282,11 +283,22 @@ export function bedtimeReminderActive(rawData, context) {
 
   const weekend = !isWeekday(context.now);
   const kidsInRange = [];
+  const derivedBedtimes = [];
   let earliest = null;
 
   for (const setting of settings) {
     const [h, m] = (weekend ? setting.weekend : setting.weekday).split(":").map(Number);
-    const bedtimeAt = atClock(context.now, h, m);
+    const wakeAt = wakeDateForChild(rawData.wakeTimes, setting.childId, context.now);
+    const bedtimeAt = wakeAt
+      ? new Date(wakeAt.getTime() + WAKE_TO_BEDTIME_HOURS * 60 * 60 * 1000)
+      : atClock(context.now, h, m);
+    derivedBedtimes.push({
+      childId: setting.childId,
+      childName: setting.childName,
+      wakeAt: wakeAt?.toISOString() ?? null,
+      bedtimeAt: bedtimeAt.toISOString(),
+      source: wakeAt ? "wake-log" : "schedule",
+    });
     const lead = Number.isFinite(setting.reminderLeadMin) ? setting.reminderLeadMin : 30;
     const windowStart = new Date(bedtimeAt.getTime() - lead * 60_000);
     if (context.now >= windowStart && context.now < bedtimeAt) {
@@ -295,7 +307,7 @@ export function bedtimeReminderActive(rawData, context) {
     }
   }
 
-  if (kidsInRange.length === 0) return { value: false, window: null };
+  if (kidsInRange.length === 0) return { value: false, window: null, derivedBedtimes };
   return {
     value: true,
     window: {
@@ -306,7 +318,38 @@ export function bedtimeReminderActive(rawData, context) {
       ),
       kidsInRange,
     },
+    derivedBedtimes,
   };
+}
+
+export function wakeLogStatus(rawData, context) {
+  const settings = rawData.bedtime ?? [];
+  const children = settings.map((setting) => {
+    const wakeAt = wakeDateForChild(rawData.wakeTimes, setting.childId, context.now);
+    return {
+      childId: setting.childId,
+      childName: setting.childName,
+      wakeAt: wakeAt?.toISOString() ?? null,
+      bedtimeAt: wakeAt
+        ? new Date(wakeAt.getTime() + WAKE_TO_BEDTIME_HOURS * 60 * 60 * 1000).toISOString()
+        : null,
+    };
+  });
+  const missing = children.filter((child) => !child.wakeAt);
+  return {
+    value: settings.length > 0 && missing.length > 0,
+    children,
+    missing,
+  };
+}
+
+function wakeDateForChild(wakeTimes, childId, now) {
+  if (!wakeTimes || wakeTimes.date !== dateKey(now)) return null;
+  const entry = wakeTimes.children?.[childId];
+  const value = typeof entry === "string" ? entry : entry?.wakeAt;
+  if (!value) return null;
+  const parsed = new Date(value);
+  return Number.isFinite(parsed.getTime()) && isSameDate(parsed, now) ? parsed : null;
 }
 
 /**
@@ -393,8 +436,10 @@ export function computeDerivedState(rawData, context) {
   const schoolUpcoming = hasSchoolEventUpcoming(rawData, context);
   const birthdays = birthdayNeedsGift(rawData, context);
   const bedtime = bedtimeReminderActive(rawData, context);
+  const wakeLog = wakeLogStatus(rawData, context);
   const takeout = takeoutUndecided(rawData, context);
   const tomorrow = tomorrowNeedsPrep(rawData, context);
+  const cleanupAt = earliestCleanupAt(bedtime.derivedBedtimes ?? wakeLog.children);
 
   const partial = {
     hasMorningConflict: morning.value,
@@ -416,6 +461,10 @@ export function computeDerivedState(rawData, context) {
     birthdayGiftNeeded: birthdays.value,
     bedtimeReminderActive: bedtime.value,
     bedtimeWindow: bedtime.window,
+    wakeLogNeeded: wakeLog.value,
+    wakeLogStatus: wakeLog,
+    wakeDerivedBedtimes: bedtime.derivedBedtimes ?? wakeLog.children,
+    cleanupAt,
     takeoutUndecided: takeout.value,
     takeoutDecisionPending: takeout.value,
     takeoutState: takeout.state,
@@ -435,6 +484,14 @@ export function computeDerivedState(rawData, context) {
   return partial;
 }
 
+function earliestCleanupAt(derivedBedtimes = []) {
+  const earliest = derivedBedtimes
+    .map((item) => item.bedtimeAt ? new Date(item.bedtimeAt) : null)
+    .filter((date) => date && Number.isFinite(date.getTime()))
+    .sort((a, b) => a - b)[0];
+  return earliest ? new Date(earliest.getTime() - 60 * 60 * 1000).toISOString() : null;
+}
+
 export function emptyRawState() {
   return {
     calendar: { events: [] },
@@ -443,6 +500,7 @@ export function emptyRawState() {
     bedtime: [],
     checklist: { items: [] },
     takeout: { today: null },
+    wakeTimes: null,
     lunchDecisions: {},
     schoolLunchMenu: [],
     schoolItems: [],
@@ -546,6 +604,22 @@ function buildClawSuggestions(derived) {
         targetRef: { schoolItemId: item.id },
       });
     }
+  }
+
+  if (derived.wakeLogNeeded) {
+    const missing = derived.wakeLogStatus?.missing ?? [];
+    const names = missing.map((child) => child.childName).filter(Boolean);
+    out.push({
+      id: "wake-log",
+      tier: 2,
+      iconName: "sunrise",
+      accent: "amber",
+      title: "Log wake-up times",
+      detail: names.length >= 2
+        ? 'Say "Hey Homer, both girls woke up at 7:00."'
+        : `Say "Hey Homer, ${names[0] ?? "Lucy"} woke up at 7:00."`,
+      actionKind: "logWakeTimes",
+    });
   }
 
   if (derived.hasMorningOverlap && derived.conflicts[0]) {

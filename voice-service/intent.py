@@ -23,7 +23,7 @@ HOWIE_WAKE_PHRASE_RE = re.compile(
 COMMAND_KEYWORD_RE = re.compile(
     r"\b(open|show|go\s+(to|back|home)|calendar|weather|photos?|pictures?|gallery|"
     r"turn(ed|s)?\s*(it\s+)?(on|off|of|up|down|f)|set\s+(a\s+)?timer|"
-    r"remind\s+me|ordered|mark|done|suggest|ideas?|gift|stop|dismiss|cancel|quiet|shut\s+up|like|don't\s+like|"
+    r"remind\s+me|ordered|mark|done|suggest|ideas?|gift|woke|wake|stop|dismiss|cancel|quiet|shut\s+up|like|don't\s+like|"
     r"do\s+not\s+like|what|who|where|when|"
     r"version\s+(one|two)|v[12]|"
     r"why|how|do|does|did|is|are|can|could|should|would|will|tell\s+me|"
@@ -227,6 +227,50 @@ def _parse_needs_action_done(text: str) -> dict:
     return {"action": "needs_action_done", "name": name.title()}
 
 
+def _parse_wake_log(text: str) -> dict:
+    time_pattern = r"(\d{1,2}(?::\d{2})?\s*(?:a\.?m\.?|p\.?m\.?)?)"
+    both = re.search(
+        rf"\b(?:both\s+)?(?:girls|kids|children|lucy\s+and\s+(?:livy|liv|olivia)|(?:livy|liv|olivia)\s+and\s+lucy)\s+woke\s+up\s+at\s+{time_pattern}\b",
+        text,
+    )
+    if both:
+        wake_time = _normalize_clock_text(both.group(1))
+        if wake_time:
+            return {"action": "wake_log", "children": {"lucy": wake_time, "livy": wake_time}}
+
+    matches = list(re.finditer(
+        rf"\b(lucy|livy|liv|olivia)\s+woke\s+up\s+at\s+{time_pattern}\b",
+        text,
+    ))
+    if not matches:
+        return {"action": "none"}
+    children = {}
+    for match in matches:
+        child = "livy" if match.group(1) in {"livy", "liv", "olivia"} else "lucy"
+        wake_time = _normalize_clock_text(match.group(2))
+        if wake_time:
+            children[child] = wake_time
+    if not children:
+        return {"action": "none"}
+    return {"action": "wake_log", "children": children}
+
+
+def _normalize_clock_text(value: str) -> str:
+    match = re.fullmatch(r"\s*(\d{1,2})(?::(\d{2}))?\s*(a\.?m\.?|p\.?m\.?)?\s*", value, re.IGNORECASE)
+    if not match:
+        return ""
+    hour = int(match.group(1))
+    minute = int(match.group(2) or "0")
+    suffix = (match.group(3) or "").lower().replace(".", "")
+    if minute > 59 or hour > 23:
+        return ""
+    if suffix == "pm" and hour < 12:
+        hour += 12
+    if suffix == "am" and hour == 12:
+        hour = 0
+    return f"{hour:02d}:{minute:02d}"
+
+
 def parse_command(text: str, allow_bare_ask: bool = True, allow_wake_knowledge: bool = False) -> dict:
     """Parse the command body after "Hey Homer" into a stable action dict."""
     original_text = text.strip()
@@ -242,6 +286,10 @@ def parse_command(text: str, allow_bare_ask: bool = True, allow_wake_knowledge: 
 
     if STOP_COMMAND_RE.fullmatch(text):
         return {"action": "stop"}
+
+    wake_log_command = _parse_wake_log(text)
+    if wake_log_command["action"] != "none":
+        return wake_log_command
 
     needs_action_command = _parse_needs_action_done(text)
     if needs_action_command["action"] != "none":
@@ -355,6 +403,12 @@ def is_dispatchable_command(command: dict) -> bool:
         index = command.get("index")
         name = str(command.get("name", "")).strip()
         return (isinstance(index, int) and index >= 1) or len(name.split()) >= 1
+    if action == "wake_log":
+        children = command.get("children")
+        return isinstance(children, dict) and any(
+            child in children and re.fullmatch(r"\d{2}:\d{2}", str(children[child]))
+            for child in ("lucy", "livy")
+        )
     if action == "set_timer":
         duration = command.get("duration")
         return isinstance(duration, int) and 1 <= duration <= _MAX_TIMER_SECONDS

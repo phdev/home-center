@@ -55,3 +55,14 @@ The Mac voice service sends this to OpenClaw as a bounded gift-ideas request.
 Howie should use the birthday row facts and any explicit constraints, without
 Facebook lookup, then send Peter gift ideas or follow-up questions through
 Telegram.
+
+Wake-up logging is a Worker-backed household state command:
+
+- `Hey Homer, both girls woke up at 7:05`
+- `Hey Homer, Lucy woke up at 6:45 and Livy woke up at 7:10`
+
+The voice service posts the parsed child wake times to
+`/api/wake-times/today`. Home Center keeps the wake-log Needs Action visible
+until both Lucy and Livy have a wake time for today, then derives each bedtime
+as wake time plus 13.5 hours and cleanup as one hour before the earliest
+wake-derived bedtime.

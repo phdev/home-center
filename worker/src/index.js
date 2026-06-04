@@ -155,6 +155,13 @@ export default {
       if (path === "/api/takeout/suggestions" && request.method === "POST") {
         return corsResponse(env, await handleTakeoutSuggestionsPost(request, env));
       }
+      // ── Wake times (today's per-child wake log) ──
+      if (path === "/api/wake-times/today" && request.method === "GET") {
+        return corsResponse(env, await handleWakeTimesGet(env));
+      }
+      if (path === "/api/wake-times/today" && request.method === "POST") {
+        return corsResponse(env, await handleWakeTimesPost(request, env));
+      }
       // ── Lunch decisions per date ──
       if (path === "/api/lunch/decisions" && request.method === "GET") {
         return corsResponse(env, await handleLunchGet(env));
@@ -3562,6 +3569,16 @@ async function handleNeedsActionDone(request, env) {
     }, 409);
   }
 
+  if (action.type === "wake_log") {
+    return json({
+      ok: false,
+      reason: "voice_input_required",
+      index: matchedIndex,
+      action,
+      message: "Say the wake-up time, for example: Hey Homer, both girls woke up at 7:00.",
+    }, 409);
+  }
+
   return json({
     ok: false,
     reason: "unsupported_action_type",
@@ -3609,6 +3626,28 @@ async function buildCurrentNeedsActions(env, now = new Date()) {
   const calendarEvents = await currentCalendarEvents(env, now);
   for (const conflict of buildCalendarConflictNeedsActions(calendarEvents, now)) {
     actions.push(conflict);
+  }
+  const wakeTimes = await currentWakeTimes(env, now);
+  const missingWakeChildren = WAKE_LOG_CHILDREN.filter((child) => !wakeTimes?.children?.[child.id]?.wakeAt);
+  if (missingWakeChildren.length) {
+    actions.push({
+      id: "wake-log",
+      type: "wake_log",
+      title: "Log wake-up times",
+      aliases: [
+        "Log wake times",
+        "Log wake-up times",
+        "Register wake times",
+        "Record wake times",
+      ],
+      missingChildren: missingWakeChildren.map((child) => child.id),
+      detail: missingWakeChildren.length >= 2
+        ? 'Say "Hey Homer, both girls woke up at 7:00."'
+        : `Say "Hey Homer, ${missingWakeChildren[0].name} woke up at 7:00."`,
+      guard: "auto",
+      urgencyScore: 0.72,
+      tiebreaker: -now.getTime(),
+    });
   }
   const schoolData = env.NOTIFICATIONS
     ? (await env.NOTIFICATIONS.get(SCHOOL_UPDATES_KEY, { type: "json" })) ?? {}
@@ -3740,6 +3779,75 @@ function formatWorkerNeedsActionTime(value) {
   const date = new Date(value);
   if (!Number.isFinite(date.getTime())) return null;
   return date.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+}
+
+const WAKE_LOG_CHILDREN = [
+  { id: "lucy", name: "Lucy" },
+  { id: "livy", name: "Livy" },
+];
+
+function wakeTimesKeyForDate(date) {
+  return `hc:wake-times:${date}`;
+}
+
+async function currentWakeTimes(env, now = new Date()) {
+  if (!env.NOTIFICATIONS) return null;
+  const date = localDateKey(now);
+  return (await env.NOTIFICATIONS.get(wakeTimesKeyForDate(date), { type: "json" })) ?? { date, children: {} };
+}
+
+async function handleWakeTimesGet(env) {
+  if (!env.NOTIFICATIONS) return json(null);
+  return json(await currentWakeTimes(env, new Date()));
+}
+
+async function handleWakeTimesPost(request, env) {
+  if (!env.NOTIFICATIONS) return json({ error: "KV not configured" }, 500);
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return json({ error: "Invalid JSON" }, 400);
+  }
+  const now = new Date();
+  const date = body?.date && /^\d{4}-\d{2}-\d{2}$/.test(String(body.date)) ? String(body.date) : localDateKey(now);
+  const prev = (await env.NOTIFICATIONS.get(wakeTimesKeyForDate(date), { type: "json" })) ?? { date, children: {} };
+  const children = { ...(prev.children ?? {}) };
+  const incoming = body?.children && typeof body.children === "object" ? body.children : {};
+  for (const child of WAKE_LOG_CHILDREN) {
+    const value = incoming[child.id];
+    const wakeAt = normalizeWorkerWakeTime(value, date);
+    if (!wakeAt) continue;
+    children[child.id] = {
+      childId: child.id,
+      childName: child.name,
+      wakeAt,
+      source: body?.source || "voice",
+      updatedAt: now.toISOString(),
+    };
+  }
+  const record = { date, children, updatedAt: now.toISOString() };
+  await env.NOTIFICATIONS.put(wakeTimesKeyForDate(date), JSON.stringify(record), {
+    expirationTtl: 60 * 60 * 24 * 3,
+  });
+  return json(record);
+}
+
+function normalizeWorkerWakeTime(value, date) {
+  if (!value) return null;
+  if (typeof value === "object" && value.wakeAt) return normalizeWorkerWakeTime(value.wakeAt, date);
+  const text = String(value).trim();
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(text)) return text;
+  const match = /^(\d{1,2})(?::(\d{2}))?\s*(a\.?m\.?|p\.?m\.?)?$/i.exec(text);
+  if (!match) return null;
+  let hour = Number(match[1]);
+  const minute = Number(match[2] ?? "0");
+  const suffix = match[3]?.toLowerCase().replace(/\./g, "");
+  if (!Number.isInteger(hour) || !Number.isInteger(minute) || minute < 0 || minute > 59) return null;
+  if (suffix === "pm" && hour < 12) hour += 12;
+  if (suffix === "am" && hour === 12) hour = 0;
+  if (hour < 0 || hour > 23) return null;
+  return `${date}T${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}:00`;
 }
 
 async function currentCalendarEvents(env, now = new Date()) {

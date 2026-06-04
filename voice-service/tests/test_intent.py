@@ -164,6 +164,23 @@ def test_needs_action_done_intent():
     assert not is_dispatchable_command({"action": "needs_action_done", "index": 0})
 
 
+def test_wake_log_intent():
+    assert parse_command("Hey Homer, both girls woke up at 7:05.") == {
+        "action": "wake_log",
+        "children": {"lucy": "07:05", "livy": "07:05"},
+    }
+    assert parse_command("Hey Homer, Lucy woke up at 6:45 and Livy woke up at 7:10") == {
+        "action": "wake_log",
+        "children": {"lucy": "06:45", "livy": "07:10"},
+    }
+    assert parse_command("Hey Homer, Olivia woke up at 7 am") == {
+        "action": "wake_log",
+        "children": {"livy": "07:00"},
+    }
+    assert is_dispatchable_command({"action": "wake_log", "children": {"lucy": "06:45"}})
+    assert not is_dispatchable_command({"action": "wake_log", "children": {}})
+
+
 def test_howie_message_intent():
     assert parse_command("Hey Howie, ask Devon if the second Pi is healthy") == {
         "action": "howie_message",

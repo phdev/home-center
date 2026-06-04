@@ -12,15 +12,15 @@ export function useBedtimeSettings(settings) {
     if (Array.isArray(cfg) && cfg.length > 0) return cfg;
     return [
       {
-        childId: "emma",
-        childName: "Emma",
+        childId: "lucy",
+        childName: "Lucy",
         weekday: "20:30",
         weekend: "21:00",
         reminderLeadMin: 30,
       },
       {
-        childId: "jack",
-        childName: "Jack",
+        childId: "livy",
+        childName: "Livy",
         weekday: "21:00",
         weekend: "21:30",
         reminderLeadMin: 30,

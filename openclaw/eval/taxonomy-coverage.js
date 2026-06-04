@@ -160,7 +160,11 @@ function suggestedActionRows() {
             today: {
               decision: null,
               suggestedVendors: ["Rascals", "Chicken Maison"],
-              recentVendors: ["Mickey's Deli", "Ralph's", "Costco"],
+              recentVendors: [
+                { vendor: "Mickey's Deli", lastOrderedDate: "2026-05-30" },
+                { vendor: "Ralph's", lastOrderedDate: "2026-05-29" },
+                { vendor: "Costco", lastOrderedDate: "2026-05-28" },
+              ],
               suggestionsSource: "receipt-history",
             },
           },
@@ -232,7 +236,7 @@ function suggestedActionRows() {
       evaluate() {
         const event = normalizeCommandEvent({
           source: "voice",
-          transcript: "Hey Homer, Jack woke up at 6:45 and Emma woke up at 7:10",
+          transcript: "Hey Homer, Lucy woke up at 6:45 and Livy woke up at 7:10",
           wakewordDetected: true,
           confidence: 0.9,
           locale: "en-US",
@@ -252,15 +256,36 @@ function suggestedActionRows() {
       coverage_dimension: "derived-state deterministic assert",
       expected_guard: "advisory",
       evaluate() {
-        return {
-          pass: false,
-          reason: "missing wake_time_to_13_5h_bedtime_derivation",
-          expected: {
-            jackWake: "2026-06-03T06:45:00-07:00",
-            jackBedtime: "2026-06-03T20:15:00-07:00",
-            emmaWake: "2026-06-03T07:10:00-07:00",
-            emmaBedtime: "2026-06-03T20:40:00-07:00",
+        const raw = {
+          ...emptyRawState(),
+          bedtime: [
+            { childId: "lucy", childName: "Lucy", weekday: "20:30", weekend: "21:00", reminderLeadMin: 30 },
+            { childId: "livy", childName: "Livy", weekday: "21:00", weekend: "21:30", reminderLeadMin: 30 },
+          ],
+          wakeTimes: {
+            date: "2026-06-03",
+            children: {
+              lucy: { wakeAt: "2026-06-03T06:45:00" },
+              livy: { wakeAt: "2026-06-03T07:10:00" },
+            },
           },
+        };
+        const derived = computeDerivedState(raw, baseContext("2026-06-03T16:45:00-07:00"));
+        const byId = Object.fromEntries((derived.wakeDerivedBedtimes ?? []).map((item) => [item.childId, item]));
+        return {
+          pass:
+            byId.lucy?.source === "wake-log" &&
+            byId.livy?.source === "wake-log" &&
+            byId.lucy?.bedtimeAt === "2026-06-04T03:15:00.000Z" &&
+            byId.livy?.bedtimeAt === "2026-06-04T03:40:00.000Z",
+          reason: "wake_time_to_13_5h_bedtime_derivation_present",
+          expected: {
+            lucyWake: "2026-06-03T06:45:00-07:00",
+            lucyBedtime: "2026-06-03T20:15:00-07:00",
+            livyWake: "2026-06-03T07:10:00-07:00",
+            livyBedtime: "2026-06-03T20:40:00-07:00",
+          },
+          derivedBedtimes: derived.wakeDerivedBedtimes,
         };
       },
     },
@@ -271,13 +296,29 @@ function suggestedActionRows() {
       coverage_dimension: "derived-state deterministic assert",
       expected_guard: "none",
       evaluate() {
+        const raw = {
+          ...emptyRawState(),
+          bedtime: [
+            { childId: "lucy", childName: "Lucy", weekday: "20:30", weekend: "21:00", reminderLeadMin: 30 },
+            { childId: "livy", childName: "Livy", weekday: "21:00", weekend: "21:30", reminderLeadMin: 30 },
+          ],
+          wakeTimes: {
+            date: "2026-06-03",
+            children: {
+              lucy: { wakeAt: "2026-06-03T06:45:00" },
+              livy: { wakeAt: "2026-06-03T07:10:00" },
+            },
+          },
+        };
+        const derived = computeDerivedState(raw, baseContext("2026-06-03T16:45:00-07:00"));
         return {
-          pass: false,
-          reason: "missing_cleanup_trigger_from_earliest_derived_bedtime",
+          pass: derived.cleanupAt === "2026-06-04T02:15:00.000Z",
+          reason: "cleanup_trigger_from_earliest_derived_bedtime_present",
           expected: {
             earliestBedtime: "2026-06-03T20:15:00-07:00",
             cleanupAt: "2026-06-03T19:15:00-07:00",
           },
+          cleanupAt: derived.cleanupAt,
         };
       },
     },

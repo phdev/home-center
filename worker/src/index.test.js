@@ -121,12 +121,12 @@ describe("Needs Action completion", () => {
     const res = await worker.fetch(new Request("https://worker.test/api/needs-action/done", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ index: 1 }),
+      body: JSON.stringify({ index: 99 }),
     }), currentEnv, {});
     const body = await res.json();
 
     expect(res.status).toBe(404);
-    expect(body).toMatchObject({ ok: false, reason: "index_out_of_range", index: 1, count: 0 });
+    expect(body).toMatchObject({ ok: false, reason: "index_out_of_range", index: 99, count: 1 });
   });
 
   it("marks a Needs Action item dismissed by visible name", async () => {
@@ -298,6 +298,65 @@ END:VCALENDAR`, {
         eventIds: ["dentist", "dropoff"],
       },
     });
+  });
+
+  it("surfaces missing wake logs as a Needs Action item", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-05-28T07:30:00-07:00"));
+    const notifications = createKv();
+    const currentEnv = env({ NOTIFICATIONS: notifications });
+
+    const res = await worker.fetch(new Request("https://worker.test/api/needs-action/done", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: "Log wake-up times" }),
+    }), currentEnv, {});
+    const body = await res.json();
+
+    expect(res.status).toBe(409);
+    expect(body).toMatchObject({
+      ok: false,
+      reason: "voice_input_required",
+      action: {
+        id: "wake-log",
+        type: "wake_log",
+        title: "Log wake-up times",
+        guard: "auto",
+        missingChildren: ["lucy", "livy"],
+      },
+    });
+  });
+});
+
+describe("wake times", () => {
+  it("stores voice wake logs for today", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-05-28T07:30:00-07:00"));
+    const notifications = createKv();
+    const currentEnv = env({ NOTIFICATIONS: notifications });
+
+    const post = await worker.fetch(new Request("https://worker.test/api/wake-times/today", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        source: "voice",
+        children: { lucy: "06:45", livy: "7:10 am" },
+      }),
+    }), currentEnv, {});
+    const posted = await post.json();
+
+    expect(post.status).toBe(200);
+    expect(posted).toMatchObject({
+      date: "2026-05-28",
+      children: {
+        lucy: { childId: "lucy", childName: "Lucy", wakeAt: "2026-05-28T06:45:00", source: "voice" },
+        livy: { childId: "livy", childName: "Livy", wakeAt: "2026-05-28T07:10:00", source: "voice" },
+      },
+    });
+
+    const get = await worker.fetch(new Request("https://worker.test/api/wake-times/today"), currentEnv, {});
+    const fetched = await get.json();
+    expect(fetched.children.lucy.wakeAt).toBe("2026-05-28T06:45:00");
   });
 });
 
