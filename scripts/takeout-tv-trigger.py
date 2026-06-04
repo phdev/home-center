@@ -50,8 +50,6 @@ def post_json(url: str) -> dict | None:
 def days_since_last_order(state: dict | None, today: date) -> int | None:
     if not state:
         return None
-    if isinstance(state.get("daysSinceLastOrder"), int):
-        return state["daysSinceLastOrder"]
     last = state.get("lastOrderDate")
     if not last and isinstance(state.get("recentVendors"), list):
         dates = [
@@ -65,7 +63,7 @@ def days_since_last_order(state: dict | None, today: date) -> int | None:
     try:
         parsed = datetime.strptime(last, "%Y-%m-%d").date()
     except ValueError:
-        return None
+        return state.get("daysSinceLastOrder") if isinstance(state.get("daysSinceLastOrder"), int) else None
     return (today - parsed).days
 
 

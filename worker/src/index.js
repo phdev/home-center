@@ -3846,11 +3846,6 @@ function localMinutesSinceMidnight(date) {
   return hour * 60 + Number(p.minute);
 }
 
-function startOfLocalDay(date) {
-  const p = localDateParts(date);
-  return new Date(`${p.year}-${p.month}-${p.day}T00:00:00Z`);
-}
-
 function daysUntilMMDDWorker(mmdd, now) {
   const [month, day] = String(mmdd ?? "").split("-").map(Number);
   if (!month || !day) return Infinity;
@@ -3961,9 +3956,19 @@ function latestTakeoutOrderDate(source) {
 function daysSinceTakeoutOrder(source, now = new Date()) {
   const lastOrderDate = latestTakeoutOrderDate(source);
   if (!lastOrderDate) return null;
-  const parsed = new Date(`${lastOrderDate}T00:00:00`);
-  if (!Number.isFinite(parsed.getTime())) return null;
-  return Math.floor((startOfLocalDay(now) - startOfLocalDay(parsed)) / (24 * 60 * 60 * 1000));
+  const lastDay = dateOnlyDayNumber(lastOrderDate);
+  if (lastDay == null) return null;
+  const today = localDateKey(now);
+  const todayDay = dateOnlyDayNumber(today);
+  if (todayDay == null) return null;
+  return todayDay - lastDay;
+}
+
+function dateOnlyDayNumber(value) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value ?? ""));
+  if (!match) return null;
+  const [, year, month, day] = match.map(Number);
+  return Math.floor(Date.UTC(year, month - 1, day) / (24 * 60 * 60 * 1000));
 }
 
 function takeoutEmailHistoryEligible(source, now = new Date()) {
