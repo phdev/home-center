@@ -1,0 +1,726 @@
+{
+  "mode": "taxonomy-coverage",
+  "timestamp": "2026-06-04T03:30:13.900Z",
+  "source_spec": "docs/design/home-center-build-spec.md",
+  "taxonomies": {
+    "suggested_actions": {
+      "passed": 3,
+      "failed": 5,
+      "total": 8,
+      "coverage": 0.375,
+      "by_type": {
+        "Birthday gift": {
+          "passed": 0,
+          "failed": 1,
+          "total": 1,
+          "coverage": 0,
+          "rows": [
+            "suggested_birthdays_grounded_gift"
+          ]
+        },
+        "Lock In Dinner": {
+          "passed": 0,
+          "failed": 1,
+          "total": 1,
+          "coverage": 0,
+          "rows": [
+            "suggested_takeout_grounded_restaurant"
+          ]
+        },
+        "Mark complete": {
+          "passed": 1,
+          "failed": 0,
+          "total": 1,
+          "coverage": 1,
+          "rows": [
+            "suggested_mark_complete_voice_contract"
+          ]
+        },
+        "Calendar conflict": {
+          "passed": 1,
+          "failed": 0,
+          "total": 1,
+          "coverage": 1,
+          "rows": [
+            "suggested_calendar_conflict_confirm_guard"
+          ]
+        },
+        "Wake-up log": {
+          "passed": 1,
+          "failed": 0,
+          "total": 1,
+          "coverage": 1,
+          "rows": [
+            "suggested_wake_log_voice_boundary"
+          ]
+        },
+        "Sync on bedtime": {
+          "passed": 0,
+          "failed": 1,
+          "total": 1,
+          "coverage": 0,
+          "rows": [
+            "suggested_bedtime_sync_derived_chain"
+          ]
+        },
+        "Clean up time": {
+          "passed": 0,
+          "failed": 1,
+          "total": 1,
+          "coverage": 0,
+          "rows": [
+            "suggested_cleanup_earliest_bedtime_minus_one_hour"
+          ]
+        },
+        "School lunch decision": {
+          "passed": 0,
+          "failed": 1,
+          "total": 1,
+          "coverage": 0,
+          "rows": [
+            "suggested_lunch_grounded_next_day_menu"
+          ]
+        }
+      }
+    },
+    "knowledge_queries": {
+      "passed": 7,
+      "failed": 0,
+      "total": 7,
+      "coverage": 1,
+      "by_type": {
+        "Factual lookup": {
+          "passed": 1,
+          "failed": 0,
+          "total": 1,
+          "coverage": 1,
+          "rows": [
+            "knowledge_factual_lookup_local_known"
+          ]
+        },
+        "Explanatory / educational": {
+          "passed": 1,
+          "failed": 0,
+          "total": 1,
+          "coverage": 1,
+          "rows": [
+            "knowledge_explanatory_educational_diagram"
+          ]
+        },
+        "Visual identify": {
+          "passed": 1,
+          "failed": 0,
+          "total": 1,
+          "coverage": 1,
+          "rows": [
+            "knowledge_visual_identify_known_image"
+          ]
+        },
+        "How-to / procedural": {
+          "passed": 1,
+          "failed": 0,
+          "total": 1,
+          "coverage": 1,
+          "rows": [
+            "knowledge_howto_procedural_escalates"
+          ]
+        },
+        "Local / contextual": {
+          "passed": 1,
+          "failed": 0,
+          "total": 1,
+          "coverage": 1,
+          "rows": [
+            "knowledge_local_contextual_routes_to_data"
+          ]
+        },
+        "Safety-sensitive": {
+          "passed": 1,
+          "failed": 0,
+          "total": 1,
+          "coverage": 1,
+          "rows": [
+            "knowledge_safety_sensitive_refusal"
+          ]
+        },
+        "Out-of-scope / unknown": {
+          "passed": 1,
+          "failed": 0,
+          "total": 1,
+          "coverage": 1,
+          "rows": [
+            "knowledge_out_of_scope_graceful_refusal"
+          ]
+        }
+      }
+    },
+    "overall": {
+      "passed": 10,
+      "failed": 5,
+      "total": 15,
+      "coverage": 0.6666666666666666,
+      "by_type": {
+        "Birthday gift": {
+          "passed": 0,
+          "failed": 1,
+          "total": 1,
+          "coverage": 0,
+          "rows": [
+            "suggested_birthdays_grounded_gift"
+          ]
+        },
+        "Lock In Dinner": {
+          "passed": 0,
+          "failed": 1,
+          "total": 1,
+          "coverage": 0,
+          "rows": [
+            "suggested_takeout_grounded_restaurant"
+          ]
+        },
+        "Mark complete": {
+          "passed": 1,
+          "failed": 0,
+          "total": 1,
+          "coverage": 1,
+          "rows": [
+            "suggested_mark_complete_voice_contract"
+          ]
+        },
+        "Calendar conflict": {
+          "passed": 1,
+          "failed": 0,
+          "total": 1,
+          "coverage": 1,
+          "rows": [
+            "suggested_calendar_conflict_confirm_guard"
+          ]
+        },
+        "Wake-up log": {
+          "passed": 1,
+          "failed": 0,
+          "total": 1,
+          "coverage": 1,
+          "rows": [
+            "suggested_wake_log_voice_boundary"
+          ]
+        },
+        "Sync on bedtime": {
+          "passed": 0,
+          "failed": 1,
+          "total": 1,
+          "coverage": 0,
+          "rows": [
+            "suggested_bedtime_sync_derived_chain"
+          ]
+        },
+        "Clean up time": {
+          "passed": 0,
+          "failed": 1,
+          "total": 1,
+          "coverage": 0,
+          "rows": [
+            "suggested_cleanup_earliest_bedtime_minus_one_hour"
+          ]
+        },
+        "School lunch decision": {
+          "passed": 0,
+          "failed": 1,
+          "total": 1,
+          "coverage": 0,
+          "rows": [
+            "suggested_lunch_grounded_next_day_menu"
+          ]
+        },
+        "Factual lookup": {
+          "passed": 1,
+          "failed": 0,
+          "total": 1,
+          "coverage": 1,
+          "rows": [
+            "knowledge_factual_lookup_local_known"
+          ]
+        },
+        "Explanatory / educational": {
+          "passed": 1,
+          "failed": 0,
+          "total": 1,
+          "coverage": 1,
+          "rows": [
+            "knowledge_explanatory_educational_diagram"
+          ]
+        },
+        "Visual identify": {
+          "passed": 1,
+          "failed": 0,
+          "total": 1,
+          "coverage": 1,
+          "rows": [
+            "knowledge_visual_identify_known_image"
+          ]
+        },
+        "How-to / procedural": {
+          "passed": 1,
+          "failed": 0,
+          "total": 1,
+          "coverage": 1,
+          "rows": [
+            "knowledge_howto_procedural_escalates"
+          ]
+        },
+        "Local / contextual": {
+          "passed": 1,
+          "failed": 0,
+          "total": 1,
+          "coverage": 1,
+          "rows": [
+            "knowledge_local_contextual_routes_to_data"
+          ]
+        },
+        "Safety-sensitive": {
+          "passed": 1,
+          "failed": 0,
+          "total": 1,
+          "coverage": 1,
+          "rows": [
+            "knowledge_safety_sensitive_refusal"
+          ]
+        },
+        "Out-of-scope / unknown": {
+          "passed": 1,
+          "failed": 0,
+          "total": 1,
+          "coverage": 1,
+          "rows": [
+            "knowledge_out_of_scope_graceful_refusal"
+          ]
+        }
+      }
+    }
+  },
+  "rows": [
+    {
+      "id": "suggested_birthdays_grounded_gift",
+      "taxonomy": "suggested_actions",
+      "type": "Birthday gift",
+      "coverage_dimension": "grounded suggested-action content",
+      "expected_guard": "advisory",
+      "pass": false,
+      "method": "llm_judged",
+      "reason": "grounded_criteria_failed",
+      "evidence": {
+        "pass": true,
+        "reason": "gift_row_present",
+        "response": "Order Taylor's gift In 7 days - no gift logged yet. orderGift",
+        "card": {
+          "id": "gift-taylor",
+          "tier": 3,
+          "iconName": "gift",
+          "accent": "amber",
+          "title": "Order Taylor's gift",
+          "detail": "In 7 days - no gift logged yet.",
+          "actionKind": "orderGift",
+          "targetRef": {
+            "birthdayId": "taylor"
+          }
+        }
+      },
+      "judgments": [
+        {
+          "criterion": "grounded_gift_suggestion",
+          "pass": false,
+          "reason": "llm_judge_unavailable",
+          "method": "llm",
+          "judge_model": "claude-sonnet-4-6",
+          "cache_hit": false
+        }
+      ]
+    },
+    {
+      "id": "suggested_takeout_grounded_restaurant",
+      "taxonomy": "suggested_actions",
+      "type": "Lock In Dinner",
+      "coverage_dimension": "grounded suggested-action content",
+      "expected_guard": "advisory",
+      "pass": false,
+      "method": "llm_judged",
+      "reason": "grounded_criteria_failed",
+      "evidence": {
+        "pass": true,
+        "reason": "takeout_row_present",
+        "response": "Lock in dinner Suggested: Rascals, Chicken Maison setTakeout",
+        "card": {
+          "id": "takeout",
+          "tier": 2,
+          "iconName": "utensils",
+          "accent": "amber",
+          "title": "Lock in dinner",
+          "detail": "Suggested: Rascals, Chicken Maison",
+          "actionKind": "setTakeout"
+        }
+      },
+      "judgments": [
+        {
+          "criterion": "grounded_restaurant_suggestion",
+          "pass": false,
+          "reason": "llm_judge_unavailable",
+          "method": "llm",
+          "judge_model": "claude-sonnet-4-6",
+          "cache_hit": false
+        }
+      ]
+    },
+    {
+      "id": "suggested_mark_complete_voice_contract",
+      "taxonomy": "suggested_actions",
+      "type": "Mark complete",
+      "coverage_dimension": "voice intent parses",
+      "expected_guard": "auto",
+      "pass": true,
+      "method": "deterministic",
+      "reason": "voice_boundary_normalized_but_state_transition_not_covered",
+      "evidence": {
+        "pass": true,
+        "reason": "voice_boundary_normalized_but_state_transition_not_covered",
+        "event": {
+          "source": "voice",
+          "transcript": "Hey Homer, mark the lunch thing complete",
+          "wakewordDetected": true,
+          "confidenceBucket": "high",
+          "locale": "en-US",
+          "deviceType": "test-fixture"
+        }
+      }
+    },
+    {
+      "id": "suggested_calendar_conflict_confirm_guard",
+      "taxonomy": "suggested_actions",
+      "type": "Calendar conflict",
+      "coverage_dimension": "guard level enforced",
+      "expected_guard": "confirm",
+      "pass": true,
+      "method": "deterministic",
+      "reason": "conflict_row_present_confirm_guard_external_to_card",
+      "evidence": {
+        "pass": true,
+        "reason": "conflict_row_present_confirm_guard_external_to_card",
+        "response": "Resolve morning conflict Dentist and School dropoff at 8:30 AM openEventDetail",
+        "card": {
+          "id": "conflict-dentist-school",
+          "tier": 2,
+          "iconName": "calendar-clock",
+          "accent": "amber",
+          "title": "Resolve morning conflict",
+          "detail": "Dentist and School dropoff at 8:30 AM",
+          "actionKind": "openEventDetail",
+          "targetRef": {
+            "eventId": "dentist"
+          }
+        }
+      }
+    },
+    {
+      "id": "suggested_wake_log_voice_boundary",
+      "taxonomy": "suggested_actions",
+      "type": "Wake-up log",
+      "coverage_dimension": "voice intent parses",
+      "expected_guard": "auto",
+      "pass": true,
+      "method": "deterministic",
+      "reason": "voice_boundary_normalized_but_wake_to_bedtime_derivation_not_covered",
+      "evidence": {
+        "pass": true,
+        "reason": "voice_boundary_normalized_but_wake_to_bedtime_derivation_not_covered",
+        "event": {
+          "source": "voice",
+          "transcript": "Hey Homer, Jack woke up at 6:45 and Emma woke up at 7:10",
+          "wakewordDetected": true,
+          "confidenceBucket": "high",
+          "locale": "en-US",
+          "deviceType": "test-fixture"
+        }
+      }
+    },
+    {
+      "id": "suggested_bedtime_sync_derived_chain",
+      "taxonomy": "suggested_actions",
+      "type": "Sync on bedtime",
+      "coverage_dimension": "derived-state deterministic assert",
+      "expected_guard": "advisory",
+      "pass": false,
+      "method": "deterministic",
+      "reason": "missing wake_time_to_13_5h_bedtime_derivation",
+      "evidence": {
+        "pass": false,
+        "reason": "missing wake_time_to_13_5h_bedtime_derivation",
+        "expected": {
+          "jackWake": "2026-06-03T06:45:00-07:00",
+          "jackBedtime": "2026-06-03T20:15:00-07:00",
+          "emmaWake": "2026-06-03T07:10:00-07:00",
+          "emmaBedtime": "2026-06-03T20:40:00-07:00"
+        }
+      }
+    },
+    {
+      "id": "suggested_cleanup_earliest_bedtime_minus_one_hour",
+      "taxonomy": "suggested_actions",
+      "type": "Clean up time",
+      "coverage_dimension": "derived-state deterministic assert",
+      "expected_guard": "none",
+      "pass": false,
+      "method": "deterministic",
+      "reason": "missing_cleanup_trigger_from_earliest_derived_bedtime",
+      "evidence": {
+        "pass": false,
+        "reason": "missing_cleanup_trigger_from_earliest_derived_bedtime",
+        "expected": {
+          "earliestBedtime": "2026-06-03T20:15:00-07:00",
+          "cleanupAt": "2026-06-03T19:15:00-07:00"
+        }
+      }
+    },
+    {
+      "id": "suggested_lunch_grounded_next_day_menu",
+      "taxonomy": "suggested_actions",
+      "type": "School lunch decision",
+      "coverage_dimension": "grounded suggested-action content",
+      "expected_guard": "advisory",
+      "pass": false,
+      "method": "llm_judged",
+      "reason": "grounded_criteria_failed",
+      "evidence": {
+        "pass": true,
+        "reason": "lunch_row_present",
+        "response": "Pick tomorrow's lunch School menu: Chicken nuggets setLunch",
+        "card": {
+          "id": "lunch",
+          "tier": 2,
+          "iconName": "sandwich",
+          "accent": "amber",
+          "title": "Pick tomorrow's lunch",
+          "detail": "School menu: Chicken nuggets",
+          "actionKind": "setLunch"
+        }
+      },
+      "judgments": [
+        {
+          "criterion": "grounded_lunch_suggestion",
+          "pass": false,
+          "reason": "llm_judge_unavailable",
+          "method": "llm",
+          "judge_model": "claude-sonnet-4-6",
+          "cache_hit": false
+        }
+      ]
+    },
+    {
+      "id": "knowledge_factual_lookup_local_known",
+      "taxonomy": "knowledge_queries",
+      "type": "Factual lookup",
+      "coverage_dimension": "routing and visual-contract deterministic assert",
+      "expected_guard": null,
+      "pass": true,
+      "method": "deterministic",
+      "reason": "factual_lookup_local_no_image",
+      "evidence": {
+        "pass": true,
+        "reason": "factual_lookup_local_no_image",
+        "route": {
+          "classification": "local",
+          "escalation_target": null
+        },
+        "response": {
+          "type": "concept",
+          "title": "Paris",
+          "summary": "Paris is the capital of France.",
+          "sections": [
+            {
+              "heading": "Overview",
+              "content": "Paris overview."
+            }
+          ],
+          "infographic": null,
+          "imageSourceType": "none"
+        }
+      }
+    },
+    {
+      "id": "knowledge_explanatory_educational_diagram",
+      "taxonomy": "knowledge_queries",
+      "type": "Explanatory / educational",
+      "coverage_dimension": "routing and visual-contract deterministic assert",
+      "expected_guard": null,
+      "pass": true,
+      "method": "deterministic",
+      "reason": "educational_diagram_shape",
+      "evidence": {
+        "pass": true,
+        "reason": "educational_diagram_shape",
+        "route": {
+          "classification": "local",
+          "escalation_target": null
+        },
+        "response": {
+          "type": "concept",
+          "title": "Photosynthesis",
+          "summary": "Photosynthesis summary.",
+          "sections": [
+            {
+              "heading": "Overview",
+              "content": "Photosynthesis overview."
+            }
+          ],
+          "infographic": null,
+          "imageSourceType": "diagram",
+          "imageQuery": "Photosynthesis image"
+        }
+      }
+    },
+    {
+      "id": "knowledge_visual_identify_known_image",
+      "taxonomy": "knowledge_queries",
+      "type": "Visual identify",
+      "coverage_dimension": "visual-contract deterministic assert",
+      "expected_guard": null,
+      "pass": true,
+      "method": "deterministic",
+      "reason": "known_real_image_shape",
+      "evidence": {
+        "pass": true,
+        "reason": "known_real_image_shape",
+        "response": {
+          "type": "fauna",
+          "title": "Red panda",
+          "summary": "Red panda summary.",
+          "sections": [
+            {
+              "heading": "Overview",
+              "content": "Red panda overview."
+            }
+          ],
+          "infographic": null,
+          "imageSourceType": "known",
+          "imageQuery": "red panda photograph"
+        }
+      }
+    },
+    {
+      "id": "knowledge_howto_procedural_escalates",
+      "taxonomy": "knowledge_queries",
+      "type": "How-to / procedural",
+      "coverage_dimension": "routing deterministic assert",
+      "expected_guard": null,
+      "pass": true,
+      "method": "deterministic",
+      "reason": "procedural_shape_present_router_still_local",
+      "evidence": {
+        "pass": true,
+        "reason": "procedural_shape_present_router_still_local",
+        "route": {
+          "classification": "local",
+          "escalation_target": null
+        },
+        "response": {
+          "type": "concept",
+          "title": "Tie a tie",
+          "summary": "Tie a tie summary.",
+          "sections": [
+            {
+              "heading": "Overview",
+              "content": "Tie a tie overview."
+            }
+          ],
+          "infographic": null,
+          "imageSourceType": "diagram",
+          "imageQuery": "Tie a tie image"
+        }
+      }
+    },
+    {
+      "id": "knowledge_local_contextual_routes_to_data",
+      "taxonomy": "knowledge_queries",
+      "type": "Local / contextual",
+      "coverage_dimension": "local/contextual boundary",
+      "expected_guard": null,
+      "pass": true,
+      "method": "deterministic",
+      "reason": "calendar_query_stays_local_for_data_surface_resolution",
+      "evidence": {
+        "pass": true,
+        "reason": "calendar_query_stays_local_for_data_surface_resolution",
+        "route": {
+          "classification": "local",
+          "escalation_target": null
+        }
+      }
+    },
+    {
+      "id": "knowledge_safety_sensitive_refusal",
+      "taxonomy": "knowledge_queries",
+      "type": "Safety-sensitive",
+      "coverage_dimension": "safety-expansion deterministic contract",
+      "expected_guard": null,
+      "pass": true,
+      "method": "deterministic",
+      "reason": "safety_routes_to_opus_no_image",
+      "evidence": {
+        "pass": true,
+        "reason": "safety_routes_to_opus_no_image",
+        "route": {
+          "classification": "escalate",
+          "escalation_target": "opus"
+        },
+        "response": {
+          "type": "concept",
+          "title": "Medication safety",
+          "summary": "I can't give personalized medication dosing. Contact the prescribing clinician or pharmacist, and use emergency services for urgent symptoms.",
+          "sections": [
+            {
+              "heading": "Overview",
+              "content": "Medication safety overview."
+            }
+          ],
+          "infographic": null,
+          "imageSourceType": "none"
+        }
+      }
+    },
+    {
+      "id": "knowledge_out_of_scope_graceful_refusal",
+      "taxonomy": "knowledge_queries",
+      "type": "Out-of-scope / unknown",
+      "coverage_dimension": "graceful degradation",
+      "expected_guard": null,
+      "pass": true,
+      "method": "deterministic",
+      "reason": "graceful_ambiguous_refusal",
+      "evidence": {
+        "pass": true,
+        "reason": "graceful_ambiguous_refusal",
+        "response": {
+          "type": "concept",
+          "title": "Ambiguous subject",
+          "summary": "I can't answer that without a clearer subject. Ask again with the thing you want explained.",
+          "sections": [
+            {
+              "heading": "Overview",
+              "content": "Ambiguous subject overview."
+            }
+          ],
+          "infographic": null,
+          "imageSourceType": "none"
+        }
+      }
+    }
+  ],
+  "judge_stats": {
+    "total": 3,
+    "deterministic": 0,
+    "llm": 3,
+    "cacheHits": 0,
+    "newJudgments": 3,
+    "estimatedInputTokens": 484,
+    "estimatedOutputTokens": 0,
+    "estimatedCostUsd": 0.001452
+  }
+}
