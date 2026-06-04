@@ -26,7 +26,8 @@
     "knowledge:promote-asset": "node scripts/promote-curated-knowledge-asset.mjs",
     "check:knowledge-visual-contract": "node scripts/check-knowledge-visual-contract.mjs",
     "check:knowledge-reference-fidelity": "node scripts/check-knowledge-reference-fidelity.mjs",
-    "check:knowledge-visual-contract:live": "node scripts/check-knowledge-visual-contract.mjs --live"
+    "check:knowledge-visual-contract:live": "node scripts/check-knowledge-visual-contract.mjs --live",
+    "monitor:homecenters": "node scripts/homecenter-node-health.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
