@@ -19,6 +19,7 @@
     "eval:compare": "node openclaw/eval/runner.js --mode compare --suite all",
     "eval:taxonomy": "node openclaw/eval/taxonomy-coverage.js",
     "eval:report": "node openclaw/eval/report.js",
+    "benchmark:mac-mini-elimination": "python3 voice-service/pi_elimination_benchmark.py --remote-host homecenter.local --openwakeword-model /home/pi/home-center/pi/models/hey_homer.onnx",
     "mcp:home-center": "node openclaw/mcp/server.js",
     "agentci:gate": "node scripts/agentci.js gate",
     "audit:clawpatch": "bash scripts/clawpatch-audit.sh",
