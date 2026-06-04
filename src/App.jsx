@@ -1309,18 +1309,19 @@ export function buildAgenda(events, now) {
   const normalized = src
     .map((event, index) => {
       const start = event.start ? new Date(event.start) : null;
-      const day = event.day || dayLabel(start, now);
+      const agendaDate = event.allDay ? allDayAgendaDate(event.start) : start;
+      const day = event.day && !agendaDate ? event.day : dayLabel(agendaDate, now);
       return {
         id: event.id || `${event.title}-${index}`,
         day,
-        offset: dayOffset(start, now),
+        offset: dayOffset(agendaDate, now),
         title: event.title || event.summary || "Calendar event",
         sub: event.sub || event.location || event.who || event.calendar || "",
         icon: event.icon || "▣",
-        time: event.time || (start && Number.isFinite(start.getTime())
+        time: event.allDay ? "All day" : event.time || (start && Number.isFinite(start.getTime())
           ? start.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }).replace(":00", "")
           : "All day"),
-        sort: start?.getTime() ?? index,
+        sort: (event.allDay && agendaDate ? agendaDate.getTime() - 1 : start?.getTime()) ?? index,
       };
     })
     .filter((event) => event.offset >= 0 && event.offset < V2_AGENDA_DAYS)
@@ -1358,6 +1359,14 @@ function dayOffset(date, now) {
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const target = new Date(date.getFullYear(), date.getMonth(), date.getDate());
   return Math.round((target - today) / 86_400_000);
+}
+
+function allDayAgendaDate(value) {
+  if (!value) return null;
+  const parsed = value instanceof Date ? value : new Date(value);
+  if (!Number.isFinite(parsed.getTime())) return null;
+  const [year, month, day] = parsed.toISOString().slice(0, 10).split("-").map(Number);
+  return new Date(year, month - 1, day);
 }
 
 function agendaGroups(events, now) {

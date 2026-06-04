@@ -54,6 +54,29 @@ describe("buildAgenda", () => {
     ]);
     expect(agenda.days.map((day) => day.items.length)).toEqual([1, 0, 0, 0, 0, 0, 0]);
   });
+
+  it("keeps all-day worker events on their intended calendar date", () => {
+    const now = new Date("2026-06-04T08:00:00-07:00");
+    const agenda = buildAgenda([
+      {
+        id: "park-day",
+        title: "Park day 1st grade",
+        start: "2026-06-05T00:00:00.000Z",
+        end: "2026-06-06T00:00:00.000Z",
+        allDay: true,
+      },
+      {
+        id: "morning",
+        title: "Morning call",
+        start: "2026-06-04T15:00:00.000Z",
+        allDay: false,
+      },
+    ], now);
+
+    expect(agenda.days[0].items.map((item) => item.title)).toEqual(["Morning call"]);
+    expect(agenda.days[1].items.map((item) => item.title)).toEqual(["Park day 1st grade"]);
+    expect(agenda.days[1].items[0].time).toBe("All day");
+  });
 });
 
 describe("shouldShowWeekdayMorningTasks", () => {
