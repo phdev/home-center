@@ -75,6 +75,26 @@ describe("buildHowieActions", () => {
     });
   });
 
+  it("adds a confirm-guarded Needs Action for calendar conflicts", () => {
+    const actions = buildHowieActions({
+      hasMorningOverlap: true,
+      conflicts: [{
+        a: { id: "dentist", title: "Dentist", start: "2026-05-28T08:00:00-07:00" },
+        b: { id: "dropoff", title: "School dropoff", start: "2026-05-28T08:30:00-07:00" },
+        at: "2026-05-28T08:30:00-07:00",
+      }],
+    }, at(8, 20));
+
+    expect(actions[0]).toMatchObject({
+      id: "conflict-dentist-dropoff",
+      kind: "Calendar",
+      tone: "urgent",
+      meta: "Overlap at 8:30 AM",
+      title: "Resolve calendar conflict",
+      detail: "Dentist overlaps School dropoff. Confirm before rescheduling.",
+    });
+  });
+
   it("interleaves takeout, gift, and school by urgency at the dinner prompt", () => {
     const derived = {
       rankedSchoolItems: [{

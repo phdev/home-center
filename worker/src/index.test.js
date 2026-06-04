@@ -255,6 +255,50 @@ END:VCALENDAR`, {
     expect(stored.updates.find((item) => item.id === "park-day-form").dismissedAt).toEqual(expect.any(String));
     expect(stored.updates.find((item) => item.id === "franklin").dismissedAt).toBeUndefined();
   });
+
+  it("surfaces calendar overlaps as confirm-guarded Needs Action items", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-05-28T08:20:00-07:00"));
+    global.fetch = vi.fn(async () => new Response(`BEGIN:VCALENDAR
+BEGIN:VEVENT
+UID:dentist
+DTSTART:20260528T150000Z
+DTEND:20260528T154500Z
+SUMMARY:Dentist
+END:VEVENT
+BEGIN:VEVENT
+UID:dropoff
+DTSTART:20260528T153000Z
+DTEND:20260528T160000Z
+SUMMARY:School dropoff
+END:VEVENT
+END:VCALENDAR`, {
+      headers: { "Content-Type": "text/calendar" },
+    }));
+    const currentEnv = env({
+      CALENDAR_URLS: "https://calendar.test/howell.ics",
+    });
+
+    const res = await worker.fetch(new Request("https://worker.test/api/needs-action/done", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: "Resolve calendar conflict" }),
+    }), currentEnv, {});
+    const body = await res.json();
+
+    expect(res.status).toBe(409);
+    expect(body).toMatchObject({
+      ok: false,
+      reason: "confirm_required",
+      action: {
+        id: "conflict-dentist-dropoff",
+        type: "calendar_conflict",
+        title: "Resolve calendar conflict",
+        guard: "confirm",
+        eventIds: ["dentist", "dropoff"],
+      },
+    });
+  });
 });
 
 describe("takeout suggestions", () => {

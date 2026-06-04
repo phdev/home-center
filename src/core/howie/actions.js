@@ -70,6 +70,11 @@ export function buildHowieActions(derived, now = new Date()) {
     if (!Number.isFinite(date.getTime())) return null;
     return `${prefix} ${date.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`;
   };
+  const formatTime = (value) => {
+    const date = new Date(value);
+    if (!Number.isFinite(date.getTime())) return null;
+    return date.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+  };
 
   for (const item of derived?.rankedSchoolItems ?? []) {
     const tiebreaker = item.dueDate
@@ -89,6 +94,24 @@ export function buildHowieActions(derived, now = new Date()) {
       detailLabel: item.suggestedAction ? "Suggested action" : null,
       detail: item.suggestedAction || item.summary || item.child || "School update",
     }, clamp01(item.urgency), tiebreaker);
+  }
+
+  if (derived?.hasMorningOverlap && derived.conflicts?.[0]) {
+    const conflict = derived.conflicts[0];
+    const startsAt = new Date(conflict.at);
+    const minutesUntil = Number.isFinite(startsAt.getTime())
+      ? Math.round((startsAt.getTime() - now.getTime()) / 60_000)
+      : null;
+    const soon = minutesUntil != null && minutesUntil >= 0 && minutesUntil <= 15;
+    const time = formatTime(conflict.at);
+    withPriority({
+      id: `conflict-${conflict.a?.id ?? "a"}-${conflict.b?.id ?? "b"}`,
+      kind: "Calendar",
+      tone: soon ? "urgent" : "warning",
+      meta: time ? `Overlap at ${time}` : "Calendar overlap",
+      title: "Resolve calendar conflict",
+      detail: `${conflict.a?.title ?? "Event"} overlaps ${conflict.b?.title ?? "another event"}. Confirm before rescheduling.`,
+    }, soon ? 0.92 : 0.7, Number.isFinite(startsAt.getTime()) ? -startsAt.getTime() : SCHOOL_TIEBREAKER_FALLBACK);
   }
 
   if (derived?.birthdayGiftNeeded && derived.birthdaysRanked?.length) {

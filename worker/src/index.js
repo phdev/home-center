@@ -3552,6 +3552,16 @@ async function handleNeedsActionDone(request, env) {
     return json({ ok: true, index: matchedIndex, action, result: { ok: true, record } });
   }
 
+  if (action.type === "calendar_conflict") {
+    return json({
+      ok: false,
+      reason: "confirm_required",
+      index: matchedIndex,
+      action,
+      message: "Calendar conflicts require confirmation before any reschedule action.",
+    }, 409);
+  }
+
   return json({
     ok: false,
     reason: "unsupported_action_type",
@@ -3597,6 +3607,9 @@ function findNeedsActionByName(actions, rawName) {
 async function buildCurrentNeedsActions(env, now = new Date()) {
   const actions = [];
   const calendarEvents = await currentCalendarEvents(env, now);
+  for (const conflict of buildCalendarConflictNeedsActions(calendarEvents, now)) {
+    actions.push(conflict);
+  }
   const schoolData = env.NOTIFICATIONS
     ? (await env.NOTIFICATIONS.get(SCHOOL_UPDATES_KEY, { type: "json" })) ?? {}
     : {};
@@ -3652,6 +3665,81 @@ async function buildCurrentNeedsActions(env, now = new Date()) {
   return actions
     .sort((a, b) => b.urgencyScore - a.urgencyScore || b.tiebreaker - a.tiebreaker)
     .map(({ urgencyScore, tiebreaker, ...action }) => action);
+}
+
+function buildCalendarConflictNeedsActions(calendarEvents = [], now = new Date()) {
+  const conflicts = detectWorkerMorningCalendarConflicts(calendarEvents, now);
+  return conflicts.map((conflict) => {
+    const startsAt = new Date(conflict.at);
+    const minutesUntil = Number.isFinite(startsAt.getTime())
+      ? Math.round((startsAt.getTime() - now.getTime()) / 60_000)
+      : null;
+    const soon = minutesUntil != null && minutesUntil >= 0 && minutesUntil <= 15;
+    const time = formatWorkerNeedsActionTime(conflict.at);
+    return {
+      id: `conflict-${conflict.a.id}-${conflict.b.id}`,
+      type: "calendar_conflict",
+      sourceId: conflict.a.id,
+      title: "Resolve calendar conflict",
+      aliases: [
+        "Resolve morning conflict",
+        "Resolve calendar overlap",
+        conflict.a.title,
+        conflict.b.title,
+      ].filter(Boolean),
+      eventIds: [conflict.a.id, conflict.b.id],
+      detail: `${conflict.a.title} overlaps ${conflict.b.title}${time ? ` at ${time}` : ""}.`,
+      guard: "confirm",
+      urgencyScore: soon ? 0.92 : 0.7,
+      tiebreaker: Number.isFinite(startsAt.getTime()) ? -startsAt.getTime() : -Number.MAX_SAFE_INTEGER,
+    };
+  });
+}
+
+function detectWorkerMorningCalendarConflicts(calendarEvents = [], now = new Date()) {
+  const dayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const noon = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 12);
+  const morning = calendarEvents
+    .filter((event) => !event?.allDay && event?.status !== "declined")
+    .map((event, index) => {
+      const start = new Date(event.start ?? event.startDate ?? "");
+      const end = new Date(event.end ?? event.endDate ?? "");
+      return {
+        id: String(event.id ?? event.uid ?? `event-${index}`),
+        title: String(event.title ?? event.summary ?? "Calendar event"),
+        start,
+        end,
+      };
+    })
+    .filter((event) =>
+      Number.isFinite(event.start.getTime()) &&
+      Number.isFinite(event.end.getTime()) &&
+      event.start >= dayStart &&
+      event.start < noon
+    )
+    .sort((a, b) => a.start - b.start);
+
+  const conflicts = [];
+  for (let i = 0; i < morning.length; i += 1) {
+    for (let j = i + 1; j < morning.length; j += 1) {
+      const a = morning[i];
+      const b = morning[j];
+      if (a.end > b.start) {
+        conflicts.push({
+          a: { id: a.id, title: a.title, start: a.start.toISOString() },
+          b: { id: b.id, title: b.title, start: b.start.toISOString() },
+          at: b.start.toISOString(),
+        });
+      }
+    }
+  }
+  return conflicts;
+}
+
+function formatWorkerNeedsActionTime(value) {
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return null;
+  return date.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
 }
 
 async function currentCalendarEvents(env, now = new Date()) {

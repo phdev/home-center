@@ -49,6 +49,18 @@ volume, tall affordances, one primary action per card.
 | **Actions** | `Dismiss` (hides for 2 h), `Open calendar detail` |
 | **Priority** | Tier 4 normally; Tier 2 if the conflict starts within 15 minutes |
 
+## Calendar Conflict Needs Action
+
+| Field | Value |
+|---|---|
+| **Purpose** | Put calendar overlaps that already have a reschedule suggestion into the actionable queue |
+| **Location** | Needs Action panel and Worker `/api/needs-action/done` matching surface |
+| **Visibility** | `derived.hasMorningOverlap === true` with at least one `derived.conflicts[]` row |
+| **Required data** | First conflict pair: `a.id`, `a.title`, `b.id`, `b.title`, `at` |
+| **Deterministic fallback copy** | Title: `Resolve calendar conflict`. Detail: `{eventA.title} overlaps {eventB.title}. Confirm before rescheduling.` |
+| **Actions** | Open/review calendar detail only. Completion returns `confirm_required`; never silently moves or edits a calendar event. |
+| **Priority** | Important; urgent only when the conflict starts in the next 15 minutes |
+
 ## Morning School Checklist Card
 
 | Field | Value |
