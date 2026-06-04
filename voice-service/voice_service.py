@@ -28,7 +28,14 @@ from urllib.parse import quote
 import numpy as np
 import requests
 
-from intent import COMMAND_KEYWORD_RE, HOWIE_WAKE_PHRASE_RE, WAKE_PHRASE_RE, is_dispatchable_command, parse_command
+from intent import (
+    COMMAND_KEYWORD_RE,
+    HOWIE_WAKE_PHRASE_RE,
+    WAKE_PHRASE_RE,
+    is_dispatchable_command,
+    is_incomplete_wake_log,
+    parse_command,
+)
 
 
 def env_flag(name: str, default: bool = False) -> bool:
@@ -1366,6 +1373,23 @@ def confirmed_command_from_transcript(
     return body, command, candidates
 
 
+def wake_log_followup_command(
+    body: str,
+    followup_text: str,
+    fallback_text: str = "Hey Homer",
+    require_wake_phrase: bool = True,
+    wake_re=CONFIRM_WAKE_PHRASE_RE,
+) -> tuple[str, dict, list[dict]]:
+    combined = f"Hey Homer, {body} {followup_text}".strip()
+    return confirmed_command_from_transcript(
+        combined,
+        fallback_text=fallback_text,
+        require_wake_phrase=require_wake_phrase,
+        wake_re=wake_re,
+        allow_bare_ask=False,
+    )
+
+
 def confirmed_dispatches(
     body: str,
     command: dict,
@@ -2248,6 +2272,52 @@ def main() -> None:
                     openai_diag.latency_ms,
                     openai_diag.error,
                 )
+            if not dispatch_items and is_incomplete_wake_log(body or text):
+                followup_audio, waited_seconds, speech_seconds = capture_followup_command(
+                    mic,
+                    rolling,
+                    noise,
+                    wait_seconds=2.0,
+                    max_speech_seconds=1.8,
+                )
+                followup_text = transcribe(
+                    followup_audio,
+                    args.whisper_model,
+                    args.whisper_no_speech_threshold,
+                )
+                followup_body, followup_command, followup_candidates = wake_log_followup_command(
+                    body or text,
+                    followup_text,
+                    fallback_text=wake_text,
+                    require_wake_phrase=is_local_stt_engine(args.wake_engine),
+                    wake_re=CONFIRM_WAKE_PHRASE_RE,
+                )
+                reliability.event(
+                    "wake_log_followup",
+                    wakeEngine=args.wake_engine,
+                    source=wake_source,
+                    wakeText=wake_text,
+                    originalBody=body,
+                    followupTranscript=followup_text,
+                    waitedMs=round(waited_seconds * 1000),
+                    speechMs=round(speech_seconds * 1000),
+                    body=followup_body,
+                    command=followup_command,
+                    dispatchable=is_dispatchable_command(followup_command),
+                )
+                followup_dispatch_items = confirmed_dispatches(
+                    followup_body,
+                    followup_command,
+                    followup_candidates,
+                    dispatch_all=args.confirm_multi_command_dispatch,
+                )
+                if followup_dispatch_items:
+                    text = f"{text} {followup_text}".strip()
+                    body = followup_body
+                    command = followup_command
+                    command_candidates = followup_candidates
+                    dispatch_items = followup_dispatch_items
+                    stt_source = "local_followup"
             stt_done = time.time()
             reliability.event(
                 "confirmed_transcript",

@@ -3,7 +3,7 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from intent import is_dispatchable_command, parse_command, strip_wake_phrase
+from intent import is_dispatchable_command, is_incomplete_wake_log, parse_command, strip_wake_phrase
 
 
 def test_empty_wake_phrase_does_not_turn_on_tv():
@@ -173,12 +173,22 @@ def test_wake_log_intent():
         "action": "wake_log",
         "children": {"lucy": "06:45", "livy": "07:10"},
     }
+    assert parse_command("Hey Homer, both girls woke up at six thirty.") == {
+        "action": "wake_log",
+        "children": {"lucy": "06:30", "livy": "06:30"},
+    }
+    assert parse_command("Hey Homer, both girls woke up that six thirty.") == {
+        "action": "wake_log",
+        "children": {"lucy": "06:30", "livy": "06:30"},
+    }
     assert parse_command("Hey Homer, Olivia woke up at 7 am") == {
         "action": "wake_log",
         "children": {"livy": "07:00"},
     }
     assert is_dispatchable_command({"action": "wake_log", "children": {"lucy": "06:45"}})
     assert not is_dispatchable_command({"action": "wake_log", "children": {}})
+    assert is_incomplete_wake_log("Hey Homer, both girls woke up that.")
+    assert not is_incomplete_wake_log("Hey Homer, both girls woke up at six thirty.")
 
 
 def test_howie_message_intent():

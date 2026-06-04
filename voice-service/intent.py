@@ -87,6 +87,8 @@ _ALLOWED_NAV_VIEWS = {"monthly", "weekly", "daily"}
 _MAX_TIMER_SECONDS = 24 * 60 * 60
 
 _NUMBER_WORDS = {
+    "zero": 0,
+    "oh": 0,
     "a": 1,
     "an": 1,
     "one": 1,
@@ -116,6 +118,8 @@ _NUMBER_WORDS = {
 }
 
 _NUMBER_PATTERN = "|".join(sorted(_NUMBER_WORDS, key=len, reverse=True))
+_CLOCK_WORD_PATTERN = rf"(?:{_NUMBER_PATTERN})(?:\s+(?:{_NUMBER_PATTERN}))?"
+_CLOCK_PATTERN = rf"(?:\d{{1,2}}(?::\d{{2}})?|{_CLOCK_WORD_PATTERN})\s*(?:a\.?m\.?|p\.?m\.?)?"
 
 
 def strip_wake_phrase(text: str) -> str:
@@ -228,9 +232,8 @@ def _parse_needs_action_done(text: str) -> dict:
 
 
 def _parse_wake_log(text: str) -> dict:
-    time_pattern = r"(\d{1,2}(?::\d{2})?\s*(?:a\.?m\.?|p\.?m\.?)?)"
     both = re.search(
-        rf"\b(?:both\s+)?(?:girls|kids|children|lucy\s+and\s+(?:livy|liv|olivia)|(?:livy|liv|olivia)\s+and\s+lucy)\s+woke\s+up\s+at\s+{time_pattern}\b",
+        rf"\b(?:both\s+)?(?:girls|kids|children|lucy\s+and\s+(?:livy|liv|olivia)|(?:livy|liv|olivia)\s+and\s+lucy)\s+(?:woke|wake|waking)\s+up\s+(?:at|that)\s+({_CLOCK_PATTERN})\b",
         text,
     )
     if both:
@@ -239,7 +242,7 @@ def _parse_wake_log(text: str) -> dict:
             return {"action": "wake_log", "children": {"lucy": wake_time, "livy": wake_time}}
 
     matches = list(re.finditer(
-        rf"\b(lucy|livy|liv|olivia)\s+woke\s+up\s+at\s+{time_pattern}\b",
+        rf"\b(lucy|livy|liv|olivia)\s+(?:woke|wake|waking)\s+up\s+(?:at|that)\s+({_CLOCK_PATTERN})\b",
         text,
     ))
     if not matches:
@@ -257,18 +260,61 @@ def _parse_wake_log(text: str) -> dict:
 
 def _normalize_clock_text(value: str) -> str:
     match = re.fullmatch(r"\s*(\d{1,2})(?::(\d{2}))?\s*(a\.?m\.?|p\.?m\.?)?\s*", value, re.IGNORECASE)
-    if not match:
+    if match:
+        hour = int(match.group(1))
+        minute = int(match.group(2) or "0")
+        suffix = (match.group(3) or "").lower().replace(".", "")
+        if minute > 59 or hour > 23:
+            return ""
+        if suffix == "pm" and hour < 12:
+            hour += 12
+        if suffix == "am" and hour == 12:
+            hour = 0
+        return f"{hour:02d}:{minute:02d}"
+
+    word_match = re.fullmatch(
+        rf"\s*({_CLOCK_WORD_PATTERN})\s*(a\.?m\.?|p\.?m\.?)?\s*",
+        value,
+        re.IGNORECASE,
+    )
+    if not word_match:
         return ""
-    hour = int(match.group(1))
-    minute = int(match.group(2) or "0")
-    suffix = (match.group(3) or "").lower().replace(".", "")
-    if minute > 59 or hour > 23:
+    words = word_match.group(1).lower().split()
+    suffix = (word_match.group(2) or "").lower().replace(".", "")
+    hour = _parse_word_number(words[:1])
+    minute = _parse_word_number(words[1:]) if len(words) > 1 else 0
+    if hour is None or minute is None or hour > 23 or minute > 59:
         return ""
     if suffix == "pm" and hour < 12:
         hour += 12
     if suffix == "am" and hour == 12:
         hour = 0
     return f"{hour:02d}:{minute:02d}"
+
+
+def _parse_word_number(words: list[str]) -> int | None:
+    if not words:
+        return None
+    if len(words) == 1:
+        return _NUMBER_WORDS.get(words[0])
+    if len(words) == 2 and words[0] in {"twenty", "thirty", "forty", "fifty"}:
+        ones = _NUMBER_WORDS.get(words[1])
+        if ones is None or ones >= 10:
+            return None
+        return _NUMBER_WORDS[words[0]] + ones
+    return None
+
+
+def is_incomplete_wake_log(text: str) -> bool:
+    body = strip_wake_phrase(text).lower().strip(" ,.:;!?-")
+    if _parse_wake_log(body)["action"] != "none":
+        return False
+    has_subject = re.search(
+        r"\b(?:both\s+)?(?:girls|kids|children|lucy|livy|liv|olivia)\b",
+        body,
+    )
+    has_wake = re.search(r"\b(?:woke|wake|waking)\s+up\b", body)
+    return bool(has_subject and has_wake)
 
 
 def parse_command(text: str, allow_bare_ask: bool = True, allow_wake_knowledge: bool = False) -> dict:

@@ -45,6 +45,7 @@ from voice_service import (
     updated_speech_max_empty_backoff_until,
     validate_wake_mode_config,
     VoiceReliabilityLogger,
+    wake_log_followup_command,
 )
 
 
@@ -243,6 +244,24 @@ def test_audio_activity_heartbeat_summarizes_quiet_windows(monkeypatch):
     assert snapshot["max_rms"] == 48
     assert snapshot["avg_rms"] == 30
     assert not heartbeat.should_log(now=14.2)
+
+
+def test_wake_log_followup_command_combines_split_time_fragment():
+    body, command, candidates = wake_log_followup_command(
+        "both girls woke up that",
+        "six thirty",
+        fallback_text="a hummer",
+    )
+
+    assert body == "both girls woke up that six thirty"
+    assert command == {
+        "action": "wake_log",
+        "children": {"lucy": "06:30", "livy": "06:30"},
+    }
+    assert candidates == [{
+        "body": "both girls woke up that six thirty",
+        "command": command,
+    }]
 
 
 def test_voice_reliability_logger_writes_jsonl_and_activity_summary(tmp_path, monkeypatch):
