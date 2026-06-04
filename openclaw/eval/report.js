@@ -56,6 +56,18 @@ function getLatestResults() {
   });
 }
 
+function getLatestTaxonomyCoverage() {
+  let files;
+  try {
+    files = readdirSync(RESULTS_DIR).filter((f) => /^\d{4}-\d{2}-\d{2}-taxonomy-coverage\.json$/.test(f));
+  } catch {
+    return null;
+  }
+  const latest = files.sort().at(-1);
+  if (!latest) return null;
+  return JSON.parse(readFileSync(join(RESULTS_DIR, latest), 'utf-8'));
+}
+
 function ensureTier(tiers, tier) {
   if (!tiers[tier]) tiers[tier] = { model: null, suites: {} };
   return tiers[tier];
@@ -159,6 +171,7 @@ function buildReport(results) {
     tiers,
     recommendation,
     knowledge_bridge: summarizeKnowledgeBridge(),
+    taxonomy_coverage: getLatestTaxonomyCoverage()?.taxonomies || null,
   };
 }
 

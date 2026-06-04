@@ -17,6 +17,7 @@
     "eval:env": "node openclaw/eval/check-environment.js",
     "eval:score": "node openclaw/eval/runner.js --tier all --suite all",
     "eval:compare": "node openclaw/eval/runner.js --mode compare --suite all",
+    "eval:taxonomy": "node openclaw/eval/taxonomy-coverage.js",
     "eval:report": "node openclaw/eval/report.js",
     "mcp:home-center": "node openclaw/mcp/server.js",
     "agentci:gate": "node scripts/agentci.js gate",

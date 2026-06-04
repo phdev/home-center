@@ -59,6 +59,12 @@ const CRITERION_DESCRIPTIONS = {
   contains_comparison: 'The response should compare two or more options, tradeoffs, costs, or choices.',
   contains_analysis: 'The response should reason about the information and identify implications, conflicts, or priorities.',
   contains_budget: 'The response should discuss budget, cost, spending, prices, or money constraints.',
+  grounded_gift_suggestion:
+    'The response should give a birthday gift next step or idea grounded in the provided household birthday facts, and should not imply external account access.',
+  grounded_restaurant_suggestion:
+    'The response should recommend a restaurant or takeout next step grounded in the provided recent-order facts, and should avoid grocery merchants when restaurant options are present.',
+  grounded_lunch_suggestion:
+    'The response should mention the next school-day lunch decision, include the provided menu facts when available, and preserve the school-versus-home choice.',
   acknowledges_action: 'The response should clearly acknowledge that the requested action was understood or completed.',
   acknowledges_timer: 'The response should clearly acknowledge setting, starting, stopping, canceling, or managing a timer.',
   appropriate_refusal:

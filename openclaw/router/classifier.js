@@ -48,6 +48,7 @@ const HARD_SIGNALS = [
   /\bmedical\b/i,
   /\bmedication\b/i,
   /\bmedicine\b/i,
+  /\b(prescription|antibiotic|antibiotics|dose|dosing|dosage|tylenol|ibuprofen|advil|motrin|fever)\b/i,
   /\bemergency\b/i,
   /\blegal\b/i,
   /\blong[\s-]term\s+plan/i,
