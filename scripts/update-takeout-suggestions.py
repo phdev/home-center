@@ -40,6 +40,7 @@ KNOWN_VENDORS = [
     "Urban Plates",
     "Cava",
     "Panda Express",
+    "Bamboo Thai Bistro",
 ]
 
 ORDER_QUERY = (
@@ -113,6 +114,8 @@ def message_date(value: str | None) -> str | None:
 
 def normalize_vendor(value: str) -> str:
     cleaned = re.sub(r"\s+", " ", value).strip(" -:|.,\t\r\n")
+    cleaned = re.split(r"\s+(?:will be ready|is ready|was ready|can be picked up|can pick it up|order is ready)\b", cleaned, maxsplit=1, flags=re.IGNORECASE)[0]
+    cleaned = cleaned.strip(" -:|.,\t\r\n")
     for vendor in KNOWN_VENDORS:
         if cleaned.lower() == vendor.lower():
             return vendor
@@ -171,6 +174,7 @@ def build_suggestions(messages_by_account: dict[str, list[dict]]) -> dict:
     recent_set = {vendor.lower() for vendor in recent_ranked[:8]}
     candidates = [vendor for vendor in KNOWN_VENDORS if vendor.lower() not in recent_set]
     candidates.extend(vendor for vendor in KNOWN_VENDORS if vendor.lower() in recent_set)
+    last_order_date = max(last_seen.values()) if last_seen else None
 
     return {
         "suggestedVendors": candidates[:8],
@@ -183,6 +187,8 @@ def build_suggestions(messages_by_account: dict[str, list[dict]]) -> dict:
             }
             for vendor in recent_ranked[:12]
         ],
+        "lastOrderDate": last_order_date,
+        "sourceAccounts": sorted(messages_by_account),
         "suggestionsSource": "gmail:" + ",".join(sorted(messages_by_account)),
     }
 

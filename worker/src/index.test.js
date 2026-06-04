@@ -173,7 +173,13 @@ describe("Needs Action completion", () => {
   it("marks Lock in dinner complete by name so it leaves Needs Action", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-05-28T17:00:00-07:00"));
-    const notifications = createKv();
+    const notifications = createKv({
+      "hc:takeout:suggestions": JSON.stringify({
+        suggestedVendors: ["El Tarasco", "Thai Dishes"],
+        recentVendors: [{ name: "Rascals", lastOrderedDate: "2026-05-20", count: 2 }],
+        suggestionsSource: "gmail:phhowell@gmail.com",
+      }),
+    });
     const currentEnv = env({ NOTIFICATIONS: notifications });
 
     const res = await worker.fetch(new Request("https://worker.test/api/needs-action/done", {
@@ -280,6 +286,9 @@ describe("takeout suggestions", () => {
       decision: null,
       suggestedVendors: ["El Tarasco", "Thai Dishes", "Chicken Maison"],
       recentVendors: [{ name: "Rascals", lastOrderedDate: "2026-05-20", count: 2 }],
+      lastOrderDate: "2026-05-20",
+      daysSinceLastOrder: 8,
+      minDaysSinceLastOrder: 3,
       suggestionsSource: "gmail:phhowell@gmail.com",
     });
   });

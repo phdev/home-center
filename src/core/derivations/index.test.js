@@ -116,14 +116,40 @@ describe("core derivations", () => {
     expect(result.items[0].id).toBe("book-fair");
   });
 
-  it("takeoutUndecided flags the 16:30-20:00 undecided window", () => {
-    const result = takeoutUndecided(emptyRawState(), {
-      now: at(2026, 4, 23, 17),
+  it("takeoutUndecided flags the 16:00-20:00 window after 3+ days since email-confirmed takeout", () => {
+    const result = takeoutUndecided(raw({
+      takeout: {
+        today: {
+          decision: null,
+          suggestedVendors: ["El Tarasco", "Thai Dishes"],
+          recentVendors: [{ name: "Rascals", lastOrderedDate: "2026-05-20", count: 2 }],
+        },
+      },
+    }), {
+      now: at(2026, 5, 23, 16),
       user: PETER,
     });
 
     expect(result.value).toBe(true);
-    expect(result.state.suggestedVendors).toHaveLength(4);
+    expect(result.state.suggestedVendors.slice(0, 2)).toEqual(["El Tarasco", "Thai Dishes"]);
+    expect(result.state.daysSinceLastOrder).toBe(3);
+  });
+
+  it("takeoutUndecided stays hidden before 3 days since last takeout order", () => {
+    const result = takeoutUndecided(raw({
+      takeout: {
+        today: {
+          decision: null,
+          suggestedVendors: ["El Tarasco"],
+          recentVendors: [{ name: "Rascals", lastOrderedDate: "2026-05-22", count: 2 }],
+        },
+      },
+    }), {
+      now: at(2026, 5, 23, 17),
+      user: PETER,
+    });
+
+    expect(result.value).toBe(false);
   });
 
   it("bedtimeReminderActive flags the lead window", () => {

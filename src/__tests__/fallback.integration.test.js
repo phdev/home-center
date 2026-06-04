@@ -35,9 +35,18 @@ describe("integration — no card depends on OpenClaw for visibility", () => {
     expect(r.source).toBe("fallback");
   });
 
-  it("takeout decision: card visible after 16:30 regardless of AI", async () => {
+  it("takeout decision: card visible after 16:00 when email history says it is due", async () => {
     vi.stubGlobal("fetch", vi.fn(() => Promise.reject(new Error("down"))));
-    const derived = computeDerivedState(emptyRawState(), {
+    const derived = computeDerivedState({
+      ...emptyRawState(),
+      takeout: {
+        today: {
+          decision: null,
+          suggestedVendors: ["Mickey's Deli", "Rascals"],
+          recentVendors: [{ name: "Chipotle", lastOrderedDate: "2026-04-20", count: 1 }],
+        },
+      },
+    }, {
       now: at(2026, 4, 23, 17, 0),
       user: { isPeter: true },
     });

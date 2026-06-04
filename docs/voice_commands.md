@@ -51,6 +51,7 @@ Birthday gift planning is a Telegram-bound Howie command:
 
 - `Hey Homer, suggest gift ideas for <name>`
 
-The Mac voice service sends this to OpenClaw as a research request. Howie should
-use the available Facebook session for context when possible, then send Peter
-gift ideas or follow-up questions through Telegram.
+The Mac voice service sends this to OpenClaw as a bounded gift-ideas request.
+Howie should use the birthday row facts and any explicit constraints, without
+Facebook lookup, then send Peter gift ideas or follow-up questions through
+Telegram.

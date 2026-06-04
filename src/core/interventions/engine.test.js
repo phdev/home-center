@@ -36,6 +36,16 @@ function schoolItem(overrides = {}) {
 
 const USER = { isPeter: true, email: "peter@howell.com" };
 
+function takeoutDue() {
+  return {
+    today: {
+      decision: null,
+      suggestedVendors: ["California Chicken Cafe", "Mickey's Deli"],
+      recentVendors: [{ name: "Chipotle", lastOrderedDate: "2026-04-20", count: 1 }],
+    },
+  };
+}
+
 beforeAll(() => {
   process.env.TZ = "America/Los_Angeles";
 });
@@ -65,7 +75,7 @@ function derivedForEngine(now) {
           urgency: 0.2,
         }),
       ],
-      takeout: { today: null },
+      takeout: takeoutDue(),
       schoolLunchMenu: [{ date: "2026-04-24", items: ["Pasta"] }],
       bedtime: [
         {
@@ -111,7 +121,7 @@ describe("intervention engine", () => {
             event("standup", at(2026, 4, 23, 8, 30), at(2026, 4, 23, 9)),
           ],
         },
-        takeout: { today: null },
+        takeout: takeoutDue(),
       },
       { now, user: USER },
     );
@@ -157,7 +167,7 @@ describe("intervention engine", () => {
             event("standup", at(2026, 4, 23, 8, 30), at(2026, 4, 23, 9)),
           ],
         },
-        takeout: { today: null },
+        takeout: takeoutDue(),
       },
       { now, user: USER },
     );
@@ -168,7 +178,17 @@ describe("intervention engine", () => {
           "agent": {
             "feature": "takeout",
             "state": {
+              "daysSinceLastOrder": 3,
               "decision": null,
+              "lastOrderDate": "2026-04-20",
+              "minDaysSinceLastOrder": 3,
+              "recentVendors": [
+                {
+                  "count": 1,
+                  "lastOrderedDate": "2026-04-20",
+                  "name": "Chipotle",
+                },
+              ],
               "suggestedVendors": [
                 "California Chicken Cafe",
                 "Mickey's Deli",
@@ -180,7 +200,17 @@ describe("intervention engine", () => {
           },
           "data": {
             "state": {
+              "daysSinceLastOrder": 3,
               "decision": null,
+              "lastOrderDate": "2026-04-20",
+              "minDaysSinceLastOrder": 3,
+              "recentVendors": [
+                {
+                  "count": 1,
+                  "lastOrderedDate": "2026-04-20",
+                  "name": "Chipotle",
+                },
+              ],
               "suggestedVendors": [
                 "California Chicken Cafe",
                 "Mickey's Deli",

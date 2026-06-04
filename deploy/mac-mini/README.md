@@ -12,6 +12,8 @@ environment variables or sed substitution.
 | OpenClaw Telegram bridge | Family-facing chat bot (persona + skill live in `openclaw/prompts/`) | `com.openclaw.bridge` |
 | Email triage | Classify Gmail, fan out to worker + Telegram | `com.homecenter.email-triage` |
 | School updates | Pull school emails into the worker | `com.homecenter.school-updates` |
+| Takeout suggestions | Pull bounded Gmail receipt facts into the worker | `com.homecenter.takeout-suggestions` |
+| Takeout TV trigger | Turn on Home Center at 16:00 when takeout is due | `com.homecenter.takeout-tv-trigger` |
 | Design Claw | Daily design-exploration digest to Telegram (runs once at 08:15) | `com.homecenter.design-claw` |
 | Design Claw listener | Polls Telegram DMs every 5 min; replies as David or merges explicit memory feedback | `com.homecenter.design-claw-listener` |
 | Home Center voice | Vosk wake gate, local Whisper command STT, Pi command dispatch | `com.homecenter.voice` |

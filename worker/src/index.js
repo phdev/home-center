@@ -3637,8 +3637,8 @@ async function buildCurrentNeedsActions(env, now = new Date()) {
 
   const minutesSinceMidnight = localMinutesSinceMidnight(now);
   const takeout = await currentTakeoutState(env, now);
-  if ((takeout?.decision ?? null) === null && minutesSinceMidnight >= 16.5 * 60 && minutesSinceMidnight < 20 * 60) {
-    const minutesToCutoff = 16.5 * 60 - minutesSinceMidnight;
+  if ((takeout?.decision ?? null) === null && minutesSinceMidnight >= 16 * 60 && minutesSinceMidnight < 20 * 60 && takeoutEmailHistoryEligible(takeout, now)) {
+    const minutesToCutoff = 16 * 60 - minutesSinceMidnight;
     actions.push({
       id: "takeout",
       type: "takeout",
@@ -3792,7 +3792,26 @@ async function firstNeedsActionBirthday(env, now) {
 
 async function currentTakeoutState(env, now) {
   if (!env.NOTIFICATIONS) return null;
-  return await env.NOTIFICATIONS.get(takeoutKeyForDate(localDateKey(now)), { type: "json" });
+  const raw = await env.NOTIFICATIONS.get(takeoutKeyForDate(localDateKey(now)), { type: "json" });
+  const suggestions = await currentTakeoutSuggestions(env);
+  if (!raw) {
+    if (!suggestions) return null;
+    return {
+      date: localDateKey(now),
+      decision: null,
+      ...suggestions,
+    };
+  }
+  return {
+    ...raw,
+    suggestedVendors: raw.suggestedVendors ?? suggestions?.suggestedVendors,
+    recentVendors: raw.recentVendors ?? suggestions?.recentVendors,
+    lastOrderDate: raw.lastOrderDate ?? suggestions?.lastOrderDate,
+    daysSinceLastOrder: raw.daysSinceLastOrder ?? suggestions?.daysSinceLastOrder,
+    minDaysSinceLastOrder: raw.minDaysSinceLastOrder ?? suggestions?.minDaysSinceLastOrder,
+    suggestionsSource: raw.suggestionsSource ?? suggestions?.suggestionsSource,
+    suggestionsUpdatedAt: raw.suggestionsUpdatedAt ?? suggestions?.suggestionsUpdatedAt,
+  };
 }
 
 function cutoffScore(minutesToCutoff) {
@@ -3827,6 +3846,11 @@ function localMinutesSinceMidnight(date) {
   return hour * 60 + Number(p.minute);
 }
 
+function startOfLocalDay(date) {
+  const p = localDateParts(date);
+  return new Date(`${p.year}-${p.month}-${p.day}T00:00:00Z`);
+}
+
 function daysUntilMMDDWorker(mmdd, now) {
   const [month, day] = String(mmdd ?? "").split("-").map(Number);
   if (!month || !day) return Infinity;
@@ -3841,6 +3865,7 @@ function daysUntilMMDDWorker(mmdd, now) {
 
 const VALID_TAKEOUT_DECISIONS = new Set(["takeout", "home"]);
 const TAKEOUT_SUGGESTIONS_KEY = "hc:takeout:suggestions";
+const TAKEOUT_MIN_DAYS_SINCE_ORDER = 3;
 
 function takeoutKeyForDate(date) {
   return `hc:takeout:${date}`;
@@ -3863,6 +3888,9 @@ async function handleTakeoutGet(env) {
     ...raw,
     suggestedVendors: raw.suggestedVendors ?? suggestions?.suggestedVendors,
     recentVendors: raw.recentVendors ?? suggestions?.recentVendors,
+    lastOrderDate: raw.lastOrderDate ?? suggestions?.lastOrderDate,
+    daysSinceLastOrder: raw.daysSinceLastOrder ?? suggestions?.daysSinceLastOrder,
+    minDaysSinceLastOrder: raw.minDaysSinceLastOrder ?? suggestions?.minDaysSinceLastOrder,
     suggestionsSource: raw.suggestionsSource ?? suggestions?.suggestionsSource,
     suggestionsUpdatedAt: raw.suggestionsUpdatedAt ?? suggestions?.suggestionsUpdatedAt,
   });
@@ -3910,9 +3938,37 @@ async function currentTakeoutSuggestions(env) {
         count: Number.isFinite(Number(item?.count)) ? Number(item.count) : undefined,
       })).filter((item) => item.name)
       : [],
+    lastOrderDate: latestTakeoutOrderDate(raw),
+    daysSinceLastOrder: daysSinceTakeoutOrder(raw, new Date()),
+    minDaysSinceLastOrder: TAKEOUT_MIN_DAYS_SINCE_ORDER,
     suggestionsSource: clampStr(raw.suggestionsSource, 80) || "gmail",
     suggestionsUpdatedAt: clampStr(raw.suggestionsUpdatedAt, 40),
   };
+}
+
+function latestTakeoutOrderDate(source) {
+  if (typeof source?.lastOrderDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(source.lastOrderDate)) {
+    return source.lastOrderDate;
+  }
+  if (!Array.isArray(source?.recentVendors)) return null;
+  return source.recentVendors
+    .map((vendor) => vendor?.lastOrderedDate)
+    .filter((date) => typeof date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(date))
+    .sort()
+    .at(-1) ?? null;
+}
+
+function daysSinceTakeoutOrder(source, now = new Date()) {
+  const lastOrderDate = latestTakeoutOrderDate(source);
+  if (!lastOrderDate) return null;
+  const parsed = new Date(`${lastOrderDate}T00:00:00`);
+  if (!Number.isFinite(parsed.getTime())) return null;
+  return Math.floor((startOfLocalDay(now) - startOfLocalDay(parsed)) / (24 * 60 * 60 * 1000));
+}
+
+function takeoutEmailHistoryEligible(source, now = new Date()) {
+  const days = daysSinceTakeoutOrder(source, now);
+  return days != null && days >= TAKEOUT_MIN_DAYS_SINCE_ORDER;
 }
 
 async function handleTakeoutSuggestionsPost(request, env) {
@@ -3938,9 +3994,12 @@ async function handleTakeoutSuggestionsPost(request, env) {
   const record = {
     suggestedVendors,
     recentVendors,
+    lastOrderDate: latestTakeoutOrderDate({ recentVendors }),
+    minDaysSinceLastOrder: TAKEOUT_MIN_DAYS_SINCE_ORDER,
     suggestionsSource: clampStr(body?.suggestionsSource, 80) || "gmail",
     suggestionsUpdatedAt: new Date().toISOString(),
   };
+  record.daysSinceLastOrder = daysSinceTakeoutOrder(record, new Date());
   await env.NOTIFICATIONS.put(TAKEOUT_SUGGESTIONS_KEY, JSON.stringify(record), {
     expirationTtl: 60 * 60 * 24 * 7,
   });

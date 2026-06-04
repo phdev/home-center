@@ -1,7 +1,7 @@
 export function buildHowieActions(derived, now = new Date()) {
   const SCHOOL_TIEBREAKER_FALLBACK = -Number.MAX_SAFE_INTEGER;
   const GIFT_DAYS_HORIZON = 14;
-  const TAKEOUT_CUTOFF_MINUTES = 16.5 * 60;
+  const TAKEOUT_CUTOFF_MINUTES = 16 * 60;
   const LUNCH_CUTOFF_MINUTES = 18 * 60;
   const CUTOFF_PAST_SCORE = 0.95;
   const CUTOFF_30_MIN_SCORE = 0.8;

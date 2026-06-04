@@ -537,16 +537,34 @@ describe("computeDerivedState — takeout", () => {
     return `${y}-${m}-${d}`;
   };
 
-  it("not pending before 16:30", () => {
-    const now = at(2026, 4, 23, 16, 29);
-    const d = computeDerivedState(emptyRawState(), { now, user: PETER });
+  function takeoutRaw(lastOrderedDate = "2026-04-19") {
+    return raw({
+      takeout: {
+        today: {
+          decision: null,
+          suggestedVendors: ["Mickey's Deli", "Rascals"],
+          recentVendors: [{ name: "Chipotle", lastOrderedDate, count: 1 }],
+        },
+      },
+    });
+  }
+
+  it("not pending before 16:00", () => {
+    const now = at(2026, 4, 23, 15, 59);
+    const d = computeDerivedState(takeoutRaw(), { now, user: PETER });
     expect(d.takeoutDecisionPending).toBe(false);
   });
 
-  it("pending at exactly 16:30 with no decision", () => {
-    const now = at(2026, 4, 23, 16, 30);
-    const d = computeDerivedState(emptyRawState(), { now, user: PETER });
+  it("pending at exactly 16:00 with no decision and 3+ day email history gap", () => {
+    const now = at(2026, 4, 23, 16, 0);
+    const d = computeDerivedState(takeoutRaw("2026-04-20"), { now, user: PETER });
     expect(d.takeoutDecisionPending).toBe(true);
+  });
+
+  it("not pending when email receipt history says takeout was less than 3 days ago", () => {
+    const now = at(2026, 4, 23, 17, 0);
+    const d = computeDerivedState(takeoutRaw("2026-04-22"), { now, user: PETER });
+    expect(d.takeoutDecisionPending).toBe(false);
   });
 
   it("not pending once a decision is recorded", () => {

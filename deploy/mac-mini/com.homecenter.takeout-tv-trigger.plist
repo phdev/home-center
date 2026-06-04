@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.homecenter.takeout-tv-trigger</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/usr/bin/python3</string>
+    <string>__REPO__/scripts/takeout-tv-trigger.py</string>
+  </array>
+
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>HOME</key>
+    <string>__HOME__</string>
+    <key>WORKER_URL</key>
+    <string>https://home-center-api.phhowell.workers.dev</string>
+    <key>WORKER_TOKEN</key>
+    <string>__WORKER_TOKEN__</string>
+    <key>PI_URL</key>
+    <string>http://homecenter.local:8765</string>
+  </dict>
+
+  <key>StartCalendarInterval</key>
+  <dict>
+    <key>Hour</key>
+    <integer>16</integer>
+    <key>Minute</key>
+    <integer>0</integer>
+  </dict>
+
+  <key>StandardOutPath</key>
+  <string>__REPO__/logs/takeout-tv-trigger.log</string>
+  <key>StandardErrorPath</key>
+  <string>__REPO__/logs/takeout-tv-trigger.err.log</string>
+</dict>
+</plist>

@@ -75,7 +75,7 @@ describe("buildHowieActions", () => {
     });
   });
 
-  it("interleaves takeout, gift, and school by urgency at dinner cutoff", () => {
+  it("interleaves takeout, gift, and school by urgency at the dinner prompt", () => {
     const derived = {
       rankedSchoolItems: [{
         id: "school",
@@ -90,7 +90,7 @@ describe("buildHowieActions", () => {
       takeoutState: { suggestedVendors: ["Rascals"] },
     };
 
-    expect(buildHowieActions(derived, at(17)).map((action) => action.id)).toEqual([
+    expect(buildHowieActions(derived, at(16)).map((action) => action.id)).toEqual([
       "takeout",
       "gift-mom",
       "school-school",
@@ -144,8 +144,8 @@ describe("buildHowieActions", () => {
     }, at(16, 15));
 
     expect(actions.map((action) => action.id)).toEqual([
-      "school-urgent-school",
       "takeout",
+      "school-urgent-school",
       "gift-mom",
       "lunch",
       "school-low-school",

@@ -21,6 +21,10 @@ const VENDOR_ROTATION = [
   "California Chicken Cafe",
 ];
 
+const TAKEOUT_PROMPT_START_MINUTES = 16 * 60;
+const TAKEOUT_PROMPT_END_HOUR = 20;
+const TAKEOUT_MIN_DAYS_SINCE_ORDER = 3;
+
 function rankedTakeoutVendors(today, context) {
   const dayIdx = Math.floor(
     (startOfDay(context.now) - startOfDay(new Date(context.now.getFullYear(), 0, 1))) /
@@ -36,6 +40,29 @@ function rankedTakeoutVendors(today, context) {
     : [];
   const merged = [...suggested, ...fallback];
   return Array.from(new Set(merged)).slice(0, 4);
+}
+
+function latestTakeoutOrderDate(today) {
+  if (typeof today?.lastOrderDate === "string" && today.lastOrderDate) return today.lastOrderDate;
+  if (!Array.isArray(today?.recentVendors)) return null;
+  return today.recentVendors
+    .map((vendor) => vendor?.lastOrderedDate)
+    .filter((date) => typeof date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(date))
+    .sort()
+    .at(-1) ?? null;
+}
+
+function daysSinceTakeoutOrder(today, now) {
+  const lastOrderDate = latestTakeoutOrderDate(today);
+  if (!lastOrderDate) return null;
+  const parsed = new Date(`${lastOrderDate}T00:00:00`);
+  if (!Number.isFinite(parsed.getTime())) return null;
+  return Math.floor((startOfDay(now) - startOfDay(parsed)) / MS_PER_DAY);
+}
+
+function takeoutEmailHistoryEligible(today, now) {
+  const days = daysSinceTakeoutOrder(today, now);
+  return days != null && days >= TAKEOUT_MIN_DAYS_SINCE_ORDER;
 }
 
 /**
@@ -212,15 +239,18 @@ function looseTokenMatch(itemTokens, eventTokens) {
 export function takeoutUndecided(rawData, context) {
   const today = rawData.takeout?.today;
   const decision = today?.decision ?? null;
-  const cutoff = atClock(context.now, 16, 30);
+  const cutoff = atClock(context.now, 16, 0);
   const h = context.now.getHours();
-  const pending = decision === null && context.now >= cutoff && h < 20;
+  const pending = decision === null && context.now >= cutoff && h < TAKEOUT_PROMPT_END_HOUR && takeoutEmailHistoryEligible(today, context.now);
   const suggestedVendors = rankedTakeoutVendors(today, context);
 
   const state = {
     decision,
     vendor: today?.vendor,
     suggestedVendors,
+    lastOrderDate: latestTakeoutOrderDate(today),
+    daysSinceLastOrder: daysSinceTakeoutOrder(today, context.now),
+    minDaysSinceLastOrder: TAKEOUT_MIN_DAYS_SINCE_ORDER,
   };
   if (Array.isArray(today?.recentVendors) && today.recentVendors.length) {
     state.recentVendors = today.recentVendors;

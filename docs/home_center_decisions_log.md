@@ -323,6 +323,22 @@ would still need human input every month — same effort, more
 machinery to drift silently. No scheduled ingestion worker in scope.
 
 ### A2 (`/api/claw/enhance`) uses OpenAI GPT 5.5
+
+## 2026-06-04 — Takeout prompt is email-history gated
+
+The Lock In Dinner prompt now starts at 16:00 only when Gmail-derived takeout
+receipt history shows at least three days since the last takeout order. The
+restaurant suggestions source of truth is `scripts/update-takeout-suggestions.py`,
+which stores bounded vendor/date aggregates in the Worker instead of raw email
+bodies.
+
+The 16:00 TV wake-up is a narrow scheduled side effect handled by
+`scripts/takeout-tv-trigger.py`: it reads `/api/takeout/today`, verifies no
+dinner decision exists and the 3-day condition is met, then calls the Pi
+`/api/tv/on` endpoint. Missing email history does not trigger the TV.
+
+Birthday gift idea requests explicitly avoid Facebook lookup and use only the
+birthday row facts plus user-provided constraints.
 Enhancement calls hit OpenAI, not Anthropic. Default model
 `gpt-5.5`, configurable via `OPENAI_ENHANCE_MODEL` env var on
 the worker (per the "model IDs never hardcoded" decision). Worker
