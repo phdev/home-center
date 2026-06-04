@@ -10,6 +10,7 @@ function healthy(overrides = {}) {
       "dashboard-local": "active",
       "wake-word": "active",
       "kiosk-watchdog": "active",
+      "network-watchdog": "active",
       "avahi-daemon": "active",
     },
     bundle: { ok: true, js: "assets/index-live.js", css: "assets/index-live.css" },
@@ -44,12 +45,28 @@ describe("homecenter-node-health", () => {
         "dashboard-local": "active",
         "wake-word": "active",
         "kiosk-watchdog": "inactive",
+        "network-watchdog": "active",
         "avahi-daemon": "active",
       },
     }));
 
     expect(summary.ok).toBe(false);
     expect(summary.failures).toContain("service:kiosk-watchdog:inactive");
+  });
+
+  it("fails when the network watchdog is not running", () => {
+    const summary = summarizeNodeHealth(healthy({
+      services: {
+        "dashboard-local": "active",
+        "wake-word": "active",
+        "kiosk-watchdog": "active",
+        "network-watchdog": "inactive",
+        "avahi-daemon": "active",
+      },
+    }));
+
+    expect(summary.ok).toBe(false);
+    expect(summary.failures).toContain("service:network-watchdog:inactive");
   });
 
   it("fails when Chromium has no Worker token and would fall back to local data", () => {

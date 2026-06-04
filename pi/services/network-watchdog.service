@@ -1,0 +1,13 @@
+[Unit]
+Description=Home Center network watchdog
+After=NetworkManager.service network-online.target
+Wants=NetworkManager.service network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 __REPO_DIR__/pi/network-watchdog.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

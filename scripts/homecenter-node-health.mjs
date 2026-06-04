@@ -11,7 +11,7 @@ const DEFAULT_NODES = [
   { name: "homecenter2", host: "homecenter2.local", expectedHostname: "homecenter2" },
 ];
 
-const REQUIRED_SYSTEMD = ["dashboard-local", "wake-word", "kiosk-watchdog", "avahi-daemon"];
+const REQUIRED_SYSTEMD = ["dashboard-local", "wake-word", "kiosk-watchdog", "network-watchdog", "avahi-daemon"];
 
 export function summarizeNodeHealth(check) {
   const failures = [];

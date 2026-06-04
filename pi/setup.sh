@@ -96,6 +96,10 @@ sudo sed -i "s|__USER__|$USER|g" /etc/systemd/system/mic-streamer.service
 sudo cp "$SCRIPT_DIR/services/kiosk-watchdog.service" /etc/systemd/system/
 sudo sed -i "s|__REPO_DIR__|$REPO_DIR|g" /etc/systemd/system/kiosk-watchdog.service
 
+# Network watchdog (recovers Wi-Fi/mDNS loss while the screen remains visible)
+sudo cp "$SCRIPT_DIR/services/network-watchdog.service" /etc/systemd/system/
+sudo sed -i "s|__REPO_DIR__|$REPO_DIR|g" /etc/systemd/system/network-watchdog.service
+
 # Weekday morning HDMI activation
 chmod +x "$SCRIPT_DIR/morning_dashboard.sh"
 sudo cp "$SCRIPT_DIR/services/morning-dashboard.service" /etc/systemd/system/
@@ -108,6 +112,7 @@ sudo systemctl enable dashboard-local.service
 sudo systemctl enable wake-word.service
 sudo systemctl enable mic-streamer.service
 sudo systemctl enable kiosk-watchdog.service
+sudo systemctl enable network-watchdog.service
 sudo systemctl enable morning-dashboard.timer
 
 # Chromium itself is launched by ~/.config/labwc/autostart, not by a systemd
@@ -165,6 +170,7 @@ log "   - dashboard-local : Python HTTP server (no-cache) on :8080 serving dist"
 log "   - mic-streamer    : XVF3800 PipeWire audio stream on :8766"
 log "   - wake-word       : Pi command server on :8765 (CEC, timers, chime)"
 log "   - kiosk-watchdog  : Chromium health check on :9222; restarts LightDM if crashed"
+log "   - network-watchdog: Wi-Fi/mDNS health check; restarts NetworkManager/Avahi if stuck"
 log "   - morning-dashboard.timer : weekdays 7:50 AM, turns TV on and selects Pi HDMI"
 log "   (Chromium kiosk is launched from ~/.config/labwc/autostart on session start)"
 log ""
@@ -173,6 +179,7 @@ log "   sudo systemctl start dashboard-local"
 log "   sudo systemctl start mic-streamer"
 log "   sudo systemctl start wake-word"
 log "   sudo systemctl start kiosk-watchdog"
+log "   sudo systemctl start network-watchdog"
 log ""
 log " To check status:"
 log "   sudo systemctl status wake-word"

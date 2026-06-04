@@ -30,6 +30,7 @@ unreachable.
 - Verified Chromium localStorage on Home Center Two has the Worker URL and a
   Worker token present without exposing the token.
 - Restarted `kiosk-watchdog` on Home Center Two.
+- Installed and started `network-watchdog` on both Home Centers.
 - Reloaded the Home Center Two Chromium kiosk through CDP.
 - Restarted the Mac mini Home Center Two voice service.
 - Re-ran Home Center Two voice health; it returned `ok: true`.
@@ -41,7 +42,8 @@ unreachable.
 - DNS/mDNS resolution.
 - Pi command API `/api/navigate`.
 - SSH hostname and required services:
-  `dashboard-local`, `wake-word`, `kiosk-watchdog`, and `avahi-daemon`.
+  `dashboard-local`, `wake-word`, `kiosk-watchdog`, `network-watchdog`, and
+  `avahi-daemon`.
 - Deployed dashboard bundle in `dashboard-local/home-center`.
 - Chromium page health and redacted Worker settings, including whether a Worker
   token is present.
@@ -50,3 +52,9 @@ The monitor fails fast on the exact failure modes from this incident: Pi
 unreachable, mDNS missing, command API down, watchdog inactive, stale/missing
 bundle, Chromium not on Home Center, or missing Worker token that would leave the
 dashboard on local fallback data.
+
+`network-watchdog` now runs on each Pi and handles the local recovery path:
+after repeated failures for LAN IPv4 address, default route, gateway
+reachability, NetworkManager, or Avahi, it restarts NetworkManager and Avahi
+with a cooldown. This covers the failure class where the kiosk remains visible
+but the Pi has dropped off Wi-Fi/mDNS and cannot be reached from the Mac mini.
