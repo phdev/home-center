@@ -2,6 +2,7 @@
 import { spawn } from "node:child_process";
 import { lookup } from "node:dns/promises";
 import http from "node:http";
+import net from "node:net";
 import { setTimeout as delay } from "node:timers/promises";
 import process from "node:process";
 import WebSocket from "ws";
@@ -156,12 +157,23 @@ PY`;
   return { ok: Boolean(js && css), js, css, error: js && css ? null : "missing built assets" };
 }
 
-function localPortFor(index) {
-  return 12440 + index;
+function availableLocalPort() {
+  return new Promise((resolve, reject) => {
+    const server = net.createServer();
+    server.listen(0, "127.0.0.1", () => {
+      const address = server.address();
+      const port = typeof address === "object" && address ? address.port : null;
+      server.close(() => {
+        if (port) resolve(port);
+        else reject(new Error("no local port assigned"));
+      });
+    });
+    server.on("error", reject);
+  });
 }
 
 async function evaluateBrowserState(host, index) {
-  const port = localPortFor(index);
+  const port = await availableLocalPort();
   const ssh = spawn("ssh", [
     "-N",
     "-o", "ExitOnForwardFailure=yes",

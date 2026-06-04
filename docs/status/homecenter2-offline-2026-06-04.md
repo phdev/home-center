@@ -58,3 +58,8 @@ after repeated failures for LAN IPv4 address, default route, gateway
 reachability, NetworkManager, or Avahi, it restarts NetworkManager and Avahi
 with a cooldown. This covers the failure class where the kiosk remains visible
 but the Pi has dropped off Wi-Fi/mDNS and cannot be reached from the Mac mini.
+
+The Mac mini also runs `com.homecenter.node-health` every 5 minutes via
+launchd. It writes `logs/homecenter-node-health-status.json`, stores the last
+full monitor output at `logs/homecenter-node-health-last.json`, and raises a
+macOS notification on failure.
