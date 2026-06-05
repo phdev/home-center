@@ -326,6 +326,51 @@ END:VCALENDAR`, {
       },
     });
   });
+
+  it("dismisses the wake-log Needs Action item when removed by voice", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-05-28T07:30:00-07:00"));
+    const notifications = createKv();
+    const currentEnv = env({ NOTIFICATIONS: notifications });
+
+    const res = await worker.fetch(new Request("https://worker.test/api/needs-action/done", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ index: 1, operation: "dismiss" }),
+    }), currentEnv, {});
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body).toMatchObject({
+      ok: true,
+      index: 1,
+      action: {
+        id: "wake-log",
+        type: "wake_log",
+        title: "Log wake-up times",
+      },
+      result: {
+        ok: true,
+        record: {
+          date: "2026-05-28",
+          dismissedBy: "voice",
+        },
+      },
+    });
+
+    const stored = JSON.parse(notifications.store.get("hc:wake-times:2026-05-28"));
+    expect(stored.dismissedAt).toEqual(expect.any(String));
+
+    const second = await worker.fetch(new Request("https://worker.test/api/needs-action/done", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ index: 1, operation: "dismiss" }),
+    }), currentEnv, {});
+    const secondBody = await second.json();
+
+    expect(second.status).toBe(404);
+    expect(secondBody).toMatchObject({ ok: false, reason: "index_out_of_range", index: 1 });
+  });
 });
 
 describe("wake times", () => {

@@ -211,27 +211,35 @@ def _parse_birthday_gift_ideas(text: str) -> dict:
 
 def _parse_needs_action_done(text: str) -> dict:
     match = re.search(
-        rf"\b(?:mark|remove|clear|dismiss|delete)\s+(?:needs\s+action\s+)?item\s+(\d+|{_NUMBER_PATTERN})(?:\s+(?:as|is)\s+(?:done|complete|completed))?\b",
+        rf"\b(mark|remove|clear|dismiss|delete)\s+(?:needs\s+action\s+)?item\s+(\d+|{_NUMBER_PATTERN})(?:\s+(?:as|is)\s+(?:done|complete|completed))?\b",
         text,
     )
     if match:
-        index = _parse_amount(match.group(1))
-        return {"action": "needs_action_done", "index": index}
+        index = _parse_amount(match.group(2))
+        command = {"action": "needs_action_done", "index": index}
+        if match.group(1) != "mark":
+            command["operation"] = "dismiss"
+        return command
 
-    match = re.search(
+    mark_match = re.search(
         r"\bmark\s+(?:the\s+)?(.+?)\s+(?:as|is)\s+(?:done|complete|completed)\b",
         text,
-    ) or re.search(
+    )
+    dismiss_match = re.search(
         r"\b(?:remove|clear|dismiss|delete)\s+(?:the\s+)?(.+?)\s*$",
         text,
     )
+    match = mark_match or dismiss_match
     if not match:
         return {"action": "none"}
     name = match.group(1).strip(" .,'\"")
     name = re.sub(r"^(?:needs\s+action\s+)?(?:item\s+)?", "", name).strip(" .,'\"")
     if not name:
         return {"action": "none"}
-    return {"action": "needs_action_done", "name": name.title()}
+    command = {"action": "needs_action_done", "name": name.title()}
+    if dismiss_match and not mark_match:
+        command["operation"] = "dismiss"
+    return command
 
 
 def _parse_wake_log(text: str) -> dict:

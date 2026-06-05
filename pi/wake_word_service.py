@@ -704,7 +704,7 @@ def parse_command(text: str) -> dict:
         return {"action": "design_system", "version": "v2"}
 
     item_done_match = re.search(
-        r"\b(?:mark|remove|clear|dismiss|delete)\s+(?:needs\s+action\s+)?item\s+(\d+|one|two|three|four|five|six|seven|eight|nine|ten)(?:\s+(?:as|is)\s+(?:done|complete|completed))?\b",
+        r"\b(mark|remove|clear|dismiss|delete)\s+(?:needs\s+action\s+)?item\s+(\d+|one|two|three|four|five|six|seven|eight|nine|ten)(?:\s+(?:as|is)\s+(?:done|complete|completed))?\b",
         text,
     )
     if item_done_match:
@@ -720,22 +720,30 @@ def parse_command(text: str) -> dict:
             "nine": 9,
             "ten": 10,
         }
-        raw_index = item_done_match.group(1)
+        raw_index = item_done_match.group(2)
         index = int(raw_index) if raw_index.isdigit() else word_numbers[raw_index]
-        return {"action": "needs_action_done", "index": index}
+        command = {"action": "needs_action_done", "index": index}
+        if item_done_match.group(1) != "mark":
+            command["operation"] = "dismiss"
+        return command
 
-    item_name_done_match = re.search(
+    item_name_mark_match = re.search(
         r"\bmark\s+(?:the\s+)?(.+?)\s+(?:as|is)\s+(?:done|complete|completed)\b",
         text,
-    ) or re.search(
+    )
+    item_name_dismiss_match = re.search(
         r"\b(?:remove|clear|dismiss|delete)\s+(?:the\s+)?(.+?)\s*$",
         text,
     )
+    item_name_done_match = item_name_mark_match or item_name_dismiss_match
     if item_name_done_match:
         name = item_name_done_match.group(1).strip(" .,'\"")
         name = re.sub(r"^(?:needs\s+action\s+)?(?:item\s+)?", "", name).strip(" .,'\"")
         if name:
-            return {"action": "needs_action_done", "name": name.title()}
+            command = {"action": "needs_action_done", "name": name.title()}
+            if item_name_dismiss_match and not item_name_mark_match:
+                command["operation"] = "dismiss"
+            return command
 
 
     gift_ideas_match = re.search(r"\bsuggest\s+(?:birthday\s+)?gift\s+ideas\s+for\s+(.+?)\s*$", text)

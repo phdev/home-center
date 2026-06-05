@@ -1028,6 +1028,16 @@ def test_dispatch_needs_action_done_posts_index_to_worker(monkeypatch):
         "timeout": 10,
     }]
 
+    calls.clear()
+    dispatcher.dispatch({"action": "needs_action_done", "index": 1, "operation": "dismiss"})
+
+    assert calls == [{
+        "url": "https://worker.example/api/needs-action/done",
+        "json": {"index": 1, "operation": "dismiss"},
+        "headers": {"Content-Type": "application/json", "Authorization": "Bearer secret"},
+        "timeout": 10,
+    }]
+
 
 def test_dispatch_wake_log_posts_children_to_worker(monkeypatch):
     calls = []

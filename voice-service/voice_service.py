@@ -971,6 +971,7 @@ class Dispatcher:
             self.mark_needs_action_done(
                 int(command.get("index", 0) or 0),
                 str(command.get("name", "") or ""),
+                str(command.get("operation", "") or ""),
             )
         elif action == "wake_log":
             self.log_wake_times(command.get("children") or {})
@@ -1017,12 +1018,14 @@ class Dispatcher:
         log.info("Marked birthday gift ordered: %s (%s)", ok["name"], ok["id"])
         return ok
 
-    def mark_needs_action_done(self, index: int = 0, name: str = "") -> None:
+    def mark_needs_action_done(self, index: int = 0, name: str = "", operation: str = "") -> None:
         name = name.strip()
         if index < 1 and not name:
             log.warning("Needs Action voice command has no valid index or name: index=%s name=%r", index, name)
             return
         body = {"index": index} if index >= 1 else {"name": name}
+        if operation:
+            body["operation"] = operation
         self._worker_post("/api/needs-action/done", body)
 
     def log_wake_times(self, children: dict) -> None:

@@ -3501,6 +3501,7 @@ async function handleNeedsActionDone(request, env) {
   }
   const hasName = typeof body?.name === "string" && body.name.trim();
   const index = Number(body?.index);
+  const operation = body?.operation === "dismiss" ? "dismiss" : "complete";
   if (!hasName && (!Number.isInteger(index) || index < 1)) {
     return json({ error: "index must be a 1-based integer or name must be a non-empty string" }, 400);
   }
@@ -3570,6 +3571,10 @@ async function handleNeedsActionDone(request, env) {
   }
 
   if (action.type === "wake_log") {
+    if (operation === "dismiss") {
+      const result = await dismissWakeLogForToday(env, now, "voice");
+      return json({ ok: true, index: matchedIndex, action, result });
+    }
     return json({
       ok: false,
       reason: "voice_input_required",
@@ -3628,7 +3633,11 @@ async function buildCurrentNeedsActions(env, now = new Date()) {
     actions.push(conflict);
   }
   const wakeTimes = await currentWakeTimes(env, now);
-  const missingWakeChildren = WAKE_LOG_CHILDREN.filter((child) => !wakeTimes?.children?.[child.id]?.wakeAt);
+  const wakeLogDismissed =
+    wakeTimes?.dismissedAt && localDateKey(new Date(wakeTimes.dismissedAt)) === localDateKey(now);
+  const missingWakeChildren = wakeLogDismissed
+    ? []
+    : WAKE_LOG_CHILDREN.filter((child) => !wakeTimes?.children?.[child.id]?.wakeAt);
   if (missingWakeChildren.length) {
     actions.push({
       id: "wake-log",
@@ -3788,6 +3797,23 @@ const WAKE_LOG_CHILDREN = [
 
 function wakeTimesKeyForDate(date) {
   return `hc:wake-times:${date}`;
+}
+
+async function dismissWakeLogForToday(env, now = new Date(), source = "voice") {
+  const date = localDateKey(now);
+  const prev = (await env.NOTIFICATIONS.get(wakeTimesKeyForDate(date), { type: "json" })) ?? { date, children: {} };
+  const record = {
+    ...prev,
+    date,
+    children: prev.children ?? {},
+    dismissedAt: now.toISOString(),
+    dismissedBy: source,
+    updatedAt: now.toISOString(),
+  };
+  await env.NOTIFICATIONS.put(wakeTimesKeyForDate(date), JSON.stringify(record), {
+    expirationTtl: 60 * 60 * 24 * 3,
+  });
+  return { ok: true, record };
 }
 
 async function currentWakeTimes(env, now = new Date()) {

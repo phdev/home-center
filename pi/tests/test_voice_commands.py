@@ -55,14 +55,17 @@ def test_hey_homer_mark_needs_action_item_done():
     assert service.parse_command("Hey Homer, remove item 1.") == {
         "action": "needs_action_done",
         "index": 1,
+        "operation": "dismiss",
     }
     assert service.parse_command("Hey Homer, dismiss Needs Action item one.") == {
         "action": "needs_action_done",
         "index": 1,
+        "operation": "dismiss",
     }
     assert service.parse_command("Hey Homer, delete item one.") == {
         "action": "needs_action_done",
         "index": 1,
+        "operation": "dismiss",
     }
     assert service.parse_command("Hey Homer, mark Needs Action item three as done.") == {
         "action": "needs_action_done",
@@ -75,8 +78,10 @@ def test_hey_homer_mark_needs_action_item_done():
     assert service.parse_command("Hey Homer, remove Lock In Dinner.") == {
         "action": "needs_action_done",
         "name": "Lock In Dinner",
+        "operation": "dismiss",
     }
     assert service.parse_command("Hey Homer, delete Lock In Dinner.") == {
         "action": "needs_action_done",
         "name": "Lock In Dinner",
+        "operation": "dismiss",
     }

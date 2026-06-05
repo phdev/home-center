@@ -39,7 +39,7 @@ def check_parser_regressions() -> list[str]:
         ("im_are_photos", parse_command("hey i'm are open for us"), {"action": "navigate", "page": "photos"}),
         ("go_back", parse_command("a hummer go back"), {"action": "navigate", "page": "dashboard"}),
         ("timer", parse_command("Hey Homer, set a timer for ten seconds"), {"action": "set_timer", "label": "timer", "duration": 10}),
-        ("remove_needs_action_item", parse_command("Hey Homer, remove item 1"), {"action": "needs_action_done", "index": 1}),
+        ("remove_needs_action_item", parse_command("Hey Homer, remove item 1"), {"action": "needs_action_done", "index": 1, "operation": "dismiss"}),
         ("bare_wake", parse_command("Hey Homer"), {"action": "none"}),
         ("hammer_guard", strip_wake_phrase("a hammer open calendar"), "a hammer open calendar"),
     ]
