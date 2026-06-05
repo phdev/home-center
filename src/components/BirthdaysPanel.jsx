@@ -67,7 +67,7 @@ export function BirthdaysPanel({ birthdays, loading, error, selected, derived })
         </div>
       )}
       {error && (
-        <div style={{ fontFamily: F, fontSize: 16.5, color: "#FFFFFF66", padding: 8 }}>
+        <div style={{ fontFamily: F, fontSize: 16.5, lineHeight: 1.25, color: "#FFFFFF66", padding: 8, overflowWrap: "anywhere" }}>
           {error}
         </div>
       )}

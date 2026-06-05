@@ -1,5 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { buildAgenda, shouldShowWeekdayMorningTasks } from "../App";
+import { buildAgenda, MOBILE_DASHBOARD_SECTION_ORDER, shouldShowWeekdayMorningTasks } from "../App";
+
+describe("mobile dashboard", () => {
+  it("keeps the requested phone section order", () => {
+    expect(MOBILE_DASHBOARD_SECTION_ORDER).toEqual([
+      "needs-action",
+      "calendar",
+      "birthdays",
+      "holidays",
+    ]);
+  });
+});
 
 describe("buildAgenda", () => {
   it("groups calendar events into the next 7 dashboard days", () => {

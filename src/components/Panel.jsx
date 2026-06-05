@@ -8,6 +8,8 @@ export function Panel({ children, style = {}, selected = false, selectedBorderCo
         margin: selected ? -4 : 0,
         padding: 16,
         background: "transparent",
+        boxSizing: "border-box",
+        maxWidth: "100%",
         display: "flex",
         flexDirection: "column",
         overflow: "hidden",

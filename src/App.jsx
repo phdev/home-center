@@ -69,6 +69,7 @@ import { useWakeTimes } from "./data/useWakeTimes";
 import { ContextualSlot, RightColumnCards, OverlayCards } from "./cards/ContextualSlot";
 
 const V2_AGENDA_DAYS = 7;
+export const MOBILE_DASHBOARD_SECTION_ORDER = ["needs-action", "calendar", "birthdays", "holidays"];
 export { buildHowieActions };
 export const WEEKDAY_MORNING_TASKS = [
   "Put on Glow Stick",
@@ -736,6 +737,7 @@ export default function App() {
   // URL params can force a specific page/view (used by TV preview)
   const urlParams = new URLSearchParams(window.location.search);
   const requestedPage = urlParams.get("page");
+  const isPhoneDashboard = isMobile || requestedPage === "mobile";
   const forceView = urlParams.get("view") || calendarView;
   const forceNow = parseForcedNow(urlParams.get("now"));
   const sectionOutlines = urlParams.get("sectionOutlines");
@@ -854,7 +856,7 @@ export default function App() {
     }
   }, [activeLLMResponse, page, navigationTimestamp, llm.dismissResponse]);
 
-  if (forcePage === "calendar" && !isMobile) {
+  if (forcePage === "calendar" && !isPhoneDashboard) {
     return (
       <>
         {voiceOverlay}
@@ -873,7 +875,7 @@ export default function App() {
     );
   }
 
-  if (forcePage === "weather" && !isMobile) {
+  if (forcePage === "weather" && !isPhoneDashboard) {
     return (
       <>
         {voiceOverlay}
@@ -891,7 +893,7 @@ export default function App() {
     );
   }
 
-  if (forcePage === "photos" && !isMobile) {
+  if (forcePage === "photos" && !isPhoneDashboard) {
     return (
       <>
         {voiceOverlay}
@@ -910,7 +912,7 @@ export default function App() {
     );
   }
 
-  if (forcePage === "llm-response" && !isMobile) {
+  if (forcePage === "llm-response" && !isPhoneDashboard) {
     return (
       <>
         {voiceOverlay}
@@ -925,7 +927,7 @@ export default function App() {
     );
   }
 
-  if (forcePage === "knowledge" && !isMobile) {
+  if (forcePage === "knowledge" && !isPhoneDashboard) {
     return (
       <>
         {voiceOverlay}
@@ -950,7 +952,7 @@ export default function App() {
     );
   }
 
-  if (forcePage === "history" && !isMobile) {
+  if (forcePage === "history" && !isPhoneDashboard) {
     return (
       <>
         {voiceOverlay}
@@ -975,7 +977,7 @@ export default function App() {
     <>
       {voiceOverlay}
       <style>{`
-        body { overflow: ${isMobile ? "auto" : "hidden"} }
+        body { overflow: ${isPhoneDashboard ? "auto" : "hidden"} }
         ::-webkit-scrollbar { width: 3px }
         ::-webkit-scrollbar-track { background: transparent }
         ::-webkit-scrollbar-thumb { background: #FFFFFF15; border-radius: 3px }
@@ -984,32 +986,35 @@ export default function App() {
         className={`hc-app-shell${designSystem === "v2" && sectionOutlines === "none" ? " hc-v2-no-section-outlines" : ""}`}
         style={{
           width: "100%",
-          minHeight: isMobile ? "100vh" : undefined,
-          height: isMobile ? "auto" : "100vh",
+          boxSizing: "border-box",
+          maxWidth: isPhoneDashboard ? "100vw" : undefined,
+          minHeight: isPhoneDashboard ? "100vh" : undefined,
+          height: isPhoneDashboard ? "auto" : "100vh",
           background: designSystem === "v2" ? "transparent" : "#000000",
-          padding: isMobile ? "12px 12px 80px" : designSystem === "v2" ? "0px 30px 18px" : "0px 16px 16px",
+          padding: isPhoneDashboard ? "12px 12px 32px" : designSystem === "v2" ? "0px 30px 18px" : "0px 16px 16px",
           display: "flex",
           flexDirection: "column",
-          overflow: isMobile ? "visible" : "hidden",
+          overflow: isPhoneDashboard ? "visible" : "hidden",
           fontFamily: "'Geist','Inter',system-ui,sans-serif",
           color: "#FFFFFF",
         }}
       >
-        <Header now={appNow} isMobile={isMobile} onHistory={() => { llm.fetchHistory(); goTo("history"); }} handControllerConnected={hc.connected} lastGesture={hc.lastGesture} wakeRecord={wakeRecord} designSystem={designSystem} />
-        <div className="hc-v2-version-chip" style={{ position: "fixed", right: 20, bottom: 18, zIndex: 80 }}>
-          VERSION TWO
-        </div>
-
-        {isMobile ? (
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            <CalendarPanel events={dashboardCalendar.events} loading={dashboardCalendar.loading} error={dashboardCalendar.error} conflictCard={calendarConflictCard} />
-            <WeatherPanel weatherData={dashboardWeather.data ?? dashboardWeather} loading={dashboardWeather.loading} error={dashboardWeather.error} />
-            <BirthdaysPanel birthdays={dashboardBirthdays.birthdays} loading={dashboardBirthdays.loading} error={dashboardBirthdays.error} derived={derived} />
-            <HolidaysPanel now={appNow} />
-            <EventsPanel card={schoolUpdatesCard} />
-            <ModelHealthPanel onExpand={() => goTo("model-health")} workerSettings={settings.worker} />
-            <FactPanel />
+        <Header now={appNow} isMobile={isPhoneDashboard} hideClock={isPhoneDashboard} onHistory={() => { llm.fetchHistory(); goTo("history"); }} handControllerConnected={hc.connected} lastGesture={hc.lastGesture} wakeRecord={wakeRecord} designSystem={designSystem} />
+        {!isPhoneDashboard && (
+          <div className="hc-v2-version-chip" style={{ position: "fixed", right: 20, bottom: 18, zIndex: 80 }}>
+            VERSION TWO
           </div>
+        )}
+
+        {isPhoneDashboard ? (
+          <MobileDashboard
+            now={appNow}
+            actions={buildHowieActions(derived, appNow)}
+            calendar={dashboardCalendar}
+            calendarConflictCard={calendarConflictCard}
+            birthdays={dashboardBirthdays}
+            derived={derived}
+          />
         ) : (
           <div style={{ display: "flex", flex: 1, marginTop: designSystem === "v2" ? 2 : 16, minHeight: 0 }}>
             {designSystem !== "v2" && <SideNav activeMember={activeMember} onSelect={setActiveMember} />}
@@ -1083,6 +1088,47 @@ export default function App() {
 
 function findCard(cards, type) {
   return (cards ?? []).find((card) => card.type === type) ?? null;
+}
+
+function MobileDashboard({ now, actions, calendar, calendarConflictCard, birthdays, derived }) {
+  const sections = {
+    "needs-action": (
+      <section key="needs-action" data-mobile-section="needs-action" style={mobileNeedsActionSectionStyle}>
+        <NeedsActionPanel actions={actions} />
+      </section>
+    ),
+    calendar: (
+      <section key="calendar" data-mobile-section="calendar" style={mobilePanelSectionStyle(360)}>
+        <CalendarPanel
+          events={calendar.events}
+          loading={calendar.loading}
+          error={calendar.error}
+          conflictCard={calendarConflictCard}
+        />
+      </section>
+    ),
+    birthdays: (
+      <section key="birthdays" data-mobile-section="birthdays" style={mobilePanelSectionStyle(220)}>
+        <BirthdaysPanel
+          birthdays={birthdays.birthdays}
+          loading={birthdays.loading}
+          error={birthdays.error}
+          derived={derived}
+        />
+      </section>
+    ),
+    holidays: (
+      <section key="holidays" data-mobile-section="holidays" style={mobilePanelSectionStyle(280)}>
+        <HolidaysPanel now={now} max={5} daysAhead={90} />
+      </section>
+    ),
+  };
+
+  return (
+    <main style={mobileDashboardStyle} aria-label="Mobile Home Center dashboard">
+      {MOBILE_DASHBOARD_SECTION_ORDER.map((section) => sections[section])}
+    </main>
+  );
 }
 
 function parseForcedNow(value) {
@@ -1446,6 +1492,41 @@ const v2GlassPanelStyle = {
   contain: "layout paint style",
 };
 
+const mobileDashboardStyle = {
+  display: "flex",
+  flexDirection: "column",
+  gap: 12,
+  paddingBottom: 18,
+  width: "100%",
+  boxSizing: "border-box",
+  maxWidth: "100%",
+  minWidth: 0,
+  overflowX: "hidden",
+};
+
+const mobileNeedsActionSectionStyle = {
+  ...v2GlassPanelStyle,
+  minHeight: 184,
+  padding: "16px 16px",
+  overflow: "hidden",
+  width: "100%",
+  boxSizing: "border-box",
+  maxWidth: "100%",
+  minWidth: 0,
+};
+
+function mobilePanelSectionStyle(minHeight) {
+  return {
+    minHeight,
+    width: "100%",
+    boxSizing: "border-box",
+    maxWidth: "100%",
+    minWidth: 0,
+    display: "flex",
+    flexDirection: "column",
+  };
+}
+
 const v2AgendaStyle = {
   ...v2GlassPanelStyle,
   gridColumn: "1",
@@ -1658,7 +1739,7 @@ const v2ActionCountStyle = { width: 23, height: 23, borderRadius: 999, display: 
 const v2ActionListStyle = { display: "flex", flexDirection: "column", gap: 8, marginTop: 10, flex: 1, minHeight: 0, overflowY: "auto", paddingRight: 2 };
 const v2ActionMetaStyle = { fontFamily: "'Geist','Inter',system-ui,sans-serif", fontSize: 10.5, fontWeight: 850, color: "rgba(255,255,255,0.58)", marginBottom: 3 };
 const v2ActionTitleStyle = { fontFamily: "'Geist','Inter',system-ui,sans-serif", fontSize: 15.5, fontWeight: 850, color: "#FFFFFF", lineHeight: 1.12, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" };
-const v2ActionDetailTextStyle = { minWidth: 0 };
+const v2ActionDetailTextStyle = { minWidth: 0, overflowWrap: "anywhere" };
 const v2ChevronStyle = { color: "rgba(255,255,255,0.72)", fontSize: 28, lineHeight: 1 };
 const v2HowiePromptStyle = { display: "flex", flexDirection: "column", gap: 6 };
 const v2HowieGreetingStyle = { fontFamily: "'Geist','Inter',system-ui,sans-serif", fontSize: 12.5, lineHeight: 1.28, color: "rgba(255,255,255,0.72)", fontWeight: 650 };
@@ -1678,6 +1759,7 @@ function v2ActionItemStyle(tone) {
     alignItems: "center",
     gap: 10,
     width: "100%",
+    boxSizing: "border-box",
     minHeight: 68,
     border: 0,
     borderRadius: 12,
@@ -1695,10 +1777,12 @@ function v2ActionSurface(tone) {
 
 function v2SuggestedActionButtonStyle(tone) {
   return {
-    display: "inline-grid",
+    display: "grid",
     gridTemplateColumns: "auto minmax(0,1fr)",
     alignItems: "center",
+    width: "100%",
     maxWidth: "100%",
+    boxSizing: "border-box",
     minHeight: 30,
     gap: 5,
     marginTop: 7,
