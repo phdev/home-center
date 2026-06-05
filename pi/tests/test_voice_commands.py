@@ -85,3 +85,27 @@ def test_hey_homer_mark_needs_action_item_done():
         "name": "Lock In Dinner",
         "operation": "dismiss",
     }
+
+
+def test_mark_needs_action_done_forwards_dismiss_operation(monkeypatch):
+    service = load_wake_word_service()
+    calls = []
+
+    def fake_worker_post(url, token, path, data):
+        calls.append({"url": url, "token": token, "path": path, "data": data})
+        return {"ok": True}
+
+    monkeypatch.setattr(service, "worker_post", fake_worker_post)
+
+    assert service.mark_needs_action_done(
+        "https://worker.example",
+        "secret",
+        index=1,
+        operation="dismiss",
+    ) == {"ok": True}
+    assert calls == [{
+        "url": "https://worker.example",
+        "token": "secret",
+        "path": "/api/needs-action/done",
+        "data": {"index": 1, "operation": "dismiss"},
+    }]

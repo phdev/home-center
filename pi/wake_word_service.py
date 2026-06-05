@@ -952,9 +952,17 @@ def mark_birthday_gift_ordered(worker_url: str, worker_token: str | None, name: 
     return {"ok": True, "name": birthday.get("name", name), "id": birthday_id, "result": result}
 
 
-def mark_needs_action_done(worker_url: str, worker_token: str | None, index: int = 0, name: str = "") -> dict:
+def mark_needs_action_done(
+    worker_url: str,
+    worker_token: str | None,
+    index: int = 0,
+    name: str = "",
+    operation: str = "",
+) -> dict:
     """Mark a Needs Action item done through the worker by index or visible name."""
     body = {"index": index} if index >= 1 else {"name": name}
+    if operation:
+        body["operation"] = operation
     result = worker_post(worker_url, worker_token, "/api/needs-action/done", body)
     if not result:
         return {"ok": False, "reason": "worker_request_failed", **body}
@@ -2559,7 +2567,8 @@ def main() -> None:
                         if args.dry_run:
                             log.info("[DRY RUN] Would mark Needs Action item done: index=%s name=%s", index, name)
                         elif args.worker_url:
-                            result = mark_needs_action_done(args.worker_url, args.worker_token, index, name)
+                            operation = str(command.get("operation", "") or "").strip()
+                            result = mark_needs_action_done(args.worker_url, args.worker_token, index, name, operation)
                             if result.get("ok"):
                                 action_title = (result.get("action") or {}).get("title")
                                 log.info("Marked Needs Action item done: %s", action_title or result)

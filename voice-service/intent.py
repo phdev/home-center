@@ -10,6 +10,7 @@ WAKE_PHRASE_RE = re.compile(
     r"(?:ho(?:mer|mmer|mar|me[rl]|m'r)|home\s*(?:her|or)|homework|homer(?:ed)?|hummer|number|armor|over)"
     r"|(?:he|hey|hi|hay|a)[\s,.\-!?:]+homer(?:ed)?"
     r"|(?:hey|hi|hay|okay|ok)[\s,.\-!?:]+(?:i'?m\s+)?(?:rob(?:in|yn)|are)"
+    r"|(?:hey|hi|hay|okay|ok)[\s,.\-!?:]+how"
     r"|(?:hey|hi|hay|okay|ok)[\s,.\-!?:]+howie"
     r")\b[,.\s!?:-]*",
     re.IGNORECASE,

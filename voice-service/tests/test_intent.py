@@ -17,6 +17,7 @@ def test_explicit_turn_on_required():
 def test_turn_off_variants():
     assert parse_command("turn it off") == {"action": "turn_off"}
     assert parse_command("turn it down") == {"action": "turn_off"}
+    assert parse_command("hey how turn off") == {"action": "turn_off"}
 
 
 def test_stop_intent_rejects_trailing_hallucinated_words():

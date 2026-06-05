@@ -36,6 +36,7 @@ def check_parser_regressions() -> list[str]:
         ("open_calendar", parse_command("Hey Homer, open calendar"), {"action": "navigate", "page": "calendar"}),
         ("family_photos", parse_command("hey armor open family photos"), {"action": "navigate", "page": "photos"}),
         ("hey_over_photos", parse_command("hey over open photos"), {"action": "navigate", "page": "photos"}),
+        ("hey_how_turn_off", parse_command("hey how turn off"), {"action": "turn_off"}),
         ("im_are_photos", parse_command("hey i'm are open for us"), {"action": "navigate", "page": "photos"}),
         ("go_back", parse_command("a hummer go back"), {"action": "navigate", "page": "dashboard"}),
         ("timer", parse_command("Hey Homer, set a timer for ten seconds"), {"action": "set_timer", "label": "timer", "duration": 10}),
