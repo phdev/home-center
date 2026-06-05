@@ -5,15 +5,16 @@ export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
     const path = url.pathname;
+    const isApiRequest = path.startsWith("/api/");
 
     // CORS preflight
     if (request.method === "OPTIONS") {
       return corsResponse(env, new Response(null, { status: 204 }));
     }
 
-    // Auth check — if AUTH_TOKEN is configured, require it on every request
+    // Auth check — if AUTH_TOKEN is configured, require it on API requests
     // (except /api/health which is always open for diagnostics)
-    if (env.AUTH_TOKEN && path !== "/api/health") {
+    if (isApiRequest && env.AUTH_TOKEN && path !== "/api/health") {
       const auth = request.headers.get("Authorization");
       if (!auth) {
         return corsResponse(env, json({
@@ -213,6 +214,9 @@ export default {
           openaiEnhanceModel: openaiEnhanceModel(env),
         }));
       }
+      if (!isApiRequest) {
+        return serveDashboardAsset(request, env);
+      }
       return corsResponse(env, json({ error: "Not found" }, 404));
     } catch (e) {
       return corsResponse(env, json({ error: e.message }, 500));
@@ -221,6 +225,35 @@ export default {
 };
 
 // ── Helpers ──────────────────────────────────────────────────────────
+
+async function serveDashboardAsset(request, env) {
+  if (!env.ASSETS || typeof env.ASSETS.fetch !== "function") {
+    return new Response("Dashboard assets are not configured.", { status: 404 });
+  }
+
+  const url = new URL(request.url);
+  if (url.pathname === "/") {
+    url.pathname = "/home-center/";
+    if (!url.searchParams.has("page")) {
+      url.searchParams.set("page", "mobile");
+    }
+    return Response.redirect(url.toString(), 302);
+  }
+
+  if (url.pathname === "/home-center") {
+    url.pathname = "/home-center/";
+    return Response.redirect(url.toString(), 302);
+  }
+
+  if (url.pathname.startsWith("/home-center/")) {
+    url.pathname = url.pathname.slice("/home-center".length) || "/";
+  }
+
+  return env.ASSETS.fetch(new Request(url.toString(), {
+    method: request.method,
+    headers: request.headers,
+  }));
+}
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {

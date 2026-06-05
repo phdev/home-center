@@ -567,6 +567,68 @@ afterEach(() => {
   global.fetch = originalFetch;
 });
 
+describe("hosted dashboard assets", () => {
+  it("serves the Home Center app shell without requiring API auth", async () => {
+    const assets = {
+      fetch: vi.fn(async (request) => new Response("app shell", {
+        headers: { "Content-Type": "text/html" },
+      })),
+    };
+    const currentEnv = env({ AUTH_TOKEN: "secret-token", ASSETS: assets });
+
+    const response = await worker.fetch(
+      new Request("https://worker.test/home-center/?page=mobile"),
+      currentEnv,
+      {},
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe("app shell");
+    expect(new URL(assets.fetch.mock.calls[0][0].url).pathname).toBe("/");
+  });
+
+  it("maps built /home-center asset URLs to the Worker assets directory", async () => {
+    const assets = {
+      fetch: vi.fn(async () => new Response("console.log('app')", {
+        headers: { "Content-Type": "application/javascript" },
+      })),
+    };
+    const currentEnv = env({ ASSETS: assets });
+
+    const response = await worker.fetch(
+      new Request("https://worker.test/home-center/assets/index-abc123.js"),
+      currentEnv,
+      {},
+    );
+
+    expect(response.status).toBe(200);
+    expect(new URL(assets.fetch.mock.calls[0][0].url).pathname).toBe("/assets/index-abc123.js");
+  });
+
+  it("keeps API routes protected when the app shell is public", async () => {
+    const response = await worker.fetch(
+      new Request("https://worker.test/api/calendar"),
+      env({ AUTH_TOKEN: "secret-token" }),
+      {},
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(401);
+    expect(body.error).toMatch(/no token/i);
+  });
+
+  it("redirects the Worker root to the phone dashboard", async () => {
+    const response = await worker.fetch(
+      new Request("https://worker.test/"),
+      env({ ASSETS: { fetch: vi.fn() } }),
+      {},
+    );
+
+    expect(response.status).toBe(302);
+    expect(response.headers.get("Location")).toBe("https://worker.test/home-center/?page=mobile");
+  });
+});
+
 describe("claw school updates enhancer", () => {
   it("filters newsletters and shipping while accepting sign-and-return school emails", async () => {
     let body = await enhanceSchoolEmail(

@@ -728,7 +728,7 @@ export default function App() {
   const now = useTime();
   const { isMobile } = usePreviewMode();
   const [activeMember, setActiveMember] = useState("home");
-  const { settings } = useSettings();
+  const { settings, updateSection } = useSettings();
   const { designSystem } = useDesignSystem(settings.worker, settings.appearance?.designSystem);
   const { timers, expiredTimers, dismissTimer, dismissAll } = useTimers(settings.worker);
   const { page, calendarView, navigationTimestamp, goTo } = useNavigation(settings.worker);
@@ -743,6 +743,20 @@ export default function App() {
   const sectionOutlines = urlParams.get("sectionOutlines");
   const noOutlinePreview = designSystem === "v2" && sectionOutlines === "none";
   const appNow = forceNow ?? now;
+
+  useEffect(() => {
+    const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+    const workerToken = hashParams.get("workerToken") || urlParams.get("workerToken");
+    if (!workerToken || workerToken === settings.worker?.token) return;
+
+    updateSection("worker", { token: workerToken });
+    hashParams.delete("workerToken");
+    urlParams.delete("workerToken");
+    const nextSearch = urlParams.toString();
+    const nextHash = hashParams.toString();
+    const nextUrl = `${window.location.pathname}${nextSearch ? `?${nextSearch}` : ""}${nextHash ? `#${nextHash}` : ""}`;
+    window.history.replaceState(null, "", nextUrl);
+  }, [settings.worker?.token, updateSection]);
   const previewResponse =
     requestedPage === "knowledge"
       ? (urlParams.get("knowledgeFixture") === "apollo-11"
