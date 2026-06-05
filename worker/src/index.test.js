@@ -672,6 +672,52 @@ describe("hosted dashboard assets", () => {
     expect(notifications.store.has("hc:mobile-login:abc123")).toBe(false);
   });
 
+  it("creates a reusable hosted app login link", async () => {
+    const notifications = createKv();
+    const response = await worker.fetch(
+      new Request("https://worker.test/api/mobile-login-link", {
+        method: "POST",
+        headers: {
+          Authorization: "Bearer secret-token",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ reusable: true, label: "safari" }),
+      }),
+      env({ AUTH_TOKEN: "secret-token", NOTIFICATIONS: notifications }),
+      {},
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.reusable).toBe(true);
+    expect(body.expiresAt).toBeNull();
+    const code = new URL(body.loginUrl).searchParams.get("code");
+    expect(JSON.parse(notifications.store.get(`hc:mobile-login:${code}`))).toMatchObject({
+      reusable: true,
+      label: "safari",
+    });
+  });
+
+  it("keeps reusable hosted app login codes after exchange", async () => {
+    const notifications = createKv({
+      "hc:mobile-login:reusable": JSON.stringify({ reusable: true, createdAt: Date.now(), label: "safari" }),
+    });
+    const first = await worker.fetch(
+      new Request("https://worker.test/app-login?code=reusable"),
+      env({ AUTH_TOKEN: "secret-token", NOTIFICATIONS: notifications }),
+      {},
+    );
+    const second = await worker.fetch(
+      new Request("https://worker.test/app-login?code=reusable"),
+      env({ AUTH_TOKEN: "secret-token", NOTIFICATIONS: notifications }),
+      {},
+    );
+
+    expect(first.status).toBe(302);
+    expect(second.status).toBe(302);
+    expect(notifications.store.has("hc:mobile-login:reusable")).toBe(true);
+  });
+
   it("rejects an expired hosted app login code", async () => {
     const notifications = createKv({
       "hc:mobile-login:expired": JSON.stringify({ expiresAt: Date.now() - 1 }),

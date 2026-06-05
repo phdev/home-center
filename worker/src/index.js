@@ -269,18 +269,21 @@ async function handleMobileLoginLink(request, env) {
   if (!env.AUTH_TOKEN || !env.NOTIFICATIONS) {
     return json({ ok: false, error: "Mobile login is not configured." }, 500);
   }
+  const body = await request.json().catch(() => ({}));
+  const reusable = body?.reusable === true;
   const code = randomCode();
   const expiresAt = Date.now() + 15 * 60 * 1000;
-  await env.NOTIFICATIONS.put(
-    `hc:mobile-login:${code}`,
-    JSON.stringify({ expiresAt }),
-    { expirationTtl: 15 * 60 },
-  );
+  const record = reusable
+    ? { reusable: true, createdAt: Date.now(), label: String(body?.label || "mobile") }
+    : { expiresAt };
+  const options = reusable ? undefined : { expirationTtl: 15 * 60 };
+  await env.NOTIFICATIONS.put(`hc:mobile-login:${code}`, JSON.stringify(record), options);
   const url = new URL(request.url);
   return json({
     ok: true,
     loginUrl: `${url.origin}/app-login?code=${encodeURIComponent(code)}`,
-    expiresAt,
+    reusable,
+    expiresAt: reusable ? null : expiresAt,
   });
 }
 
@@ -291,11 +294,14 @@ async function handleAppLogin(url, env) {
   }
   const key = `hc:mobile-login:${code}`;
   const record = await env.NOTIFICATIONS.get(key, { type: "json" });
-  if (!record || Number(record.expiresAt) < Date.now()) {
+  const expired = !record || (!record.reusable && Number(record.expiresAt) < Date.now());
+  if (expired) {
     await env.NOTIFICATIONS.delete(key).catch(() => {});
     return new Response("Mobile login link expired. Ask Devon for a new one.", { status: 401 });
   }
-  await env.NOTIFICATIONS.delete(key);
+  if (!record.reusable) {
+    await env.NOTIFICATIONS.delete(key);
+  }
 
   const destination = new URL("/home-center/?page=mobile", url.origin);
   return new Response(null, {
