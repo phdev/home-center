@@ -211,7 +211,7 @@ def _parse_birthday_gift_ideas(text: str) -> dict:
 
 def _parse_needs_action_done(text: str) -> dict:
     match = re.search(
-        rf"\bmark\s+(?:needs\s+action\s+)?item\s+(\d+|{_NUMBER_PATTERN})\s+(?:as|is)\s+(?:done|complete|completed)\b",
+        rf"\b(?:mark|remove|clear|dismiss)\s+(?:needs\s+action\s+)?item\s+(\d+|{_NUMBER_PATTERN})(?:\s+(?:as|is)\s+(?:done|complete|completed))?\b",
         text,
     )
     if match:
@@ -220,6 +220,9 @@ def _parse_needs_action_done(text: str) -> dict:
 
     match = re.search(
         r"\bmark\s+(?:the\s+)?(.+?)\s+(?:as|is)\s+(?:done|complete|completed)\b",
+        text,
+    ) or re.search(
+        r"\b(?:remove|clear|dismiss)\s+(?:the\s+)?(.+?)\s*$",
         text,
     )
     if not match:
