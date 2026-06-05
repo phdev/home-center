@@ -1,6 +1,5 @@
 import { Calendar } from "lucide-react";
 import { Panel, PanelHeader } from "./Panel";
-import { CALENDAR } from "../data/mockData";
 import { CalendarConflictCard } from "../ui/cards/CalendarConflictCard";
 
 const F = "'Geist','Inter',system-ui,sans-serif";
@@ -17,7 +16,7 @@ function dedup(events) {
 }
 
 export function CalendarPanel({ t, events, loading, error, selected, conflictCard }) {
-  const items = dedup(events || CALENDAR);
+  const items = dedup(Array.isArray(events) ? events : []);
 
   // Group events by day label
   const groups = [];

@@ -1,7 +1,6 @@
 import { useState, useMemo } from "react";
 import { Cake, Check, AlarmClock, Sparkles } from "lucide-react";
 import { Panel, PanelHeader } from "./Panel";
-import { BIRTHDAYS } from "../data/mockData";
 import { useBirthdayGiftWriter, readGiftOverrides } from "../data/useBirthdayGift";
 import { useSettings } from "../hooks/useSettings";
 
@@ -24,7 +23,7 @@ const NEXT_STATUS = {
 };
 
 export function BirthdaysPanel({ birthdays, loading, error, selected, derived }) {
-  const items = birthdays && birthdays.length > 0 ? birthdays : BIRTHDAYS;
+  const items = Array.isArray(birthdays) ? birthdays : [];
   const { settings } = useSettings();
   const writeGift = useBirthdayGiftWriter(settings?.worker);
   const [localOverrides, setLocalOverrides] = useState(() => readGiftOverrides());
