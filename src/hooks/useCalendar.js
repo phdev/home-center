@@ -26,6 +26,7 @@ export function useCalendar(calendarSettings, workerSettings) {
         const res = await fetch(`${workerSettings.url}/api/calendar`, {
           headers,
           cache: "no-store",
+          credentials: "include",
         });
         if (!res.ok) {
           const err = await res.json().catch(() => ({}));

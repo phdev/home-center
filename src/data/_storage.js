@@ -28,7 +28,7 @@ async function fetchJson(url, init, timeoutMs) {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), timeoutMs);
   try {
-    const res = await fetch(url, { ...init, signal: ctrl.signal });
+    const res = await fetch(url, { credentials: "include", ...init, signal: ctrl.signal });
     if (!res.ok) return null;
     return await res.json();
   } catch {

@@ -15,7 +15,10 @@ export function useBirthdays(workerSettings) {
     try {
       const headers = {};
       if (workerSettings.token) headers.Authorization = `Bearer ${workerSettings.token}`;
-      const res = await fetch(`${workerSettings.url}/api/birthdays`, { headers });
+      const res = await fetch(`${workerSettings.url}/api/birthdays`, {
+        headers,
+        credentials: "include",
+      });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         throw new Error(err.error || `Birthdays: worker returned ${res.status}`);

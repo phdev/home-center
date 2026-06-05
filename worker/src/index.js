@@ -16,12 +16,15 @@ export default {
     // (except /api/health which is always open for diagnostics)
     if (isApiRequest && env.AUTH_TOKEN && path !== "/api/health") {
       const auth = request.headers.get("Authorization");
-      if (!auth) {
+      const cookieToken = parseCookie(request.headers.get("Cookie")).hc_app_auth;
+      const hasValidBearer = auth === `Bearer ${env.AUTH_TOKEN}`;
+      const hasValidCookie = cookieToken === env.AUTH_TOKEN;
+      if (!auth && !hasValidCookie) {
         return corsResponse(env, json({
           error: "Unauthorized — no token sent. Set the Auth Token in Settings to match your worker's AUTH_TOKEN secret.",
         }, 401));
       }
-      if (auth !== `Bearer ${env.AUTH_TOKEN}`) {
+      if (!hasValidBearer && !hasValidCookie) {
         return corsResponse(env, json({
           error: "Unauthorized — token mismatch. The Auth Token in Settings does not match the AUTH_TOKEN secret on your worker.",
         }, 401));
@@ -29,6 +32,9 @@ export default {
     }
 
     try {
+      if (path === "/app-login" && request.method === "GET") {
+        return await handleAppLogin(url, env);
+      }
       if (path === "/api/ask" && request.method === "POST") {
         return corsResponse(env, await handleAsk(request, env));
       }
@@ -186,10 +192,11 @@ export default {
       if (path === "/api/health") {
         // Auth status: check if a valid token was provided (but don't block)
         const auth = request.headers.get("Authorization");
+        const cookieToken = parseCookie(request.headers.get("Cookie")).hc_app_auth;
         let authStatus = "no AUTH_TOKEN configured (open access)";
         if (env.AUTH_TOKEN) {
-          if (!auth) authStatus = "AUTH_TOKEN set but no token sent — requests will fail";
-          else if (auth === `Bearer ${env.AUTH_TOKEN}`) authStatus = "ok";
+          if (!auth && !cookieToken) authStatus = "AUTH_TOKEN set but no token sent — requests will fail";
+          else if (auth === `Bearer ${env.AUTH_TOKEN}` || cookieToken === env.AUTH_TOKEN) authStatus = "ok";
           else authStatus = "token mismatch — requests will fail";
         }
         return corsResponse(env, json({
@@ -213,6 +220,9 @@ export default {
           imageGenerationEnabled: imageGenerationEnabled(env),
           openaiEnhanceModel: openaiEnhanceModel(env),
         }));
+      }
+      if (path === "/api/mobile-login-link" && request.method === "POST") {
+        return corsResponse(env, await handleMobileLoginLink(request, env));
       }
       if (!isApiRequest) {
         return serveDashboardAsset(request, env);
@@ -253,6 +263,74 @@ async function serveDashboardAsset(request, env) {
     method: request.method,
     headers: request.headers,
   }));
+}
+
+async function handleMobileLoginLink(request, env) {
+  if (!env.AUTH_TOKEN || !env.NOTIFICATIONS) {
+    return json({ ok: false, error: "Mobile login is not configured." }, 500);
+  }
+  const code = randomCode();
+  const expiresAt = Date.now() + 15 * 60 * 1000;
+  await env.NOTIFICATIONS.put(
+    `hc:mobile-login:${code}`,
+    JSON.stringify({ expiresAt }),
+    { expirationTtl: 15 * 60 },
+  );
+  const url = new URL(request.url);
+  return json({
+    ok: true,
+    loginUrl: `${url.origin}/app-login?code=${encodeURIComponent(code)}`,
+    expiresAt,
+  });
+}
+
+async function handleAppLogin(url, env) {
+  const code = url.searchParams.get("code") || "";
+  if (!env.AUTH_TOKEN || !env.NOTIFICATIONS || !code) {
+    return new Response("Invalid mobile login link.", { status: 400 });
+  }
+  const key = `hc:mobile-login:${code}`;
+  const record = await env.NOTIFICATIONS.get(key, { type: "json" });
+  if (!record || Number(record.expiresAt) < Date.now()) {
+    await env.NOTIFICATIONS.delete(key).catch(() => {});
+    return new Response("Mobile login link expired. Ask Devon for a new one.", { status: 401 });
+  }
+  await env.NOTIFICATIONS.delete(key);
+
+  const destination = new URL("/home-center/?page=mobile", url.origin);
+  return new Response(null, {
+    status: 302,
+    headers: {
+      Location: destination.toString(),
+      "Set-Cookie": authCookie(env.AUTH_TOKEN),
+      "Cache-Control": "no-store",
+    },
+  });
+}
+
+function authCookie(token) {
+  return `hc_app_auth=${encodeURIComponent(token)}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=${60 * 60 * 24 * 30}`;
+}
+
+function parseCookie(header = "") {
+  return Object.fromEntries(
+    String(header)
+      .split(";")
+      .map((part) => part.trim())
+      .filter(Boolean)
+      .map((part) => {
+        const index = part.indexOf("=");
+        const key = index >= 0 ? part.slice(0, index) : part;
+        const value = index >= 0 ? part.slice(index + 1) : "";
+        return [key, decodeURIComponent(value)];
+      }),
+  );
+}
+
+function randomCode() {
+  const bytes = new Uint8Array(24);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
 }
 
 function json(data, status = 200) {

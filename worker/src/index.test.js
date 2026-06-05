@@ -617,6 +617,75 @@ describe("hosted dashboard assets", () => {
     expect(body.error).toMatch(/no token/i);
   });
 
+  it("allows API routes with the hosted app auth cookie", async () => {
+    global.fetch = vi.fn(async () => new Response("BEGIN:VCALENDAR\nEND:VCALENDAR", {
+      headers: { "Content-Type": "text/calendar" },
+    }));
+    const response = await worker.fetch(
+      new Request("https://worker.test/api/calendar", {
+        headers: { Cookie: "hc_app_auth=secret-token" },
+      }),
+      env({ AUTH_TOKEN: "secret-token", CALENDAR_URLS: "https://calendar.test/feed.ics" }),
+      {},
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.events).toEqual([]);
+  });
+
+  it("creates a short-lived one-time hosted app login link", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-06-05T16:00:00-07:00"));
+    const notifications = createKv();
+    const response = await worker.fetch(
+      new Request("https://worker.test/api/mobile-login-link", {
+        method: "POST",
+        headers: { Authorization: "Bearer secret-token" },
+      }),
+      env({ AUTH_TOKEN: "secret-token", NOTIFICATIONS: notifications }),
+      {},
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.loginUrl).toMatch(/^https:\/\/worker\.test\/app-login\?code=/);
+    expect(body.expiresAt).toBe(Date.now() + 15 * 60 * 1000);
+    const code = new URL(body.loginUrl).searchParams.get("code");
+    expect(notifications.store.has(`hc:mobile-login:${code}`)).toBe(true);
+  });
+
+  it("exchanges a one-time hosted app login code for an HttpOnly cookie", async () => {
+    const notifications = createKv({
+      "hc:mobile-login:abc123": JSON.stringify({ expiresAt: Date.now() + 60_000 }),
+    });
+    const response = await worker.fetch(
+      new Request("https://worker.test/app-login?code=abc123"),
+      env({ AUTH_TOKEN: "secret-token", NOTIFICATIONS: notifications }),
+      {},
+    );
+
+    expect(response.status).toBe(302);
+    expect(response.headers.get("Location")).toBe("https://worker.test/home-center/?page=mobile");
+    expect(response.headers.get("Set-Cookie")).toContain("hc_app_auth=secret-token");
+    expect(response.headers.get("Set-Cookie")).toContain("HttpOnly");
+    expect(notifications.store.has("hc:mobile-login:abc123")).toBe(false);
+  });
+
+  it("rejects an expired hosted app login code", async () => {
+    const notifications = createKv({
+      "hc:mobile-login:expired": JSON.stringify({ expiresAt: Date.now() - 1 }),
+    });
+    const response = await worker.fetch(
+      new Request("https://worker.test/app-login?code=expired"),
+      env({ AUTH_TOKEN: "secret-token", NOTIFICATIONS: notifications }),
+      {},
+    );
+
+    expect(response.status).toBe(401);
+    expect(notifications.store.has("hc:mobile-login:expired")).toBe(false);
+  });
+
   it("redirects the Worker root to the phone dashboard", async () => {
     const response = await worker.fetch(
       new Request("https://worker.test/"),
