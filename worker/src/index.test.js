@@ -666,7 +666,7 @@ describe("hosted dashboard assets", () => {
     );
 
     expect(response.status).toBe(302);
-    expect(response.headers.get("Location")).toBe("https://worker.test/home-center/?page=mobile");
+    expect(response.headers.get("Location")).toBe("https://worker.test/home-center/?page=mobile#workerToken=secret-token");
     expect(response.headers.get("Set-Cookie")).toContain("hc_app_auth=secret-token");
     expect(response.headers.get("Set-Cookie")).toContain("HttpOnly");
     expect(notifications.store.has("hc:mobile-login:abc123")).toBe(false);
@@ -715,6 +715,7 @@ describe("hosted dashboard assets", () => {
 
     expect(first.status).toBe(302);
     expect(second.status).toBe(302);
+    expect(first.headers.get("Location")).toBe("https://worker.test/home-center/?page=mobile#workerToken=secret-token");
     expect(notifications.store.has("hc:mobile-login:reusable")).toBe(true);
   });
 

@@ -304,6 +304,7 @@ async function handleAppLogin(url, env) {
   }
 
   const destination = new URL("/home-center/?page=mobile", url.origin);
+  destination.hash = `workerToken=${encodeURIComponent(env.AUTH_TOKEN)}`;
   return new Response(null, {
     status: 302,
     headers: {
