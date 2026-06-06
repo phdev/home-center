@@ -29,7 +29,9 @@ export HOME_CENTER_PI_URL="http://homecenter.local:8765"
 
 ## Claude Desktop
 
-Copy `claude_desktop_config.example.json`, replace `/Users/peter/home-center` if needed, and set environment values locally. Do not paste real tokens into the repo.
+Copy `claude_desktop_config.example.json`, replace `<repo-root>` with your
+local checkout path, and set environment values locally. Do not paste real
+tokens into the repo.
 
 What you'll see: Claude can list Home Center tools, read the calendar, set a timer, ask a knowledge question, and control TV power only when the tool call includes explicit confirmation.
 

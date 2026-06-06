@@ -597,14 +597,17 @@ sprayed across components.
 **Decision**
 Every new feature flows through three layers:
 1. `src/data/` adapters normalize raw inputs.
-2. `src/state/deriveState.js` is the single source of truth for **whether a
-   card shows** and **what data it gets**.
-3. `src/cards/` + `src/components/` render read-only view models.
+2. `src/core/derivations/` is the single source of truth for derived state.
+   `src/state/deriveState.js` is now a compatibility export.
+3. `src/core/interventions/engine.js` is the single source of truth for card
+   selection and emitted view models.
+4. `src/ui/cards/` renders engine card objects; legacy `src/cards/` and
+   `src/components/` wrappers remain during migration.
 
 **Consequence**
 Components cannot compute visibility rules. `computeDerivedState` is pure and
-unit-testable. Features die by removing a branch in `deriveState` rather than
-greps across the tree.
+unit-testable. Features die by removing a derivation or intervention branch
+rather than greps across the tree.
 
 ---
 

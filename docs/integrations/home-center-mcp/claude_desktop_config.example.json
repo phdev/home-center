@@ -2,7 +2,7 @@
   "mcpServers": {
     "home-center": {
       "command": "node",
-      "args": ["/Users/peter/home-center/openclaw/mcp/server.js"],
+      "args": ["<repo-root>/openclaw/mcp/server.js"],
       "env": {
         "HOME_CENTER_API_URL": "https://your-worker.example",
         "HOME_CENTER_AUTH_TOKEN": "set-this-in-your-local-config",

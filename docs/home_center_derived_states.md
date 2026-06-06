@@ -304,7 +304,10 @@ flag = unset && now.getHours() >= 18 && now.getHours() < 22 && isSchoolDay(tomor
 
 1. Add an entry above with: inputs, rule, enhancement fields, dependent cards, edge cases.
 2. Add the type in `src/state/types.js` under `DerivedState`.
-3. Implement in `src/state/deriveState.js`.
-4. Write a unit test in `src/state/__tests__/deriveState.test.js` with fixture inputs.
-5. Wire card visibility in `src/cards/registry.js`.
+3. Implement in `src/core/derivations/`; `src/state/deriveState.js` is only
+   a compatibility export.
+4. Write a unit test in `src/core/derivations/index.test.js` or the owning
+   module's test file, and keep legacy `src/state/*` tests green.
+5. Wire card selection in `src/core/interventions/engine.js`; new renderers
+   should consume engine card objects through `src/ui/cards/*`.
 6. Update `home_center_ui_card_contracts.md` with the card contract.

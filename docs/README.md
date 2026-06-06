@@ -33,7 +33,9 @@ These are the non-negotiable rules every change must respect.
 
 ### 1. Raw data → derived state → UI is the canonical flow
 - `src/services/` + `src/data/*` adapters produce normalized `RawState`
-- `src/state/deriveState.js` is the **only** place that computes `DerivedState`
+- `src/core/derivations/` is the **only** place that computes `DerivedState`
+- `src/state/deriveState.js` is a compatibility export for existing callers,
+  not the place for new derivation logic
 - Cards in `src/cards/*` and panels in `src/components/*` read `DerivedState`
   and never compute visibility rules themselves
 

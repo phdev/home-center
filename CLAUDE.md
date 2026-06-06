@@ -17,7 +17,7 @@ the four docs in `docs/`:
 1. **Raw data → derived state → UI is the only flow.** Do not bypass it.
 2. **UI visibility is driven only by derived state.** Never put visibility
    logic (`if now.hour >= …`, `if fetch result …`) inside a component. If a
-   card needs a new trigger, add a flag in `src/state/deriveState.js` first.
+   card needs a new trigger, add a flag in `src/core/derivations/` first.
 3. **OpenClaw enhances, it does not decide.** Copy, summaries, ordering
    hints — yes. Card visibility, reminder timing, flag truth value — no.
    Every enhancement call must degrade gracefully to deterministic copy.
@@ -36,8 +36,11 @@ the four docs in `docs/`:
   extend the contract (update the doc) or rethink the change.
 
 **While implementing:**
-- Put state logic in `src/state/deriveState.js` (pure, testable).
-- Put visibility predicates in `src/cards/registry.js`.
+- Put derived-state logic in `src/core/derivations/` (pure, testable).
+- Put card selection in `src/core/interventions/engine.js`.
+- Put new engine-card renderers in `src/ui/cards/*`; keep legacy
+  `src/cards/*` and `src/components/*` wrappers working while migration
+  callers remain.
 - Put storage routing in `src/data/*` adapters.
 - Put enhancement calls behind `useEnhancement(...)` with fallback.
 
@@ -247,7 +250,9 @@ A `deploy-pi` skill captures this flow — see `.claude/skills/deploy-pi/`.
 2. Pi's wake word service HTTP server extracts gesture from title, normalizes to camelCase, stores in memory
 3. Dashboard (Chromium on Pi) polls `GET http://localhost:8765/gesture` every 500ms → processes gesture → green glasses icon appears in top nav
 
-**Pi gesture endpoint:** `http://192.168.1.162:8765/gesture` (same HTTP server as wake word recording)
+**Pi gesture endpoint:** use the Pi command URL configured in local ops notes
+or environment, e.g. `http://<pi-ip>:8765/gesture` (same HTTP server as wake
+word recording). Do not commit concrete LAN IPs here.
 
 **Spatial navigation** (dashboard only):
 ```
@@ -471,9 +476,9 @@ ssh pi@homecenter.local "sudo systemctl restart wake-word"
 ssh pi@homecenter.local "sudo systemctl restart mic-streamer"
 
 # Reload the Mac mini voice service after changes
-rsync -av voice-service/ peter@peters-mac-mini.lan:/Users/peter/home-center/voice-service/
-rsync -av deploy/mac-mini/ peter@peters-mac-mini.lan:/Users/peter/home-center/deploy/mac-mini/
-ssh peter@peters-mac-mini.lan "bash /Users/peter/home-center/deploy/mac-mini/setup-voice-service.sh"
+rsync -av voice-service/ peter@peters-mac-mini.lan:~/home-center/voice-service/
+rsync -av deploy/mac-mini/ peter@peters-mac-mini.lan:~/home-center/deploy/mac-mini/
+ssh peter@peters-mac-mini.lan "bash ~/home-center/deploy/mac-mini/setup-voice-service.sh"
 
 # Install a Python package in the Pi's venv
 ssh pi@homecenter.local "/home/pi/home-center/pi/.venv/bin/pip install <package>"
@@ -533,8 +538,11 @@ The dashboard follows a **raw → derived → UI** pipeline. See the detailed sp
 | `src/services/` | External API clients (no React) |
 | `src/data/` | Normalizers + small hooks that adapt service output to canonical RawState shapes |
 | `src/hooks/` | Existing React data-fetching hooks — kept as-is |
-| `src/state/` | `types.js` (JSDoc typedefs), `deriveState.js` (pure fn), `useDerivedState.js` |
-| `src/cards/` | New feature cards + `registry.js` + `ContextualSlot.jsx` |
+| `src/core/derivations/` | Pure derived-state implementation + tests |
+| `src/core/interventions/engine.js` | Deterministic card selection and emitted card view models |
+| `src/state/` | Compatibility exports, JSDoc typedefs, and React recompute hook |
+| `src/ui/cards/` | Renderers for intervention-engine card objects |
+| `src/cards/` | Legacy feature cards and wrappers kept during migration |
 | `src/ai/openclaw.js` | Enhancement helper — timeout + graceful fallback |
 
 ### Guardrails (see decisions log)
@@ -542,7 +550,7 @@ The dashboard follows a **raw → derived → UI** pipeline. See the detailed sp
 - **Card visibility is deterministic.** Components never compute `should I show?`; they read from `DerivedState`.
 - **OpenClaw is enrichment, not dependency.** Cards must render correctly with the enhancer offline.
 - **Reminder timing is deterministic.** Bedtime / 16:30 / 18:00 thresholds are arithmetic, not LLM calls.
-- **Adding a new card = edit `src/cards/registry.js`.** That file is the only place that maps flags → components.
+- **Adding a new card = derive state first, then edit `src/core/interventions/engine.js`.** That file is the card-selection boundary for new work.
 
 ### Contextual slot
 
@@ -557,8 +565,8 @@ flips to `<ClawSuggestionsCard>` when suggestions exist.
 2. Add the card contract to `docs/home_center_ui_card_contracts.md`.
 3. Extend `src/state/types.js` with the new fields.
 4. Write a failing test in `src/state/deriveState.test.js` for the new flag (red).
-5. Implement the rule in `src/state/deriveState.js` until green.
-6. Add the card under `src/cards/` and register it in `src/cards/registry.js`. Add a registry test covering its visibility in `src/cards/registry.test.js`.
+5. Implement the rule in `src/core/derivations/` until green.
+6. Add or update selection in `src/core/interventions/engine.js`; add renderer coverage in `src/ui/cards/*` or the owning legacy wrapper while migration is in progress.
 7. (Optional) Wire an OpenClaw enhancer via `useEnhancement("featureKey", state, workerSettings)` — the `fallback.integration.test.js` suite enforces that the card still works offline.
 
 ### Testing

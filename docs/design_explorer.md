@@ -66,9 +66,10 @@ The script prints the saved path and the full response.
    and synthesize a merged recommendation. There's no dedicated script
    for this yet — paste the prompt + explorer artifact into a chat.
 5. **Implement the chosen direction.** Translate the picked structural
-   idea into `src/App.jsx` + `src/cards/registry.js`. Derived-state
-   flags still gate visibility; this tool only changes which flags map
-   to which regions.
+   idea into the relevant dashboard renderer. Derived-state logic belongs
+   in `src/core/derivations/`, and card selection belongs in
+   `src/core/interventions/engine.js`; design tools should not decide
+   runtime visibility.
 
 ## File map
 

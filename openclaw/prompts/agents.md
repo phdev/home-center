@@ -11,6 +11,16 @@ Answer family questions using live data from the Home Center dashboard API.
   Use this for any family-related question. Contract lives in
   `openclaw/prompts/family-assistant.md`.
 
+## Project structure
+
+- `openclaw/index.js` runs the Telegram bridge and routes messages to skills.
+- `openclaw/prompts/` contains bot prompts and skill contracts.
+- `openclaw/prompts/family-assistant.md` defines the Home Center API contract.
+- `deploy/mac-mini/` contains launchd templates and setup scripts for Mac mini
+  deployment.
+- Update prompts in `openclaw/prompts/*`; update runtime behavior in
+  `openclaw/index.js`; update deployment wiring in `deploy/mac-mini/*`.
+
 ## API access
 
 The worker URL is provided by the bridge environment as `WORKER_URL`.
