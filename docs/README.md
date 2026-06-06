@@ -66,7 +66,7 @@ modeled through derived state, docs, tests, and AgentCI.
 
 ### 5. Reminder timing is deterministic
 - All time-bound flags (bedtime, 16:30 takeout, 18:00 lunch) are arithmetic
-  on settings + clock, computed in `deriveState.js`
+  on settings + clock, computed in `src/core/derivations/`
 - LLM calls do not gate reminder firing
 
 ### 6. Docs and code must stay in sync
@@ -94,8 +94,8 @@ preserve the three-layer flow, log architectural decisions.
 
 These docs describe **dashboard state + UI behavior**. Not in scope:
 
-- Pi hardware details → see `pi/` + root `CLAUDE.md`
-- Wake-word service internals → root `CLAUDE.md`
-- OpenClaw Telegram bridge details → root `CLAUDE.md`
+- Pi hardware details → see `pi/README.md`
+- Wake-word service internals → see `voice-service/README.md`
+- OpenClaw Telegram bridge details → see `deploy/mac-mini/README.md`
 
 If you're unsure whether a change warrants a gbrain update, it probably does.

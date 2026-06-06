@@ -51,3 +51,30 @@ flag. Updated docs now agree that:
 - New card selection belongs in `src/core/interventions/engine.js`.
 - `src/ui/cards/*` is the target for engine-card renderers, while legacy
   `src/cards/*` wrappers remain during migration.
+
+## 2026-06-06 Follow-up
+
+Commands rerun:
+
+```sh
+npx repomix --token-count-tree -o /tmp/home-center-repomix-output.xml
+npx @packmind/cli lint .
+curl -X POST https://context-evaluator.ai/api/evaluate \
+  -H 'Content-Type: application/json' \
+  -d '{"repositoryUrl":"https://github.com/phdev/home-center","options":{"provider":"codex"}}'
+```
+
+Repomix reported:
+
+- Total packed context: 899,253 tokens across 476 files.
+- `CLAUDE.md`: 1,323 tokens, down from 10,936 in the pre-refactor run.
+- `docs/runbooks/`: 1,289 tokens split between Pencil and TV dashboard runbooks.
+
+Packmind CLI still returned:
+
+```text
+No packmind.json config found. Run `packmind-cli install <some-package>` first to set up linting.
+```
+
+Context-Evaluator accepted the GitHub repo and started job
+`c9db87be-ee9f-4dda-8d60-7498b8f5acb0`.

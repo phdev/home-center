@@ -54,9 +54,9 @@ Pi Python venv, and enables:
   if needed and selects the Pi as the active HDMI source.
 
 Chromium kiosk launch is handled by the user Wayland/labwc session, not a
-systemd service. See `CLAUDE.md` "Deploying to the Pi" for the deploy loop.
-Chromium exposes remote debugging on `127.0.0.1:9222`; the watchdog uses that
-local-only endpoint to detect missing or crashed Home Center tabs.
+systemd service. Chromium exposes remote debugging on `127.0.0.1:9222`; the
+watchdog uses that local-only endpoint to detect missing or crashed Home Center
+tabs.
 
 ## How It Works
 
@@ -112,6 +112,68 @@ journalctl -u kiosk-watchdog -f
 journalctl -u mic-streamer -f
 journalctl -u wake-word -f
 ```
+
+## Deploying the Kiosk Bundle
+
+The Pi's Chromium kiosk loads `http://localhost:8080/home-center/`, served by
+`dashboard-local.service` from `/home/pi/home-center/dashboard-local/`. The
+actual deploy target is:
+
+```text
+/home/pi/home-center/dashboard-local/home-center/
+```
+
+Paths that are easy to confuse with the deploy target:
+
+- `phdev.github.io/home-center/`: GitHub Pages for remote/mobile access only.
+- `/home/pi/home-center/dist/`: build output on the Pi, not what the kiosk serves.
+
+After a PR merges to `main`, deploy from a clean local checkout:
+
+```bash
+cd ~/home-center
+git checkout main && git pull
+npm run build
+rsync -av --delete dist/ pi@homecenter.local:/home/pi/home-center/dashboard-local/home-center/
+ssh pi@homecenter.local 'sudo systemctl restart lightdm'
+```
+
+Restarting LightDM bounces the graphical session and relaunches Chromium through
+`~/.config/labwc/autostart`. Expect about 10 seconds of black screen. Avoid
+relaunching Chromium directly over SSH; it can hang the SSH session.
+
+Verify the deployed asset hash:
+
+```bash
+ssh pi@homecenter.local 'grep -oE "index-[A-Za-z0-9_-]+\.js" /home/pi/home-center/dashboard-local/home-center/index.html'
+ls dist/assets/ | grep '^index-'
+```
+
+Then confirm fresh kiosk requests:
+
+```bash
+ssh pi@homecenter.local 'sudo journalctl -u dashboard-local --since "30 seconds ago" --no-pager | tail'
+```
+
+Expected requests include `GET /home-center/ ... 200` and
+`GET /home-center/assets/index-*.js ... 200`.
+
+Build-on-the-Pi also works:
+
+```bash
+ssh pi@homecenter.local 'cd /home/pi/home-center && git pull --ff-only origin main && npm install && npm run build && rsync -av --delete dist/ /home/pi/home-center/dashboard-local/home-center/ && sudo systemctl restart lightdm'
+```
+
+Pi git divergence was reconciled to `main` on 2026-04-24 by pulling cleanly and
+marking these Pi-local service files with `git update-index --skip-worktree`:
+
+- `pi/wake_word_service.py`
+- `openclaw/index.js`
+- `openclaw/package.json`
+- `openclaw/package-lock.json`
+- `openclaw/openclaw.service`
+
+Do not unmark those without checking the live service impact.
 
 The mic streamer systemd unit must run in the `pi` user's PipeWire context:
 
@@ -172,12 +234,7 @@ PY
 
 ### Voice commands do not trigger
 
-- Check Mac logs: `tail -f ~/home-center/voice-service/logs/voice-stderr.log`.
-- Check structured events:
-  `tail -f ~/home-center/voice-service/logs/voice-reliability.jsonl`.
-- If `detector_text` contains a command word like `calendar` but no wake hit,
-  debug Vosk wake recognition or a narrow alias in `voice-service/intent.py`
-  before changing kiosk/Worker routing.
+- Follow the debugging order in `voice-service/README.md`.
 - Confirm `mic-streamer` has a connected client.
 - If the Mac logs `Mic stream connected` but no audio-heartbeat or wake probe
   lines appear, restart `mic-streamer` and check for stale `CLOSE-WAIT`

@@ -18,6 +18,26 @@ environment variables or sed substitution.
 | Design Claw listener | Polls Telegram DMs every 5 min; replies as David or merges explicit memory feedback | `com.homecenter.design-claw-listener` |
 | Home Center voice | Vosk wake gate, local Whisper command STT, Pi command dispatch | `com.homecenter.voice` |
 
+## Hardware Architecture
+
+| Machine | Hostname | Role |
+|---|---|---|
+| Raspberry Pi | `homecenter.local` | Chromium kiosk, XVF3800 mic stream, local command API, HDMI-CEC |
+| Mac mini | `peters-mac-mini.lan` | Voice wake/STT compute, OpenClaw bridge, email-triage, school-updates, agent spawning |
+| Laptop | n/a | Development only |
+
+| Service | Machine | Manager | Port |
+|---|---|---|---|
+| Chromium kiosk | Pi | `~/.config/labwc/autostart` | n/a |
+| Dashboard HTTP server | Pi | systemd `dashboard-local` | 8080 |
+| Mic streamer | Pi | systemd `mic-streamer` | 8766 |
+| Pi command server | Pi | systemd `wake-word` | 8765 |
+| Voice wake/STT | Mac mini | launchd `com.homecenter.voice` | n/a |
+| OpenClaw bridge | Mac mini | launchd `com.openclaw.bridge` | 3100 |
+| Email triage | Mac mini | launchd `com.homecenter.email-triage` | n/a |
+| School updates | Mac mini | launchd `com.homecenter.school-updates` | n/a |
+| Cloudflare Worker | Cloudflare | n/a | n/a |
+
 ## What does **not** live here
 
 Personal developer-agent automation (PR review bots, agent spawners,
@@ -25,6 +45,13 @@ Personal developer-agent automation (PR review bots, agent spawners,
 for that, it has been relocated outside the repo.
 
 ## First-time setup
+
+Clone and enter the repo before installing Mac mini services:
+
+```bash
+git clone https://github.com/phdev/home-center.git
+cd home-center
+```
 
 ### OpenClaw Telegram bridge
 

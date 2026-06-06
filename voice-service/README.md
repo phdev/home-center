@@ -31,6 +31,20 @@ Mac mini service for the Home Center voice path.
 Whisper is not used for wake detection. Empty “Hey Homer” does not turn on the
 TV; the user must say an explicit command.
 
+## Hardware Architecture
+
+The production voice path is split across two machines:
+
+| Machine | Hostname | Role |
+|---|---|---|
+| Raspberry Pi | `homecenter.local` | Chromium kiosk, XVF3800 mic stream, local command API, HDMI-CEC |
+| Mac mini | `peters-mac-mini.lan` | Voice wake/STT compute, OpenClaw bridge, email-triage, school-updates |
+
+The Pi `wake-word` service runs with `--no-wake-detection` and remains the
+local HTTP command server for CEC, timers, navigation, chime playback, gesture
+state, and live transcription. The Mac mini handles wake/STT compute and posts
+actions back to the Pi command server on `:8765`.
+
 ## Install
 
 ```bash
@@ -65,6 +79,25 @@ python voice_service.py \
 
 Use `--dry-run --debug` to inspect wake scores and parsed commands without
 posting actions back to the Pi.
+
+## Voice Miss Debugging Order
+
+When a voice navigation command like `Hey Homer, open calendar` does nothing,
+start from the voice evidence before changing dashboard routing:
+
+1. Check `voice-service/logs/voice-reliability.jsonl` for recent
+   `detector_text`, wake hits, command transcripts, parser results, and dispatches.
+2. Check `voice-service/logs/voice-stderr.log` for human-readable command
+   transcripts and `Dispatching: ...` lines.
+3. If Vosk heard the command word but the wake text is wrong, fix the wake
+   alias/parser path in `voice-service/intent.py` with a regression test.
+4. Only after dispatch reaches `/api/navigate` should you debug Pi navigation
+   state or kiosk polling.
+
+Specific lesson from 2026-05-05: `Hey Homer, open calendar` was misheard by
+Vosk as `hey i'm robyn calendar`. That looked like calendar navigation failure,
+but the real failure was wake recognition. The narrow alias is covered in
+`voice-service/tests/test_intent.py`.
 
 Local `faster-whisper` remains the default command STT path. OpenAI
 transcription is opt-in for fallback or diagnostics:
