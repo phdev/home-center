@@ -1,5 +1,5 @@
-import { render, screen, within } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
 import { NeedsActionPanel } from "../App";
 
 function action(index) {
@@ -69,5 +69,26 @@ describe("NeedsActionPanel", () => {
     expect(screen.queryByText("Event")).toBeNull();
     expect(screen.queryByText("Gift")).toBeNull();
     expect(screen.getByText("Suggest gift ideas")).toBeTruthy();
+  });
+
+  it("shows mobile delete controls and sends the selected action", async () => {
+    const onDismissAction = vi.fn(async () => {});
+    const { container } = render(
+      <NeedsActionPanel
+        actions={[action(0), action(1)]}
+        showDeleteControls
+        onDismissAction={onDismissAction}
+      />
+    );
+
+    expect(container.textContent).not.toContain("›");
+    fireEvent.click(screen.getByLabelText("Delete Action 2"));
+
+    await waitFor(() => {
+      expect(onDismissAction).toHaveBeenCalledWith(expect.objectContaining({
+        id: "action-1",
+        title: "Action 2",
+      }));
+    });
   });
 });

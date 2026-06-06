@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   AudioLines,
   Cake,
@@ -14,6 +14,7 @@ import {
   Wind,
   Droplets,
   Thermometer,
+  X,
 } from "lucide-react";
 import { useTime } from "./hooks/useTime";
 import { useTimers } from "./hooks/useTimers";
@@ -803,6 +804,23 @@ export default function App() {
   const lunchDecisions = useLunchDecisions(settings.worker);
   const schoolLunchMenu = useSchoolLunchMenu(settings.worker);
   const wakeTimes = useWakeTimes(settings.worker);
+  const dismissNeedsAction = useCallback(async (action) => {
+    if (!settings.worker?.url) throw new Error("Worker URL is not configured.");
+    const headers = { "Content-Type": "application/json" };
+    if (settings.worker.token) headers.Authorization = `Bearer ${settings.worker.token}`;
+    const res = await fetch(`${settings.worker.url}/api/needs-action/done`, {
+      method: "POST",
+      headers,
+      credentials: "include",
+      body: JSON.stringify({ name: action.id || action.title, operation: "dismiss" }),
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok || body.ok === false) {
+      throw new Error(body.message || body.error || body.reason || `Needs Action returned ${res.status}`);
+    }
+    await school.refresh?.({ showLoading: false });
+    return body;
+  }, [settings.worker?.url, settings.worker?.token, school.refresh]);
 
   const rawState = useMemo(() => {
     const schoolItems = normalizeSchoolItems(dashboardSchool);
@@ -1024,6 +1042,7 @@ export default function App() {
           <MobileDashboard
             now={appNow}
             actions={buildHowieActions(derived, appNow)}
+            onDismissAction={dismissNeedsAction}
             calendar={dashboardCalendar}
             calendarConflictCard={calendarConflictCard}
             birthdays={dashboardBirthdays}
@@ -1104,11 +1123,45 @@ function findCard(cards, type) {
   return (cards ?? []).find((card) => card.type === type) ?? null;
 }
 
-function MobileDashboard({ now, actions, calendar, calendarConflictCard, birthdays, derived }) {
+function MobileDashboard({ now, actions, onDismissAction, calendar, calendarConflictCard, birthdays, derived }) {
+  const [hiddenActionIds, setHiddenActionIds] = useState(() => new Set());
+  const [deletingActionIds, setDeletingActionIds] = useState(() => new Set());
+  const [deleteError, setDeleteError] = useState(null);
+  const visibleActions = actions.filter((action) => !hiddenActionIds.has(action.id));
+
+  const dismissAction = async (action) => {
+    if (!onDismissAction || action.id === "fallback") return;
+    setDeleteError(null);
+    setDeletingActionIds((current) => new Set(current).add(action.id));
+    setHiddenActionIds((current) => new Set(current).add(action.id));
+    try {
+      await onDismissAction(action);
+    } catch (error) {
+      setHiddenActionIds((current) => {
+        const next = new Set(current);
+        next.delete(action.id);
+        return next;
+      });
+      setDeleteError(error.message || "Could not delete item.");
+    } finally {
+      setDeletingActionIds((current) => {
+        const next = new Set(current);
+        next.delete(action.id);
+        return next;
+      });
+    }
+  };
+
   const sections = {
     "needs-action": (
       <section key="needs-action" data-mobile-section="needs-action" style={mobileNeedsActionSectionStyle}>
-        <NeedsActionPanel actions={actions} />
+        <NeedsActionPanel
+          actions={visibleActions}
+          showDeleteControls
+          deletingActionIds={deletingActionIds}
+          deleteError={deleteError}
+          onDismissAction={dismissAction}
+        />
       </section>
     ),
     calendar: (
@@ -1305,29 +1358,54 @@ function V2Metric({ icon, text }) {
   );
 }
 
-export function NeedsActionPanel({ actions }) {
+export function NeedsActionPanel({
+  actions,
+  showDeleteControls = false,
+  deletingActionIds = new Set(),
+  deleteError = null,
+  onDismissAction,
+}) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12, height: "100%" }}>
       <div style={v2NeedsHeaderStyle}>
         <div style={v2NeedsTitleStyle}>Needs Action</div>
         <span style={v2ActionCountStyle}>{actions.length}</span>
       </div>
+      {deleteError && <div role="status" style={v2ActionDeleteErrorStyle}>{deleteError}</div>}
       <div style={v2ActionListStyle} data-testid="needs-action-list">
-        {actions.map((action) => (
-          <button key={action.id} style={v2ActionItemStyle(action.tone)}>
-            <div style={{ minWidth: 0, flex: 1 }}>
-              {action.meta && <div style={v2ActionMetaStyle}>{action.meta}</div>}
-              <div style={v2ActionTitleStyle}>{action.title}</div>
-              {action.detail && (
-                <div style={v2SuggestedActionButtonStyle(action.tone)}>
-                  <AudioLines size={14} strokeWidth={2.4} aria-hidden="true" />
-                  <span style={v2ActionDetailTextStyle}>{action.detail}</span>
-                </div>
+        {actions.map((action) => {
+          const canDelete = showDeleteControls && action.id !== "fallback" && typeof onDismissAction === "function";
+          const deleting = deletingActionIds.has(action.id);
+          const ItemTag = canDelete ? "div" : "button";
+          return (
+            <ItemTag key={action.id} style={v2ActionItemStyle(action.tone)}>
+              <div style={{ minWidth: 0, flex: 1 }}>
+                {action.meta && <div style={v2ActionMetaStyle}>{action.meta}</div>}
+                <div style={v2ActionTitleStyle}>{action.title}</div>
+                {action.detail && (
+                  <div style={v2SuggestedActionButtonStyle(action.tone)}>
+                    <AudioLines size={14} strokeWidth={2.4} aria-hidden="true" />
+                    <span style={v2ActionDetailTextStyle}>{action.detail}</span>
+                  </div>
+                )}
+              </div>
+              {canDelete ? (
+                <button
+                  type="button"
+                  aria-label={`Delete ${action.title}`}
+                  title={`Delete ${action.title}`}
+                  disabled={deleting}
+                  onClick={() => onDismissAction(action)}
+                  style={v2ActionDeleteButtonStyle(deleting)}
+                >
+                  <X size={18} strokeWidth={2.8} aria-hidden="true" />
+                </button>
+              ) : (
+                <span style={v2ChevronStyle}>›</span>
               )}
-            </div>
-            <span style={v2ChevronStyle}>›</span>
-          </button>
-        ))}
+            </ItemTag>
+          );
+        })}
       </div>
     </div>
   );
@@ -1755,6 +1833,7 @@ const v2ActionMetaStyle = { fontFamily: "'Geist','Inter',system-ui,sans-serif", 
 const v2ActionTitleStyle = { fontFamily: "'Geist','Inter',system-ui,sans-serif", fontSize: 15.5, fontWeight: 850, color: "#FFFFFF", lineHeight: 1.12, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" };
 const v2ActionDetailTextStyle = { minWidth: 0, overflowWrap: "anywhere" };
 const v2ChevronStyle = { color: "rgba(255,255,255,0.72)", fontSize: 28, lineHeight: 1 };
+const v2ActionDeleteErrorStyle = { borderRadius: 10, border: "1px solid rgba(248,113,113,0.38)", background: "rgba(127,29,29,0.28)", color: "#FECACA", padding: "7px 10px", fontFamily: "'Geist','Inter',system-ui,sans-serif", fontSize: 12, fontWeight: 750 };
 const v2HowiePromptStyle = { display: "flex", flexDirection: "column", gap: 6 };
 const v2HowieGreetingStyle = { fontFamily: "'Geist','Inter',system-ui,sans-serif", fontSize: 12.5, lineHeight: 1.28, color: "rgba(255,255,255,0.72)", fontWeight: 650 };
 const v2HowieCommandStyle = { minHeight: 28, borderRadius: 999, border: "1px solid rgba(255,255,255,0.18)", background: "rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.78)", display: "flex", alignItems: "center", gap: 9, padding: "0 13px", fontFamily: "'Geist','Inter',system-ui,sans-serif", fontSize: 11.5, fontWeight: 750, textAlign: "left" };
@@ -1780,6 +1859,23 @@ function v2ActionItemStyle(tone) {
     background: v2ActionSurface(tone),
     padding: "8px 12px",
     textAlign: "left",
+  };
+}
+
+function v2ActionDeleteButtonStyle(disabled) {
+  return {
+    width: 36,
+    height: 36,
+    flex: "0 0 36px",
+    borderRadius: 999,
+    border: "1px solid rgba(255,255,255,0.2)",
+    background: disabled ? "rgba(255,255,255,0.05)" : "rgba(255,255,255,0.11)",
+    color: disabled ? "rgba(255,255,255,0.35)" : "rgba(255,255,255,0.86)",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 0,
+    cursor: disabled ? "default" : "pointer",
   };
 }
 
