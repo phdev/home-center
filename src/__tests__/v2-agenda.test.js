@@ -5,6 +5,7 @@ describe("mobile dashboard", () => {
   it("keeps the requested phone section order", () => {
     expect(MOBILE_DASHBOARD_SECTION_ORDER).toEqual([
       "needs-action",
+      "bedtime",
       "calendar",
       "birthdays",
       "holidays",

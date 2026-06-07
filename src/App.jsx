@@ -8,6 +8,7 @@ import {
   CheckCircle2,
   LayoutDashboard,
   Mic,
+  Moon,
   PartyPopper,
   Send,
   Settings,
@@ -70,7 +71,7 @@ import { useWakeTimes } from "./data/useWakeTimes";
 import { ContextualSlot, RightColumnCards, OverlayCards } from "./cards/ContextualSlot";
 
 const V2_AGENDA_DAYS = 7;
-export const MOBILE_DASHBOARD_SECTION_ORDER = ["needs-action", "calendar", "birthdays", "holidays"];
+export const MOBILE_DASHBOARD_SECTION_ORDER = ["needs-action", "bedtime", "calendar", "birthdays", "holidays"];
 export { buildHowieActions };
 export const WEEKDAY_MORNING_TASKS = [
   "Put on Glow Stick",
@@ -1184,6 +1185,11 @@ function MobileDashboard({ now, actions, onDismissAction, calendar, calendarConf
         />
       </section>
     ),
+    bedtime: (
+      <section key="bedtime" data-mobile-section="bedtime" style={mobileNeedsActionSectionStyle}>
+        <BedtimePanel derived={derived} />
+      </section>
+    ),
     holidays: (
       <section key="holidays" data-mobile-section="holidays" style={mobilePanelSectionStyle(280)}>
         <HolidaysPanel now={now} max={5} daysAhead={90} />
@@ -1252,6 +1258,9 @@ function V2HomeDashboard({ now, calendar, weather, birthdays, derived }) {
         </section>
         <section style={v2HowiePanelStyle}>
           <HowieAssistantPanel />
+        </section>
+        <section style={v2BedtimePanelStyle}>
+          <BedtimePanel derived={derived} />
         </section>
       </div>
 
@@ -1428,6 +1437,73 @@ function HowieAssistantPanel() {
   );
 }
 
+export function BedtimePanel({ derived }) {
+  const rows = normalizeBedtimeRows(derived);
+  const missing = derived?.wakeLogStatus?.missing ?? [];
+  const wakeLogNeeded = !!derived?.wakeLogNeeded && missing.length > 0;
+  const names = missing.map((child) => child.childName).filter(Boolean);
+  const wakePrompt = names.length >= 2
+    ? 'Say "Hey Homer, both girls woke up at 7:00."'
+    : `Say "Hey Homer, ${names[0] ?? "Lucy"} woke up at 7:00."`;
+
+  return (
+    <div style={v2BedtimeContentStyle}>
+      <V2SectionTitle icon={<Moon size={20} />} label="Bedtime" />
+      <div style={v2BedtimeRowsStyle}>
+        {rows.map((row) => (
+          <div key={row.childId} style={v2BedtimeRowStyle}>
+            <div style={{ minWidth: 0 }}>
+              <div style={v2BedtimeNameLineStyle}>
+                <span style={v2ItemTitleStyle}>{row.childName}</span>
+                <span style={v2BedtimeTimeStyle}>{row.bedtimeLabel}</span>
+              </div>
+              <div style={v2MutedStyle}>{row.detail}</div>
+            </div>
+            {row.pendingWake ? (
+              <div style={v2BedtimeActionStackStyle}>
+                <span style={v2BedtimePendingStyle}>Pending wake-up time</span>
+                <span style={v2BedtimeMiniCtaStyle}>Log wake-up</span>
+              </div>
+            ) : (
+              <span style={v2BedtimeSourceStyle}>Wake logged</span>
+            )}
+          </div>
+        ))}
+      </div>
+      {wakeLogNeeded ? (
+        <div style={v2BedtimeCtaStyle}>
+          <AudioLines size={15} strokeWidth={2.5} aria-hidden="true" />
+          <span>{wakePrompt}</span>
+        </div>
+      ) : (
+        <div style={v2BedtimeFootnoteStyle}>Bedtimes are based on last wake-up times.</div>
+      )}
+    </div>
+  );
+}
+
+function normalizeBedtimeRows(derived) {
+  const source = derived?.wakeDerivedBedtimes?.length
+    ? derived.wakeDerivedBedtimes
+    : derived?.wakeLogStatus?.children ?? [];
+  return source.map((item) => {
+    const pendingWake = !item.wakeAt;
+    return {
+      childId: item.childId,
+      childName: item.childName,
+      pendingWake,
+      bedtimeLabel: formatBedtimeTime(item.bedtimeAt),
+      detail: pendingWake ? "Target bedtime" : `Based on ${formatBedtimeTime(item.wakeAt)} wake-up`,
+    };
+  });
+}
+
+function formatBedtimeTime(value) {
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return "Pending";
+  return date.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+}
+
 export function buildAgenda(events, now) {
   const referenceAgenda = [
     { id: "ref-today-1", day: "Today", time: "4:30", title: "Family check-in", sub: "Kitchen", icon: "▣", sort: 1 },
@@ -1570,7 +1646,7 @@ const v2ShellStyle = {
   minHeight: 0,
   display: "grid",
   gridTemplateColumns: "340px minmax(420px, 1fr) 340px",
-  gridTemplateRows: "1fr 130px 30px",
+  gridTemplateRows: "1fr 76px 30px",
   gap: 12,
   marginLeft: 0,
   padding: "0 0 0 0",
@@ -1648,7 +1724,7 @@ const v2RightRailStyle = {
   gridColumn: "3",
   gridRow: "1",
   display: "grid",
-  gridTemplateRows: "minmax(0, 1.1fr) minmax(0, 0.92fr)",
+  gridTemplateRows: "122px 150px minmax(0, 1fr)",
   gap: 10,
   minHeight: 0,
 };
@@ -1667,6 +1743,13 @@ const v2HowiePanelStyle = {
   overflow: "hidden",
 };
 
+const v2BedtimePanelStyle = {
+  ...v2GlassPanelStyle,
+  padding: "17px 20px",
+  minHeight: 0,
+  overflow: "hidden",
+};
+
 const v2BottomTrayStyle = {
   ...v2GlassPanelStyle,
   gridColumn: "1 / span 3",
@@ -1674,7 +1757,7 @@ const v2BottomTrayStyle = {
   display: "grid",
   gridTemplateColumns: "1fr 1px 1fr",
   alignItems: "stretch",
-  padding: "18px 22px",
+  padding: "12px 22px",
   gap: 18,
   minWidth: 0,
 };
@@ -1834,9 +1917,20 @@ const v2ActionTitleStyle = { fontFamily: "'Geist','Inter',system-ui,sans-serif",
 const v2ActionDetailTextStyle = { minWidth: 0, overflowWrap: "anywhere" };
 const v2ChevronStyle = { color: "rgba(255,255,255,0.72)", fontSize: 28, lineHeight: 1 };
 const v2ActionDeleteErrorStyle = { borderRadius: 10, border: "1px solid rgba(248,113,113,0.38)", background: "rgba(127,29,29,0.28)", color: "#FECACA", padding: "7px 10px", fontFamily: "'Geist','Inter',system-ui,sans-serif", fontSize: 12, fontWeight: 750 };
-const v2HowiePromptStyle = { display: "flex", flexDirection: "column", gap: 6 };
-const v2HowieGreetingStyle = { fontFamily: "'Geist','Inter',system-ui,sans-serif", fontSize: 12.5, lineHeight: 1.28, color: "rgba(255,255,255,0.72)", fontWeight: 650 };
-const v2HowieCommandStyle = { minHeight: 28, borderRadius: 999, border: "1px solid rgba(255,255,255,0.18)", background: "rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.78)", display: "flex", alignItems: "center", gap: 9, padding: "0 13px", fontFamily: "'Geist','Inter',system-ui,sans-serif", fontSize: 11.5, fontWeight: 750, textAlign: "left" };
+const v2HowiePromptStyle = { display: "flex", flexDirection: "column", gap: 5 };
+const v2HowieGreetingStyle = { fontFamily: "'Geist','Inter',system-ui,sans-serif", fontSize: 12, lineHeight: 1.16, color: "rgba(255,255,255,0.72)", fontWeight: 650 };
+const v2HowieCommandStyle = { minHeight: 23, borderRadius: 999, border: "1px solid rgba(255,255,255,0.18)", background: "rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.78)", display: "flex", alignItems: "center", gap: 9, padding: "0 13px", fontFamily: "'Geist','Inter',system-ui,sans-serif", fontSize: 11.5, fontWeight: 750, textAlign: "left" };
+const v2BedtimeContentStyle = { display: "flex", flexDirection: "column", gap: 9, height: "100%", minHeight: 0 };
+const v2BedtimeRowsStyle = { display: "flex", flexDirection: "column", gap: 6, minHeight: 0, overflowY: "auto" };
+const v2BedtimeRowStyle = { display: "grid", gridTemplateColumns: "minmax(0,1fr) auto", alignItems: "center", gap: 10, minHeight: 48, padding: "7px 10px", borderRadius: 13, background: "rgba(255,255,255,0.055)", border: "1px solid rgba(255,255,255,0.08)" };
+const v2BedtimeNameLineStyle = { display: "flex", alignItems: "baseline", gap: 9, minWidth: 0 };
+const v2BedtimeTimeStyle = { fontFamily: "'JetBrains Mono',ui-monospace,monospace", fontSize: 15, fontWeight: 850, color: "#FFFFFF", letterSpacing: 0, whiteSpace: "nowrap" };
+const v2BedtimeActionStackStyle = { display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 5, minWidth: 96 };
+const v2BedtimePendingStyle = { fontFamily: "'Geist','Inter',system-ui,sans-serif", fontSize: 10.5, fontWeight: 800, color: "rgba(255,255,255,0.58)", textAlign: "right", lineHeight: 1.15 };
+const v2BedtimeMiniCtaStyle = { borderRadius: 999, padding: "5px 9px", background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.16)", color: "#FFFFFF", fontFamily: "'Geist','Inter',system-ui,sans-serif", fontSize: 11, fontWeight: 850, whiteSpace: "nowrap" };
+const v2BedtimeSourceStyle = { borderRadius: 999, padding: "6px 9px", background: "rgba(34,197,94,0.16)", border: "1px solid rgba(199,249,204,0.24)", color: "#C7F9CC", fontFamily: "'Geist','Inter',system-ui,sans-serif", fontSize: 11, fontWeight: 850, whiteSpace: "nowrap" };
+const v2BedtimeCtaStyle = { display: "grid", gridTemplateColumns: "auto minmax(0,1fr)", alignItems: "center", gap: 8, borderRadius: 14, padding: "8px 12px", background: "rgba(234,179,8,0.16)", border: "1px solid rgba(250,204,21,0.26)", color: "#FFFFFF", fontFamily: "'Geist','Inter',system-ui,sans-serif", fontSize: 12.5, fontWeight: 780, lineHeight: 1.2 };
+const v2BedtimeFootnoteStyle = { fontFamily: "'Geist','Inter',system-ui,sans-serif", fontSize: 12, fontWeight: 650, color: "rgba(255,255,255,0.5)", lineHeight: 1.25 };
 const v2BirthdayRowStyle = { display: "grid", gridTemplateColumns: "repeat(3, minmax(0,1fr))", gap: 12 };
 const v2BirthdayItemStyle = { display: "grid", gridTemplateColumns: "minmax(0,1fr) auto", alignItems: "center", gap: 9, minWidth: 0 };
 const v2HolidayRowStyle = { display: "grid", gridTemplateColumns: "repeat(2, minmax(0,1fr))", gap: 12 };
