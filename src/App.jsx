@@ -1685,6 +1685,7 @@ const mobileNeedsActionSectionStyle = {
 
 function mobilePanelSectionStyle(minHeight) {
   return {
+    ...v2GlassPanelStyle,
     minHeight,
     width: "100%",
     boxSizing: "border-box",
@@ -1692,6 +1693,8 @@ function mobilePanelSectionStyle(minHeight) {
     minWidth: 0,
     display: "flex",
     flexDirection: "column",
+    padding: "16px 20px",
+    overflow: "hidden",
   };
 }
 
