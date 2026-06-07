@@ -1,6 +1,8 @@
-import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { BedtimePanel } from "../App";
+
+afterEach(() => cleanup());
 
 describe("BedtimePanel", () => {
   it("calls for wake-up logging when wake times are missing", () => {
@@ -63,5 +65,42 @@ describe("BedtimePanel", () => {
     expect(screen.getByText("Based on 7:15 AM wake-up")).toBeTruthy();
     expect(screen.getByText("8:45 PM")).toBeTruthy();
     expect(screen.getByText("Wake logged")).toBeTruthy();
+  });
+
+  it("opens a wake-up time picker and saves the selected time", async () => {
+    const onLogWakeTime = vi.fn().mockResolvedValue({});
+    render(
+      <BedtimePanel
+        onLogWakeTime={onLogWakeTime}
+        derived={{
+          wakeLogNeeded: true,
+          wakeLogStatus: {
+            missing: [{ childId: "lucy", childName: "Lucy" }],
+          },
+          wakeDerivedBedtimes: [
+            {
+              childId: "lucy",
+              childName: "Lucy",
+              wakeAt: null,
+              bedtimeAt: "2026-06-06T20:00:00-07:00",
+              source: "schedule",
+            },
+          ],
+        }}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Log Lucy wake-up time" }));
+    const picker = screen.getByLabelText("Lucy wake-up time");
+    fireEvent.change(picker, { target: { value: "07:20" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => {
+      expect(onLogWakeTime).toHaveBeenCalledWith({
+        childId: "lucy",
+        childName: "Lucy",
+        time: "07:20",
+      });
+    });
   });
 });

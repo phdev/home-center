@@ -67,7 +67,7 @@ import { useBedtimeSettings } from "./data/useBedtime";
 import { useChecklistConfig } from "./data/useChecklist";
 import { useLunchDecisions } from "./data/useLunch";
 import { useSchoolLunchMenu } from "./data/useSchoolLunch";
-import { useWakeTimes } from "./data/useWakeTimes";
+import { useWakeTimeWriter, useWakeTimes } from "./data/useWakeTimes";
 import { ContextualSlot, RightColumnCards, OverlayCards } from "./cards/ContextualSlot";
 
 const V2_AGENDA_DAYS = 7;
@@ -805,6 +805,7 @@ export default function App() {
   const lunchDecisions = useLunchDecisions(settings.worker);
   const schoolLunchMenu = useSchoolLunchMenu(settings.worker);
   const wakeTimes = useWakeTimes(settings.worker);
+  const saveWakeTime = useWakeTimeWriter(settings.worker);
   const dismissNeedsAction = useCallback(async (action) => {
     if (!settings.worker?.url) throw new Error("Worker URL is not configured.");
     const headers = { "Content-Type": "application/json" };
@@ -1048,6 +1049,7 @@ export default function App() {
             calendarConflictCard={calendarConflictCard}
             birthdays={dashboardBirthdays}
             derived={derived}
+            onLogWakeTime={saveWakeTime}
           />
         ) : (
           <div style={{ display: "flex", flex: 1, marginTop: designSystem === "v2" ? 2 : 16, minHeight: 0 }}>
@@ -1061,6 +1063,7 @@ export default function App() {
                 weather={dashboardWeather}
                 birthdays={dashboardBirthdays}
                 derived={derived}
+                onLogWakeTime={saveWakeTime}
               />
             ) : (
               <div style={{ display: "flex", gap: 16, flex: 1, minHeight: 0, marginLeft: 16 }}>
@@ -1124,7 +1127,7 @@ function findCard(cards, type) {
   return (cards ?? []).find((card) => card.type === type) ?? null;
 }
 
-function MobileDashboard({ now, actions, onDismissAction, calendar, calendarConflictCard, birthdays, derived }) {
+function MobileDashboard({ now, actions, onDismissAction, calendar, calendarConflictCard, birthdays, derived, onLogWakeTime }) {
   const [hiddenActionIds, setHiddenActionIds] = useState(() => new Set());
   const [deletingActionIds, setDeletingActionIds] = useState(() => new Set());
   const [deleteError, setDeleteError] = useState(null);
@@ -1187,7 +1190,7 @@ function MobileDashboard({ now, actions, onDismissAction, calendar, calendarConf
     ),
     bedtime: (
       <section key="bedtime" data-mobile-section="bedtime" style={mobileNeedsActionSectionStyle}>
-        <BedtimePanel derived={derived} />
+        <BedtimePanel derived={derived} onLogWakeTime={onLogWakeTime} />
       </section>
     ),
     holidays: (
@@ -1210,7 +1213,7 @@ function parseForcedNow(value) {
   return Number.isFinite(parsed.getTime()) ? parsed : null;
 }
 
-function V2HomeDashboard({ now, calendar, weather, birthdays, derived }) {
+function V2HomeDashboard({ now, calendar, weather, birthdays, derived, onLogWakeTime }) {
   const agenda = useMemo(() => buildAgenda(calendar?.events, now), [calendar?.events, now]);
   const showMorningTasks = shouldShowWeekdayMorningTasks(now);
   const current = normalizeV2Weather(weather?.data ?? weather);
@@ -1260,7 +1263,7 @@ function V2HomeDashboard({ now, calendar, weather, birthdays, derived }) {
           <HowieAssistantPanel />
         </section>
         <section style={v2BedtimePanelStyle}>
-          <BedtimePanel derived={derived} />
+          <BedtimePanel derived={derived} onLogWakeTime={onLogWakeTime} />
         </section>
       </div>
 
@@ -1437,7 +1440,11 @@ function HowieAssistantPanel() {
   );
 }
 
-export function BedtimePanel({ derived }) {
+export function BedtimePanel({ derived, onLogWakeTime }) {
+  const [editingChildId, setEditingChildId] = useState(null);
+  const [draftTimes, setDraftTimes] = useState({});
+  const [savingChildId, setSavingChildId] = useState(null);
+  const [error, setError] = useState("");
   const rows = normalizeBedtimeRows(derived);
   const missing = derived?.wakeLogStatus?.missing ?? [];
   const wakeLogNeeded = !!derived?.wakeLogNeeded && missing.length > 0;
@@ -1445,6 +1452,27 @@ export function BedtimePanel({ derived }) {
   const wakePrompt = names.length >= 2
     ? 'Say "Hey Homer, both girls woke up at 7:00."'
     : `Say "Hey Homer, ${names[0] ?? "Lucy"} woke up at 7:00."`;
+  const canLogWakeTime = typeof onLogWakeTime === "function";
+  const startLog = (row) => {
+    if (!canLogWakeTime) return;
+    setError("");
+    setEditingChildId(row.childId);
+    setDraftTimes((prev) => ({ ...prev, [row.childId]: prev[row.childId] ?? defaultWakeTimeValue() }));
+  };
+  const saveLog = async (row) => {
+    const time = draftTimes[row.childId];
+    if (!time) return;
+    setError("");
+    setSavingChildId(row.childId);
+    try {
+      await onLogWakeTime({ childId: row.childId, childName: row.childName, time });
+      setEditingChildId(null);
+    } catch (err) {
+      setError(err?.message || "Wake-up time did not save.");
+    } finally {
+      setSavingChildId(null);
+    }
+  };
 
   return (
     <div style={v2BedtimeContentStyle}>
@@ -1462,14 +1490,43 @@ export function BedtimePanel({ derived }) {
             {row.pendingWake ? (
               <div style={v2BedtimeActionStackStyle}>
                 <span style={v2BedtimePendingStyle}>Pending wake-up time</span>
-                <span style={v2BedtimeMiniCtaStyle}>Log wake-up</span>
+                <button
+                  type="button"
+                  style={v2BedtimeMiniCtaStyle}
+                  onClick={() => startLog(row)}
+                  disabled={!canLogWakeTime || savingChildId === row.childId}
+                  aria-label={`Log ${row.childName} wake-up time`}
+                >
+                  Log wake-up
+                </button>
               </div>
             ) : (
               <span style={v2BedtimeSourceStyle}>Wake logged</span>
             )}
+            {editingChildId === row.childId ? (
+              <div style={v2BedtimePickerStyle}>
+                <input
+                  type="time"
+                  value={draftTimes[row.childId] ?? ""}
+                  onChange={(event) => setDraftTimes((prev) => ({ ...prev, [row.childId]: event.target.value }))}
+                  style={v2BedtimeTimeInputStyle}
+                  aria-label={`${row.childName} wake-up time`}
+                  autoFocus
+                />
+                <button
+                  type="button"
+                  style={v2BedtimeSaveButtonStyle}
+                  onClick={() => saveLog(row)}
+                  disabled={!draftTimes[row.childId] || savingChildId === row.childId}
+                >
+                  {savingChildId === row.childId ? "Saving" : "Save"}
+                </button>
+              </div>
+            ) : null}
           </div>
         ))}
       </div>
+      {error ? <div style={v2BedtimeErrorStyle}>{error}</div> : null}
       {wakeLogNeeded ? (
         <div style={v2BedtimeCtaStyle}>
           <AudioLines size={15} strokeWidth={2.5} aria-hidden="true" />
@@ -1480,6 +1537,11 @@ export function BedtimePanel({ derived }) {
       )}
     </div>
   );
+}
+
+function defaultWakeTimeValue() {
+  const now = new Date();
+  return `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
 }
 
 function normalizeBedtimeRows(derived) {
@@ -1930,8 +1992,12 @@ const v2BedtimeNameLineStyle = { display: "flex", alignItems: "baseline", gap: 9
 const v2BedtimeTimeStyle = { fontFamily: "'JetBrains Mono',ui-monospace,monospace", fontSize: 15, fontWeight: 850, color: "#FFFFFF", letterSpacing: 0, whiteSpace: "nowrap" };
 const v2BedtimeActionStackStyle = { display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 5, minWidth: 96 };
 const v2BedtimePendingStyle = { fontFamily: "'Geist','Inter',system-ui,sans-serif", fontSize: 10.5, fontWeight: 800, color: "rgba(255,255,255,0.58)", textAlign: "right", lineHeight: 1.15 };
-const v2BedtimeMiniCtaStyle = { borderRadius: 999, padding: "5px 9px", background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.16)", color: "#FFFFFF", fontFamily: "'Geist','Inter',system-ui,sans-serif", fontSize: 11, fontWeight: 850, whiteSpace: "nowrap" };
+const v2BedtimeMiniCtaStyle = { borderRadius: 999, padding: "5px 9px", background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.16)", color: "#FFFFFF", fontFamily: "'Geist','Inter',system-ui,sans-serif", fontSize: 11, fontWeight: 850, whiteSpace: "nowrap", cursor: "pointer" };
 const v2BedtimeSourceStyle = { borderRadius: 999, padding: "6px 9px", background: "rgba(34,197,94,0.16)", border: "1px solid rgba(199,249,204,0.24)", color: "#C7F9CC", fontFamily: "'Geist','Inter',system-ui,sans-serif", fontSize: 11, fontWeight: 850, whiteSpace: "nowrap" };
+const v2BedtimePickerStyle = { gridColumn: "1 / -1", display: "grid", gridTemplateColumns: "minmax(0,1fr) auto", gap: 8, alignItems: "center", paddingTop: 2 };
+const v2BedtimeTimeInputStyle = { minWidth: 0, height: 36, borderRadius: 10, border: "1px solid rgba(255,255,255,0.18)", background: "rgba(8,12,20,0.58)", color: "#FFFFFF", colorScheme: "dark", padding: "0 10px", fontFamily: "'JetBrains Mono',ui-monospace,monospace", fontSize: 15, fontWeight: 800 };
+const v2BedtimeSaveButtonStyle = { height: 36, borderRadius: 10, border: "1px solid rgba(199,249,204,0.26)", background: "rgba(34,197,94,0.18)", color: "#C7F9CC", padding: "0 12px", fontFamily: "'Geist','Inter',system-ui,sans-serif", fontSize: 12, fontWeight: 850, cursor: "pointer" };
+const v2BedtimeErrorStyle = { borderRadius: 10, border: "1px solid rgba(248,113,113,0.36)", background: "rgba(127,29,29,0.24)", color: "#FECACA", padding: "7px 10px", fontFamily: "'Geist','Inter',system-ui,sans-serif", fontSize: 12, fontWeight: 750 };
 const v2BedtimeCtaStyle = { display: "grid", gridTemplateColumns: "auto minmax(0,1fr)", alignItems: "center", gap: 8, borderRadius: 14, padding: "8px 12px", background: "rgba(234,179,8,0.16)", border: "1px solid rgba(250,204,21,0.26)", color: "#FFFFFF", fontFamily: "'Geist','Inter',system-ui,sans-serif", fontSize: 12.5, fontWeight: 780, lineHeight: 1.2 };
 const v2BedtimeFootnoteStyle = { fontFamily: "'Geist','Inter',system-ui,sans-serif", fontSize: 12, fontWeight: 650, color: "rgba(255,255,255,0.5)", lineHeight: 1.25 };
 const v2BirthdayRowStyle = { display: "grid", gridTemplateColumns: "repeat(3, minmax(0,1fr))", gap: 12 };
