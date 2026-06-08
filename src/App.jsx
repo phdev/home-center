@@ -1190,7 +1190,7 @@ function MobileDashboard({ now, actions, onDismissAction, calendar, calendarConf
       </section>
     ),
     bedtime: (
-      <section key="bedtime" data-mobile-section="bedtime" style={mobileNeedsActionSectionStyle}>
+      <section key="bedtime" data-mobile-section="bedtime" style={mobileBedtimeSectionStyle}>
         <BedtimePanel derived={derived} onLogWakeTime={onLogWakeTime} />
       </section>
     ),
@@ -1737,8 +1737,19 @@ const mobileDashboardStyle = {
 
 const mobileNeedsActionSectionStyle = {
   ...v2GlassPanelStyle,
-  minHeight: 184,
+  minHeight: 236,
   padding: "16px 16px",
+  overflow: "hidden",
+  width: "100%",
+  boxSizing: "border-box",
+  maxWidth: "100%",
+  minWidth: 0,
+};
+
+const mobileBedtimeSectionStyle = {
+  ...v2GlassPanelStyle,
+  minHeight: 148,
+  padding: "14px 16px",
   overflow: "hidden",
   width: "100%",
   boxSizing: "border-box",
@@ -1790,7 +1801,7 @@ const v2RightRailStyle = {
   gridColumn: "3",
   gridRow: "1",
   display: "grid",
-  gridTemplateRows: "230px 150px minmax(0, 1fr)",
+  gridTemplateRows: "minmax(284px, 1fr) 132px 176px",
   gap: 10,
   minHeight: 0,
 };
@@ -1987,8 +1998,8 @@ const v2HowiePromptStyle = { display: "flex", flexDirection: "column", gap: 5 };
 const v2HowieGreetingStyle = { fontFamily: "'Geist','Inter',system-ui,sans-serif", fontSize: 12, lineHeight: 1.16, color: "rgba(255,255,255,0.72)", fontWeight: 650 };
 const v2HowieCommandStyle = { minHeight: 23, borderRadius: 999, border: "1px solid rgba(255,255,255,0.18)", background: "rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.78)", display: "flex", alignItems: "center", gap: 9, padding: "0 13px", fontFamily: "'Geist','Inter',system-ui,sans-serif", fontSize: 11.5, fontWeight: 750, textAlign: "left" };
 const v2BedtimeContentStyle = { display: "flex", flexDirection: "column", gap: 9, height: "100%", minHeight: 0 };
-const v2BedtimeRowsStyle = { display: "flex", flexDirection: "column", gap: 6, minHeight: 0, overflowY: "auto" };
-const v2BedtimeRowStyle = { display: "grid", gridTemplateColumns: "minmax(0,1fr) auto", alignItems: "center", gap: 10, minHeight: 48, padding: "7px 10px", borderRadius: 13, background: "rgba(255,255,255,0.055)", border: "1px solid rgba(255,255,255,0.08)" };
+const v2BedtimeRowsStyle = { display: "flex", flex: "1 1 auto", flexDirection: "column", gap: 5, minHeight: 0, overflowY: "auto" };
+const v2BedtimeRowStyle = { display: "grid", gridTemplateColumns: "minmax(0,1fr) auto", alignItems: "center", gap: 9, minHeight: 42, padding: "6px 9px", borderRadius: 12, background: "rgba(255,255,255,0.055)", border: "1px solid rgba(255,255,255,0.08)" };
 const v2BedtimeNameLineStyle = { display: "flex", alignItems: "baseline", gap: 9, minWidth: 0 };
 const v2BedtimeTimeStyle = { fontFamily: "'JetBrains Mono',ui-monospace,monospace", fontSize: 15, fontWeight: 850, color: "#FFFFFF", letterSpacing: 0, whiteSpace: "nowrap" };
 const v2BedtimeActionStackStyle = { display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 5, minWidth: 96 };
