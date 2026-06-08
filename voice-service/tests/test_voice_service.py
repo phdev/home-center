@@ -1,5 +1,6 @@
 from pathlib import Path
 import sys
+from types import ModuleType
 from types import SimpleNamespace
 
 import numpy as np
@@ -24,6 +25,7 @@ from voice_service import (
     is_max_speech_candidate,
     is_local_stt_engine,
     is_strong_speech_candidate,
+    LiveKitWakeWordDetector,
     next_speech_empty_backoff_until,
     passes_recent_speech_gate,
     recent_speech_stats,
@@ -48,6 +50,7 @@ from voice_service import (
     VoiceReliabilityLogger,
     wake_log_followup_command,
 )
+import voice_service
 
 
 def test_vosk_power_on_candidate_accepts_turn_on_variants():
@@ -93,6 +96,41 @@ def speech_detector_args(**overrides):
     }
     defaults.update(overrides)
     return SimpleNamespace(**defaults)
+
+
+def livekit_detector_args(model_path, **overrides):
+    defaults = {
+        "wake_engine": "livekit",
+        "livekit_wakeword_model": str(model_path),
+        "livekit_wakeword_threshold": 0.5,
+        "livekit_wakeword_min_consecutive": 2,
+        "cooldown": 0.75,
+    }
+    defaults.update(overrides)
+    return SimpleNamespace(**defaults)
+
+
+def install_fake_livekit(monkeypatch, score_sequence):
+    class FakeWakeWordModel:
+        instances = []
+
+        def __init__(self, models):
+            self.models = models
+            self.calls = 0
+            FakeWakeWordModel.instances.append(self)
+
+        def predict(self, audio_chunk):
+            self.calls += 1
+            score = score_sequence.pop(0) if score_sequence else 0.0
+            self.last_audio_len = len(audio_chunk)
+            return {"hey_homer": score}
+
+    livekit_pkg = ModuleType("livekit")
+    wakeword_mod = ModuleType("livekit.wakeword")
+    wakeword_mod.WakeWordModel = FakeWakeWordModel
+    monkeypatch.setitem(sys.modules, "livekit", livekit_pkg)
+    monkeypatch.setitem(sys.modules, "livekit.wakeword", wakeword_mod)
+    return FakeWakeWordModel
 
 
 def test_capture_followup_command_waits_for_speech_after_pause():
@@ -351,6 +389,81 @@ def test_speech_candidate_detector_uses_its_own_short_cooldown():
 
     assert isinstance(detector, SpeechCandidateDetector)
     assert detector.cooldown == 0.4
+
+
+def test_livekit_wakeword_detector_requires_threshold_and_consecutive_hits(tmp_path, monkeypatch):
+    model_path = tmp_path / "hey_homer.onnx"
+    model_path.write_bytes(b"model")
+    install_fake_livekit(monkeypatch, [0.49, 0.72, 0.81])
+    monkeypatch.setattr("voice_service.time.time", lambda: 100.0)
+    detector = LiveKitWakeWordDetector(
+        model_path,
+        cooldown=0.0,
+        threshold=0.5,
+        min_consecutive=2,
+        window_seconds=0.08,
+    )
+    chunk = np.ones(1280, dtype=np.int16)
+
+    assert detector.accept(chunk) == (False, "", "livekit:hey_homer:0.490")
+    assert detector.accept(chunk) == (False, "", "livekit:hey_homer:0.720")
+    assert detector.accept(chunk) == (True, "Hey Homer", "livekit:hey_homer:0.810")
+
+
+def test_livekit_wakeword_detector_respects_cooldown(tmp_path, monkeypatch):
+    model_path = tmp_path / "hey_homer.onnx"
+    model_path.write_bytes(b"model")
+    install_fake_livekit(monkeypatch, [0.9, 0.9, 0.9, 0.9, 0.9])
+    times = iter([100.0, 101.0, 106.0])
+    monkeypatch.setattr("voice_service.time.time", lambda: next(times))
+    detector = LiveKitWakeWordDetector(
+        model_path,
+        cooldown=5.0,
+        threshold=0.5,
+        min_consecutive=2,
+        window_seconds=0.08,
+    )
+    chunk = np.ones(1280, dtype=np.int16)
+
+    assert detector.accept(chunk)[0] is False
+    assert detector.accept(chunk)[0] is True
+    assert detector.accept(chunk)[0] is False
+    assert detector.accept(chunk)[0] is False
+    assert detector.accept(chunk)[0] is True
+
+
+def test_build_wake_detector_selects_livekit(tmp_path, monkeypatch):
+    model_path = tmp_path / "hey_homer.onnx"
+    model_path.write_bytes(b"model")
+    fake_model = install_fake_livekit(monkeypatch, [0.0])
+
+    detector = build_wake_detector(livekit_detector_args(model_path))
+
+    assert isinstance(detector, LiveKitWakeWordDetector)
+    assert detector.name == "livekit:hey_homer"
+    assert detector.threshold == 0.5
+    assert detector.min_consecutive == 2
+    assert fake_model.instances[0].models == [str(model_path)]
+
+
+def test_build_wake_detector_keeps_vosk_as_default(monkeypatch, tmp_path):
+    calls = []
+
+    class FakeVoskWakeDetector:
+        def __init__(self, model_dir, cooldown):
+            calls.append((model_dir, cooldown))
+
+    monkeypatch.setattr(voice_service, "VoskWakeDetector", FakeVoskWakeDetector)
+    args = SimpleNamespace(
+        wake_engine="vosk",
+        vosk_model_dir=str(tmp_path),
+        cooldown=0.75,
+    )
+
+    detector = build_wake_detector(args)
+
+    assert isinstance(detector, FakeVoskWakeDetector)
+    assert calls == [(tmp_path, 0.75)]
 
 
 def test_speech_candidate_detector_rejects_short_quiet_segments():

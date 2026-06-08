@@ -8,7 +8,8 @@ Mac mini service for the Home Center voice path.
 2. Mac mini runs the configured local wake engine. The default is Vosk/Kaldi
    because it measured 0 TV false positives in the first hardware run; the
    service also supports a purpose-built `openwakeword` DNN engine via
-   `WAKE_ENGINE=openwakeword`, a confirmed-command `WAKE_ENGINE=speech`
+   `WAKE_ENGINE=openwakeword`, an experimental LiveKit wake-word engine via
+   `WAKE_ENGINE=livekit`, a confirmed-command `WAKE_ENGINE=speech`
    trial mode, and a brute-force local-STT benchmark via
    `WAKE_ENGINE=always-stt`.
 3. In the default Vosk path, a wake hit still posts the Pi chime immediately.
@@ -146,6 +147,23 @@ OPENWAKEWORD_EMPTY_CONFIRM_COOLDOWN_SECONDS=4.0 \
 python voice_service.py --dry-run --debug
 ```
 
+To exercise the experimental LiveKit wake-word path as a candidate-only
+trigger:
+
+```bash
+WAKE_ENGINE=livekit \
+WAKE_CONFIRM_COMMAND=1 \
+LIVEKIT_WAKEWORD_MODEL=./models/hey_homer_livekit.onnx \
+LIVEKIT_WAKEWORD_THRESHOLD=0.5 \
+LIVEKIT_WAKEWORD_MIN_CONSECUTIVE=2 \
+python voice_service.py --dry-run --debug
+```
+
+`livekit-wakeword` is not installed by the production Python 3.9 venv because
+PyPI declares `Requires-Python >=3.11`. Use a separate Python 3.11+ validation
+venv before enabling `WAKE_ENGINE=livekit`. Keep `WAKE_ENGINE=vosk` in launchd
+until the LiveKit model passes the promotion gates below.
+
 To bypass the current DNN and test speech segments as candidate triggers:
 
 ```bash
@@ -267,6 +285,25 @@ punctuated Whisper variants like `Okay, Homer, ...`.
 
 Do not make `openwakeword` the launchd default until it passes the same
 30-minute TV false-positive test as Vosk.
+
+Do not make `WAKE_ENGINE=livekit` the launchd default until it passes:
+
+- 5/5 family voice validation: Peter, wife, kids where practical
+- 30-minute TV/passive speech run with 0 dispatches
+- no worse command latency than the current Vosk path
+
+Rollback from a LiveKit validation run:
+
+```bash
+launchctl setenv WAKE_ENGINE vosk
+launchctl kickstart -k gui/$(id -u)/com.homecenter.voice
+tail -n 50 logs/voice-reliability.jsonl | grep '"wakeEngine":"vosk"'
+```
+
+For a rendered launchd plist, set `WAKE_ENGINE=vosk`, reload
+`com.homecenter.voice`, and confirm the latest
+`voice-service/logs/voice-reliability.jsonl` entries show
+`wakeEngine=vosk`.
 
 Do not make `WAKE_ENGINE=speech` the launchd default unless it passes the
 5-phrase validation and then the same ambient-TV false-dispatch checks. It is a

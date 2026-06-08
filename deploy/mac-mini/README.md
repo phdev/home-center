@@ -145,8 +145,10 @@ Optional environment variables:
 - `PYTHON_BIN`: Python executable for the venv, default `python3`
 - `WORKER_TOKEN`: optional bearer token for worker `/api/ask-query`
 - `WAKE_ENGINE`: `vosk` by default; `openwakeword` enables the purpose-built
-  DNN path after hardware validation; `speech` is a confirmed-command dry-run
-  mode that uses RMS speech segments as local Whisper candidates;
+  DNN path after hardware validation; `livekit` enables the experimental
+  LiveKit wake-word path after installing `livekit-wakeword` in a Python 3.11+
+  validation venv; `speech` is a confirmed-command dry-run mode that uses RMS
+  speech segments as local Whisper candidates;
   `always-stt` is the brute-force local-STT benchmark that sends every
   qualifying speech segment to local Whisper
 - `OPENAI_STT_MODE`: `off` by default; set to `fallback` to call OpenAI only
@@ -155,10 +157,15 @@ Optional environment variables:
 - `OPENAI_STT_MODEL`: OpenAI transcription model for fallback/diagnostic
   runs, default `gpt-4o-transcribe`
 - `OPENWAKEWORD_MODEL`: defaults to `pi/models/hey_homer.onnx`
+- `LIVEKIT_WAKEWORD_MODEL`: required only for `WAKE_ENGINE=livekit`; points to
+  the LiveKit ONNX wake-word model. Do not commit model artifacts unless they
+  are already covered by the repo's ignored local model paths.
+- `LIVEKIT_WAKEWORD_THRESHOLD`: default `0.5`
+- `LIVEKIT_WAKEWORD_MIN_CONSECUTIVE`: default `2`
 - `WAKE_CONFIRM_COMMAND`: `0` by default; set to `1` for openWakeWord dry-runs
-  where the DNN is only a candidate trigger and local Whisper must parse a
-  dispatchable command before chime/dispatch. Required for `WAKE_ENGINE=speech`
-  and `WAKE_ENGINE=always-stt`
+  and LiveKit dry-runs where the wake model is only a candidate trigger and
+  local Whisper must parse a dispatchable command before chime/dispatch.
+  Required for `WAKE_ENGINE=speech` and `WAKE_ENGINE=always-stt`
 - `CONFIRM_PRE_WAKE_SECONDS` / `CONFIRM_POST_WAKE_SECONDS`: confirmed-command
   capture window, default `5.0` pre + `2.0` post
 - `POST_ACTION_MUTE_SECONDS`: default `3.0`; production launchd uses `0.15`
@@ -210,6 +217,21 @@ Optional environment variables:
 - `CONFIRM_MULTI_COMMAND_DISPATCH`: default `0`; set to `1` only for dry-run
   validation to dispatch every wake-qualified command candidate from one
   merged transcript
+
+LiveKit validation/rollback:
+
+```bash
+WAKE_ENGINE=livekit \
+WAKE_CONFIRM_COMMAND=1 \
+LIVEKIT_WAKEWORD_MODEL=/path/to/hey_homer_livekit.onnx \
+python voice-service/voice_service.py --dry-run --debug
+```
+
+Promote only after 5/5 family voice validation, a 30-minute TV/passive speech
+run with 0 dispatches, and command latency no worse than the current Vosk path.
+Rollback by setting `WAKE_ENGINE=vosk`, reloading `com.homecenter.voice`, and
+confirming the latest `voice-service/logs/voice-reliability.jsonl` entries show
+`wakeEngine=vosk`.
 
 ### Design Claw (daily + listener)
 

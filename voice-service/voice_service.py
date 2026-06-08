@@ -80,6 +80,9 @@ OPENWAKEWORD_SEGMENT_END_SILENCE_SECONDS = float(os.environ.get("OPENWAKEWORD_SE
 OPENWAKEWORD_EMPTY_CONFIRM_COOLDOWN_SECONDS = float(
     os.environ.get("OPENWAKEWORD_EMPTY_CONFIRM_COOLDOWN_SECONDS", "4.0")
 )
+LIVEKIT_WAKEWORD_THRESHOLD = float(os.environ.get("LIVEKIT_WAKEWORD_THRESHOLD", "0.5"))
+LIVEKIT_WAKEWORD_MIN_CONSECUTIVE = int(os.environ.get("LIVEKIT_WAKEWORD_MIN_CONSECUTIVE", "2"))
+LIVEKIT_WAKEWORD_WINDOW_SECONDS = float(os.environ.get("LIVEKIT_WAKEWORD_WINDOW_SECONDS", "2.0"))
 VOSK_POWER_ON_CANDIDATE_RE = re.compile(
     r"\b(?:turn|return)\s+(?:it\s+)?on\b(?!\s+(?:the\s+)?radio\b)",
     re.IGNORECASE,
@@ -316,6 +319,81 @@ class OpenWakeWordWakeDetector:
         self.last_hit = 0.0
 
 
+class LiveKitWakeWordDetector:
+    """Experimental LiveKit wake-word path.
+
+    LiveKit's Python package provides a stateless model API that expects the
+    caller to manage a roughly two-second audio window. This adapter keeps that
+    buffering local and preserves the service's detector contract.
+    """
+
+    def __init__(
+        self,
+        model_path: Path,
+        cooldown: float,
+        threshold: float = LIVEKIT_WAKEWORD_THRESHOLD,
+        min_consecutive: int = LIVEKIT_WAKEWORD_MIN_CONSECUTIVE,
+        window_seconds: float = LIVEKIT_WAKEWORD_WINDOW_SECONDS,
+    ):
+        if not model_path:
+            raise SystemExit("LIVEKIT_WAKEWORD_MODEL/--livekit-wakeword-model is required for WAKE_ENGINE=livekit")
+        if not model_path.exists():
+            raise SystemExit(f"LiveKit wake word model not found: {model_path}")
+
+        try:
+            from livekit.wakeword import WakeWordModel
+        except ImportError as exc:
+            raise SystemExit(
+                "WAKE_ENGINE=livekit requires livekit-wakeword in a Python 3.11+ voice venv"
+            ) from exc
+
+        self.model = WakeWordModel(models=[str(model_path)])
+        self.model_name = model_path.stem
+        self.name = f"livekit:{self.model_name}"
+        self.cooldown = cooldown
+        self.threshold = threshold
+        self.min_consecutive = max(1, min_consecutive)
+        self.window_samples = max(CHUNK_SIZE, int(window_seconds * SAMPLE_RATE))
+        self.window_chunks = deque(maxlen=max(1, int(np.ceil(self.window_samples / CHUNK_SIZE))))
+        self.consecutive = 0
+        self.last_hit = 0.0
+        self.last_score = 0.0
+        self.last_model_name = self.model_name
+
+    def accept(self, chunk: np.ndarray) -> tuple[bool, str, str]:
+        self.window_chunks.append(chunk.astype(np.int16, copy=True))
+        audio = np.concatenate(self.window_chunks) if self.window_chunks else np.array([], dtype=np.int16)
+        if len(audio) < self.window_samples:
+            return False, "", f"livekit:{self.last_model_name}:0.000"
+        audio = audio[-self.window_samples:]
+        predictions = self.model.predict(audio)
+        name, score = max(
+            ((str(k), float(v)) for k, v in predictions.items()),
+            key=lambda item: item[1],
+            default=(self.model_name, 0.0),
+        )
+        self.last_model_name = name
+        self.last_score = score
+        if score >= self.threshold:
+            self.consecutive += 1
+        else:
+            self.consecutive = 0
+
+        source = f"livekit:{name}:{score:.3f}"
+        if self.consecutive >= self.min_consecutive:
+            now = time.time()
+            if now - self.last_hit >= self.cooldown:
+                self.last_hit = now
+                self.consecutive = 0
+                return True, "Hey Homer", source
+
+        return False, "", source
+
+    def reject_last_hit(self) -> None:
+        """Undo cooldown when confirmed-command mode rejects the wake hit."""
+        self.last_hit = 0.0
+
+
 class SpeechCandidateDetector:
     """RMS speech-segment candidate source for confirmed-command trials.
 
@@ -432,7 +510,7 @@ def validate_wake_mode_config(wake_engine: str, wake_confirm_command: bool) -> N
         raise SystemExit(f"WAKE_ENGINE={wake_engine} requires WAKE_CONFIRM_COMMAND=1")
 
 
-def build_wake_detector(args) -> VoskWakeDetector | OpenWakeWordWakeDetector | SpeechCandidateDetector:
+def build_wake_detector(args) -> VoskWakeDetector | OpenWakeWordWakeDetector | LiveKitWakeWordDetector | SpeechCandidateDetector:
     if args.wake_engine == "openwakeword":
         verifier_path = Path(args.openwakeword_verifier) if args.openwakeword_verifier else None
         return OpenWakeWordWakeDetector(
@@ -442,6 +520,16 @@ def build_wake_detector(args) -> VoskWakeDetector | OpenWakeWordWakeDetector | S
             min_consecutive=args.openwakeword_min_consecutive,
             verifier_path=verifier_path,
             vad_threshold=args.openwakeword_vad_threshold,
+        )
+    if args.wake_engine == "livekit":
+        livekit_model = str(args.livekit_wakeword_model or "").strip()
+        if not livekit_model:
+            raise SystemExit("LIVEKIT_WAKEWORD_MODEL/--livekit-wakeword-model is required for WAKE_ENGINE=livekit")
+        return LiveKitWakeWordDetector(
+            Path(livekit_model),
+            cooldown=args.cooldown,
+            threshold=args.livekit_wakeword_threshold,
+            min_consecutive=args.livekit_wakeword_min_consecutive,
         )
     if is_local_stt_engine(args.wake_engine):
         return SpeechCandidateDetector(
@@ -1545,7 +1633,7 @@ def main() -> None:
     repo_root = Path(__file__).resolve().parents[1]
     parser.add_argument(
         "--wake-engine",
-        choices=("vosk", "openwakeword", "speech", "always-stt"),
+        choices=("vosk", "openwakeword", "livekit", "speech", "always-stt"),
         default=os.environ.get("WAKE_ENGINE", "vosk"),
         help="Wake detector engine. Use speech/always-stt only for confirmed-command dry-runs.",
     )
@@ -1635,6 +1723,23 @@ def main() -> None:
         type=float,
         default=OPENWAKEWORD_EMPTY_CONFIRM_COOLDOWN_SECONDS,
         help="Cooldown after an empty confirmed-command transcript.",
+    )
+    parser.add_argument(
+        "--livekit-wakeword-model",
+        default=os.environ.get("LIVEKIT_WAKEWORD_MODEL", ""),
+        help="Experimental LiveKit ONNX wake-word model path. Required when WAKE_ENGINE=livekit.",
+    )
+    parser.add_argument(
+        "--livekit-wakeword-threshold",
+        type=float,
+        default=LIVEKIT_WAKEWORD_THRESHOLD,
+        help="LiveKit wake-word score threshold.",
+    )
+    parser.add_argument(
+        "--livekit-wakeword-min-consecutive",
+        type=int,
+        default=LIVEKIT_WAKEWORD_MIN_CONSECUTIVE,
+        help="Consecutive LiveKit scores above threshold required before a candidate wake.",
     )
     parser.add_argument(
         "--speech-candidate-end-silence-seconds",

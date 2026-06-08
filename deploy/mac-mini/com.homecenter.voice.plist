@@ -55,6 +55,14 @@
         <string>3.0</string>
         <key>WAKE_ENGINE</key>
         <string>vosk</string>
+        <!--
+        Experimental LiveKit wake engine opt-in example only. Keep production
+        default above as WAKE_ENGINE=vosk. For a Python 3.11+ validation venv,
+        set WAKE_ENGINE=livekit and add:
+          LIVEKIT_WAKEWORD_MODEL=/path/to/hey_homer_livekit.onnx
+          LIVEKIT_WAKEWORD_THRESHOLD=0.5
+          LIVEKIT_WAKEWORD_MIN_CONSECUTIVE=2
+        -->
         <key>WAKE_CONFIRM_COMMAND</key>
         <string>1</string>
         <key>CONFIRM_PRE_WAKE_SECONDS</key>
