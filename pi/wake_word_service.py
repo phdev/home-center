@@ -662,6 +662,11 @@ NEGATIVE_IMAGE_FEEDBACK_PHRASES = {
     "that image is wrong",
 }
 
+LIVY_NAME_PATTERN = r"(?:livy|liv|olivia|levy|levi|levee)"
+CHILD_NAME_PATTERN = rf"(?:lucy|{LIVY_NAME_PATTERN})"
+WAKE_VERB_PATTERN = r"(?:woke(?:\s+up)?|wake(?:\s+up)?|waking\s+up|got\s+up|were\s+up|was\s+up)"
+CLOCK_PATTERN = r"(?:\d{1,2}(?::\d{2})?)\s*(?:a\.?m\.?|p\.?m\.?)?"
+
 
 def negative_knowledge_feedback_intent(text: str) -> str | None:
     normalized = re.sub(r"[^\w\s']", " ", text.lower())
@@ -677,6 +682,45 @@ def is_negative_knowledge_feedback(text: str) -> bool:
     return negative_knowledge_feedback_intent(text) == "knowledge"
 
 
+def normalize_wake_clock(value: str) -> str:
+    match = re.fullmatch(r"\s*(\d{1,2})(?::(\d{2}))?\s*(a\.?m\.?|p\.?m\.?)?\s*", value, re.IGNORECASE)
+    if not match:
+        return ""
+    hour = int(match.group(1))
+    minute = int(match.group(2) or "0")
+    suffix = (match.group(3) or "").lower().replace(".", "")
+    if minute > 59 or hour > 23:
+        return ""
+    if suffix == "pm" and hour < 12:
+        hour += 12
+    if suffix == "am" and hour == 12:
+        hour = 0
+    return f"{hour:02d}:{minute:02d}"
+
+
+def parse_wake_log_command(text: str) -> dict:
+    both = re.search(
+        rf"\b(?:both\s+(?:of\s+)?(?:the\s+)?(?:girls|kids|children)|(?:the\s+)?(?:girls|kids|children)|lucy\s+and\s+{LIVY_NAME_PATTERN}|{LIVY_NAME_PATTERN}\s+and\s+lucy)\s+{WAKE_VERB_PATTERN}\s+(?:at|that)\s+({CLOCK_PATTERN})\b",
+        text,
+    )
+    if both:
+        wake_time = normalize_wake_clock(both.group(1))
+        if wake_time:
+            return {"action": "wake_log", "children": {"lucy": wake_time, "livy": wake_time}}
+
+    matches = list(re.finditer(
+        rf"\b({CHILD_NAME_PATTERN})\s+{WAKE_VERB_PATTERN}\s+(?:at|that)\s+({CLOCK_PATTERN})\b",
+        text,
+    ))
+    children = {}
+    for match in matches:
+        child = "livy" if re.fullmatch(LIVY_NAME_PATTERN, match.group(1)) else "lucy"
+        wake_time = normalize_wake_clock(match.group(2))
+        if wake_time:
+            children[child] = wake_time
+    return {"action": "wake_log", "children": children} if children else {"action": "none"}
+
+
 def parse_command(text: str) -> dict:
     """Parse transcribed text into a command dict."""
     text = text.lower().strip()
@@ -689,6 +733,10 @@ def parse_command(text: str) -> dict:
 
     if not text:
         return {"action": "turn_on"}
+
+    wake_log_command = parse_wake_log_command(text)
+    if wake_log_command["action"] != "none":
+        return wake_log_command
 
     # Negative feedback on the most recent knowledge answer.
     # Keep this as an explicit phrase list so nearby commands do not trigger it.
@@ -966,6 +1014,19 @@ def mark_needs_action_done(
     result = worker_post(worker_url, worker_token, "/api/needs-action/done", body)
     if not result:
         return {"ok": False, "reason": "worker_request_failed", **body}
+    return result
+
+
+def log_wake_times(worker_url: str, worker_token: str | None, children: dict) -> dict:
+    """Store today's child wake times through the worker."""
+    if not children:
+        return {"ok": False, "reason": "missing_children"}
+    result = worker_post(worker_url, worker_token, "/api/wake-times/today", {
+        "children": children,
+        "source": "voice",
+    })
+    if not result:
+        return {"ok": False, "reason": "worker_request_failed", "children": children}
     return result
 
 
@@ -2576,6 +2637,19 @@ def main() -> None:
                                 log.info("Needs Action voice command failed: %s", result)
                         else:
                             log.info("Needs Action voice command ignored: no worker URL configured")
+
+                    elif action == "wake_log":
+                        children = command.get("children") or {}
+                        if args.dry_run:
+                            log.info("[DRY RUN] Would log wake times: %s", children)
+                        elif args.worker_url:
+                            result = log_wake_times(args.worker_url, args.worker_token, children)
+                            if result.get("date"):
+                                log.info("Logged wake times for %s: %s", result.get("date"), sorted(children.keys()))
+                            else:
+                                log.info("Wake log voice command failed: %s", result)
+                        else:
+                            log.info("Wake log voice command ignored: no worker URL configured")
 
                     elif action == "birthday_gift_ideas":
                         name = str(command.get("name", "")).strip()

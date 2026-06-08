@@ -87,6 +87,27 @@ def test_hey_homer_mark_needs_action_item_done():
     }
 
 
+def test_hey_homer_wake_log_commands():
+    service = load_wake_word_service()
+
+    assert service.parse_command("a Homer Lucy woke up at 6:45") == {
+        "action": "wake_log",
+        "children": {"lucy": "06:45"},
+    }
+    assert service.parse_command("Hey Homer, Levy woke up at 7:10") == {
+        "action": "wake_log",
+        "children": {"livy": "07:10"},
+    }
+    assert service.parse_command("Hey Homer, both girls woke up at 7:05.") == {
+        "action": "wake_log",
+        "children": {"lucy": "07:05", "livy": "07:05"},
+    }
+    assert service.parse_command("Hey Homer, the girls got up at 7") == {
+        "action": "wake_log",
+        "children": {"lucy": "07:00", "livy": "07:00"},
+    }
+
+
 def test_mark_needs_action_done_forwards_dismiss_operation(monkeypatch):
     service = load_wake_word_service()
     calls = []
@@ -108,4 +129,27 @@ def test_mark_needs_action_done_forwards_dismiss_operation(monkeypatch):
         "token": "secret",
         "path": "/api/needs-action/done",
         "data": {"index": 1, "operation": "dismiss"},
+    }]
+
+
+def test_log_wake_times_posts_to_worker(monkeypatch):
+    service = load_wake_word_service()
+    calls = []
+
+    def fake_worker_post(url, token, path, data):
+        calls.append({"url": url, "token": token, "path": path, "data": data})
+        return {"date": "2026-06-07", "children": data["children"]}
+
+    monkeypatch.setattr(service, "worker_post", fake_worker_post)
+
+    assert service.log_wake_times(
+        "https://worker.example",
+        "secret",
+        {"lucy": "06:45", "livy": "07:10"},
+    ) == {"date": "2026-06-07", "children": {"lucy": "06:45", "livy": "07:10"}}
+    assert calls == [{
+        "url": "https://worker.example",
+        "token": "secret",
+        "path": "/api/wake-times/today",
+        "data": {"children": {"lucy": "06:45", "livy": "07:10"}, "source": "voice"},
     }]

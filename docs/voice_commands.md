@@ -59,7 +59,9 @@ Telegram.
 Wake-up logging is a Worker-backed household state command:
 
 - `Hey Homer, both girls woke up at 7:05`
+- `Hey Homer, the girls got up at 7`
 - `Hey Homer, Lucy woke up at 6:45 and Livy woke up at 7:10`
+- `Hey Homer, Levy woke up at 7:10`
 
 The voice service posts the parsed child wake times to
 `/api/wake-times/today`. Home Center keeps the wake-log Needs Action visible

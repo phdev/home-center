@@ -24,7 +24,8 @@ HOWIE_WAKE_PHRASE_RE = re.compile(
 COMMAND_KEYWORD_RE = re.compile(
     r"\b(open|show|go\s+(to|back|home)|calendar|weather|photos?|pictures?|gallery|"
     r"turn(ed|s)?\s*(it\s+)?(on|off|of|up|down|f)|set\s+(a\s+)?timer|"
-    r"remind\s+me|ordered|mark|done|suggest|ideas?|gift|woke|wake|stop|dismiss|cancel|quiet|shut\s+up|like|don't\s+like|"
+    r"remind\s+me|ordered|mark|done|suggest|ideas?|gift|woke|wake|got\s+up|was\s+up|were\s+up|"
+    r"stop|dismiss|cancel|quiet|shut\s+up|like|don't\s+like|"
     r"do\s+not\s+like|what|who|where|when|"
     r"version\s+(one|two)|v[12]|"
     r"why|how|do|does|did|is|are|can|could|should|would|will|tell\s+me|"
@@ -121,6 +122,9 @@ _NUMBER_WORDS = {
 _NUMBER_PATTERN = "|".join(sorted(_NUMBER_WORDS, key=len, reverse=True))
 _CLOCK_WORD_PATTERN = rf"(?:{_NUMBER_PATTERN})(?:\s+(?:{_NUMBER_PATTERN}))?"
 _CLOCK_PATTERN = rf"(?:\d{{1,2}}(?::\d{{2}})?|{_CLOCK_WORD_PATTERN})\s*(?:a\.?m\.?|p\.?m\.?)?"
+_LIVY_NAME_PATTERN = r"(?:livy|liv|olivia|levy|levi|levee)"
+_CHILD_NAME_PATTERN = rf"(?:lucy|{_LIVY_NAME_PATTERN})"
+_WAKE_VERB_PATTERN = r"(?:woke(?:\s+up)?|wake(?:\s+up)?|waking\s+up|got\s+up|were\s+up|was\s+up)"
 
 
 def strip_wake_phrase(text: str) -> str:
@@ -245,7 +249,7 @@ def _parse_needs_action_done(text: str) -> dict:
 
 def _parse_wake_log(text: str) -> dict:
     both = re.search(
-        rf"\b(?:both\s+)?(?:girls|kids|children|lucy\s+and\s+(?:livy|liv|olivia)|(?:livy|liv|olivia)\s+and\s+lucy)\s+(?:woke|wake|waking)\s+up\s+(?:at|that)\s+({_CLOCK_PATTERN})\b",
+        rf"\b(?:both\s+(?:of\s+)?(?:the\s+)?(?:girls|kids|children)|(?:the\s+)?(?:girls|kids|children)|lucy\s+and\s+{_LIVY_NAME_PATTERN}|{_LIVY_NAME_PATTERN}\s+and\s+lucy)\s+{_WAKE_VERB_PATTERN}\s+(?:at|that)\s+({_CLOCK_PATTERN})\b",
         text,
     )
     if both:
@@ -254,14 +258,14 @@ def _parse_wake_log(text: str) -> dict:
             return {"action": "wake_log", "children": {"lucy": wake_time, "livy": wake_time}}
 
     matches = list(re.finditer(
-        rf"\b(lucy|livy|liv|olivia)\s+(?:woke|wake|waking)\s+up\s+(?:at|that)\s+({_CLOCK_PATTERN})\b",
+        rf"\b({_CHILD_NAME_PATTERN})\s+{_WAKE_VERB_PATTERN}\s+(?:at|that)\s+({_CLOCK_PATTERN})\b",
         text,
     ))
     if not matches:
         return {"action": "none"}
     children = {}
     for match in matches:
-        child = "livy" if match.group(1) in {"livy", "liv", "olivia"} else "lucy"
+        child = "livy" if re.fullmatch(_LIVY_NAME_PATTERN, match.group(1)) else "lucy"
         wake_time = _normalize_clock_text(match.group(2))
         if wake_time:
             children[child] = wake_time
@@ -322,7 +326,7 @@ def is_incomplete_wake_log(text: str) -> bool:
     if _parse_wake_log(body)["action"] != "none":
         return False
     has_subject = re.search(
-        r"\b(?:both\s+)?(?:girls|kids|children|lucy|livy|liv|olivia)\b",
+        rf"\b(?:both\s+)?(?:girls|kids|children|lucy|{_LIVY_NAME_PATTERN})\b",
         body,
     )
     has_wake = re.search(r"\b(?:woke|wake|waking)\s+up\b", body)

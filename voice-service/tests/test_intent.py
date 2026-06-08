@@ -191,9 +191,21 @@ def test_needs_action_done_intent():
 
 
 def test_wake_log_intent():
+    assert parse_command("a Homer Lucy woke up at 6:45") == {
+        "action": "wake_log",
+        "children": {"lucy": "06:45"},
+    }
+    assert parse_command("Hey Homer, Levy woke up at 7:10") == {
+        "action": "wake_log",
+        "children": {"livy": "07:10"},
+    }
     assert parse_command("Hey Homer, both girls woke up at 7:05.") == {
         "action": "wake_log",
         "children": {"lucy": "07:05", "livy": "07:05"},
+    }
+    assert parse_command("Hey Homer, the girls got up at 7") == {
+        "action": "wake_log",
+        "children": {"lucy": "07:00", "livy": "07:00"},
     }
     assert parse_command("Hey Homer, Lucy woke up at 6:45 and Livy woke up at 7:10") == {
         "action": "wake_log",
@@ -214,6 +226,7 @@ def test_wake_log_intent():
     assert is_dispatchable_command({"action": "wake_log", "children": {"lucy": "06:45"}})
     assert not is_dispatchable_command({"action": "wake_log", "children": {}})
     assert is_incomplete_wake_log("Hey Homer, both girls woke up that.")
+    assert is_incomplete_wake_log("Hey Homer, Levy woke up that.")
     assert not is_incomplete_wake_log("Hey Homer, both girls woke up at six thirty.")
 
 
