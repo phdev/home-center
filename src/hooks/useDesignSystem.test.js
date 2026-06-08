@@ -43,7 +43,7 @@ describe("useDesignSystem", () => {
     expect(result.current.designSystem).toBe("v2");
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalledWith(
-        "http://localhost:8765/api/design-system",
+        "https://worker.test/api/design-system",
         expect.objectContaining({
           method: "POST",
           body: expect.stringContaining('"version":"v2"'),
