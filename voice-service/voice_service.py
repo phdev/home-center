@@ -13,6 +13,7 @@ import logging
 import os
 import re
 import socket
+import struct
 import subprocess
 import sys
 import tempfile
@@ -83,6 +84,7 @@ OPENWAKEWORD_EMPTY_CONFIRM_COOLDOWN_SECONDS = float(
 LIVEKIT_WAKEWORD_THRESHOLD = float(os.environ.get("LIVEKIT_WAKEWORD_THRESHOLD", "0.5"))
 LIVEKIT_WAKEWORD_MIN_CONSECUTIVE = int(os.environ.get("LIVEKIT_WAKEWORD_MIN_CONSECUTIVE", "2"))
 LIVEKIT_WAKEWORD_WINDOW_SECONDS = float(os.environ.get("LIVEKIT_WAKEWORD_WINDOW_SECONDS", "2.0"))
+LIVEKIT_WAKEWORD_HELPER_PYTHON = os.environ.get("LIVEKIT_WAKEWORD_HELPER_PYTHON", "")
 VOSK_POWER_ON_CANDIDATE_RE = re.compile(
     r"\b(?:turn|return)\s+(?:it\s+)?on\b(?!\s+(?:the\s+)?radio\b)",
     re.IGNORECASE,
@@ -342,12 +344,16 @@ class LiveKitWakeWordDetector:
 
         try:
             from livekit.wakeword import WakeWordModel
-        except ImportError as exc:
-            raise SystemExit(
-                "WAKE_ENGINE=livekit requires livekit-wakeword in a Python 3.11+ voice venv"
-            ) from exc
 
-        self.model = WakeWordModel(models=[str(model_path)])
+            self.model = WakeWordModel(models=[str(model_path)])
+        except ImportError as exc:
+            helper_python = LIVEKIT_WAKEWORD_HELPER_PYTHON.strip()
+            if not helper_python:
+                raise SystemExit(
+                    "WAKE_ENGINE=livekit requires livekit-wakeword in this venv or "
+                    "LIVEKIT_WAKEWORD_HELPER_PYTHON pointing at a Python 3.11+ helper venv"
+                ) from exc
+            self.model = LiveKitWakeWordHelperClient(helper_python, model_path)
         self.model_name = model_path.stem
         self.name = f"livekit:{self.model_name}"
         self.cooldown = cooldown
@@ -392,6 +398,40 @@ class LiveKitWakeWordDetector:
     def reject_last_hit(self) -> None:
         """Undo cooldown when confirmed-command mode rejects the wake hit."""
         self.last_hit = 0.0
+
+
+class LiveKitWakeWordHelperClient:
+    """Persistent Python 3.11 LiveKit model helper for older main voice venvs."""
+
+    def __init__(self, python_bin: str, model_path: Path):
+        helper_path = Path(__file__).resolve().parent / "livekit_wakeword_helper.py"
+        self.proc = subprocess.Popen(
+            [python_bin, str(helper_path), str(model_path)],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        self.lock = threading.Lock()
+
+    def predict(self, audio: np.ndarray) -> dict[str, float]:
+        data = audio.astype(np.int16, copy=False).tobytes()
+        with self.lock:
+            if not self.proc.stdin or not self.proc.stdout:
+                raise RuntimeError("LiveKit wake-word helper pipes are closed")
+            try:
+                self.proc.stdin.write(struct.pack("<I", len(data)))
+                self.proc.stdin.write(data)
+                self.proc.stdin.flush()
+                line = self.proc.stdout.readline()
+            except BrokenPipeError as exc:
+                raise RuntimeError("LiveKit wake-word helper exited") from exc
+        if not line:
+            err = self.proc.stderr.read().decode("utf-8", errors="replace") if self.proc.stderr else ""
+            raise RuntimeError(f"LiveKit wake-word helper exited: {err.strip()}")
+        payload = json.loads(line)
+        if "error" in payload:
+            raise RuntimeError(f"LiveKit wake-word helper error: {payload['error']}")
+        return {str(k): float(v) for k, v in payload.get("scores", {}).items()}
 
 
 class SpeechCandidateDetector:
@@ -2285,13 +2325,14 @@ def main() -> None:
             noise=round(noise),
         )
         listening_text = wake_text or ("Speech" if is_local_stt_engine(args.wake_engine) else "Hey Homer")
-        dispatcher.wake_ack_async(
-            listening_text,
-            1.0,
-            chime=False,
-            wakeSource=wake_source,
-            wakeEngine=args.wake_engine,
-        )
+        if not (args.wake_confirm_command and args.wake_engine == "livekit"):
+            dispatcher.wake_ack_async(
+                listening_text,
+                1.0,
+                chime=False,
+                wakeSource=wake_source,
+                wakeEngine=args.wake_engine,
+            )
         if args.wake_confirm_command:
             pre_audio = rolling.tail(args.confirm_pre_wake_seconds)
             verifying_text = listening_text

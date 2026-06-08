@@ -153,16 +153,16 @@ trigger:
 ```bash
 WAKE_ENGINE=livekit \
 WAKE_CONFIRM_COMMAND=1 \
-LIVEKIT_WAKEWORD_MODEL=./models/hey_homer_livekit.onnx \
+LIVEKIT_WAKEWORD_MODEL=../pi/models/hey_homer.onnx \
 LIVEKIT_WAKEWORD_THRESHOLD=0.5 \
 LIVEKIT_WAKEWORD_MIN_CONSECUTIVE=2 \
 python voice_service.py --dry-run --debug
 ```
 
-`livekit-wakeword` is not installed by the production Python 3.9 venv because
-PyPI declares `Requires-Python >=3.11`. Use a separate Python 3.11+ validation
-venv before enabling `WAKE_ENGINE=livekit`. Keep `WAKE_ENGINE=vosk` in launchd
-until the LiveKit model passes the promotion gates below.
+`livekit-wakeword` declares `Requires-Python >=3.11`. The active launchd
+configuration keeps the main voice service on `voice-service/.venv` and uses
+`voice-service/.venv-livekit` as a helper process for LiveKit inference. Vosk
+is still installed for rollback by setting `WAKE_ENGINE=vosk`.
 
 To bypass the current DNN and test speech segments as candidate triggers:
 

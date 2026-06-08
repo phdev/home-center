@@ -7,8 +7,15 @@ WORKER_TOKEN="${WORKER_TOKEN:-}"
 OPENCLAW_CHAT_ID="${OPENCLAW_CHAT_ID:-${TELEGRAM_CHAT_ID:-}}"
 PLIST="$USER_HOME/Library/LaunchAgents/com.homecenter.voice.homecenter2.plist"
 
-if [ ! -x "$REPO/voice-service/.venv/bin/python3" ]; then
-  echo "voice-service venv is missing; run deploy/mac-mini/setup-voice-service.sh first" >&2
+VENV_DIR="${VENV_DIR:-.venv}"
+LIVEKIT_VENV_DIR="${LIVEKIT_VENV_DIR:-.venv-livekit}"
+
+if [ ! -x "$REPO/voice-service/$VENV_DIR/bin/python3" ]; then
+  echo "voice-service $VENV_DIR is missing; run deploy/mac-mini/setup-voice-service.sh first" >&2
+  exit 1
+fi
+if [ ! -x "$REPO/voice-service/$LIVEKIT_VENV_DIR/bin/python3" ]; then
+  echo "voice-service $LIVEKIT_VENV_DIR is missing; run deploy/mac-mini/setup-voice-service.sh first" >&2
   exit 1
 fi
 

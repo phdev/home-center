@@ -6,6 +6,6 @@ openwakeword>=0.6.0
 onnxruntime>=1.16
 pytest>=8.0
 # Optional experimental LiveKit wake engine:
-# livekit-wakeword>=0.2.1 requires Python >=3.11. The current Mac mini
-# production voice venv is Python 3.9, so install this only in a separate
-# Python 3.11+ validation venv before using WAKE_ENGINE=livekit.
+# livekit-wakeword>=0.2.1 requires Python >=3.11. The launchd voice service
+# can stay on the existing Python 3.9 venv and call a Python 3.11 helper via
+# LIVEKIT_WAKEWORD_HELPER_PYTHON.

@@ -5,13 +5,19 @@ REPO="${REPO:-$HOME/home-center}"
 WORKER_TOKEN="${WORKER_TOKEN:-}"
 OPENCLAW_CHAT_ID="${OPENCLAW_CHAT_ID:-${TELEGRAM_CHAT_ID:-}}"
 PYTHON_BIN="${PYTHON_BIN:-python3}"
+VENV_DIR="${VENV_DIR:-.venv}"
+LIVEKIT_PYTHON_BIN="${LIVEKIT_PYTHON_BIN:-/opt/homebrew/bin/python3.11}"
+LIVEKIT_VENV_DIR="${LIVEKIT_VENV_DIR:-.venv-livekit}"
 PLIST="$HOME/Library/LaunchAgents/com.homecenter.voice.plist"
 
 cd "$REPO/voice-service"
-"$PYTHON_BIN" -m venv .venv
-. .venv/bin/activate
+"$PYTHON_BIN" -m venv "$VENV_DIR"
+. "$VENV_DIR/bin/activate"
 pip install --upgrade pip
 pip install -r requirements.txt
+"$LIVEKIT_PYTHON_BIN" -m venv "$LIVEKIT_VENV_DIR"
+"$LIVEKIT_VENV_DIR/bin/python" -m pip install --upgrade pip
+"$LIVEKIT_VENV_DIR/bin/python" -m pip install livekit-wakeword
 python - <<'PY'
 from openwakeword.utils import download_models
 

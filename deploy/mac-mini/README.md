@@ -142,13 +142,15 @@ and writes `voice-service/logs/voice-health-status.json`.
 Optional environment variables:
 
 - `REPO`: checkout path, default `~/home-center`
-- `PYTHON_BIN`: Python executable for the venv, default `python3`
+- `PYTHON_BIN`: Python executable for the main voice venv, default `python3`
+- `LIVEKIT_PYTHON_BIN`: Python executable for the LiveKit helper venv, default
+  `/opt/homebrew/bin/python3.11`
 - `WORKER_TOKEN`: optional bearer token for worker `/api/ask-query`
-- `WAKE_ENGINE`: `vosk` by default; `openwakeword` enables the purpose-built
-  DNN path after hardware validation; `livekit` enables the experimental
-  LiveKit wake-word path after installing `livekit-wakeword` in a Python 3.11+
-  validation venv; `speech` is a confirmed-command dry-run mode that uses RMS
-  speech segments as local Whisper candidates;
+- `WAKE_ENGINE`: `livekit` in the active plist templates; set `vosk` to roll
+  back to the original production wake gate. `openwakeword` enables the
+  purpose-built DNN path after hardware validation; `speech` is a
+  confirmed-command dry-run mode that uses RMS speech segments as local Whisper
+  candidates;
   `always-stt` is the brute-force local-STT benchmark that sends every
   qualifying speech segment to local Whisper
 - `OPENAI_STT_MODE`: `off` by default; set to `fallback` to call OpenAI only
@@ -157,11 +159,17 @@ Optional environment variables:
 - `OPENAI_STT_MODEL`: OpenAI transcription model for fallback/diagnostic
   runs, default `gpt-4o-transcribe`
 - `OPENWAKEWORD_MODEL`: defaults to `pi/models/hey_homer.onnx`
-- `LIVEKIT_WAKEWORD_MODEL`: required only for `WAKE_ENGINE=livekit`; points to
-  the LiveKit ONNX wake-word model. Do not commit model artifacts unless they
-  are already covered by the repo's ignored local model paths.
-- `LIVEKIT_WAKEWORD_THRESHOLD`: default `0.5`
-- `LIVEKIT_WAKEWORD_MIN_CONSECUTIVE`: default `2`
+- `LIVEKIT_WAKEWORD_MODEL`: required only for `WAKE_ENGINE=livekit`; currently
+  points to the existing `pi/models/hey_homer.onnx` classifier. Do not commit
+  model artifacts unless they are already covered by the repo's ignored local
+  model paths.
+- `LIVEKIT_WAKEWORD_HELPER_PYTHON`: Python 3.11 helper used when the main
+  voice venv cannot import `livekit-wakeword`, default
+  `voice-service/.venv-livekit/bin/python3` in the plist templates.
+- `LIVEKIT_WAKEWORD_THRESHOLD`: code default `0.5`; active launchd templates
+  use `0.995` after passive-speech false candidate wakes at lower thresholds
+- `LIVEKIT_WAKEWORD_MIN_CONSECUTIVE`: code default `2`; active launchd
+  templates use `3`
 - `WAKE_CONFIRM_COMMAND`: `0` by default; set to `1` for openWakeWord dry-runs
   and LiveKit dry-runs where the wake model is only a candidate trigger and
   local Whisper must parse a dispatchable command before chime/dispatch.

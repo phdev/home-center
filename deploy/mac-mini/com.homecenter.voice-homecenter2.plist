@@ -16,7 +16,7 @@
         <key>PATH</key>
         <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
         <key>MIC_STREAM_HOST</key>
-        <string>homecenter2.local</string>
+        <string>192.168.1.206</string>
         <key>MIC_STREAM_PORT</key>
         <string>8766</string>
         <key>PI_COMMAND_URL</key>
@@ -58,7 +58,15 @@
         <key>FOLLOWUP_COMMAND_MAX_SECONDS</key>
         <string>3.0</string>
         <key>WAKE_ENGINE</key>
-        <string>vosk</string>
+        <string>livekit</string>
+        <key>LIVEKIT_WAKEWORD_MODEL</key>
+        <string>__REPO__/pi/models/hey_homer.onnx</string>
+        <key>LIVEKIT_WAKEWORD_HELPER_PYTHON</key>
+        <string>__REPO__/voice-service/.venv-livekit/bin/python3</string>
+        <key>LIVEKIT_WAKEWORD_THRESHOLD</key>
+        <string>0.995</string>
+        <key>LIVEKIT_WAKEWORD_MIN_CONSECUTIVE</key>
+        <string>3</string>
         <key>WAKE_CONFIRM_COMMAND</key>
         <string>1</string>
         <key>CONFIRM_PRE_WAKE_SECONDS</key>
