@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
+import { credentialsForUrl } from "../data/_storage";
 import { fetchCalendarEvents } from "../services/calendar";
+import { apiHeaders, apiUrl } from "../services/piLocal";
 
 export function useCalendar(calendarSettings, workerSettings) {
   const [events, setEvents] = useState(null);
@@ -21,12 +23,12 @@ export function useCalendar(calendarSettings, workerSettings) {
     setError(null);
     try {
       if (useWorker) {
-        const headers = {};
-        if (workerSettings.token) headers.Authorization = `Bearer ${workerSettings.token}`;
-        const res = await fetch(`${workerSettings.url}/api/calendar`, {
+        const url = apiUrl(workerSettings.url, "/api/calendar");
+        const headers = apiHeaders(workerSettings.token);
+        const res = await fetch(url, {
           headers,
           cache: "no-store",
-          credentials: "include",
+          credentials: credentialsForUrl(url),
         });
         if (!res.ok) {
           const err = await res.json().catch(() => ({}));

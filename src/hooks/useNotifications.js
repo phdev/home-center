@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { apiHeaders, apiUrl } from "../services/piLocal";
 
 export function useNotifications(workerSettings) {
   const [notifications, setNotifications] = useState([]);
@@ -13,9 +14,8 @@ export function useNotifications(workerSettings) {
       return;
     }
     try {
-      const headers = {};
-      if (workerSettings.token) headers.Authorization = `Bearer ${workerSettings.token}`;
-      const res = await fetch(`${workerSettings.url}/api/notifications`, { headers });
+      const url = apiUrl(workerSettings.url, "/api/notifications");
+      const res = await fetch(url, { headers: apiHeaders(workerSettings.token) });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         throw new Error(err.error || `Notifications: worker returned ${res.status}`);
@@ -32,12 +32,11 @@ export function useNotifications(workerSettings) {
 
   const dismiss = useCallback(async (id) => {
     if (!hasWorker) return;
-    const headers = { "Content-Type": "application/json" };
-    if (workerSettings.token) headers.Authorization = `Bearer ${workerSettings.token}`;
+    const url = apiUrl(workerSettings.url, `/api/notifications/${encodeURIComponent(id)}`);
     try {
-      await fetch(`${workerSettings.url}/api/notifications/${encodeURIComponent(id)}`, {
+      await fetch(url, {
         method: "DELETE",
-        headers,
+        headers: apiHeaders(workerSettings.token),
       });
       setNotifications((prev) => prev.filter((n) => n.id !== id));
     } catch (e) {

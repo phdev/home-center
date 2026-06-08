@@ -2,7 +2,12 @@ export const PI_LOCAL_URL = "http://localhost:8765";
 
 export function isOnPi() {
   const h = window.location.hostname;
-  return h === "localhost" || h === "127.0.0.1" || h === "homecenter.local";
+  const port = window.location.port;
+  return (
+    ((h === "localhost" || h === "127.0.0.1") && port === "8080") ||
+    h === "homecenter.local" ||
+    h === "homecenter2.local"
+  );
 }
 
 /**

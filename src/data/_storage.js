@@ -16,6 +16,8 @@
  * breaks the invariant that components are storage-source-agnostic.
  */
 
+import { apiHeaders, apiUrl } from "../services/piLocal";
+
 const DEFAULT_TIMEOUT_MS = 6_000;
 
 /**
@@ -28,7 +30,7 @@ async function fetchJson(url, init, timeoutMs) {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), timeoutMs);
   try {
-    const res = await fetch(url, { credentials: "include", ...init, signal: ctrl.signal });
+    const res = await fetch(url, { credentials: credentialsForUrl(url), ...init, signal: ctrl.signal });
     if (!res.ok) return null;
     return await res.json();
   } catch {
@@ -38,8 +40,14 @@ async function fetchJson(url, init, timeoutMs) {
   }
 }
 
-function authHeaders(token) {
-  return token ? { Authorization: `Bearer ${token}` } : {};
+export function credentialsForUrl(url) {
+  try {
+    const current = globalThis.location?.origin;
+    if (!current) return "omit";
+    return new URL(url, globalThis.location.href).origin === current ? "include" : "omit";
+  } catch {
+    return "omit";
+  }
 }
 
 /**
@@ -64,9 +72,11 @@ export async function readWithFallback({
   timeoutMs = DEFAULT_TIMEOUT_MS,
 }) {
   if (!workerSettings?.url) return readLocal();
+  const url = apiUrl(workerSettings.url, path);
+  if (!url) return readLocal();
   const data = await fetchJson(
-    `${workerSettings.url}${path}`,
-    { headers: authHeaders(workerSettings.token) },
+    url,
+    { headers: apiHeaders(workerSettings.token) },
     timeoutMs,
   );
   const parsed = data == null ? null : parse(data);
@@ -106,13 +116,17 @@ export async function writeWithFallback({
     writeLocalOnFailure?.();
     return { source: "local" };
   }
+  const url = apiUrl(workerSettings.url, path);
+  if (!url) {
+    writeLocalOnFailure?.();
+    return { source: "local" };
+  }
   const data = await fetchJson(
-    `${workerSettings.url}${path}`,
+    url,
     {
       method,
       headers: {
-        "Content-Type": "application/json",
-        ...authHeaders(workerSettings.token),
+        ...apiHeaders(workerSettings.token),
       },
       body: JSON.stringify(body),
     },

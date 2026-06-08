@@ -68,6 +68,8 @@ import { useChecklistConfig } from "./data/useChecklist";
 import { useLunchDecisions } from "./data/useLunch";
 import { useSchoolLunchMenu } from "./data/useSchoolLunch";
 import { useWakeTimeWriter, useWakeTimes } from "./data/useWakeTimes";
+import { credentialsForUrl } from "./data/_storage";
+import { apiHeaders, apiUrl } from "./services/piLocal";
 import { ContextualSlot, RightColumnCards, OverlayCards } from "./cards/ContextualSlot";
 
 const V2_AGENDA_DAYS = 7;
@@ -808,12 +810,11 @@ export default function App() {
   const saveWakeTime = useWakeTimeWriter(settings.worker);
   const dismissNeedsAction = useCallback(async (action) => {
     if (!settings.worker?.url) throw new Error("Worker URL is not configured.");
-    const headers = { "Content-Type": "application/json" };
-    if (settings.worker.token) headers.Authorization = `Bearer ${settings.worker.token}`;
-    const res = await fetch(`${settings.worker.url}/api/needs-action/done`, {
+    const url = apiUrl(settings.worker.url, "/api/needs-action/done");
+    const res = await fetch(url, {
       method: "POST",
-      headers,
-      credentials: "include",
+      headers: apiHeaders(settings.worker.token),
+      credentials: credentialsForUrl(url),
       body: JSON.stringify({ name: action.id || action.title, operation: "dismiss" }),
     });
     const body = await res.json().catch(() => ({}));
@@ -1708,7 +1709,7 @@ const v2ShellStyle = {
   minHeight: 0,
   display: "grid",
   gridTemplateColumns: "340px minmax(420px, 1fr) 340px",
-  gridTemplateRows: "1fr 76px 30px",
+  gridTemplateRows: "1fr 104px 30px",
   gap: 12,
   marginLeft: 0,
   padding: "0 0 0 0",
@@ -1789,7 +1790,7 @@ const v2RightRailStyle = {
   gridColumn: "3",
   gridRow: "1",
   display: "grid",
-  gridTemplateRows: "122px 150px minmax(0, 1fr)",
+  gridTemplateRows: "230px 150px minmax(0, 1fr)",
   gap: 10,
   minHeight: 0,
 };

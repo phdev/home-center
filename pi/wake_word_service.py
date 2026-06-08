@@ -954,6 +954,37 @@ def worker_get(url: str, token: str | None, path: str) -> dict | None:
     return None
 
 
+def worker_request(
+    url: str,
+    token: str | None,
+    method: str,
+    path: str,
+    data: dict | None = None,
+) -> tuple[int, dict | list | str | None]:
+    """Proxy an HTTP request to the Worker without exposing its token to the kiosk."""
+    import requests
+    headers = {}
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    if data is not None:
+        headers["Content-Type"] = "application/json"
+    try:
+        resp = requests.request(
+            method,
+            f"{url}{path}",
+            headers=headers,
+            json=data if data is not None else None,
+            timeout=15,
+        )
+        try:
+            return resp.status_code, resp.json()
+        except Exception:
+            return resp.status_code, resp.text
+    except Exception as e:
+        log.warning("Worker proxy %s %s error: %s", method, path, e)
+        return 502, {"error": "worker_proxy_failed", "message": str(e)}
+
+
 def openclaw_post(url: str, path: str, data: dict | None = None) -> dict | None:
     """POST to the local OpenClaw bridge. Returns parsed JSON or None on failure."""
     import requests
@@ -1737,7 +1768,7 @@ class RecordingManager:
 
             def _cors_headers(self):
                 self.send_header("Access-Control-Allow-Origin", "*")
-                self.send_header("Access-Control-Allow-Methods", "GET, POST, PUT, OPTIONS")
+                self.send_header("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
                 self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization")
 
             def _respond_json(self, data, code=200):
@@ -1757,6 +1788,22 @@ class RecordingManager:
             def do_PUT(self):
                 # Route PUT to POST handler (for wake-config)
                 self.do_POST()
+
+            def _proxy_worker(self, method, path, body=None):
+                if not mgr.worker_url:
+                    self._respond_json({"error": "worker not configured"}, 502)
+                    return
+                code, payload = worker_request(mgr.worker_url, mgr.worker_token, method, path, body)
+                self._respond_json(payload if payload is not None else {}, code)
+
+            def _read_json_body(self):
+                length = int(self.headers.get("Content-Length", 0))
+                if length <= 0:
+                    return {}
+                try:
+                    return _json.loads(self.rfile.read(length))
+                except Exception:
+                    return {}
 
             def _handle_gesture(self, body):
                 title = body.get("title", "")
@@ -1833,17 +1880,13 @@ class RecordingManager:
                         self._respond_json({"error": "not found"}, 404)
                 elif path == "/api/enrollment-status":
                     self._respond_json(mgr.get_enrollment_status())
+                elif path.startswith("/api/"):
+                    self._proxy_worker("GET", self.path)
                 else:
                     self._respond_json({"error": "not found"}, 404)
 
             def do_POST(self):
-                length = int(self.headers.get("Content-Length", 0))
-                body = {}
-                if length > 0:
-                    try:
-                        body = _json.loads(self.rfile.read(length))
-                    except Exception:
-                        pass
+                body = self._read_json_body()
 
                 if self.path == "/toggle":
                     with mgr._lock:
@@ -2029,6 +2072,22 @@ class RecordingManager:
                         mgr._enroll_buffer = []
                     self._respond_json({"ok": True})
 
+                elif self.path.startswith("/api/"):
+                    self._proxy_worker("POST", self.path, body)
+
+                else:
+                    self._respond_json({"error": "not found"}, 404)
+
+            def do_PATCH(self):
+                body = self._read_json_body()
+                if self.path.startswith("/api/"):
+                    self._proxy_worker("PATCH", self.path, body)
+                else:
+                    self._respond_json({"error": "not found"}, 404)
+
+            def do_DELETE(self):
+                if self.path.startswith("/api/"):
+                    self._proxy_worker("DELETE", self.path)
                 else:
                     self._respond_json({"error": "not found"}, 404)
 

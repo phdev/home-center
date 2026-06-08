@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { rememberKnowledgeResponse } from "../knowledge/feedback";
+import { apiHeaders, apiUrl } from "../services/piLocal";
 
 /**
  * Polls the worker for LLM query responses (from voice/Pi).
@@ -20,9 +21,8 @@ export function useLLMQuery(workerSettings) {
 
     const poll = async () => {
       try {
-        const headers = {};
-        if (workerToken) headers.Authorization = `Bearer ${workerToken}`;
-        const res = await fetch(`${workerUrl}/api/llm/latest`, { headers });
+        const url = apiUrl(workerUrl, "/api/llm/latest");
+        const res = await fetch(url, { headers: apiHeaders(workerToken) });
         if (!res.ok) return;
         const data = await res.json();
         if (!data.response) {
@@ -50,9 +50,8 @@ export function useLLMQuery(workerSettings) {
     if (!workerUrl) return;
     setHistoryLoading(true);
     try {
-      const headers = {};
-      if (workerToken) headers.Authorization = `Bearer ${workerToken}`;
-      const res = await fetch(`${workerUrl}/api/llm/history`, { headers });
+      const url = apiUrl(workerUrl, "/api/llm/history");
+      const res = await fetch(url, { headers: apiHeaders(workerToken) });
       if (res.ok) {
         const data = await res.json();
         setHistory(data.history || []);
@@ -69,11 +68,10 @@ export function useLLMQuery(workerSettings) {
     setLatestResponse(null);
     if (!workerUrl) return;
     try {
-      const headers = { "Content-Type": "application/json" };
-      if (workerToken) headers.Authorization = `Bearer ${workerToken}`;
-      await fetch(`${workerUrl}/api/llm/dismiss`, {
+      const url = apiUrl(workerUrl, "/api/llm/dismiss");
+      await fetch(url, {
         method: "POST",
-        headers,
+        headers: apiHeaders(workerToken),
         body: "{}",
       });
     } catch {

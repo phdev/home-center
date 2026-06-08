@@ -1,4 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
+import { credentialsForUrl } from "../data/_storage";
+import { apiHeaders, apiUrl } from "../services/piLocal";
 
 const POLL_MS = 15 * 1000;
 
@@ -15,11 +17,11 @@ export function useSchoolUpdates(workerSettings) {
     if (showLoading) setLoading(true);
     setError(null);
     try {
-      const headers = {};
-      if (workerSettings.token) headers.Authorization = `Bearer ${workerSettings.token}`;
-      const res = await fetch(`${workerSettings.url}/api/school-updates`, {
+      const url = apiUrl(workerSettings.url, "/api/school-updates");
+      const headers = apiHeaders(workerSettings.token);
+      const res = await fetch(url, {
         headers,
-        credentials: "include",
+        credentials: credentialsForUrl(url),
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));

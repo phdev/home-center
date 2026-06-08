@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { fetchPhotosFromAlbum } from "../services/photos";
+import { apiHeaders, apiUrl } from "../services/piLocal";
 
 export function usePhotos(photoSettings, workerSettings) {
   const [photos, setPhotos] = useState(null);
@@ -21,9 +22,8 @@ export function usePhotos(photoSettings, workerSettings) {
     setError(null);
     try {
       if (useWorker) {
-        const headers = {};
-        if (workerSettings.token) headers.Authorization = `Bearer ${workerSettings.token}`;
-        const res = await fetch(`${workerSettings.url}/api/photos`, { headers });
+        const url = apiUrl(workerSettings.url, "/api/photos");
+        const res = await fetch(url, { headers: apiHeaders(workerSettings.token) });
         if (!res.ok) {
           const err = await res.json().catch(() => ({}));
           throw new Error(err.error || `Photos: worker returned ${res.status}`);
