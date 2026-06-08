@@ -19,6 +19,7 @@ from voice_service import (
     dispatchable_commands_from_transcript,
     howie_fallback_from_transcript,
     hybrid_command_body_candidates,
+    is_vosk_power_on_candidate,
     parse_howie_openai_transcript,
     is_max_speech_candidate,
     is_local_stt_engine,
@@ -47,6 +48,13 @@ from voice_service import (
     VoiceReliabilityLogger,
     wake_log_followup_command,
 )
+
+
+def test_vosk_power_on_candidate_accepts_turn_on_variants():
+    assert is_vosk_power_on_candidate("turn on how working on home center")
+    assert is_vosk_power_on_candidate("return on how working on home center")
+    assert not is_vosk_power_on_candidate("turn on the radio")
+    assert not is_vosk_power_on_candidate("how can we improve reliability")
 
 
 class FakeMic:

@@ -59,6 +59,7 @@ FOLLOWUP_COMMAND_PRE_ROLL_SECONDS = float(os.environ.get("FOLLOWUP_COMMAND_PRE_R
 FOLLOWUP_COMMAND_MIN_SECONDS = float(os.environ.get("FOLLOWUP_COMMAND_MIN_SECONDS", "0.16"))
 FOLLOWUP_COMMAND_SILENCE_SECONDS = float(os.environ.get("FOLLOWUP_COMMAND_SILENCE_SECONDS", "0.16"))
 WAKE_CONFIRM_COMMAND = env_flag("WAKE_CONFIRM_COMMAND", False)
+VOSK_COMMAND_CANDIDATE_CONFIRM = env_flag("VOSK_COMMAND_CANDIDATE_CONFIRM", True)
 CONFIRM_MULTI_COMMAND_DISPATCH = env_flag("CONFIRM_MULTI_COMMAND_DISPATCH", False)
 CONFIRM_PRE_WAKE_SECONDS = float(os.environ.get("CONFIRM_PRE_WAKE_SECONDS", "5.0"))
 CONFIRM_POST_WAKE_SECONDS = float(os.environ.get("CONFIRM_POST_WAKE_SECONDS", "2.0"))
@@ -78,6 +79,10 @@ OPENWAKEWORD_SCORE_LOG_INTERVAL_SECONDS = float(os.environ.get("OPENWAKEWORD_SCO
 OPENWAKEWORD_SEGMENT_END_SILENCE_SECONDS = float(os.environ.get("OPENWAKEWORD_SEGMENT_END_SILENCE_SECONDS", "0.8"))
 OPENWAKEWORD_EMPTY_CONFIRM_COOLDOWN_SECONDS = float(
     os.environ.get("OPENWAKEWORD_EMPTY_CONFIRM_COOLDOWN_SECONDS", "4.0")
+)
+VOSK_POWER_ON_CANDIDATE_RE = re.compile(
+    r"\b(?:turn|return)\s+(?:it\s+)?on\b(?!\s+(?:the\s+)?radio\b)",
+    re.IGNORECASE,
 )
 SPEECH_CANDIDATE_END_SILENCE_SECONDS = float(os.environ.get("SPEECH_CANDIDATE_END_SILENCE_SECONDS", "0.65"))
 SPEECH_CANDIDATE_COOLDOWN_SECONDS = float(os.environ.get("SPEECH_CANDIDATE_COOLDOWN_SECONDS", "0.5"))
@@ -633,6 +638,10 @@ def update_noise_floor(noise_floor: float, chunk_rms: float, active_gate: float)
         return noise_floor
     target = min(chunk_rms, noise_floor * 3)
     return 0.995 * noise_floor + 0.005 * target
+
+
+def is_vosk_power_on_candidate(text: str) -> bool:
+    return bool(VOSK_POWER_ON_CANDIDATE_RE.search(text or ""))
 
 
 def should_log_openwakeword_score(
@@ -1723,6 +1732,12 @@ def main() -> None:
         help="Treat wake hits as candidates and only chime/dispatch after local STT parses a valid command.",
     )
     parser.add_argument(
+        "--vosk-command-candidate-confirm",
+        action=argparse.BooleanOptionalAction,
+        default=VOSK_COMMAND_CANDIDATE_CONFIRM,
+        help="Let narrow Vosk command text such as 'turn on' trigger confirmed-command STT; dispatch still requires a wake phrase.",
+    )
+    parser.add_argument(
         "--confirm-multi-command-dispatch",
         action="store_true",
         default=CONFIRM_MULTI_COMMAND_DISPATCH,
@@ -1954,6 +1969,12 @@ def main() -> None:
         if args.debug and wake_text:
             log.debug("wake %s=%r rms=%.0f noise=%.0f", wake_source, wake_text, chunk_rms, noise)
         if not hit:
+            command_candidate = (
+                args.wake_engine == "vosk"
+                and args.wake_confirm_command
+                and args.vosk_command_candidate_confirm
+                and is_vosk_power_on_candidate(wake_text)
+            )
             if wake_text:
                 reliability.event(
                     "detector_text",
@@ -1964,60 +1985,74 @@ def main() -> None:
                     noise=round(noise),
                     wakeLike=bool(WAKE_PHRASE_RE.search(wake_text)),
                     commandLike=bool(COMMAND_KEYWORD_RE.search(wake_text)),
+                    commandCandidate=command_candidate,
                 )
-            if args.wake_engine == "openwakeword" and hasattr(detector, "last_score"):
-                stats = recent_speech_stats(
-                    recent_rms,
-                    noise,
-                    args.openwakeword_min_active_rms,
-                    args.openwakeword_active_rms_multiplier,
+            if command_candidate:
+                wake_source = f"command-candidate:{wake_source}"
+                reliability.event(
+                    "wake_candidate",
+                    wakeEngine=args.wake_engine,
+                    source=wake_source,
+                    reason="power_on_command_text",
+                    text=wake_text,
+                    rms=round(chunk_rms),
+                    noise=round(noise),
                 )
-                now = time.time()
-                if should_log_openwakeword_audio(
-                    stats,
-                    args.openwakeword_audio_log_min_rms,
-                    now,
-                    last_audio_log,
-                    args.openwakeword_audio_log_interval_seconds,
-                ):
-                    last_audio_log = now
-                    log.info(
-                        "OpenWakeWord audio probe score=%.3f threshold=%.3f consecutive=%d/%d "
-                        "rms=%.0f noise=%.0f recentPeak=%.0f activeChunks=%d gate=%.0f",
-                        detector.last_score,
-                        args.openwakeword_threshold,
-                        getattr(detector, "consecutive", 0),
-                        args.openwakeword_min_consecutive,
-                        chunk_rms,
+                hit = True
+            else:
+                if args.wake_engine == "openwakeword" and hasattr(detector, "last_score"):
+                    stats = recent_speech_stats(
+                        recent_rms,
                         noise,
-                        stats["peak"],
-                        stats["active_chunks"],
-                        stats["gate"],
+                        args.openwakeword_min_active_rms,
+                        args.openwakeword_active_rms_multiplier,
                     )
-                if should_log_openwakeword_score(
-                    detector.last_score,
-                    stats,
-                    args.openwakeword_score_log_min,
-                    args.openwakeword_min_active_chunks,
-                    now,
-                    last_score_log,
-                    args.openwakeword_score_log_interval_seconds,
-                ):
-                    last_score_log = now
-                    log.info(
-                        "OpenWakeWord score probe score=%.3f threshold=%.3f consecutive=%d/%d "
-                        "rms=%.0f noise=%.0f recentPeak=%.0f activeChunks=%d gate=%.0f",
+                    now = time.time()
+                    if should_log_openwakeword_audio(
+                        stats,
+                        args.openwakeword_audio_log_min_rms,
+                        now,
+                        last_audio_log,
+                        args.openwakeword_audio_log_interval_seconds,
+                    ):
+                        last_audio_log = now
+                        log.info(
+                            "OpenWakeWord audio probe score=%.3f threshold=%.3f consecutive=%d/%d "
+                            "rms=%.0f noise=%.0f recentPeak=%.0f activeChunks=%d gate=%.0f",
+                            detector.last_score,
+                            args.openwakeword_threshold,
+                            getattr(detector, "consecutive", 0),
+                            args.openwakeword_min_consecutive,
+                            chunk_rms,
+                            noise,
+                            stats["peak"],
+                            stats["active_chunks"],
+                            stats["gate"],
+                        )
+                    if should_log_openwakeword_score(
                         detector.last_score,
-                        args.openwakeword_threshold,
-                        getattr(detector, "consecutive", 0),
-                        args.openwakeword_min_consecutive,
-                        chunk_rms,
-                        noise,
-                        stats["peak"],
-                        stats["active_chunks"],
-                        stats["gate"],
-                    )
-            continue
+                        stats,
+                        args.openwakeword_score_log_min,
+                        args.openwakeword_min_active_chunks,
+                        now,
+                        last_score_log,
+                        args.openwakeword_score_log_interval_seconds,
+                    ):
+                        last_score_log = now
+                        log.info(
+                            "OpenWakeWord score probe score=%.3f threshold=%.3f consecutive=%d/%d "
+                            "rms=%.0f noise=%.0f recentPeak=%.0f activeChunks=%d gate=%.0f",
+                            detector.last_score,
+                            args.openwakeword_threshold,
+                            getattr(detector, "consecutive", 0),
+                            args.openwakeword_min_consecutive,
+                            chunk_rms,
+                            noise,
+                            stats["peak"],
+                            stats["active_chunks"],
+                            stats["gate"],
+                        )
+                continue
 
         if args.wake_engine == "openwakeword":
             stats = recent_speech_stats(
@@ -2210,10 +2245,11 @@ def main() -> None:
                 )
                 pre_log_samples = min(len(pre_audio), len(command_audio))
             text = transcribe(command_audio, args.whisper_model, args.whisper_no_speech_threshold)
+            require_confirm_wake_phrase = is_local_stt_engine(args.wake_engine) or wake_source.startswith("command-candidate:")
             body, command, command_candidates = confirmed_command_from_transcript(
                 text,
                 fallback_text=wake_text,
-                require_wake_phrase=is_local_stt_engine(args.wake_engine),
+                require_wake_phrase=require_confirm_wake_phrase,
                 wake_re=CONFIRM_WAKE_PHRASE_RE,
                 allow_bare_ask=False,
             )
@@ -2239,7 +2275,7 @@ def main() -> None:
                 lambda cloud_text: confirmed_command_from_transcript(
                     cloud_text,
                     fallback_text=wake_text,
-                    require_wake_phrase=is_local_stt_engine(args.wake_engine),
+                    require_wake_phrase=require_confirm_wake_phrase,
                     wake_re=CONFIRM_WAKE_PHRASE_RE,
                     allow_bare_ask=False,
                 ),
@@ -2292,7 +2328,7 @@ def main() -> None:
                     body or text,
                     followup_text,
                     fallback_text=wake_text,
-                    require_wake_phrase=is_local_stt_engine(args.wake_engine),
+                    require_wake_phrase=require_confirm_wake_phrase,
                     wake_re=CONFIRM_WAKE_PHRASE_RE,
                 )
                 reliability.event(
