@@ -1257,13 +1257,13 @@ function V2HomeDashboard({ now, calendar, weather, birthdays, derived, onLogWake
       </section>
 
       <div style={v2RightRailStyle}>
-        <section style={v2NeedsPanelStyle(actions.length)}>
+        <section data-dashboard-section="needs-action" style={v2NeedsPanelStyle(actions.length)}>
           <NeedsActionPanel actions={actions} />
         </section>
-        <section style={v2HowiePanelStyle}>
+        <section data-dashboard-section="homer-ai" style={v2HowiePanelStyle}>
           <HowieAssistantPanel />
         </section>
-        <section style={v2BedtimePanelStyle}>
+        <section data-dashboard-section="bedtime" style={v2BedtimePanelStyle}>
           <BedtimePanel derived={derived} onLogWakeTime={onLogWakeTime} />
         </section>
       </div>
@@ -1738,7 +1738,7 @@ const mobileDashboardStyle = {
 function mobileNeedsActionSectionStyle(actionCount = 0) {
   return {
     ...v2GlassPanelStyle,
-    minHeight: Math.min(312, 78 + Math.max(1, actionCount) * 82),
+    minHeight: Math.min(420, 96 + Math.max(1, actionCount) * 106),
     padding: "16px 16px",
     overflow: "hidden",
     width: "100%",
@@ -1812,7 +1812,7 @@ const v2RightRailStyle = {
 };
 
 function v2NeedsPanelStyle(actionCount = 0) {
-  const height = Math.min(320, 78 + Math.max(1, actionCount) * 78);
+  const height = Math.min(430, 92 + Math.max(1, actionCount) * 104);
   return {
     ...v2GlassPanelStyle,
     padding: "18px 20px",
