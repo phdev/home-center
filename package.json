@@ -27,7 +27,8 @@
     "check:knowledge-visual-contract": "node scripts/check-knowledge-visual-contract.mjs",
     "check:knowledge-reference-fidelity": "node scripts/check-knowledge-reference-fidelity.mjs",
     "check:knowledge-visual-contract:live": "node scripts/check-knowledge-visual-contract.mjs --live",
-    "monitor:homecenters": "node scripts/homecenter-node-health.mjs"
+    "monitor:homecenters": "node scripts/homecenter-node-health.mjs",
+    "monitor:openclaw-devon": "node scripts/openclaw-devon-health.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",

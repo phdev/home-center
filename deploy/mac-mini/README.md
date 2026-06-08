@@ -17,6 +17,7 @@ environment variables or sed substitution.
 | Design Claw | Daily design-exploration digest to Telegram (runs once at 08:15) | `com.homecenter.design-claw` |
 | Design Claw listener | Polls Telegram DMs every 5 min; replies as David or merges explicit memory feedback | `com.homecenter.design-claw-listener` |
 | Home Center voice | Vosk wake gate, local Whisper command STT, Pi command dispatch | `com.homecenter.voice` |
+| Devon OpenClaw health | Watches the Devon Telegram provider and restarts OpenClaw Gateway if it wedges | `com.homecenter.openclaw-devon-health` |
 
 ## Hardware Architecture
 
@@ -34,6 +35,8 @@ environment variables or sed substitution.
 | Pi command server | Pi | systemd `wake-word` | 8765 |
 | Voice wake/STT | Mac mini | launchd `com.homecenter.voice` | n/a |
 | OpenClaw bridge | Mac mini | launchd `com.openclaw.bridge` | 3100 |
+| OpenClaw Gateway | Mac mini | launchd `ai.openclaw.gateway` | 18789 |
+| Devon OpenClaw health | Mac mini | launchd `com.homecenter.openclaw-devon-health` | n/a |
 | Email triage | Mac mini | launchd `com.homecenter.email-triage` | n/a |
 | School updates | Mac mini | launchd `com.homecenter.school-updates` | n/a |
 | Cloudflare Worker | Cloudflare | n/a | n/a |
@@ -63,6 +66,23 @@ cd home-center
    export WORKER_URL="https://home-center-api.<you>.workers.dev"
    bash deploy/mac-mini/setup-openclaw-bridge.sh
    ```
+
+### Devon OpenClaw health monitor
+
+This monitor checks `openclaw channels status --json` every 5 minutes and
+requires the `telegram/devon` account to be enabled, configured, running, and
+connected with no pending restart. If the same unhealthy state persists after a
+short retry, it runs `openclaw gateway restart` and records the before/after
+status.
+
+```bash
+bash deploy/mac-mini/setup-openclaw-devon-health-monitor.sh
+tail -f logs/openclaw-devon-health.log
+cat logs/openclaw-devon-health-status.json
+```
+
+The monitor intentionally does not repair missing tokens or disabled Devon
+configuration; those require explicit setup or token rotation.
 
    The script installs dependencies, substitutes the placeholders in
    `com.openclaw.bridge.plist`, writes a locked-down copy to
@@ -221,6 +241,11 @@ feedback prompt, merged into `design_memory/`, and acked.
   owned by a previous user.
 - **Bridge returns 503 "Telegram not connected"** — token is wrong or the
   bot has been revoked. Check `@BotFather` → `/mybots`.
+- **Devon stops replying while Gateway is running** — check
+  `logs/openclaw-devon-health-status.json` and
+  `~/Library/Logs/openclaw/gateway.log`. The Devon monitor restarts Gateway
+  automatically when `telegram/devon` is stuck in `not-running`,
+  `not-connected`, or `restart-pending`.
 - **Token rotation** — regenerate in `@BotFather`, re-run
   `setup-openclaw-bridge.sh` with the new token. The script
   unloads/reloads the agent.
