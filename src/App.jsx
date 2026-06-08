@@ -1159,7 +1159,7 @@ function MobileDashboard({ now, actions, onDismissAction, calendar, calendarConf
 
   const sections = {
     "needs-action": (
-      <section key="needs-action" data-mobile-section="needs-action" style={mobileNeedsActionSectionStyle}>
+      <section key="needs-action" data-mobile-section="needs-action" style={mobileNeedsActionSectionStyle(visibleActions.length)}>
         <NeedsActionPanel
           actions={visibleActions}
           showDeleteControls
@@ -1257,7 +1257,7 @@ function V2HomeDashboard({ now, calendar, weather, birthdays, derived, onLogWake
       </section>
 
       <div style={v2RightRailStyle}>
-        <section style={v2NeedsPanelStyle}>
+        <section style={v2NeedsPanelStyle(actions.length)}>
           <NeedsActionPanel actions={actions} />
         </section>
         <section style={v2HowiePanelStyle}>
@@ -1379,7 +1379,7 @@ export function NeedsActionPanel({
   onDismissAction,
 }) {
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 12, height: "100%" }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: 12, height: "100%", minHeight: 0 }}>
       <div style={v2NeedsHeaderStyle}>
         <div style={v2NeedsTitleStyle}>Needs Action</div>
         <span style={v2ActionCountStyle}>{actions.length}</span>
@@ -1735,20 +1735,22 @@ const mobileDashboardStyle = {
   overflowX: "hidden",
 };
 
-const mobileNeedsActionSectionStyle = {
-  ...v2GlassPanelStyle,
-  minHeight: 236,
-  padding: "16px 16px",
-  overflow: "hidden",
-  width: "100%",
-  boxSizing: "border-box",
-  maxWidth: "100%",
-  minWidth: 0,
-};
+function mobileNeedsActionSectionStyle(actionCount = 0) {
+  return {
+    ...v2GlassPanelStyle,
+    minHeight: Math.min(312, 78 + Math.max(1, actionCount) * 82),
+    padding: "16px 16px",
+    overflow: "hidden",
+    width: "100%",
+    boxSizing: "border-box",
+    maxWidth: "100%",
+    minWidth: 0,
+  };
+}
 
 const mobileBedtimeSectionStyle = {
   ...v2GlassPanelStyle,
-  minHeight: 148,
+  minHeight: 196,
   padding: "14px 16px",
   overflow: "hidden",
   width: "100%",
@@ -1801,30 +1803,37 @@ const v2RightRailStyle = {
   gridColumn: "3",
   gridRow: "1",
   display: "grid",
-  gridTemplateRows: "minmax(284px, 1fr) 132px 176px",
+  gridTemplateRows: "max-content max-content max-content",
+  alignContent: "start",
   gap: 10,
   minHeight: 0,
+  overflowY: "auto",
+  overflowX: "hidden",
 };
 
-const v2NeedsPanelStyle = {
-  ...v2GlassPanelStyle,
-  padding: "18px 20px",
-  minHeight: 0,
-  overflow: "hidden",
-};
+function v2NeedsPanelStyle(actionCount = 0) {
+  const height = Math.min(320, 78 + Math.max(1, actionCount) * 78);
+  return {
+    ...v2GlassPanelStyle,
+    padding: "18px 20px",
+    height,
+    minHeight: 0,
+    overflow: "hidden",
+  };
+}
 
 const v2HowiePanelStyle = {
   ...v2GlassPanelStyle,
   padding: "16px 20px",
   minHeight: 0,
-  overflow: "hidden",
+  overflow: "visible",
 };
 
 const v2BedtimePanelStyle = {
   ...v2GlassPanelStyle,
   padding: "17px 20px",
   minHeight: 0,
-  overflow: "hidden",
+  overflow: "visible",
 };
 
 const v2BottomTrayStyle = {
