@@ -77,6 +77,9 @@ voice-service/.venv-livekit/
 voice-service/logs/
 voice-service/models/
 voice-service/.pytest_cache/
+voice-service/wakeword-data/generated/
+voice-service/wakeword-data/private/
+voice-service/wakeword-data/eval-results/
 voice-service/benchmark_outputs/
 
 # Design Claw — runtime-only state (see docs/design_claw.md)

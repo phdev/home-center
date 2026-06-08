@@ -1,0 +1,72 @@
+{
+  "schema": "home-center.wakeword-corpus.v1",
+  "wakePhrase": "Hey Homer",
+  "positiveTemplates": [
+    "Hey Homer",
+    "Hey Homer, turn on",
+    "Hey Homer, turn off",
+    "Hey Homer, open calendar",
+    "Hey Homer, show the weather",
+    "Hey Homer, open photos",
+    "Hey Homer, go home",
+    "Hey Homer, go back",
+    "Hey Homer, set a timer for ten minutes",
+    "Hey Homer, stop the timer",
+    "Hey Homer, both girls woke up at seven",
+    "Hey Homer, Lucy woke up at six forty five",
+    "Hey Homer, Livy woke up at seven ten",
+    "Hey Homer, dismiss needs action",
+    "Hey Homer, I like this design",
+    "Hey Homer, I don't like this design",
+    "Hey Homer, ask why the moon has phases",
+    "Hey Homer, tell me about penguins"
+  ],
+  "negativeTemplates": [
+    "Hey home, turn on",
+    "Hey how, turn off",
+    "Hey over there",
+    "A number of things are on the table",
+    "However, I think this is fine",
+    "Can you come here for a minute",
+    "I thought you said something",
+    "Did you check your email",
+    "The homework is on the counter",
+    "Okay, honey, let's go",
+    "Home or away, it does not matter",
+    "I love this design but do not change it"
+  ],
+  "voiceBuckets": [
+    {
+      "id": "adult_woman",
+      "description": "Adult woman voice proxy",
+      "macosVoices": ["Samantha", "Ava", "Allison", "Susan", "Victoria"]
+    },
+    {
+      "id": "adult_man",
+      "description": "Adult man voice proxy",
+      "macosVoices": ["Alex", "Tom", "Fred", "Daniel", "Aaron"]
+    },
+    {
+      "id": "girl_7_proxy",
+      "description": "Licensed synthetic higher-pitch child-like proxy; not a clone of a real child",
+      "macosVoices": ["Flo (English (US))", "Sandy (English (US))", "Shelley (English (US))"]
+    },
+    {
+      "id": "girl_4_proxy",
+      "description": "Licensed synthetic younger child-like proxy with faster/slower rate augmentation",
+      "macosVoices": ["Flo (English (US))", "Bubbles", "Sandy (English (US))"]
+    },
+    {
+      "id": "older_adult",
+      "description": "Older family member voice proxy",
+      "macosVoices": ["Grandma (English (US))", "Grandpa (English (US))"]
+    }
+  ],
+  "rates": [145, 170, 195],
+  "gainFactors": [0.65, 1.0, 1.35],
+  "noiseProfiles": [
+    {"id": "quiet_room", "snrDb": null},
+    {"id": "low_room_noise", "snrDb": 24},
+    {"id": "tv_background", "snrDb": 14}
+  ]
+}

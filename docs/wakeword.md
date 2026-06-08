@@ -61,3 +61,8 @@ heard while the wake phrase fails, so do not assume a navigation miss is a
 Worker/Pi routing problem. Check `voice-reliability.jsonl` detector text first.
 `voice-service/intent.py` now treats the narrow Vosk alias
 `hey i'm robyn ...` as a wake phrase and strips it before parsing the command.
+
+Synthetic family-like evaluation fixtures live in
+[wakeword_synthetic_data.md](wakeword_synthetic_data.md). That workflow uses
+licensed system voices and ignored local audio paths; do not commit generated
+or private household audio.
