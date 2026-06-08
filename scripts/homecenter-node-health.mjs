@@ -13,6 +13,39 @@ const DEFAULT_NODES = [
 ];
 
 const REQUIRED_SYSTEMD = ["dashboard-local", "wake-word", "kiosk-watchdog", "network-watchdog", "avahi-daemon"];
+const PLACEHOLDER_MARKERS = [
+  "Family check-in",
+  "Soccer practice",
+  "Dinner with Grandma Sue",
+  "Pack field trip lunch",
+  "Piano lesson",
+  "Scout meeting",
+  "School assembly",
+  "Library pickup",
+  "Pizza night",
+  "Park meetup",
+  "Grandma Sue",
+  "Uncle Mike",
+  "Cousin Lily",
+  "Field trip permission slip",
+  "Book fair volunteer window",
+];
+const PLACEHOLDER_CALENDAR_TITLES = new Set([
+  "family check-in",
+  "soccer practice",
+  "dinner with grandma sue",
+  "pack field trip lunch",
+  "piano lesson",
+  "scout meeting",
+  "school assembly",
+  "dinner prep",
+  "library pickup",
+  "pizza night",
+  "park meetup",
+  "plan the week",
+]);
+const PLACEHOLDER_BIRTHDAY_NAMES = new Set(["grandma sue", "uncle mike", "cousin lily"]);
+const PLACEHOLDER_SCHOOL_TITLES = new Set(["field trip permission slip", "book fair volunteer window"]);
 
 export function summarizeNodeHealth(check) {
   const failures = [];
@@ -24,8 +57,8 @@ export function summarizeNodeHealth(check) {
     if (state !== "active") failures.push(`service:${service}:${state ?? "missing"}`);
   }
   if (!check.bundle?.ok) failures.push(`bundle:${check.bundle?.error ?? "unknown"}`);
+  if (!check.liveData?.ok) failures.push(...(check.liveData?.failures ?? ["liveData:unknown"]));
   if (!check.browser?.ok) failures.push(`browser:${check.browser?.error ?? "unknown"}`);
-  if (check.browser?.workerTokenPresent === false) failures.push("browser:worker-token-missing");
   return {
     ok: failures.length === 0,
     failures,
@@ -39,7 +72,64 @@ export function redactBrowserState(value) {
     workerUrl: value?.workerUrl ?? null,
     workerTokenPresent: value?.workerTokenPresent === true,
     storageKeys: Array.isArray(value?.storageKeys) ? value.storageKeys : [],
+    placeholderMarkers: findPlaceholderMarkers(value?.bodyText ?? ""),
     bodyPreview: typeof value?.bodyText === "string" ? value.bodyText.slice(0, 240) : "",
+  };
+}
+
+export function findPlaceholderMarkers(text) {
+  if (typeof text !== "string" || !text) return [];
+  const lower = text.toLowerCase();
+  return PLACEHOLDER_MARKERS.filter((marker) => lower.includes(marker.toLowerCase()));
+}
+
+export function validateLiveData(data) {
+  const failures = [];
+  const events = data?.calendar?.events;
+  const birthdays = data?.birthdays?.birthdays;
+  const schoolUpdates = data?.schoolUpdates?.updates;
+
+  if (!Array.isArray(events) || events.length === 0) {
+    failures.push("liveData:calendar-empty");
+  } else {
+    const placeholders = events.filter((event) => {
+      const id = String(event?.id ?? "").toLowerCase();
+      const title = String(event?.title ?? event?.summary ?? "").trim().toLowerCase();
+      return id.startsWith("preview-") || PLACEHOLDER_CALENDAR_TITLES.has(title);
+    });
+    if (placeholders.length > 0) failures.push(`liveData:calendar-placeholder:${placeholders.length}`);
+  }
+
+  if (!Array.isArray(birthdays) || birthdays.length === 0) {
+    failures.push("liveData:birthdays-empty");
+  } else {
+    const placeholders = birthdays.filter((birthday) => {
+      const id = String(birthday?.id ?? "").toLowerCase();
+      const name = String(birthday?.name ?? "").trim().toLowerCase();
+      return id.startsWith("preview-") || PLACEHOLDER_BIRTHDAY_NAMES.has(name);
+    });
+    if (placeholders.length > 0) failures.push(`liveData:birthdays-placeholder:${placeholders.length}`);
+  }
+
+  if (!Array.isArray(schoolUpdates)) {
+    failures.push("liveData:school-updates-missing");
+  } else {
+    const placeholders = schoolUpdates.filter((update) => {
+      const id = String(update?.id ?? "").toLowerCase();
+      const title = String(update?.title ?? "").trim().toLowerCase();
+      return id.startsWith("preview-") || PLACEHOLDER_SCHOOL_TITLES.has(title);
+    });
+    if (placeholders.length > 0) failures.push(`liveData:school-placeholder:${placeholders.length}`);
+  }
+
+  return {
+    ok: failures.length === 0,
+    failures,
+    counts: {
+      calendar: Array.isArray(events) ? events.length : null,
+      birthdays: Array.isArray(birthdays) ? birthdays.length : null,
+      schoolUpdates: Array.isArray(schoolUpdates) ? schoolUpdates.length : null,
+    },
   };
 }
 
@@ -109,6 +199,29 @@ async function checkPiApi(host) {
   } catch (error) {
     return { ok: false, error: error.message };
   }
+}
+
+async function checkLiveData(host) {
+  const [calendar, birthdays, schoolUpdates] = await Promise.allSettled([
+    fetchJson(`http://${host}:8765/api/calendar`, 20000),
+    fetchJson(`http://${host}:8765/api/birthdays`, 20000),
+    fetchJson(`http://${host}:8765/api/school-updates`, 20000),
+  ]);
+  const data = {
+    calendar: calendar.status === "fulfilled" ? calendar.value : null,
+    birthdays: birthdays.status === "fulfilled" ? birthdays.value : null,
+    schoolUpdates: schoolUpdates.status === "fulfilled" ? schoolUpdates.value : null,
+  };
+  const transportFailures = [];
+  if (calendar.status === "rejected") transportFailures.push(`liveData:calendar:${calendar.reason.message}`);
+  if (birthdays.status === "rejected") transportFailures.push(`liveData:birthdays:${birthdays.reason.message}`);
+  if (schoolUpdates.status === "rejected") transportFailures.push(`liveData:school-updates:${schoolUpdates.reason.message}`);
+  const validated = validateLiveData(data);
+  return {
+    ok: transportFailures.length === 0 && validated.ok,
+    failures: [...transportFailures, ...validated.failures],
+    counts: validated.counts,
+  };
 }
 
 function parseSshHealth(stdout, expectedHostname) {
@@ -203,10 +316,13 @@ async function evaluateBrowserState(host, index) {
       };
     })()`);
     const redacted = redactBrowserState(value);
+    const placeholderMarkers = redacted.placeholderMarkers ?? [];
     return {
-      ok: page.url?.includes("/home-center/") && redacted.workerTokenPresent,
+      ok: page.url?.includes("/home-center/") && placeholderMarkers.length === 0,
       ...redacted,
-      error: redacted.workerTokenPresent ? null : "worker token missing",
+      error: placeholderMarkers.length === 0
+        ? null
+        : `placeholder markers rendered: ${placeholderMarkers.slice(0, 5).join(", ")}`,
     };
   } catch (error) {
     return { ok: false, error: error.message };
@@ -255,9 +371,10 @@ function cdpEvaluate(wsUrl, expression) {
 }
 
 export async function checkNode(node, index = 0) {
-  const [dns, piApi, ssh, bundle, browser] = await Promise.all([
+  const [dns, piApi, liveData, ssh, bundle, browser] = await Promise.all([
     checkDns(node.host),
     checkPiApi(node.host),
+    checkLiveData(node.host),
     checkSsh(node),
     checkBundle(node.host),
     evaluateBrowserState(node.host, index),
@@ -271,6 +388,7 @@ export async function checkNode(node, index = 0) {
     ssh: { ok: ssh.ok, hostname: ssh.hostname, ips: ssh.ips, error: ssh.error },
     services: ssh.services ?? {},
     bundle,
+    liveData,
     browser,
   };
   return { ...check, ...summarizeNodeHealth(check) };
