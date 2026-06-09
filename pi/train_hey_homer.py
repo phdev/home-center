@@ -438,6 +438,28 @@ def augment_clip(audio: np.ndarray, target_len: int, align: str = "random") -> n
     return audio
 
 
+def augment_full_clip(audio: np.ndarray) -> np.ndarray:
+    """Apply augmentation without forcing a fixed clip length."""
+    audio = audio.copy()
+
+    if random.random() < 0.3:
+        audio = time_stretch(audio, random.uniform(0.8, 1.2))
+
+    audio = random_gain(audio)
+
+    if random.random() < 0.3:
+        audio = highpass_filter(audio)
+
+    if random.random() < 0.2:
+        audio = simulate_reverb(audio, decay=random.uniform(0.1, 0.4))
+
+    if random.random() < 0.5:
+        snr = random.uniform(5, 30)
+        audio = add_noise(audio, snr)
+
+    return audio
+
+
 # ---------------------------------------------------------------------------
 # Feature computation
 # ---------------------------------------------------------------------------
@@ -518,7 +540,14 @@ def compute_features_livekit(clips: list[np.ndarray], clip_duration_samples: int
 
     for clip in tqdm(clips, desc="Computing features"):
         for _ in range(n_augments):
-            augmented = augment_clip(clip, clip_duration_samples, align=align)
+            if window_strategy == "all":
+                augmented = augment_full_clip(clip)
+                augmented = np.concatenate([
+                    np.zeros(clip_duration_samples, dtype=np.int16),
+                    augmented,
+                ])
+            else:
+                augmented = augment_clip(clip, clip_duration_samples, align=align)
             audio = augmented.astype(np.float32) / 32768.0
             all_mel = mel_frontend(audio.flatten())
             if all_mel.ndim == 3:

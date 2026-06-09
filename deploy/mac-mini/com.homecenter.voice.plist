@@ -56,7 +56,7 @@
         <key>WAKE_ENGINE</key>
         <string>livekit</string>
         <key>LIVEKIT_WAKEWORD_MODEL</key>
-        <string>__REPO__/pi/models/hey_homer.onnx</string>
+        <string>__REPO__/pi/models/hey_homer_synthetic_livekit.onnx</string>
         <key>LIVEKIT_WAKEWORD_HELPER_PYTHON</key>
         <string>__REPO__/voice-service/.venv-livekit/bin/python3</string>
         <key>LIVEKIT_WAKEWORD_THRESHOLD</key>
