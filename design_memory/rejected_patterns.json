@@ -1,0 +1,34 @@
+{
+  "items": [
+    {
+      "id": "rp-current-daily-design-photo",
+      "text": "current daily design: photo",
+      "added": "2026-06-08",
+      "source": "voice"
+    },
+    {
+      "id": "rp-current-daily-design-one",
+      "text": "current daily design: one",
+      "added": "2026-06-08",
+      "source": "voice"
+    },
+    {
+      "id": "rp-current-daily-design-should-be-avoided-a",
+      "text": "current daily design should be avoided as a disliked direction.",
+      "added": "2026-06-08",
+      "source": "voice"
+    },
+    {
+      "id": "rp-current-daily-design-idea",
+      "text": "current daily design: idea",
+      "added": "2026-06-08",
+      "source": "voice"
+    },
+    {
+      "id": "rp-current-daily-design-for-sure",
+      "text": "current daily design: for sure",
+      "added": "2026-06-08",
+      "source": "voice"
+    }
+  ]
+}

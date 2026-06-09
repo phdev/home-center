@@ -1,6 +1,6 @@
 # David Design Memory
 
-Generated: 2026-05-23T18:34:07-07:00
+Generated: 2026-06-09T07:05:26-07:00
 
 This file is generated from David's structured design memory.
 Do not edit it by hand; run `python scripts/sync_design_memory_pack.py` from `/Users/peter/home-center`.
@@ -29,11 +29,17 @@ Do not edit it by hand; run `python scripts/sync_design_memory_pack.py` from `/U
 
 ## Accepted Patterns
 
-- None captured yet.
+- current daily design: you can't hear me (2026-06-08, voice)
+- current daily design: music (2026-06-08, voice)
+- current daily design: is my wheelhouse. i can cook with green stuff and then the bomb drums. do you like vegetables (2026-06-09, voice)
 
 ## Rejected Patterns
 
-- None captured yet.
+- current daily design: photo (2026-06-08, voice)
+- current daily design: one (2026-06-08, voice)
+- current daily design should be avoided as a disliked direction. (2026-06-08, voice)
+- current daily design: idea (2026-06-08, voice)
+- current daily design: for sure (2026-06-08, voice)
 
 ## Open Questions
 
