@@ -28,11 +28,13 @@ def read_wav(path: Path) -> np.ndarray:
     return np.frombuffer(frames, dtype=np.int16).copy()
 
 
-def replay(detector: Any, pcm: np.ndarray) -> dict[str, Any]:
+def replay(detector: Any, pcm: np.ndarray, preroll_samples: int = 0) -> dict[str, Any]:
     hit = False
     max_score = 0.0
     hit_source = ""
     started = time.perf_counter()
+    if preroll_samples > 0:
+        pcm = np.concatenate([np.zeros(preroll_samples, dtype=np.int16), pcm])
     for offset in range(0, len(pcm), CHUNK_SIZE):
         chunk = pcm[offset : offset + CHUNK_SIZE]
         if len(chunk) < CHUNK_SIZE:
@@ -59,6 +61,12 @@ def main() -> int:
     parser.add_argument("--model", type=Path, default=DEFAULT_MODEL)
     parser.add_argument("--threshold", type=float, default=0.995)
     parser.add_argument("--min-consecutive", type=int, default=3)
+    parser.add_argument(
+        "--preroll-seconds",
+        type=float,
+        default=2.0,
+        help="Silence prepended before each fixture to simulate production rolling audio.",
+    )
     parser.add_argument("--output", type=Path, default=ROOT / "wakeword-data/eval-results/latest-livekit.json")
     args = parser.parse_args()
 
@@ -69,26 +77,38 @@ def main() -> int:
     rows = []
     counts = defaultdict(int)
     base = args.manifest.parent
-    for fixture in manifest["fixtures"]:
-        detector = LiveKitWakeWordDetector(
-            args.model,
-            cooldown=0.0,
-            threshold=args.threshold,
-            min_consecutive=args.min_consecutive,
-        )
-        result = replay(detector, read_wav(base / fixture["path"]))
-        expected = bool(fixture["expectedWake"])
-        actual = bool(result["hit"])
-        if expected and actual:
-            bucket = "true_positive"
-        elif expected and not actual:
-            bucket = "false_negative"
-        elif not expected and actual:
-            bucket = "false_positive"
-        else:
-            bucket = "true_negative"
-        counts[bucket] += 1
-        rows.append({**fixture, **result, "result": bucket})
+    detector = LiveKitWakeWordDetector(
+        args.model,
+        cooldown=0.0,
+        threshold=args.threshold,
+        min_consecutive=args.min_consecutive,
+    )
+    try:
+        for fixture in manifest["fixtures"]:
+            reset = getattr(detector, "reset", None)
+            if callable(reset):
+                reset()
+            result = replay(
+                detector,
+                read_wav(base / fixture["path"]),
+                preroll_samples=max(0, int(args.preroll_seconds * 16000)),
+            )
+            expected = bool(fixture["expectedWake"])
+            actual = bool(result["hit"])
+            if expected and actual:
+                bucket = "true_positive"
+            elif expected and not actual:
+                bucket = "false_negative"
+            elif not expected and actual:
+                bucket = "false_positive"
+            else:
+                bucket = "true_negative"
+            counts[bucket] += 1
+            rows.append({**fixture, **result, "result": bucket})
+    finally:
+        close = getattr(detector, "close", None)
+        if callable(close):
+            close()
 
     positives = counts["true_positive"] + counts["false_negative"]
     negatives = counts["true_negative"] + counts["false_positive"]
@@ -98,6 +118,7 @@ def main() -> int:
         "model": str(args.model),
         "threshold": args.threshold,
         "minConsecutive": args.min_consecutive,
+        "prerollSeconds": args.preroll_seconds,
         "counts": dict(counts),
         "recall": round(counts["true_positive"] / positives, 4) if positives else None,
         "falsePositiveRate": round(counts["false_positive"] / negatives, 4) if negatives else None,

@@ -399,6 +399,19 @@ class LiveKitWakeWordDetector:
         """Undo cooldown when confirmed-command mode rejects the wake hit."""
         self.last_hit = 0.0
 
+    def reset(self) -> None:
+        """Reset streaming state between offline replay fixtures."""
+        self.window_chunks.clear()
+        self.consecutive = 0
+        self.last_hit = 0.0
+        self.last_score = 0.0
+        self.last_model_name = self.model_name
+
+    def close(self) -> None:
+        close = getattr(self.model, "close", None)
+        if callable(close):
+            close()
+
 
 class LiveKitWakeWordHelperClient:
     """Persistent Python 3.11 LiveKit model helper for older main voice venvs."""
@@ -432,6 +445,15 @@ class LiveKitWakeWordHelperClient:
         if "error" in payload:
             raise RuntimeError(f"LiveKit wake-word helper error: {payload['error']}")
         return {str(k): float(v) for k, v in payload.get("scores", {}).items()}
+
+    def close(self) -> None:
+        if self.proc.poll() is None:
+            self.proc.terminate()
+            try:
+                self.proc.wait(timeout=2)
+            except subprocess.TimeoutExpired:
+                self.proc.kill()
+                self.proc.wait(timeout=2)
 
 
 class SpeechCandidateDetector:

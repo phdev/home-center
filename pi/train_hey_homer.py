@@ -24,6 +24,7 @@ import random
 import struct
 import tempfile
 import wave
+import json
 from pathlib import Path
 
 import numpy as np
@@ -208,6 +209,67 @@ def load_real_samples(path: Path) -> list[np.ndarray]:
     return clips
 
 
+def load_wav_clip(path: Path) -> np.ndarray:
+    """Load a mono/stereo 16-bit WAV clip and return mono int16 PCM."""
+    with wave.open(str(path), "rb") as audio:
+        channels = audio.getnchannels()
+        sample_width = audio.getsampwidth()
+        sample_rate = audio.getframerate()
+        frames = audio.readframes(audio.getnframes())
+    if sample_width != 2:
+        raise ValueError(f"{path} must be 16-bit PCM WAV")
+    clip = np.frombuffer(frames, dtype=np.int16).copy()
+    if channels > 1:
+        clip = clip.reshape(-1, channels).mean(axis=1).astype(np.int16)
+    if sample_rate != 16000:
+        import soxr
+        resampled = soxr.resample(clip.astype(np.float32), sample_rate, 16000)
+        clip = np.clip(resampled, -32768, 32767).astype(np.int16)
+    return clip
+
+
+def crop_initial_speech_region(clip: np.ndarray, seconds: float = 1.35, sample_rate: int = 16000) -> np.ndarray:
+    """Crop a positive command fixture down to the initial wake-phrase region."""
+    if len(clip) == 0:
+        return clip
+    frame = max(1, int(0.02 * sample_rate))
+    rms = []
+    for offset in range(0, len(clip), frame):
+        window = clip[offset : offset + frame].astype(np.float32)
+        rms.append(float(np.sqrt(np.mean(window**2))) if len(window) else 0.0)
+    if not rms:
+        return clip
+    noise = np.percentile(rms, 20)
+    peak = max(rms)
+    threshold = max(80.0, noise * 2.5, peak * 0.12)
+    start_frame = next((i for i, value in enumerate(rms) if value >= threshold), 0)
+    start = max(0, start_frame * frame - int(0.08 * sample_rate))
+    stop = min(len(clip), start + int(seconds * sample_rate))
+    return clip[start:stop]
+
+
+def load_fixture_manifest(path: Path) -> tuple[list[np.ndarray], list[np.ndarray]]:
+    """Load generated wake-word fixtures from a manifest JSON file."""
+    manifest = json.loads(path.read_text())
+    base_dir = path.parent
+    pos_clips = []
+    neg_clips = []
+    for fixture in manifest.get("fixtures", []):
+        clip_path = base_dir / fixture["path"]
+        clip = load_wav_clip(clip_path)
+        if fixture.get("expectedWake"):
+            pos_clips.append(crop_initial_speech_region(clip))
+        else:
+            neg_clips.append(clip)
+    log.info(
+        "Loaded %d positive and %d negative fixture clips from %s",
+        len(pos_clips),
+        len(neg_clips),
+        path,
+    )
+    return pos_clips, neg_clips
+
+
 async def generate_tts_clip(text: str, voice: str, rate: str = "+0%",
                             pitch: str = "+0Hz") -> np.ndarray | None:
     """Generate a single TTS clip and return as 16kHz int16 numpy array."""
@@ -286,17 +348,26 @@ def random_gain(audio: np.ndarray, min_db: float = -6, max_db: float = 6) -> np.
     return np.clip(audio * gain, -32768, 32767).astype(np.int16)
 
 
-def pad_or_trim(audio: np.ndarray, target_len: int) -> np.ndarray:
+def pad_or_trim(audio: np.ndarray, target_len: int, align: str = "random") -> np.ndarray:
     """Pad with silence or trim to target length."""
     if len(audio) >= target_len:
-        # Random offset for trimming
-        max_start = len(audio) - target_len
-        start = random.randint(0, max_start)
+        if align == "end":
+            start = len(audio) - target_len
+        else:
+            # Random offset for trimming
+            max_start = len(audio) - target_len
+            start = random.randint(0, max_start)
         return audio[start:start + target_len]
     else:
-        # Pad with silence, random position
         pad_total = target_len - len(audio)
-        pad_before = random.randint(0, pad_total)
+        if align == "end":
+            # In streaming inference, the score should fire just after the
+            # wake phrase, so train positives with speech near the window end.
+            tail = random.randint(0, min(pad_total, int(0.16 * 16000)))
+            pad_before = pad_total - tail
+        else:
+            # Pad with silence, random position
+            pad_before = random.randint(0, pad_total)
         pad_after = pad_total - pad_before
         return np.pad(audio, (pad_before, pad_after), mode="constant")
 
@@ -337,7 +408,7 @@ def highpass_filter(audio: np.ndarray, cutoff_hz: float = 80, sr: int = 16000) -
     return np.clip(output, -32768, 32767).astype(np.int16)
 
 
-def augment_clip(audio: np.ndarray, target_len: int) -> np.ndarray:
+def augment_clip(audio: np.ndarray, target_len: int, align: str = "random") -> np.ndarray:
     """Apply random augmentation pipeline."""
     audio = audio.copy()
 
@@ -362,7 +433,7 @@ def augment_clip(audio: np.ndarray, target_len: int) -> np.ndarray:
         audio = add_noise(audio, snr)
 
     # Pad or trim
-    audio = pad_or_trim(audio, target_len)
+    audio = pad_or_trim(audio, target_len, align=align)
 
     return audio
 
@@ -372,8 +443,25 @@ def augment_clip(audio: np.ndarray, target_len: int) -> np.ndarray:
 # ---------------------------------------------------------------------------
 
 
+def active_window_end(audio: np.ndarray, feature_count: int, chunk_size: int = 1280) -> int:
+    """Pick a feature-window end near the strongest speech activity."""
+    if feature_count <= 16:
+        return feature_count
+    rms = []
+    for offset in range(0, len(audio) - chunk_size + 1, chunk_size):
+        chunk = audio[offset : offset + chunk_size].astype(np.float32)
+        rms.append(float(np.sqrt(np.mean(chunk**2))))
+    if not rms:
+        return feature_count
+    peak_index = int(np.argmax(rms))
+    # Use a window slightly after peak energy so the full wake phrase lands in
+    # the receptive field, but never before the model has accumulated 16 frames.
+    return min(feature_count, max(16, peak_index + 6))
+
+
 def compute_features_streaming(clips: list[np.ndarray], clip_duration_samples: int,
-                               n_augments: int = 3) -> np.ndarray:
+                               n_augments: int = 3, window_strategy: str = "last",
+                               align: str = "random") -> np.ndarray:
     """
     Compute features by running clips through the same AudioFeatures pipeline
     that the wake word model uses at inference time.
@@ -385,7 +473,7 @@ def compute_features_streaming(clips: list[np.ndarray], clip_duration_samples: i
 
     for clip in tqdm(clips, desc="Computing features"):
         for _ in range(n_augments):
-            augmented = augment_clip(clip, clip_duration_samples)
+            augmented = augment_clip(clip, clip_duration_samples, align=align)
 
             # Create fresh AudioFeatures instance for each clip
             af = AudioFeatures(inference_framework="onnx")
@@ -396,7 +484,11 @@ def compute_features_streaming(clips: list[np.ndarray], clip_duration_samples: i
 
             # feature_buffer is an ndarray of shape (n_frames, 96)
             if len(af.feature_buffer) >= 16:
-                feat_window = af.feature_buffer[-16:]  # last 16 frames
+                if window_strategy == "active":
+                    end = active_window_end(augmented, len(af.feature_buffer), chunk_size=chunk_size)
+                    feat_window = af.feature_buffer[end - 16:end]
+                else:
+                    feat_window = af.feature_buffer[-16:]  # last 16 frames
                 all_features.append(feat_window)
 
     if not all_features:
@@ -405,6 +497,75 @@ def compute_features_streaming(clips: list[np.ndarray], clip_duration_samples: i
     result = np.array(all_features, dtype=np.float32)
     log.info("Feature shape: %s", result.shape)
     return result
+
+
+def compute_features_livekit(clips: list[np.ndarray], clip_duration_samples: int,
+                             n_augments: int = 3, align: str = "random",
+                             window_strategy: str = "last") -> np.ndarray:
+    """Compute classifier features with LiveKit's production frontend."""
+    from livekit.wakeword.inference.model import (
+        EMBEDDING_STRIDE,
+        EMBEDDING_WINDOW,
+        MIN_EMBEDDINGS,
+        MelSpectrogramFrontend,
+        SpeechEmbedding,
+    )
+    from livekit.wakeword.resources import get_embedding_model_path, get_mel_model_path
+
+    mel_frontend = MelSpectrogramFrontend(onnx_path=get_mel_model_path())
+    speech_embedding = SpeechEmbedding(onnx_path=get_embedding_model_path())
+    all_features = []
+
+    for clip in tqdm(clips, desc="Computing features"):
+        for _ in range(n_augments):
+            augmented = augment_clip(clip, clip_duration_samples, align=align)
+            audio = augmented.astype(np.float32) / 32768.0
+            all_mel = mel_frontend(audio.flatten())
+            if all_mel.ndim == 3:
+                all_mel = all_mel[0]
+            if all_mel.shape[0] < EMBEDDING_WINDOW:
+                continue
+
+            embeddings = []
+            for start in range(0, all_mel.shape[0] - EMBEDDING_WINDOW + 1, EMBEDDING_STRIDE):
+                window = all_mel[start : start + EMBEDDING_WINDOW]
+                emb = speech_embedding(window[np.newaxis, :, :])
+                embeddings.append(emb[0])
+
+            if len(embeddings) < MIN_EMBEDDINGS:
+                continue
+            if window_strategy == "all":
+                for end in range(MIN_EMBEDDINGS, len(embeddings) + 1):
+                    all_features.append(np.stack(embeddings[end - MIN_EMBEDDINGS:end], axis=0))
+            else:
+                all_features.append(np.stack(embeddings[-MIN_EMBEDDINGS:], axis=0))
+
+    if not all_features:
+        raise RuntimeError("No LiveKit features could be computed.")
+
+    result = np.array(all_features, dtype=np.float32)
+    log.info("Feature shape: %s", result.shape)
+    return result
+
+
+def compute_features(clips: list[np.ndarray], clip_duration_samples: int,
+                     n_augments: int = 3, backend: str = "openwakeword",
+                     window_strategy: str = "last", align: str = "random") -> np.ndarray:
+    if backend == "livekit":
+        return compute_features_livekit(
+            clips,
+            clip_duration_samples,
+            n_augments=n_augments,
+            align=align,
+            window_strategy=window_strategy,
+        )
+    return compute_features_streaming(
+        clips,
+        clip_duration_samples,
+        n_augments=n_augments,
+        window_strategy=window_strategy,
+        align=align,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -673,6 +834,12 @@ def main():
                         help="Path to .npz file with previously recorded real samples to include")
     parser.add_argument("--real-negative-samples", type=str, default=None,
                         help="Path to .npz file with previously recorded negative real samples")
+    parser.add_argument("--fixture-manifest", type=str, default=None,
+                        help="Path to generated wakeword fixture manifest.json to include")
+    parser.add_argument("--feature-backend", choices=("openwakeword", "livekit"), default="openwakeword",
+                        help="Feature extractor used for classifier training")
+    parser.add_argument("--skip-tts", action="store_true",
+                        help="Do not generate edge-tts samples; train only from fixtures/real/audio negatives")
     parser.add_argument("--record-device", type=str, default=None,
                         help="ALSA device for recording (auto-detected if not set)")
     parser.add_argument("--real-augments", type=int, default=20,
@@ -748,6 +915,11 @@ def main():
         loaded = load_real_samples(Path(args.real_negative_samples))
         real_neg_clips.extend(loaded)
 
+    fixture_pos_clips = []
+    fixture_neg_clips = []
+    if args.fixture_manifest:
+        fixture_pos_clips, fixture_neg_clips = load_fixture_manifest(Path(args.fixture_manifest))
+
     if real_pos_clips:
         log.info("Will include %d real positive samples (×%d augments = %d features)",
                  len(real_pos_clips), args.real_augments, len(real_pos_clips) * args.real_augments)
@@ -755,16 +927,24 @@ def main():
         log.info("Will include %d real negative samples (×%d augments = %d features)",
                  len(real_neg_clips), args.real_augments, len(real_neg_clips) * args.real_augments)
 
-    # Step 1: Generate positive samples
-    log.info("=== Generating %d positive TTS samples ===", args.positive_samples)
-    pos_clips = asyncio.run(generate_samples(pos_phrases, args.positive_samples,
-                                             desc="Positive clips"))
-    log.info("Generated %d positive TTS clips", len(pos_clips))
+    # Step 1: Generate/load positive samples
+    pos_clips = list(fixture_pos_clips)
+    neg_clips = list(fixture_neg_clips)
+    if args.skip_tts:
+        if args.positive_samples or args.negative_samples:
+            log.info("Skipping edge-tts generation because --skip-tts was supplied")
+    else:
+        log.info("=== Generating %d positive TTS samples ===", args.positive_samples)
+        generated_pos = asyncio.run(generate_samples(pos_phrases, args.positive_samples,
+                                                     desc="Positive clips"))
+        pos_clips.extend(generated_pos)
+        log.info("Generated %d positive TTS clips", len(generated_pos))
 
-    # Step 2: Generate negative samples
-    log.info("=== Generating %d negative TTS samples ===", args.negative_samples)
-    neg_clips = asyncio.run(generate_samples(neg_phrases, args.negative_samples,
-                                             desc="Negative clips"))
+        # Step 2: Generate negative samples
+        log.info("=== Generating %d negative TTS samples ===", args.negative_samples)
+        generated_neg = asyncio.run(generate_samples(neg_phrases, args.negative_samples,
+                                                     desc="Negative clips"))
+        neg_clips.extend(generated_neg)
 
     # Also add non-speech negative clips (noise, silence, tones)
     log.info("Adding non-speech negative clips...")
@@ -798,24 +978,48 @@ def main():
     # Step 3: Compute features
     log.info("=== Computing features ===")
     log.info("Computing positive features...")
-    pos_features = compute_features_streaming(pos_clips, clip_duration_samples,
-                                              n_augments=args.augments)
+    if not pos_clips:
+        raise RuntimeError("No positive clips available. Supply TTS, real samples, or --fixture-manifest.")
+    if not neg_clips:
+        raise RuntimeError("No negative clips available. Supply TTS, real samples, or --fixture-manifest.")
+    pos_features = compute_features(
+        pos_clips,
+        clip_duration_samples,
+        n_augments=args.augments,
+        backend=args.feature_backend,
+        window_strategy="last",
+        align="end",
+    )
     log.info("Computing negative features...")
-    neg_features = compute_features_streaming(neg_clips, clip_duration_samples,
-                                              n_augments=args.augments)
+    neg_features = compute_features(
+        neg_clips,
+        clip_duration_samples,
+        n_augments=args.augments,
+        backend=args.feature_backend,
+        window_strategy="all",
+        align="end",
+    )
 
     # Compute real sample features with higher augmentation factor
     if real_pos_clips:
         log.info("Computing real positive features (×%d augments)...", args.real_augments)
-        real_pos_features = compute_features_streaming(
-            real_pos_clips, clip_duration_samples, n_augments=args.real_augments)
+        real_pos_features = compute_features(
+            real_pos_clips,
+            clip_duration_samples,
+            n_augments=args.real_augments,
+            backend=args.feature_backend,
+        )
         pos_features = np.concatenate([pos_features, real_pos_features])
         log.info("Added %d real positive features (total: %d)", len(real_pos_features), len(pos_features))
 
     if real_neg_clips:
         log.info("Computing real negative features (×%d augments)...", args.real_augments)
-        real_neg_features = compute_features_streaming(
-            real_neg_clips, clip_duration_samples, n_augments=args.real_augments)
+        real_neg_features = compute_features(
+            real_neg_clips,
+            clip_duration_samples,
+            n_augments=args.real_augments,
+            backend=args.feature_backend,
+        )
         neg_features = np.concatenate([neg_features, real_neg_features])
         log.info("Added %d real negative features (total: %d)", len(real_neg_features), len(neg_features))
 

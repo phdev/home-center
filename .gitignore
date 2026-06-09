@@ -74,6 +74,7 @@ email-triage/logs/
 # Voice service — local runtime artifacts
 voice-service/.venv/
 voice-service/.venv-livekit/
+voice-service/.venv-wakeword-train/
 voice-service/logs/
 voice-service/models/
 voice-service/.pytest_cache/
