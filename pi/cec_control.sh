@@ -17,9 +17,21 @@ CMD="${1:-status}"
 CEC_POWER_ON_WAIT_SECONDS="${CEC_POWER_ON_WAIT_SECONDS:-20}"
 CEC_POWER_ON_POLL_SECONDS="${CEC_POWER_ON_POLL_SECONDS:-2}"
 CEC_ACTIVE_SOURCE_SETTLE_ATTEMPTS="${CEC_ACTIVE_SOURCE_SETTLE_ATTEMPTS:-3}"
+CEC_EXPECTED_ACTIVE_SOURCE_NUMBER="${CEC_EXPECTED_ACTIVE_SOURCE_NUMBER:-1}"
 
 cec_send() {
   echo "$1" | cec-client -s -d 1 2>/dev/null
+}
+
+active_source_status() {
+  RESULT=$(echo "scan" | cec-client -s -d 1 2>/dev/null)
+  if echo "$RESULT" | grep -qi "currently active source: unknown"; then
+    echo "unknown"
+  elif echo "$RESULT" | grep -Eqi "currently active source: .+\\(${CEC_EXPECTED_ACTIVE_SOURCE_NUMBER}\\)"; then
+    echo "selected"
+  else
+    echo "unknown"
+  fi
 }
 
 tv_power_status() {
@@ -43,6 +55,7 @@ case "$CMD" in
     cec_send "on 0"
     deadline=$((SECONDS + CEC_POWER_ON_WAIT_SECONDS))
     status="unknown"
+    source_status="unknown"
     while (( SECONDS <= deadline )); do
       cec_send "as"
       status="$(tv_power_status)"
@@ -51,15 +64,19 @@ case "$CMD" in
           cec_send "as"
           sleep "$CEC_POWER_ON_POLL_SECONDS"
         done
-        echo "Done. TV is on and showing this Pi."
-        exit 0
+        source_status="$(active_source_status)"
+        if [[ "$source_status" == "selected" ]]; then
+          echo "Done. TV is on and showing this Pi."
+          exit 0
+        fi
+        echo "TV is on, but this Pi is not verified as the active HDMI source yet (source=${source_status})." >&2
       fi
       if [[ "$status" == "standby" ]]; then
         cec_send "on 0"
       fi
       sleep "$CEC_POWER_ON_POLL_SECONDS"
     done
-    echo "Warning: TV did not verify as on after ${CEC_POWER_ON_WAIT_SECONDS}s (status=${status})." >&2
+    echo "Warning: TV did not verify as on and showing this Pi after ${CEC_POWER_ON_WAIT_SECONDS}s (status=${status}, source=${source_status})." >&2
     exit 1
     ;;
   off|standby)

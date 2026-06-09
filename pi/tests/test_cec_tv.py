@@ -28,6 +28,7 @@ def test_turn_on_tv_selects_home_center_hdmi_source(monkeypatch):
 
     monkeypatch.setattr(service, "cec_send", lambda command: commands.append(command) or True)
     monkeypatch.setattr(service, "tv_power_status", lambda: "on")
+    monkeypatch.setattr(service, "tv_active_source_status", lambda: "selected")
     monkeypatch.setattr(service.time, "sleep", lambda _: None)
     monkeypatch.setattr(service, "CEC_ACTIVE_SOURCE_SETTLE_ATTEMPTS", 3)
 
@@ -45,6 +46,7 @@ def test_turn_on_tv_still_selects_source_if_power_command_is_not_needed(monkeypa
 
     monkeypatch.setattr(service, "cec_send", fake_cec_send)
     monkeypatch.setattr(service, "tv_power_status", lambda: "on")
+    monkeypatch.setattr(service, "tv_active_source_status", lambda: "selected")
     monkeypatch.setattr(service.time, "sleep", lambda _: None)
     monkeypatch.setattr(service, "CEC_ACTIVE_SOURCE_SETTLE_ATTEMPTS", 3)
 
@@ -59,12 +61,35 @@ def test_turn_on_tv_retries_active_source_while_tv_is_waking(monkeypatch):
 
     monkeypatch.setattr(service, "cec_send", lambda command: commands.append(command) or True)
     monkeypatch.setattr(service, "tv_power_status", lambda: next(statuses))
+    monkeypatch.setattr(service, "tv_active_source_status", lambda: "selected")
     monkeypatch.setattr(service.time, "sleep", lambda _: None)
     monkeypatch.setattr(service.time, "monotonic", lambda: 0)
     monkeypatch.setattr(service, "CEC_ACTIVE_SOURCE_SETTLE_ATTEMPTS", 3)
 
     assert service.turn_on_tv()
     assert commands == ["on 0", "as", "as", "as", "as", "as"]
+
+
+def test_turn_on_tv_fails_when_active_source_never_verifies(monkeypatch):
+    service = load_wake_word_service()
+    commands = []
+    now = {"value": 0}
+
+    def fake_sleep(seconds):
+        now["value"] += seconds or 1
+
+    monkeypatch.setattr(service, "cec_send", lambda command: commands.append(command) or True)
+    monkeypatch.setattr(service, "tv_power_status", lambda: "on")
+    monkeypatch.setattr(service, "tv_active_source_status", lambda: "unknown")
+    monkeypatch.setattr(service.time, "sleep", fake_sleep)
+    monkeypatch.setattr(service.time, "monotonic", lambda: now["value"])
+    monkeypatch.setattr(service, "CEC_POWER_ON_WAIT_SECONDS", 2)
+    monkeypatch.setattr(service, "CEC_POWER_ON_POLL_SECONDS", 1)
+    monkeypatch.setattr(service, "CEC_SOURCE_SETTLE_SECONDS", 0)
+    monkeypatch.setattr(service, "CEC_ACTIVE_SOURCE_SETTLE_ATTEMPTS", 1)
+
+    assert not service.turn_on_tv()
+    assert commands.count("as") >= 2
 
 
 def test_turn_on_dashboard_resets_stale_knowledge_navigation_before_cec(monkeypatch):

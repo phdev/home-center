@@ -111,6 +111,7 @@ CEC_SOURCE_SETTLE_SECONDS = 1
 CEC_POWER_ON_WAIT_SECONDS = float(os.environ.get("CEC_POWER_ON_WAIT_SECONDS", "20"))
 CEC_POWER_ON_POLL_SECONDS = float(os.environ.get("CEC_POWER_ON_POLL_SECONDS", "2"))
 CEC_ACTIVE_SOURCE_SETTLE_ATTEMPTS = int(os.environ.get("CEC_ACTIVE_SOURCE_SETTLE_ATTEMPTS", "3"))
+CEC_EXPECTED_ACTIVE_SOURCE_NUMBER = os.environ.get("CEC_EXPECTED_ACTIVE_SOURCE_NUMBER", "1")
 
 logging.basicConfig(
     level=logging.INFO,
@@ -172,12 +173,33 @@ def tv_power_status() -> str:
     return "error"
 
 
+def tv_active_source_status() -> str:
+    """Return whether HDMI-CEC reports any active source selected."""
+    try:
+        proc = subprocess.run(
+            ["cec-client", "-s", "-d", "1"],
+            input="scan\n",
+            capture_output=True, text=True, timeout=10,
+        )
+    except Exception as exc:
+        log.warning("CEC active-source query failed: %s", exc)
+        return "error"
+    output = proc.stdout.lower()
+    if "currently active source: unknown" in output:
+        return "unknown"
+    expected = re.escape(CEC_EXPECTED_ACTIVE_SOURCE_NUMBER)
+    if re.search(rf"currently active source: .+\({expected}\)", output):
+        return "selected"
+    return "unknown"
+
+
 def turn_on_tv() -> bool:
     """Power on the TV and select the Home Center Pi as the active HDMI source."""
     log.info("Turning TV ON via HDMI-CEC...")
     ok = cec_send(CEC_ON_CMD.format(dev=CEC_DEVICE))
     deadline = time.monotonic() + CEC_POWER_ON_WAIT_SECONDS
     status = "unknown"
+    source_status = "unknown"
 
     while time.monotonic() <= deadline:
         time.sleep(CEC_SOURCE_SETTLE_SECONDS)
@@ -189,13 +211,21 @@ def turn_on_tv() -> bool:
                 log.info("Reasserting Home Center HDMI source via HDMI-CEC...")
                 ok = cec_send(CEC_ACTIVE_CMD) and ok
                 time.sleep(CEC_POWER_ON_POLL_SECONDS)
-            log.info("TV is on and should be showing this Pi's HDMI output.")
-            return True
+            source_status = tv_active_source_status()
+            if source_status == "selected":
+                log.info("TV is on and HDMI-CEC reports an active source.")
+                return True
+            log.warning("TV is on, but HDMI-CEC has not verified an active source yet (source=%s).", source_status)
         if status == "standby":
             ok = cec_send(CEC_ON_CMD.format(dev=CEC_DEVICE)) and ok
         time.sleep(CEC_POWER_ON_POLL_SECONDS)
 
-    log.warning("TV on command did not verify via HDMI-CEC after %.1fs (status=%s).", CEC_POWER_ON_WAIT_SECONDS, status)
+    log.warning(
+        "TV on command did not verify power and active source via HDMI-CEC after %.1fs (status=%s, source=%s).",
+        CEC_POWER_ON_WAIT_SECONDS,
+        status,
+        source_status,
+    )
     return False
 
 
