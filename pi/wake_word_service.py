@@ -1284,6 +1284,9 @@ class RecordingManager:
             GET  /api/wake-debug?since=N  → {events: [...]}
             POST /api/wake-debug  → append event
 
+        Voice command diagnostics:
+            POST /api/voice-command/parse → parse transcript without side effects
+
         Navigation:
             GET  /api/navigate  → {navigation: {page, view, timestamp}}
             POST /api/navigate  → update page/view
@@ -2031,6 +2034,11 @@ class RecordingManager:
                             log.warning("Background chime failed: %s", e)
 
                     threading.Thread(target=_play_chime, daemon=True).start()
+
+                elif self.path == "/api/voice-command/parse":
+                    transcript = str(body.get("transcript", ""))
+                    command = parse_command(transcript)
+                    self._respond_json({"ok": True, "transcript": transcript, "command": command})
 
                 elif self.path == "/api/tv/on":
                     mgr.turn_on_dashboard()

@@ -51,6 +51,7 @@ export function summarizeNodeHealth(check) {
   const failures = [];
   if (!check.dns?.ok) failures.push(`dns:${check.dns?.error ?? "unresolved"}`);
   if (!check.piApi?.ok) failures.push(`piApi:${check.piApi?.error ?? "unreachable"}`);
+  if (!check.voiceCommands?.ok) failures.push(...(check.voiceCommands?.failures ?? ["voiceCommands:unknown"]));
   if (!check.ssh?.ok) failures.push(`ssh:${check.ssh?.error ?? "unreachable"}`);
   for (const service of REQUIRED_SYSTEMD) {
     const state = check.services?.[service];
@@ -182,6 +183,38 @@ function fetchJson(url, timeoutMs = 4000) {
   });
 }
 
+function postJson(url, body, timeoutMs = 4000) {
+  const payload = JSON.stringify(body);
+  return new Promise((resolve, reject) => {
+    const request = http.request(url, {
+      method: "POST",
+      timeout: timeoutMs,
+      headers: {
+        "Content-Type": "application/json",
+        "Content-Length": Buffer.byteLength(payload),
+      },
+    }, (response) => {
+      let responseBody = "";
+      response.on("data", (chunk) => { responseBody += chunk; });
+      response.on("end", () => {
+        if ((response.statusCode ?? 500) >= 400) {
+          reject(new Error(`http ${response.statusCode}`));
+          return;
+        }
+        try {
+          resolve(JSON.parse(responseBody));
+        } catch (error) {
+          reject(error);
+        }
+      });
+    });
+    request.on("timeout", () => request.destroy(new Error("timeout")));
+    request.on("error", reject);
+    request.write(payload);
+    request.end();
+  });
+}
+
 async function checkDns(host) {
   try {
     const addresses = await lookup(host, { all: true });
@@ -198,6 +231,41 @@ async function checkPiApi(host) {
     return { ok: true, navigation: payload.navigation };
   } catch (error) {
     return { ok: false, error: error.message };
+  }
+}
+
+export function validateVoiceCommandParses(results) {
+  const expected = new Map([
+    ["Hey Homer, turn on", { action: "turn_on" }],
+  ]);
+  const failures = [];
+  const commands = {};
+
+  for (const result of results) {
+    const transcript = result?.transcript ?? "";
+    const command = result?.command ?? null;
+    commands[transcript] = command;
+    const wanted = expected.get(transcript);
+    if (!wanted) continue;
+    for (const [key, value] of Object.entries(wanted)) {
+      if (command?.[key] !== value) {
+        failures.push(`voiceCommands:${transcript}:${key}:${command?.[key] ?? "missing"}`);
+      }
+    }
+  }
+
+  return { ok: failures.length === 0, failures, commands };
+}
+
+async function checkVoiceCommands(host) {
+  const transcripts = ["Hey Homer, turn on"];
+  try {
+    const results = await Promise.all(
+      transcripts.map((transcript) => postJson(`http://${host}:8765/api/voice-command/parse`, { transcript })),
+    );
+    return validateVoiceCommandParses(results);
+  } catch (error) {
+    return { ok: false, failures: [`voiceCommands:parse-endpoint:${error.message}`], commands: {} };
   }
 }
 
@@ -371,9 +439,10 @@ function cdpEvaluate(wsUrl, expression) {
 }
 
 export async function checkNode(node, index = 0) {
-  const [dns, piApi, liveData, ssh, bundle, browser] = await Promise.all([
+  const [dns, piApi, voiceCommands, liveData, ssh, bundle, browser] = await Promise.all([
     checkDns(node.host),
     checkPiApi(node.host),
+    checkVoiceCommands(node.host),
     checkLiveData(node.host),
     checkSsh(node),
     checkBundle(node.host),
@@ -385,6 +454,7 @@ export async function checkNode(node, index = 0) {
     checkedAt: new Date().toISOString(),
     dns,
     piApi,
+    voiceCommands,
     ssh: { ok: ssh.ok, hostname: ssh.hostname, ips: ssh.ips, error: ssh.error },
     services: ssh.services ?? {},
     bundle,

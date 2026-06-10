@@ -4,12 +4,18 @@ import {
   redactBrowserState,
   summarizeNodeHealth,
   validateLiveData,
+  validateVoiceCommandParses,
 } from "../../scripts/homecenter-node-health.mjs";
 
 function healthy(overrides = {}) {
   return {
     dns: { ok: true, addresses: ["192.168.1.206"] },
     piApi: { ok: true, navigation: { page: "dashboard" } },
+    voiceCommands: {
+      ok: true,
+      failures: [],
+      commands: { "Hey Homer, turn on": { action: "turn_on" } },
+    },
     ssh: { ok: true, hostname: "homecenter2", ips: ["192.168.1.206"] },
     services: {
       "dashboard-local": "active",
@@ -47,6 +53,19 @@ describe("homecenter-node-health", () => {
     expect(summary.ok).toBe(false);
     expect(summary.failures).toContain("dns:ENOTFOUND");
     expect(summary.failures).toContain("piApi:timeout");
+  });
+
+  it("fails when the Pi command server no longer parses Hey Homer turn on", () => {
+    const summary = summarizeNodeHealth(healthy({
+      voiceCommands: {
+        ok: false,
+        failures: ["voiceCommands:Hey Homer, turn on:action:none"],
+        commands: { "Hey Homer, turn on": { action: "none" } },
+      },
+    }));
+
+    expect(summary.ok).toBe(false);
+    expect(summary.failures).toContain("voiceCommands:Hey Homer, turn on:action:none");
   });
 
   it("fails when the kiosk watchdog is not running", () => {
@@ -154,6 +173,22 @@ describe("homecenter-node-health", () => {
         "liveData:birthdays-placeholder:1",
         "liveData:school-placeholder:1",
       ],
+    });
+  });
+
+  it("validates the Hey Homer turn on parse result", () => {
+    expect(validateVoiceCommandParses([
+      { transcript: "Hey Homer, turn on", command: { action: "turn_on" } },
+    ])).toMatchObject({
+      ok: true,
+      failures: [],
+    });
+
+    expect(validateVoiceCommandParses([
+      { transcript: "Hey Homer, turn on", command: { action: "none" } },
+    ])).toMatchObject({
+      ok: false,
+      failures: ["voiceCommands:Hey Homer, turn on:action:none"],
     });
   });
 });

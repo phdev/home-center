@@ -37,6 +37,13 @@ def test_hey_homer_suggest_gift_ideas_command_asks_howie():
     }
 
 
+def test_hey_homer_turn_on_command_turns_tv_on():
+    service = load_wake_word_service()
+
+    assert service.parse_command("Hey Homer, turn on") == {"action": "turn_on"}
+    assert service.parse_command("Hey Homer, turn it on.") == {"action": "turn_on"}
+
+
 def test_hey_homer_mark_needs_action_item_done():
     service = load_wake_word_service()
 
