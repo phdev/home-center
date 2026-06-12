@@ -105,6 +105,7 @@ CHIME_PATH = SOUNDS_DIR / "acknowledge.wav"
 ALARM_PATH = SOUNDS_DIR / "alarm.wav"
 
 CEC_DEVICE = "0"
+CEC_ADAPTER = os.environ.get("CEC_ADAPTER", "/dev/cec0")
 CEC_ON_CMD = "on {dev}"
 CEC_ACTIVE_CMD = "as"
 CEC_SOURCE_SETTLE_SECONDS = 1
@@ -132,7 +133,7 @@ _speaker_volume_ready: set[str] = set()
 def cec_send(command: str) -> bool:
     try:
         proc = subprocess.run(
-            ["cec-client", "-s", "-d", "1"],
+            ["cec-client", "-s", "-d", "1", CEC_ADAPTER],
             input=command + "\n",
             capture_output=True, text=True, timeout=10,
         )
@@ -154,7 +155,7 @@ def tv_power_status() -> str:
     """Return the HDMI-CEC TV power status: on, standby, unknown, or error."""
     try:
         proc = subprocess.run(
-            ["cec-client", "-s", "-d", "1"],
+            ["cec-client", "-s", "-d", "1", CEC_ADAPTER],
             input=f"pow {CEC_DEVICE}\n",
             capture_output=True, text=True, timeout=5,
         )
@@ -177,7 +178,7 @@ def tv_active_source_status() -> str:
     """Return whether HDMI-CEC reports any active source selected."""
     try:
         proc = subprocess.run(
-            ["cec-client", "-s", "-d", "1"],
+            ["cec-client", "-s", "-d", "1", CEC_ADAPTER],
             input="scan\n",
             capture_output=True, text=True, timeout=10,
         )

@@ -14,17 +14,18 @@
 set -euo pipefail
 
 CMD="${1:-status}"
+CEC_ADAPTER="${CEC_ADAPTER:-/dev/cec0}"
 CEC_POWER_ON_WAIT_SECONDS="${CEC_POWER_ON_WAIT_SECONDS:-20}"
 CEC_POWER_ON_POLL_SECONDS="${CEC_POWER_ON_POLL_SECONDS:-2}"
 CEC_ACTIVE_SOURCE_SETTLE_ATTEMPTS="${CEC_ACTIVE_SOURCE_SETTLE_ATTEMPTS:-3}"
 CEC_EXPECTED_ACTIVE_SOURCE_NUMBER="${CEC_EXPECTED_ACTIVE_SOURCE_NUMBER:-1}"
 
 cec_send() {
-  echo "$1" | cec-client -s -d 1 2>/dev/null
+  echo "$1" | cec-client -s -d 1 "$CEC_ADAPTER" 2>/dev/null
 }
 
 active_source_status() {
-  RESULT=$(echo "scan" | cec-client -s -d 1 2>/dev/null)
+  RESULT=$(echo "scan" | cec-client -s -d 1 "$CEC_ADAPTER" 2>/dev/null)
   if echo "$RESULT" | grep -qi "currently active source: unknown"; then
     echo "unknown"
   elif echo "$RESULT" | grep -Eqi "currently active source: .+\\(${CEC_EXPECTED_ACTIVE_SOURCE_NUMBER}\\)"; then
@@ -35,7 +36,7 @@ active_source_status() {
 }
 
 tv_power_status() {
-  RESULT=$(echo "pow 0" | cec-client -s -d 1 2>/dev/null)
+  RESULT=$(echo "pow 0" | cec-client -s -d 1 "$CEC_ADAPTER" 2>/dev/null)
   if echo "$RESULT" | grep -qi "power status: on"; then
     echo "on"
   elif echo "$RESULT" | grep -qi "power status: standby"; then
@@ -86,7 +87,7 @@ case "$CMD" in
     ;;
   status)
     echo "Checking TV power status..."
-    RESULT=$(echo "pow 0" | cec-client -s -d 1 2>/dev/null)
+    RESULT=$(echo "pow 0" | cec-client -s -d 1 "$CEC_ADAPTER" 2>/dev/null)
     if echo "$RESULT" | grep -qi "power status: on"; then
       echo "TV is ON"
     elif echo "$RESULT" | grep -qi "power status: standby"; then
@@ -105,7 +106,7 @@ case "$CMD" in
     ;;
   scan)
     echo "Scanning CEC bus for devices..."
-    echo "scan" | cec-client -s -d 1
+    echo "scan" | cec-client -s -d 1 "$CEC_ADAPTER"
     ;;
   *)
     echo "Usage: $0 {on|off|status|active|scan}"

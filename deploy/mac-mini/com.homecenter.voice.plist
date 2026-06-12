@@ -39,6 +39,8 @@
         <string>off</string>
         <key>OPENAI_STT_MODEL</key>
         <string>gpt-4o-transcribe</string>
+        <key>WHISPER_NO_SPEECH_THRESHOLD</key>
+        <string>0.95</string>
         <key>POST_ACTION_MUTE_SECONDS</key>
         <string>0.15</string>
         <key>WAKE_COOLDOWN</key>
