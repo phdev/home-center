@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { apiHeaders, apiUrl } from "../services/piLocal";
 
 let lastCompletedCaptionKey = "";
+const ACTIVE_STAGE_MAX_AGE_MS = 8000;
 
 function captionKey(data, stage) {
   return `${data.ts || 0}:${stage}:${data.text || ""}`;
@@ -27,6 +28,14 @@ export function useLiveCaption(workerSettings, { pollMs = 200 } = {}) {
         const stage = typeof data.stage === "string" ? data.stage : "";
         const isWake = !!data.is_wake;
         const activeStage = stage === "listening" || stage === "verifying";
+        const tsMs = Number(data.ts || 0) * 1000;
+        const activeStageExpired = activeStage && tsMs > 0 && Date.now() - tsMs > ACTIVE_STAGE_MAX_AGE_MS;
+        if (activeStageExpired) {
+          setState((prev) => (
+            prev.text || prev.stage ? { text: "", isWake: false, stage: "", ts: 0 } : prev
+          ));
+          return;
+        }
         const key = captionKey(data, stage);
         const nextText = activeStage ? "" : data.text;
         if (!activeStage && data.text && key === lastCompletedCaptionKey) {
