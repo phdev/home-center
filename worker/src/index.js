@@ -1,6 +1,8 @@
 import { curatedKnowledgeAssetsFromEnv, curatedTopicKey } from "./curatedKnowledgeAssets.js";
 import { artDirectedHeroPrompt, buildHeroCompositionPackage, buildKnowledgeVisualPlan } from "./knowledgeVisualPlanner.js";
 
+const HOME_CENTER_TIMERS_ENABLED = false;
+
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
@@ -4840,6 +4842,9 @@ const TIMERS_KEY = "timers";
 const TASKS_KEY = "agent_tasks";
 
 async function handleTimerPost(request, env) {
+  if (!HOME_CENTER_TIMERS_ENABLED) {
+    return json({ ok: false, disabled: true, error: "timers disabled" }, 410);
+  }
   if (!env.NOTIFICATIONS) {
     return json({ error: "NOTIFICATIONS KV namespace not configured" }, 500);
   }
@@ -4867,6 +4872,9 @@ async function handleTimerPost(request, env) {
 }
 
 async function handleTimerGet(env) {
+  if (!HOME_CENTER_TIMERS_ENABLED) {
+    return json({ timers: [], serverTime: Date.now(), disabled: true });
+  }
   if (!env.NOTIFICATIONS) {
     return json({ timers: [], serverTime: Date.now() });
   }
@@ -4883,6 +4891,9 @@ async function handleTimerGet(env) {
 }
 
 async function handleTimerDismiss(id, env) {
+  if (!HOME_CENTER_TIMERS_ENABLED) {
+    return json({ ok: true, disabled: true, found: false });
+  }
   if (!env.NOTIFICATIONS) {
     return json({ error: "NOTIFICATIONS KV namespace not configured" }, 500);
   }
@@ -4901,6 +4912,9 @@ async function handleTimerDismiss(id, env) {
 }
 
 async function handleTimerDismissAll(env) {
+  if (!HOME_CENTER_TIMERS_ENABLED) {
+    return json({ ok: true, disabled: true, dismissed: 0 });
+  }
   if (!env.NOTIFICATIONS) {
     return json({ error: "NOTIFICATIONS KV namespace not configured" }, 500);
   }

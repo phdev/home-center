@@ -31,6 +31,13 @@ import numpy as np
 from openwakeword.model import Model
 
 
+def env_flag(name: str, default: bool = False) -> bool:
+    value = os.environ.get(name)
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
 def _inference_framework() -> str:
     """Return the best available inference framework for openWakeWord."""
     try:
@@ -100,6 +107,7 @@ ENROLL_MIN_CONSECUTIVE = 3     # consecutive 80ms windows needed to trigger
 
 # Alarm polling
 ALARM_POLL_INTERVAL = 5  # Seconds between timer checks
+HOME_CENTER_TIMERS_ENABLED = env_flag("HOME_CENTER_TIMERS_ENABLED", False)
 
 SOUNDS_DIR = Path(__file__).parent / "sounds"
 CHIME_PATH = SOUNDS_DIR / "acknowledge.wav"
@@ -1179,6 +1187,10 @@ class AlarmThread(threading.Thread):
             self._alarm_proc = None
 
     def run(self):
+        if not HOME_CENTER_TIMERS_ENABLED:
+            log.info("Timer feature disabled; alarm thread exiting.")
+            return
+
         if not ALARM_PATH.exists():
             generate_alarm(ALARM_PATH)
 
@@ -1901,6 +1913,9 @@ class RecordingManager:
                     with mgr._lock:
                         self._respond_json({"designSystem": dict(mgr._design_system)})
                 elif path == "/api/timers":
+                    if not HOME_CENTER_TIMERS_ENABLED:
+                        self._respond_json({"timers": [], "serverTime": int(time.time() * 1000), "disabled": True})
+                        return
                     timers = mgr.get_active_timers()
                     self._respond_json({"timers": timers, "serverTime": int(time.time() * 1000)})
                 elif path == "/api/tasks":
@@ -2071,6 +2086,9 @@ class RecordingManager:
                     self._respond_json({"ok": True, "designSystem": state})
 
                 elif self.path == "/api/timers":
+                    if not HOME_CENTER_TIMERS_ENABLED:
+                        self._respond_json({"ok": False, "disabled": True, "error": "timers disabled"}, 410)
+                        return
                     name = body.get("name") or body.get("label") or "timer"
                     seconds = body.get("totalSeconds", body.get("duration", 60))
                     source = body.get("source", "voice")
@@ -2078,10 +2096,16 @@ class RecordingManager:
                     self._respond_json({"ok": True, "timer": timer})
 
                 elif self.path == "/api/timers/dismiss-all":
+                    if not HOME_CENTER_TIMERS_ENABLED:
+                        self._respond_json({"ok": True, "disabled": True})
+                        return
                     mgr.dismiss_all_timers()
                     self._respond_json({"ok": True})
 
                 elif self.path.startswith("/api/timers/") and self.path.endswith("/dismiss"):
+                    if not HOME_CENTER_TIMERS_ENABLED:
+                        self._respond_json({"ok": True, "disabled": True})
+                        return
                     # /api/timers/<id>/dismiss
                     parts = self.path.split("/")
                     if len(parts) >= 4:
@@ -2395,9 +2419,13 @@ def main() -> None:
         global _local_server
         _local_server = rec_mgr
 
-        alarm_thread = AlarmThread(rec_mgr, args.dry_run)
-        alarm_thread.start()
-        log.info("Alarm thread started (local timers, every %ds)", ALARM_POLL_INTERVAL)
+        alarm_thread = None
+        if HOME_CENTER_TIMERS_ENABLED:
+            alarm_thread = AlarmThread(rec_mgr, args.dry_run)
+            alarm_thread.start()
+            log.info("Alarm thread started (local timers, every %ds)", ALARM_POLL_INTERVAL)
+        else:
+            log.info("Timer feature disabled; alarm thread not started.")
 
         gesture_thread = None
         if args.worker_url:
@@ -2412,7 +2440,8 @@ def main() -> None:
         except KeyboardInterrupt:
             log.info("Shutting down...")
         finally:
-            alarm_thread.stop()
+            if alarm_thread:
+                alarm_thread.stop()
             if gesture_thread:
                 gesture_thread.stop()
         return
@@ -2462,9 +2491,13 @@ def main() -> None:
     _local_server = rec_mgr
 
     # Start alarm thread (uses local timers via rec_mgr)
-    alarm_thread = AlarmThread(rec_mgr, args.dry_run)
-    alarm_thread.start()
-    log.info("Alarm thread started (local timers, every %ds)", ALARM_POLL_INTERVAL)
+    alarm_thread = None
+    if HOME_CENTER_TIMERS_ENABLED:
+        alarm_thread = AlarmThread(rec_mgr, args.dry_run)
+        alarm_thread.start()
+        log.info("Alarm thread started (local timers, every %ds)", ALARM_POLL_INTERVAL)
+    else:
+        log.info("Timer feature disabled; alarm thread not started.")
 
     # Gesture thread — only if worker configured (HandController still posts to worker)
     if args.worker_url:

@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from "react";
 import { apiUrl, apiHeaders } from "../services/piLocal";
 
+const TIMERS_ENABLED = false;
+
 export function useTimers(workerSettings) {
   const [timers, setTimers] = useState([]);
   const workerUrl = workerSettings?.url;
@@ -8,6 +10,10 @@ export function useTimers(workerSettings) {
 
   // Poll server every 5s
   const poll = useCallback(async () => {
+    if (!TIMERS_ENABLED) {
+      setTimers([]);
+      return;
+    }
     const url = apiUrl(workerUrl, "/api/timers");
     if (!url) return;
     try {
@@ -21,6 +27,7 @@ export function useTimers(workerSettings) {
   }, [workerUrl, workerToken]);
 
   useEffect(() => {
+    if (!TIMERS_ENABLED) return;
     poll();
     const id = setInterval(poll, 5000);
     return () => clearInterval(id);
@@ -43,6 +50,7 @@ export function useTimers(workerSettings) {
 
   const addTimer = useCallback(
     async (name, seconds) => {
+      if (!TIMERS_ENABLED) return;
       const url = apiUrl(workerUrl, "/api/timers");
       if (!url) return;
       try {
@@ -61,6 +69,7 @@ export function useTimers(workerSettings) {
 
   const dismissTimer = useCallback(
     async (id) => {
+      if (!TIMERS_ENABLED) return;
       const url = apiUrl(workerUrl, `/api/timers/${encodeURIComponent(id)}/dismiss`);
       if (!url) return;
       try {
@@ -77,6 +86,7 @@ export function useTimers(workerSettings) {
   );
 
   const dismissAll = useCallback(async () => {
+    if (!TIMERS_ENABLED) return;
     const url = apiUrl(workerUrl, "/api/timers/dismiss-all");
     if (!url) return;
     try {

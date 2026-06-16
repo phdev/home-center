@@ -60,6 +60,7 @@ FOLLOWUP_COMMAND_PRE_ROLL_SECONDS = float(os.environ.get("FOLLOWUP_COMMAND_PRE_R
 FOLLOWUP_COMMAND_MIN_SECONDS = float(os.environ.get("FOLLOWUP_COMMAND_MIN_SECONDS", "0.16"))
 FOLLOWUP_COMMAND_SILENCE_SECONDS = float(os.environ.get("FOLLOWUP_COMMAND_SILENCE_SECONDS", "0.16"))
 WAKE_CONFIRM_COMMAND = env_flag("WAKE_CONFIRM_COMMAND", False)
+HOME_CENTER_TIMERS_ENABLED = env_flag("HOME_CENTER_TIMERS_ENABLED", False)
 VOSK_COMMAND_CANDIDATE_CONFIRM = env_flag("VOSK_COMMAND_CANDIDATE_CONFIRM", True)
 CONFIRM_MULTI_COMMAND_DISPATCH = env_flag("CONFIRM_MULTI_COMMAND_DISPATCH", False)
 CONFIRM_PRE_WAKE_SECONDS = float(os.environ.get("CONFIRM_PRE_WAKE_SECONDS", "5.0"))
@@ -1117,12 +1118,18 @@ class Dispatcher:
         action = command.get("action")
         log.info("Dispatching: %s", command)
         if action == "set_timer":
+            if not HOME_CENTER_TIMERS_ENABLED:
+                log.info("Timer feature disabled; ignoring set_timer command.")
+                return
             self._pi_post("/api/timers", {
                 "label": command.get("label", "timer"),
                 "duration": command.get("duration", 60),
                 "source": "voice",
             })
         elif action == "stop":
+            if not HOME_CENTER_TIMERS_ENABLED:
+                log.info("Timer feature disabled; ignoring stop/dismiss timer command.")
+                return
             self._pi_post("/api/timers/dismiss-all")
         elif action == "navigate":
             self._pi_post("/api/navigate", {"page": command.get("page"), "view": command.get("view")})

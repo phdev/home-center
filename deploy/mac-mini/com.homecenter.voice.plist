@@ -68,6 +68,8 @@
         <!-- Roll back by setting WAKE_ENGINE=vosk and reloading com.homecenter.voice. -->
         <key>WAKE_CONFIRM_COMMAND</key>
         <string>1</string>
+        <key>HOME_CENTER_TIMERS_ENABLED</key>
+        <string>0</string>
         <key>CONFIRM_REQUIRE_WAKE_PHRASE</key>
         <string>auto</string>
         <key>CONFIRM_PRE_WAKE_SECONDS</key>
