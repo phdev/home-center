@@ -32,12 +32,16 @@ cd ~/home-center
 LIVEKIT_WAKEWORD_HELPER_PYTHON=voice-service/.venv-livekit/bin/python3 \
 voice-service/.venv/bin/python3 voice-service/evaluate_wakeword_dataset.py \
   --manifest voice-service/wakeword-data/generated/manifest.json \
-  --model pi/models/hey_homer.onnx \
+  --model pi/models/hey_homer_synthetic_livekit.onnx \
   --threshold 0.995 \
   --min-consecutive 3
 ```
 
 The output goes to `voice-service/wakeword-data/eval-results/latest-livekit.json`.
+
+Use `CONFIRM_REQUIRE_WAKE_PHRASE=always` for LiveKit canary services. The model
+can still wake on varied voices, but command dispatch is blocked unless STT also
+hears a constrained `Hey Homer` phrase.
 
 ## Promotion Gates
 

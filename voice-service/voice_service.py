@@ -114,6 +114,7 @@ OPENAI_STT_MODEL = os.environ.get("OPENAI_STT_MODEL", "gpt-4o-transcribe")
 OPENAI_STT_MODE = os.environ.get("OPENAI_STT_MODE", "off")
 OPENAI_STT_TIMEOUT_SECONDS = float(os.environ.get("OPENAI_STT_TIMEOUT_SECONDS", "10.0"))
 HOWIE_OPENAI_STT = env_flag("HOWIE_OPENAI_STT", True)
+CONFIRM_REQUIRE_WAKE_PHRASE = os.environ.get("CONFIRM_REQUIRE_WAKE_PHRASE", "auto")
 STT_PROMPT = (
     "Hey Homer, turn on. Hey Homer, open calendar. "
     "Hey Homer, show the weather. Hey Homer, set a timer for ten seconds. "
@@ -634,6 +635,21 @@ def normalize_openai_stt_mode(value: str) -> str:
     if mode not in {"off", "fallback", "diagnostic"}:
         raise SystemExit("OPENAI_STT_MODE/--openai-stt-mode must be one of: off, fallback, diagnostic")
     return mode
+
+
+def normalize_confirm_require_wake_phrase(value: str) -> str:
+    mode = (value or "auto").strip().lower()
+    if mode not in {"auto", "always", "never"}:
+        raise SystemExit("CONFIRM_REQUIRE_WAKE_PHRASE/--confirm-require-wake-phrase must be one of: auto, always, never")
+    return mode
+
+
+def should_require_confirm_wake_phrase(mode: str, wake_engine: str, wake_source: str) -> bool:
+    if mode == "always":
+        return True
+    if mode == "never":
+        return False
+    return is_local_stt_engine(wake_engine) or wake_source.startswith("command-candidate:")
 
 
 def get_whisper(model_name: str):
@@ -1960,6 +1976,12 @@ def main() -> None:
         help="OpenAI transcription request timeout.",
     )
     parser.add_argument(
+        "--confirm-require-wake-phrase",
+        choices=["auto", "always", "never"],
+        default=CONFIRM_REQUIRE_WAKE_PHRASE,
+        help="Whether confirmed-command transcripts must include a wake phrase before dispatch.",
+    )
+    parser.add_argument(
         "--howie-openai-stt",
         action=argparse.BooleanOptionalAction,
         default=HOWIE_OPENAI_STT,
@@ -1991,6 +2013,7 @@ def main() -> None:
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
     args.openai_stt_mode = normalize_openai_stt_mode(args.openai_stt_mode)
+    args.confirm_require_wake_phrase = normalize_confirm_require_wake_phrase(args.confirm_require_wake_phrase)
     validate_wake_mode_config(args.wake_engine, args.wake_confirm_command)
 
     if args.debug:
@@ -2041,7 +2064,8 @@ def main() -> None:
         "audioHeartbeat=%.1fs audioLogMin=%.0f scoreLogMin=%.2f segmentSilence=%.1fs emptyCooldown=%.1fs "
         "speechMinPeak=%.0f speechEndSilence=%.1fs speechCooldown=%.1fs speechPreRoll=%.1fs speechMaxSegment=%.1fs "
         "speechMaxEmptyBackoff=%.1fs speechEmptyBackoff=%.1fs speechEmptyStrongPeak=%.0f "
-        "speechEmptyStrongActive=%d speechEmitVerifying=%s openaiStt=%s openaiModel=%s howieOpenaiStt=%s",
+        "speechEmptyStrongActive=%d speechEmitVerifying=%s openaiStt=%s openaiModel=%s howieOpenaiStt=%s "
+        "confirmRequireWake=%s",
         detector.name,
         args.whisper_model,
         args.whisper_no_speech_threshold,
@@ -2075,6 +2099,7 @@ def main() -> None:
         args.openai_stt_mode,
         args.openai_stt_model,
         args.howie_openai_stt,
+        args.confirm_require_wake_phrase,
     )
     reliability.event(
         "service_ready",
@@ -2089,6 +2114,7 @@ def main() -> None:
         openaiSttMode=args.openai_stt_mode,
         openaiSttModel=args.openai_stt_model,
         howieOpenaiStt=args.howie_openai_stt,
+        confirmRequireWake=args.confirm_require_wake_phrase,
     )
 
     while True:
@@ -2413,7 +2439,11 @@ def main() -> None:
                 )
                 pre_log_samples = min(len(pre_audio), len(command_audio))
             text = transcribe(command_audio, args.whisper_model, args.whisper_no_speech_threshold)
-            require_confirm_wake_phrase = is_local_stt_engine(args.wake_engine) or wake_source.startswith("command-candidate:")
+            require_confirm_wake_phrase = should_require_confirm_wake_phrase(
+                args.confirm_require_wake_phrase,
+                args.wake_engine,
+                wake_source,
+            )
             body, command, command_candidates = confirmed_command_from_transcript(
                 text,
                 fallback_text=wake_text,

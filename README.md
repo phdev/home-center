@@ -40,15 +40,23 @@ Production voice is split between the Pi and Mac Mini:
 
 1. The Pi streams XVF3800 microphone audio to the Mac Mini and keeps serving
    local dashboard/CEC/timer/chime APIs.
-2. The Mac Mini `voice-service` runs the production wake gate with
-   **Vosk/Kaldi** (`WAKE_ENGINE=vosk`).
-3. After a wake candidate, local **faster-whisper** transcribes the command.
-4. `voice-service/intent.py` parses only dispatchable commands before the Pi
+2. The Mac Mini `voice-service` runs the current primary wake gate with
+   `WAKE_ENGINE=speech`, which treats sufficiently loud speech segments as
+   candidates and relies on confirmed transcription plus intent parsing before
+   dispatch.
+3. The LiveKit synthetic wake-word path is the multi-voice canary:
+   `WAKE_ENGINE=livekit` with `pi/models/hey_homer_synthetic_livekit.onnx`.
+   Canary deployments set `CONFIRM_REQUIRE_WAKE_PHRASE=always` so background
+   speech after a false wake does not dispatch unless STT also hears a
+   constrained "Hey Homer" phrase.
+4. After a wake candidate, local **faster-whisper** transcribes the command.
+   OpenAI STT can be enabled as `OPENAI_STT_MODE=fallback` where an API key is
+   available, but the primary service currently runs local-only.
+5. `voice-service/intent.py` parses only dispatchable commands before the Pi
    chimes or performs an action.
 
-`openWakeWord` remains available for measured `WAKE_ENGINE=openwakeword`
-trials when an ignored local model artifact exists at
-`pi/models/hey_homer.onnx`, but it is not the launchd default.
+`openWakeWord` and Vosk remain available for measured trials when their local
+artifacts exist, but they are not the current launchd default.
 
 Supported command shapes include:
 

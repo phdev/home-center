@@ -69,6 +69,8 @@
         <string>3</string>
         <key>WAKE_CONFIRM_COMMAND</key>
         <string>1</string>
+        <key>CONFIRM_REQUIRE_WAKE_PHRASE</key>
+        <string>always</string>
         <key>CONFIRM_PRE_WAKE_SECONDS</key>
         <string>5.0</string>
         <key>CONFIRM_POST_WAKE_SECONDS</key>

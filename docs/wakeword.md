@@ -26,9 +26,14 @@ action.
 
 ## Live Reliability Notes
 
-As of 2026-05-04, production voice runs on the Mac mini `voice-service`
-using `WAKE_ENGINE=vosk`, then local faster-whisper for command text. The Pi
-hosts the dashboard API, kiosk, chime, timers, and mic stream.
+As of 2026-06-16, the primary production voice service on the Mac mini runs
+`WAKE_ENGINE=speech`, then local faster-whisper for command text. This is broad
+and catches different voices, but it also creates background-speech candidates.
+The robust multi-voice canary is `WAKE_ENGINE=livekit` with
+`pi/models/hey_homer_synthetic_livekit.onnx`; canary configs use
+`CONFIRM_REQUIRE_WAKE_PHRASE=always` so LiveKit wake hits only dispatch when
+the confirmed transcript also contains a constrained "Hey Homer" phrase. The
+Pi hosts the dashboard API, kiosk, chime, timers, and mic stream.
 
 Known working voice commands:
 

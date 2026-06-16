@@ -30,6 +30,7 @@ from voice_service import (
     passes_recent_speech_gate,
     recent_speech_stats,
     run_openai_stt_if_needed,
+    should_require_confirm_wake_phrase,
     should_attempt_openai_stt,
     should_skip_speech_candidate_confirmation,
     speech_candidate_skip_reason,
@@ -957,6 +958,24 @@ def test_confirmed_command_can_require_wake_phrase_for_speech_candidates():
         {"action": "set_timer", "label": "timer", "duration": 10},
         [{"body": "set a timer for ten seconds", "command": {"action": "set_timer", "label": "timer", "duration": 10}}],
     )
+
+
+def test_confirm_wake_phrase_policy_modes():
+    assert should_require_confirm_wake_phrase("always", "livekit", "livekit:hey_homer:1.000")
+    assert not should_require_confirm_wake_phrase("never", "speech", "speech:peak=600")
+    assert should_require_confirm_wake_phrase("auto", "speech", "speech:peak=600")
+    assert should_require_confirm_wake_phrase("auto", "vosk", "command-candidate:partial")
+    assert not should_require_confirm_wake_phrase("auto", "livekit", "livekit:hey_homer:1.000")
+
+
+def test_livekit_strict_wake_policy_rejects_background_design_feedback():
+    assert confirmed_command_from_transcript(
+        "I don't like this one another. I need some kind of gesture.",
+        fallback_text="Hey Homer",
+        require_wake_phrase=True,
+        wake_re=CONFIRM_WAKE_PHRASE_RE,
+        allow_bare_ask=False,
+    ) == ("", {"action": "none"}, [])
 
 
 def test_confirmed_command_accepts_constrained_stt_wake_variants():
