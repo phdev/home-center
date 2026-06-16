@@ -115,6 +115,26 @@ def test_hey_homer_wake_log_commands():
     }
 
 
+def test_stale_active_transcription_expires(monkeypatch):
+    service = load_wake_word_service()
+    manager = service.RecordingManager()
+    now = {"value": 1000.0}
+
+    monkeypatch.setattr(service.time, "time", lambda: now["value"])
+
+    manager.set_transcription({
+        "text": "Hey Homer",
+        "is_wake": True,
+        "stage": "listening",
+        "ts": 1000.0,
+        "duration": 5.0,
+    })
+    assert manager.get_transcription()["stage"] == "listening"
+
+    now["value"] = 1006.0
+    assert manager.get_transcription() == {"text": "", "is_wake": False, "ts": 0}
+
+
 def test_mark_needs_action_done_forwards_dismiss_operation(monkeypatch):
     service = load_wake_word_service()
     calls = []

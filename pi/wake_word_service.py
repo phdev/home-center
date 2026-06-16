@@ -92,6 +92,7 @@ RECORD_SECONDS = _DEFAULT_CONFIG["record_seconds"]
 # Enrollment constants (custom wake words via embedding similarity)
 ENROLLMENTS_DIR = Path(__file__).parent / "models" / "enrollments"
 ENROLL_SILENCE_TIMEOUT = 1.5   # seconds of silence after speech to auto-stop
+TRANSCRIPTION_ACTIVE_TTL = 8.0
 ENROLL_MAX_DURATION = 10.0     # max enrollment recording duration
 ENROLL_N_AUGMENTS = 20         # augmented variants per single sample
 ENROLL_SIMILARITY_THRESHOLD = 0.85  # cosine similarity threshold for matching
@@ -1476,7 +1477,7 @@ class RecordingManager:
             "is_wake": bool(payload.get("is_wake", payload.get("isWake", False))),
             "ts": ts,
         }
-        for key in ("stage", "wakeScore", "command"):
+        for key in ("stage", "wakeScore", "command", "duration"):
             if key in payload:
                 state[key] = payload[key]
         with self._lock:
@@ -1486,6 +1487,18 @@ class RecordingManager:
             if state["is_wake"]:
                 self._listening_until = time.time() + 5.0
             return dict(self._transcription)
+
+    def get_transcription(self) -> dict:
+        """Return live transcription state, expiring stale active overlays."""
+        with self._lock:
+            state = dict(self._transcription)
+            if state.get("stage") in {"listening", "verifying"}:
+                ttl = float(state.get("duration", TRANSCRIPTION_ACTIVE_TTL) or TRANSCRIPTION_ACTIVE_TTL)
+                ts = float(state.get("ts", 0) or 0)
+                if ts and time.time() - ts > ttl:
+                    self._transcription = {"text": "", "is_wake": False, "ts": 0}
+                    return dict(self._transcription)
+            return state
 
     def dismiss_all_timers(self):
         """Dismiss all expired timers."""
@@ -1880,8 +1893,7 @@ class RecordingManager:
                         events = [e for e in mgr._debug_events if e["timestamp"] > since]
                     self._respond_json({"events": events})
                 elif path == "/api/transcription":
-                    with mgr._lock:
-                        self._respond_json(dict(mgr._transcription))
+                    self._respond_json(mgr.get_transcription())
                 elif path == "/api/navigate":
                     with mgr._lock:
                         self._respond_json({"navigation": dict(mgr._navigation)})
