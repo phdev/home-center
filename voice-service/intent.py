@@ -52,6 +52,16 @@ WAKE_KNOWLEDGE_QUESTION_RE = re.compile(
     re.IGNORECASE,
 )
 
+SOCIAL_CHATTER_QUESTION_RE = re.compile(
+    r"^(?:"
+    r"how\s+are\s+(?:you|ya|you\s+doing)\b"
+    r"|how'?s\s+it\s+going\b"
+    r"|are\s+you\s+(?:ok|okay|alright|good)\b"
+    r"|i'?m\s+(?:good|fine|ok|okay|alright)\b"
+    r")",
+    re.IGNORECASE,
+)
+
 DESIGN_FEEDBACK_RE = re.compile(
     r"^"
     r"(?:"
@@ -144,6 +154,9 @@ def _parse_amount(value: str) -> int:
 
 
 def _parse_ask(text: str, allow_bare_ask: bool, allow_wake_knowledge: bool = False) -> dict:
+    if SOCIAL_CHATTER_QUESTION_RE.search(text.strip(" ,.:;!?-")):
+        return {"action": "none"}
+
     explicit_match = EXPLICIT_ASK_RE.match(text)
     if explicit_match:
         query = explicit_match.group(1).strip(" ,.:;!?-")

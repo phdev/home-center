@@ -978,6 +978,15 @@ def test_livekit_strict_wake_policy_rejects_background_design_feedback():
     ) == ("", {"action": "none"}, [])
 
 
+def test_confirmed_command_rejects_observed_social_chatter_false_ask():
+    assert confirmed_command_from_transcript(
+        "Hey Homer, how are you? I'm good.",
+        require_wake_phrase=True,
+        wake_re=CONFIRM_WAKE_PHRASE_RE,
+        allow_bare_ask=False,
+    ) == ("how are you? I'm good", {"action": "none"}, [])
+
+
 def test_confirmed_command_accepts_constrained_stt_wake_variants():
     assert confirmed_command_from_transcript(
         "We're open calendar. Day Homer. Show the weather.",

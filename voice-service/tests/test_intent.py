@@ -276,6 +276,12 @@ def test_confirmed_mode_ask_intent_requires_explicit_cue():
     }
 
 
+def test_social_chatter_does_not_dispatch_as_knowledge_query():
+    assert parse_command("Hey Homer, how are you?", allow_bare_ask=False) == {"action": "none"}
+    assert parse_command("Hey Homer, how are you? I'm good.", allow_bare_ask=False) == {"action": "none"}
+    assert parse_command("Hey Homer, are you okay?", allow_bare_ask=False) == {"action": "none"}
+
+
 def test_dispatchable_command_requires_complete_payload():
     assert not is_dispatchable_command({"action": "none"})
     assert is_dispatchable_command({"action": "stop"})
