@@ -71,6 +71,12 @@
       "text": "current daily design: gear",
       "added": "2026-06-16",
       "source": "voice"
+    },
+    {
+      "id": "ap-current-daily-design-round-how-many-time",
+      "text": "current daily design: round, how many times do you have",
+      "added": "2026-06-18",
+      "source": "voice"
     }
   ]
 }
