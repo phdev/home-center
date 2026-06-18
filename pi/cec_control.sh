@@ -6,6 +6,7 @@
 #
 # Usage:
 #   ./cec_control.sh on      # Turn TV on
+#   ./cec_control.sh morning # Turn TV on and select Pi HDMI once
 #   ./cec_control.sh off     # Turn TV off (standby)
 #   ./cec_control.sh status  # Check TV power status
 #   ./cec_control.sh active  # Set Pi as active HDMI source
@@ -51,6 +52,12 @@ tv_power_status() {
 }
 
 case "$CMD" in
+  morning|on-once)
+    echo "Turning TV on and selecting Pi HDMI once..."
+    cec_send "on 0"
+    cec_send "as"
+    echo "Done."
+    ;;
   on)
     echo "Turning TV on..."
     cec_send "on 0"
@@ -109,7 +116,7 @@ case "$CMD" in
     echo "scan" | cec-client -s -d 1 "$CEC_ADAPTER"
     ;;
   *)
-    echo "Usage: $0 {on|off|status|active|scan}"
+    echo "Usage: $0 {on|morning|on-once|off|status|active|scan}"
     exit 1
     ;;
 esac

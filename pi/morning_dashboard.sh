@@ -29,4 +29,4 @@ if (( day > 5 || total_minutes < start_minutes || total_minutes >= end_minutes )
 fi
 
 reset_dashboard_navigation
-"$(dirname "$0")/cec_control.sh" on
+"$(dirname "$0")/cec_control.sh" morning

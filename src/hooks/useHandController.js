@@ -5,11 +5,9 @@ const NAV_MAP = {
   calendar:    { right: "birthdays",   down: "holidays",    left: null,         up: null },
   birthdays:   { right: "weather",     down: "events",      left: "calendar",   up: null },
   weather:     { right: "events",      down: null,          left: "birthdays",  up: null },
-  worldclock:  { right: "timers",      down: "events",      left: "weather",    up: null },
-  timers:      { right: null,          down: "agenttasks",  left: "worldclock", up: null },
   holidays:    { right: null,          down: null,          left: null,         up: "calendar" },
   events:      { right: "agenttasks",  down: null,          left: "weather",    up: null },
-  agenttasks:  { right: null,          down: "fact",        left: "events",     up: "timers" },
+  agenttasks:  { right: null,          down: "fact",        left: "events",     up: null },
   fact:        { right: null,          down: null,          left: "agenttasks", up: "agenttasks" },
 };
 

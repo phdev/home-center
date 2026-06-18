@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { apiUrl, apiHeaders } from "../services/piLocal";
 
-const TIMERS_ENABLED = false;
+export const TIMERS_ENABLED = false;
 
 export function useTimers(workerSettings) {
   const [timers, setTimers] = useState([]);
@@ -36,15 +36,16 @@ export function useTimers(workerSettings) {
   // Tick every 1s to recompute `remaining` for display
   const [tick, setTick] = useState(0);
   useEffect(() => {
+    if (!TIMERS_ENABLED) return;
     const id = setInterval(() => setTick((t) => t + 1), 1000);
     return () => clearInterval(id);
   }, []);
 
   // Compute remaining + expired for each timer
-  const computed = timers.map((t) => {
+  const computed = TIMERS_ENABLED ? timers.map((t) => {
     const remaining = Math.max(0, Math.floor((t.expiresAt - Date.now()) / 1000));
     return { ...t, remaining, expired: remaining === 0 && !t.dismissed };
-  });
+  }) : [];
 
   const expiredTimers = computed.filter((t) => t.expired);
 

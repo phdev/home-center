@@ -2682,13 +2682,17 @@ def main() -> None:
                     if action == "set_timer":
                         label = command.get("label", "timer")
                         duration = command.get("duration", 60)
-                        if args.dry_run:
+                        if not HOME_CENTER_TIMERS_ENABLED:
+                            log.info("Timer command ignored because HOME_CENTER_TIMERS_ENABLED is false.")
+                        elif args.dry_run:
                             log.info("[DRY RUN] Would create timer: %s (%ds)", label, duration)
                         else:
                             rec_mgr.add_timer(label, duration, "voice")
 
                     elif action == "stop":
-                        if args.dry_run:
+                        if not HOME_CENTER_TIMERS_ENABLED:
+                            log.info("Stop command ignored because timers are disabled.")
+                        elif args.dry_run:
                             log.info("[DRY RUN] Would dismiss all timers")
                         else:
                             rec_mgr.dismiss_all_timers()
