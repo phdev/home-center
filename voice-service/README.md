@@ -286,7 +286,11 @@ punctuated Whisper variants like `Okay, Homer, ...`.
 Do not make `openwakeword` the launchd default until it passes the same
 30-minute TV false-positive test as Vosk.
 
-Do not make `WAKE_ENGINE=livekit` the launchd default until it passes:
+Synthetic LiveKit is the launchd default for the Home Center 1 and Home Center
+2 voice services as of 2026-06-19. Keep it behind confirmed-command gating:
+`WAKE_CONFIRM_COMMAND=1` and `CONFIRM_REQUIRE_WAKE_PHRASE=always`.
+
+Do not promote a new LiveKit model or looser threshold until it passes:
 
 - 5/5 family voice validation: Peter, wife, kids where practical
 - 30-minute TV/passive speech run with 0 dispatches
@@ -295,15 +299,15 @@ Do not make `WAKE_ENGINE=livekit` the launchd default until it passes:
 Rollback from a LiveKit validation run:
 
 ```bash
-launchctl setenv WAKE_ENGINE vosk
+launchctl setenv WAKE_ENGINE speech
 launchctl kickstart -k gui/$(id -u)/com.homecenter.voice
-tail -n 50 logs/voice-reliability.jsonl | grep '"wakeEngine":"vosk"'
+tail -n 50 logs/voice-reliability.jsonl | grep '"wakeEngine":"speech"'
 ```
 
-For a rendered launchd plist, set `WAKE_ENGINE=vosk`, reload
+For a rendered launchd plist, set `WAKE_ENGINE=speech` or `WAKE_ENGINE=vosk`, reload
 `com.homecenter.voice`, and confirm the latest
-`voice-service/logs/voice-reliability.jsonl` entries show
-`wakeEngine=vosk`.
+`voice-service/logs/voice-reliability.jsonl` entries show the expected
+`wakeEngine`.
 
 Do not make `WAKE_ENGINE=speech` the launchd default unless it passes the
 5-phrase validation and then the same ambient-TV false-dispatch checks. It is a

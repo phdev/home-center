@@ -159,10 +159,10 @@ Optional environment variables:
 - `OPENAI_STT_MODEL`: OpenAI transcription model for fallback/diagnostic
   runs, default `gpt-4o-transcribe`
 - `OPENWAKEWORD_MODEL`: defaults to `pi/models/hey_homer.onnx`
-- `LIVEKIT_WAKEWORD_MODEL`: required only for `WAKE_ENGINE=livekit`; currently
-  points to the existing `pi/models/hey_homer.onnx` classifier. Do not commit
-  model artifacts unless they are already covered by the repo's ignored local
-  model paths.
+- `LIVEKIT_WAKEWORD_MODEL`: required only for `WAKE_ENGINE=livekit`; production
+  templates point to the tracked synthetic-family classifier at
+  `pi/models/hey_homer_synthetic_livekit.onnx`. Keep generated WAV fixtures and
+  private evaluation data local unless a file is intentionally promoted.
 - `LIVEKIT_WAKEWORD_HELPER_PYTHON`: Python 3.11 helper used when the main
   voice venv cannot import `livekit-wakeword`, default
   `voice-service/.venv-livekit/bin/python3` in the plist templates.
@@ -235,11 +235,11 @@ LIVEKIT_WAKEWORD_MODEL=/path/to/hey_homer_livekit.onnx \
 python voice-service/voice_service.py --dry-run --debug
 ```
 
-Promote only after 5/5 family voice validation, a 30-minute TV/passive speech
-run with 0 dispatches, and command latency no worse than the current Vosk path.
-Rollback by setting `WAKE_ENGINE=vosk`, reloading `com.homecenter.voice`, and
-confirming the latest `voice-service/logs/voice-reliability.jsonl` entries show
-`wakeEngine=vosk`.
+Production templates now use synthetic LiveKit with confirmed-command gating.
+Rollback by setting `WAKE_ENGINE=speech` or `WAKE_ENGINE=vosk`, reloading
+`com.homecenter.voice`, and confirming the latest
+`voice-service/logs/voice-reliability.jsonl` entries show the expected
+`wakeEngine`.
 
 ### Design Claw (daily + listener)
 

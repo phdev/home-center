@@ -56,26 +56,26 @@
         <key>FOLLOWUP_COMMAND_MAX_SECONDS</key>
         <string>3.0</string>
         <key>WAKE_ENGINE</key>
-        <string>speech</string>
+        <string>livekit</string>
         <key>LIVEKIT_WAKEWORD_MODEL</key>
         <string>__REPO__/pi/models/hey_homer_synthetic_livekit.onnx</string>
         <key>LIVEKIT_WAKEWORD_HELPER_PYTHON</key>
         <string>__REPO__/voice-service/.venv-livekit/bin/python3</string>
         <key>LIVEKIT_WAKEWORD_THRESHOLD</key>
-        <string>0.90</string>
+        <string>0.995</string>
         <key>LIVEKIT_WAKEWORD_MIN_CONSECUTIVE</key>
-        <string>2</string>
-        <!-- Roll back by setting WAKE_ENGINE=vosk and reloading com.homecenter.voice. -->
+        <string>3</string>
+        <!-- Roll back by setting WAKE_ENGINE=speech or WAKE_ENGINE=vosk and reloading com.homecenter.voice. -->
         <key>WAKE_CONFIRM_COMMAND</key>
         <string>1</string>
         <key>HOME_CENTER_TIMERS_ENABLED</key>
         <string>0</string>
         <key>CONFIRM_REQUIRE_WAKE_PHRASE</key>
-        <string>auto</string>
+        <string>always</string>
         <key>CONFIRM_PRE_WAKE_SECONDS</key>
         <string>5.0</string>
         <key>CONFIRM_POST_WAKE_SECONDS</key>
-        <string>0.4</string>
+        <string>2.0</string>
         <key>CONFIRM_MIN_POST_WAKE_SECONDS</key>
         <string>0.1</string>
         <key>OPENWAKEWORD_MODEL</key>
